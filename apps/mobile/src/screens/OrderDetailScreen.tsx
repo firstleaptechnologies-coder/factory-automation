@@ -1,159 +1,331 @@
-import React, {useCallback, useState} from 'react';
-import {Alert, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
-import type {Order, WorkflowStatus, WorkflowTransition} from '@decor/shared';
-import {UNIT_LABEL} from '@decor/shared';
-import {api} from '../api/client';
-import {Button, Card, Loader, Row, StatusPill} from '../components/ui';
-import {colors, font, radius, spacing} from '../theme';
+import React, { useCallback, useState } from 'react';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
+import type { Order, WorkflowStatus, WorkflowTransition } from '@decor/shared';
+import { LENGTH_UNITS, UNIT_LABEL } from '@decor/shared';
+import LinearGradient from 'react-native-linear-gradient';
+import { api } from '../api/client';
+import { useApi } from '../hooks/useApi';
+import { useDisplayUnit } from '../hooks/useUnit';
+import {
+  Avatar,
+  Button,
+  Card,
+  Chip,
+  Field,
+  Icon,
+  Loader,
+  Pill,
+  Screen,
+  ScreenHeader,
+  Sheet,
+  SheetOption,
+  Text,
+  haptic,
+} from '../ui';
+import { gradients, palette, radius, shadow, spacing } from '../theme';
+import { formatDateTime, relativeTime } from '../lib/format';
 
-type NextMove = WorkflowTransition & {toStatus: WorkflowStatus};
+type NextMove = WorkflowTransition & { toStatus: WorkflowStatus };
 
-/** Read an order on site and move it along the admin-defined flow. */
-export function OrderDetailScreen({route}: {route: any}) {
-  const {orderId} = route.params as {orderId: string};
-  const [order, setOrder] = useState<Order | null>(null);
+/**
+ * One order.
+ *
+ * The order itself is rendered as a lime card — the same visual weight the home
+ * screen gives the pipeline figure — because on this screen it is the subject.
+ * Status moves come from the workflow, so the buttons here are exactly the
+ * moves the admin drew and nothing else.
+ */
+export function OrderDetailScreen({ route, navigation }: { route: any; navigation: any }) {
+  const { orderId, justPunched } = route.params as { orderId: string; justPunched?: boolean };
+  const [unit, setUnit] = useDisplayUnit();
   const [moves, setMoves] = useState<NextMove[]>([]);
+  const [moveSheet, setMoveSheet] = useState(false);
+  const [pendingMove, setPendingMove] = useState<NextMove | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    const fresh = await api.order(orderId, 'FT');
-    setOrder(fresh);
-    setMoves(await api.allowedNext(fresh.status.id));
-  }, [orderId]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
+  const order = useApi<Order>(
+    useCallback(async () => {
+      const fresh = await api.order(orderId, unit);
+      setMoves(await api.allowedNext(fresh.status.id));
+      return fresh;
+    }, [orderId, unit]),
+    [orderId, unit],
   );
 
-  const move = async (target: NextMove) => {
+  const move = async (target: NextMove, withNote?: string) => {
     setBusy(true);
     try {
-      await api.changeOrderStatus(orderId, {
-        toStatusId: target.toStatusId,
-        note: note || undefined,
-      });
+      await api.changeOrderStatus(orderId, { toStatusId: target.toStatusId, note: withNote });
+      haptic('notificationSuccess');
+      setMoveSheet(false);
+      setPendingMove(null);
       setNote('');
-      await load();
+      order.reload();
     } catch (e) {
+      haptic('notificationError');
       Alert.alert('Could not move', e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setBusy(false);
     }
   };
 
-  if (!order) return <Loader />;
+  if (!order.data) return <Loader />;
+
+  const data = order.data;
+  const references = data.attachments.filter((a) => a.kind === 'REFERENCE_IMAGE');
+  const sizeImages = data.attachments.filter((a) => a.kind === 'SIZE_IMAGE');
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.head}>
-        <Text style={styles.code}>{order.code}</Text>
-        <StatusPill label={order.status.name} color={order.status.color} />
+    <Screen refreshing={order.refreshing} onRefresh={order.refresh}>
+      <ScreenHeader
+        title={data.code}
+        subtitle={relativeTime(data.createdAt)}
+        onBack={() => navigation.goBack()}
+      />
+
+      {justPunched ? (
+        <Animated.View entering={ZoomIn.duration(400).springify()} style={styles.punchedBanner}>
+          <Icon name="check" size={16} color={palette.textOnAccent} />
+          <Text variant="small" tone="onAccent" bold style={{ marginLeft: spacing.sm }}>
+            Punched — it is on the board now
+          </Text>
+        </Animated.View>
+      ) : null}
+
+      {/* The order rendered as a physical card. */}
+      <Animated.View entering={FadeInDown.duration(420).springify()} style={shadow.glow}>
+        <LinearGradient
+          colors={gradients.accent}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.orderCard}>
+          <View style={styles.orderCardTop}>
+            <View style={{ flex: 1 }}>
+              <Text variant="h1" tone="onAccent" numberOfLines={1}>{data.client.name}</Text>
+              <Text variant="small" tone="onAccent" style={{ opacity: 0.72 }}>
+                {data.location}
+              </Text>
+            </View>
+            <Pill label={data.status.name} color={palette.textOnAccent} small />
+          </View>
+
+          <View style={styles.orderCardBottom}>
+            <View>
+              <Text variant="micro" tone="onAccent" style={{ opacity: 0.6 }}>ORDER</Text>
+              <Text variant="h3" tone="onAccent">{data.code}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text variant="micro" tone="onAccent" style={{ opacity: 0.6 }}>ITEMS</Text>
+              <Text variant="h3" tone="onAccent">{data.items.length}</Text>
+            </View>
+            {data.priority !== 'NORMAL' ? (
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text variant="micro" tone="onAccent" style={{ opacity: 0.6 }}>PRIORITY</Text>
+                <Text variant="h3" tone="onAccent">{data.priority}</Text>
+              </View>
+            ) : null}
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
+      <View style={styles.unitRow}>
+        <Text variant="label" tone="faint">Show in</Text>
+        {LENGTH_UNITS.map((u) => (
+          <Chip key={u} label={UNIT_LABEL[u]} selected={unit === u} onPress={() => setUnit(u)} />
+        ))}
       </View>
 
-      <Card>
-        <Row label="Client" value={order.client.name} />
-        <Row label="Location" value={order.location} />
-        {order.client.phone ? <Row label="Phone" value={order.client.phone} /> : null}
-        <Row label="Priority" value={order.priority} />
-      </Card>
-
-      <Card>
-        <Text style={styles.cardTitle}>Items</Text>
-        {order.items.map(item => (
-          <View key={item.id} style={styles.item}>
-            <Text style={styles.itemSize}>
+      {data.items.map((item, index) => (
+        <Animated.View key={item.id} entering={FadeInDown.delay(index * 60).duration(320)}>
+          <Card tone="dark" style={styles.itemCard}>
+            <View style={styles.itemHead}>
+              <Text variant="label" tone="faint">LINE {item.lineNo}</Text>
+              <Text variant="small" tone="accent" bold>×{item.quantity}</Text>
+            </View>
+            <Text variant="h2">
               {item.display
                 ? `${item.display.length} × ${item.display.width} ${UNIT_LABEL[item.display.unit]}`
                 : '—'}
             </Text>
-            <Text style={styles.itemMeta}>
-              {item.material.name}
-              {item.display?.thickness
-                ? ` · ${item.display.thickness} ${UNIT_LABEL[item.display.thicknessUnit]}`
-                : ''}
-              {` · qty ${item.quantity}`}
+            <Text variant="tiny" tone="faint">
+              {Number(item.lengthMm)} × {Number(item.widthMm)} mm stored
             </Text>
-            {item.notes ? <Text style={styles.itemMeta}>{item.notes}</Text> : null}
-          </View>
-        ))}
-      </Card>
+            <View style={styles.itemMeta}>
+              <View
+                style={[
+                  styles.materialDot,
+                  { backgroundColor: item.material.color ?? palette.textFaint },
+                ]}
+              />
+              <Text variant="small" tone="muted">
+                {item.material.name}
+                {item.display?.thickness
+                  ? ` · ${item.display.thickness} ${UNIT_LABEL[item.display.thicknessUnit]}`
+                  : ''}
+              </Text>
+            </View>
+            {item.notes ? (
+              <Text variant="small" tone="muted" style={{ marginTop: spacing.sm }}>
+                {item.notes}
+              </Text>
+            ) : null}
+          </Card>
+        </Animated.View>
+      ))}
 
       {moves.length ? (
-        <Card>
-          <Text style={styles.cardTitle}>Move to</Text>
-          {moves.some(m => m.requiresNote) ? (
-            <TextInput
-              style={styles.input}
-              placeholder="Note (required for some moves)"
-              placeholderTextColor={colors.textMuted}
-              value={note}
-              onChangeText={setNote}
-            />
-          ) : null}
-          {moves.map(m => (
-            <Button
-              key={m.id}
-              title={`${m.label ?? m.toStatus.name}${m.requiresNote ? ' *' : ''}`}
-              variant="ghost"
-              loading={busy}
-              style={styles.moveButton}
-              onPress={() => move(m)}
-            />
-          ))}
+        <Button
+          title="Move status"
+          variant="primary"
+          size="lg"
+          icon={<Icon name="arrowUpRight" size={18} color={palette.textOnAccent} />}
+          onPress={() => setMoveSheet(true)}
+          style={{ marginTop: spacing.lg }}
+        />
+      ) : (
+        <Card tone="dark" style={{ marginTop: spacing.lg }}>
+          <Text variant="small" tone="muted">
+            No moves are allowed from {data.status.name}. An admin can add one on the status flow.
+          </Text>
         </Card>
+      )}
+
+      <Button
+        title="Add photos"
+        variant="dark"
+        icon={<Icon name="camera" size={18} color={palette.text} />}
+        onPress={() => navigation.navigate('OrderPhotos', { orderId })}
+        style={{ marginTop: spacing.md }}
+      />
+
+      {references.length || sizeImages.length ? (
+        <>
+          <Text variant="label" tone="muted" style={styles.blockLabel}>Attachments</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {[...sizeImages, ...references].map((attachment) => (
+              <Pressable key={attachment.id} style={styles.thumb}>
+                <Image
+                  source={{
+                    uri: api.fileUrl(attachment.file.id),
+                    headers: { Authorization: `Bearer ${api.getToken()}` },
+                  }}
+                  style={styles.thumbImage}
+                />
+                <Text variant="micro" tone="faint" numberOfLines={1} style={{ marginTop: 4 }}>
+                  {attachment.kind === 'SIZE_IMAGE' ? 'Size' : attachment.description ?? 'Reference'}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </>
       ) : null}
 
-      {order.attachments.length ? (
-        <Card>
-          <Text style={styles.cardTitle}>Attachments</Text>
-          {order.attachments.map(a => (
-            <Row
-              key={a.id}
-              label={a.kind.replace(/_/g, ' ').toLowerCase()}
-              value={a.description ?? a.file.fileName}
+      <Text variant="label" tone="muted" style={styles.blockLabel}>History</Text>
+      {data.statusHistory?.map((entry) => (
+        <View key={entry.id} style={styles.historyRow}>
+          <View style={[styles.historyDot, { backgroundColor: entry.toStatus.color }]} />
+          <View style={{ flex: 1 }}>
+            <Text variant="small" bold>
+              {entry.fromStatus ? `${entry.fromStatus.name} → ` : ''}
+              {entry.toStatus.name}
+            </Text>
+            <Text variant="tiny" tone="faint">
+              {formatDateTime(entry.changedAt)}
+              {entry.changedBy ? ` · ${entry.changedBy.name}` : ''}
+            </Text>
+            {entry.note ? (
+              <Text variant="tiny" tone="muted" style={{ marginTop: 2 }}>{entry.note}</Text>
+            ) : null}
+          </View>
+        </View>
+      ))}
+
+      <Sheet
+        visible={moveSheet}
+        title="Move this order"
+        subtitle={`Currently ${data.status.name}`}
+        onClose={() => {
+          setMoveSheet(false);
+          setPendingMove(null);
+          setNote('');
+        }}>
+        {pendingMove ? (
+          <Animated.View entering={FadeIn.duration(200)}>
+            <Text variant="body" style={{ marginBottom: spacing.md }}>
+              Moving to <Text bold tone="accent">{pendingMove.toStatus.name}</Text> needs a note.
+            </Text>
+            <Field
+              label="Why?"
+              placeholder="Explain the move"
+              value={note}
+              onChangeText={setNote}
+              autoFocus
             />
-          ))}
-        </Card>
-      ) : null}
-    </ScrollView>
+            <Button
+              title="Confirm move"
+              loading={busy}
+              disabled={!note.trim()}
+              onPress={() => move(pendingMove, note.trim())}
+            />
+          </Animated.View>
+        ) : (
+          moves.map((m) => (
+            <SheetOption
+              key={m.id}
+              label={m.label ?? m.toStatus.name}
+              description={
+                m.requiresNote ? 'Needs a note' : `Move to ${m.toStatus.name}`
+              }
+              accent={m.toStatus.color}
+              onPress={() => (m.requiresNote ? setPendingMove(m) : move(m))}
+            />
+          ))
+        )}
+      </Sheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: colors.bg},
-  content: {padding: spacing.md, paddingBottom: spacing.xl},
-  head: {
+  punchedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: palette.accent,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    marginBottom: spacing.lg,
+  },
+  orderCard: { borderRadius: radius.xl, padding: spacing.xl, minHeight: 170, justifyContent: 'space-between' },
+  orderCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  orderCardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: spacing.xl,
+  },
+  unitRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
-  code: {color: colors.text, fontSize: font.h2, fontWeight: '800'},
-  cardTitle: {
-    color: colors.textMuted,
-    fontSize: font.tiny,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-  },
-  item: {paddingVertical: spacing.xs},
-  itemSize: {color: colors.text, fontSize: font.body, fontWeight: '700'},
-  itemMeta: {color: colors.textMuted, fontSize: font.small},
-  input: {
-    backgroundColor: colors.surfaceAlt,
+  itemCard: { marginBottom: spacing.sm, padding: spacing.lg },
+  itemHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs },
+  itemMeta: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
+  materialDot: { width: 8, height: 8, borderRadius: 4, marginRight: spacing.sm },
+  blockLabel: { marginTop: spacing.xl, marginBottom: spacing.md },
+  thumb: { width: 96, marginRight: spacing.md },
+  thumbImage: {
+    width: 96,
+    height: 96,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    fontSize: font.body,
-    minHeight: 52,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    backgroundColor: palette.surfaceLit,
   },
-  moveButton: {marginBottom: spacing.sm},
+  historyRow: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.sm },
+  historyDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
 });

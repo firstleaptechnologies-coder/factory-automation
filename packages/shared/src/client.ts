@@ -308,6 +308,25 @@ export class ApiClient {
     return this.upload<OrderAttachment[]>(`/orders/${orderId}/attachments`, form);
   }
 
+  /**
+   * React Native variant of `addAttachments`.
+   *
+   * RN's fetch accepts `{uri, type, name}` as a multipart part and streams the
+   * file from disk; the DOM `File` the web client passes does not exist there.
+   * Same endpoint, same contract — only the part shape differs.
+   */
+  addAttachmentsNative(
+    orderId: string,
+    files: { uri: string; type: string; name: string }[],
+    meta: { kind: AttachmentKind; description?: string },
+  ) {
+    const form = new FormData();
+    for (const file of files) form.append('files', file as unknown as Blob);
+    form.append('kind', meta.kind);
+    if (meta.description) form.append('description', meta.description);
+    return this.upload<OrderAttachment[]>(`/orders/${orderId}/attachments`, form);
+  }
+
   removeAttachment(attachmentId: string) {
     return this.del<unknown>(`/orders/attachments/${attachmentId}`);
   }

@@ -1,3 +1,10 @@
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
+  plugins: [
+    // Reanimated 4 runs its worklets through this plugin. It rewrites functions
+    // marked 'worklet' so they can execute on the UI thread — animations that
+    // never touch the JS thread, and therefore never stutter when the app is
+    // doing something else. It must stay last in the plugin list.
+    'react-native-worklets/plugin',
+  ],
 };

@@ -1,122 +1,196 @@
-import React, {useCallback, useState} from 'react';
+import React, { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
+import type { Material, Order, Paginated, Workflow } from '@decor/shared';
+import { LENGTH_UNITS, UNIT_LABEL } from '@decor/shared';
+import { api } from '../api/client';
+import { useApi } from '../hooks/useApi';
+import { useDisplayUnit } from '../hooks/useUnit';
 import {
-  FlatList,
-  RefreshControl,
-  StyleSheet,
+  Card,
+  Chip,
+  EmptyState,
+  Field,
+  Icon,
+  Loader,
+  Pill,
+  RoundButton,
+  Screen,
+  ScreenHeader,
+  Sheet,
   Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
-import type {LengthUnit, Order} from '@decor/shared';
-import {LENGTH_UNITS, UNIT_LABEL} from '@decor/shared';
-import {api} from '../api/client';
-import {Card, EmptyState, Loader, StatusPill} from '../components/ui';
-import {colors, font, spacing} from '../theme';
+} from '../ui';
+import { palette, spacing } from '../theme';
+import { relativeTime } from '../lib/format';
 
-export function OrdersScreen({navigation}: {navigation: any}) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [unit, setUnit] = useState<LengthUnit>('FT');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+export function OrdersScreen({ navigation }: { navigation: any }) {
+  const [unit, setUnit] = useDisplayUnit();
+  const [search, setSearch] = useState('');
+  const [statusId, setStatusId] = useState<string | null>(null);
+  const [materialId, setMaterialId] = useState<string | null>(null);
+  const [filterSheet, setFilterSheet] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const result = await api.orders({unit, limit: 50});
-      setOrders(result.data);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [unit]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
+  const workflow = useApi<Workflow>(() => api.defaultWorkflow(), []);
+  const materials = useApi<Material[]>(() => api.materials(), []);
+  const orders = useApi<Paginated<Order> & { unit: string }>(
+    () =>
+      api.orders({
+        unit,
+        search: search || undefined,
+        statusId: statusId ?? undefined,
+        materialId: materialId ?? undefined,
+        limit: 60,
+      }),
+    [unit, search, statusId, materialId],
   );
 
-  if (loading) return <Loader />;
+  const activeFilters = [statusId, materialId].filter(Boolean).length;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.unitBar}>
-        <Text style={styles.unitLabel}>Sizes in</Text>
-        {LENGTH_UNITS.map(u => (
-          <TouchableOpacity
-            key={u}
-            onPress={() => {
-              setUnit(u);
-              setLoading(true);
-            }}
-            style={[styles.unitChip, unit === u && styles.unitChipActive]}>
-            <Text style={[styles.unitChipText, unit === u && styles.unitChipTextActive]}>
-              {UNIT_LABEL[u]}
-            </Text>
-          </TouchableOpacity>
+    <Screen refreshing={orders.refreshing} onRefresh={orders.refresh}>
+      <ScreenHeader
+        title="Orders"
+        subtitle={`${orders.data?.meta.total ?? 0} total`}
+        right={<RoundButton icon="filter" onPress={() => setFilterSheet(true)} />}
+      />
+
+      <Field
+        placeholder="Order no, client or location"
+        value={search}
+        onChangeText={setSearch}
+        icon="search"
+      />
+
+      <View style={styles.unitRow}>
+        <Text variant="label" tone="faint">Sizes in</Text>
+        {LENGTH_UNITS.map((u) => (
+          <Chip key={u} label={UNIT_LABEL[u]} selected={unit === u} onPress={() => setUnit(u)} />
         ))}
+        {activeFilters > 0 ? (
+          <Chip
+            label={`${activeFilters} filter${activeFilters > 1 ? 's' : ''} ×`}
+            selected
+            onPress={() => {
+              setStatusId(null);
+              setMaterialId(null);
+            }}
+          />
+        ) : null}
       </View>
 
-      <FlatList
-        data={orders}
-        keyExtractor={order => order.id}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load();
-            }}
-            tintColor={colors.primary}
-          />
-        }
-        ListEmptyComponent={<EmptyState message="No orders yet." />}
-        renderItem={({item: order}) => (
-          <Card onPress={() => navigation.navigate('OrderDetail', {orderId: order.id})}>
-            <View style={styles.head}>
-              <Text style={styles.code}>{order.code}</Text>
-              <StatusPill label={order.status.name} color={order.status.color} />
-            </View>
-            <Text style={styles.meta}>{order.client.name}</Text>
-            <Text style={styles.meta}>{order.location}</Text>
-            {order.items[0]?.display ? (
-              <Text style={styles.size}>
-                {order.items[0].display.length} × {order.items[0].display.width}{' '}
-                {UNIT_LABEL[order.items[0].display.unit]}
-                {order.items.length > 1 ? `  +${order.items.length - 1} more` : ''}
-              </Text>
-            ) : null}
-          </Card>
-        )}
-      />
-    </View>
+      {orders.loading && !orders.data ? (
+        <Loader />
+      ) : orders.data?.data.length === 0 ? (
+        <EmptyState
+          icon="clipboard"
+          title="No orders match"
+          message="Try clearing the search or filters."
+        />
+      ) : (
+        orders.data?.data.map((order, index) => (
+          <Animated.View
+            key={order.id}
+            entering={FadeInDown.delay(Math.min(index, 8) * 40).duration(320)}
+            layout={Layout.springify()}>
+            <Card
+              tone="dark"
+              style={styles.card}
+              onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}>
+              <View style={styles.cardTop}>
+                <View style={{ flex: 1 }}>
+                  <Text variant="h3" numberOfLines={1}>{order.client.name}</Text>
+                  <Text variant="tiny" tone="muted">
+                    {order.code} · {relativeTime(order.createdAt)}
+                  </Text>
+                </View>
+                <Pill label={order.status.name} color={order.status.color} small />
+              </View>
+
+              <View style={styles.locationRow}>
+                <Icon name="pin" size={13} color={palette.textFaint} />
+                <Text variant="tiny" tone="faint" numberOfLines={1} style={{ marginLeft: 4 }}>
+                  {order.location}
+                </Text>
+              </View>
+
+              {order.items.map((item) => (
+                <View key={item.id} style={styles.itemRow}>
+                  <View
+                    style={[
+                      styles.materialDot,
+                      { backgroundColor: item.material.color ?? palette.textFaint },
+                    ]}
+                  />
+                  <Text variant="small" bold>
+                    {item.display
+                      ? `${item.display.length} × ${item.display.width} ${UNIT_LABEL[item.display.unit]}`
+                      : '—'}
+                  </Text>
+                  <Text variant="small" tone="muted" style={{ flex: 1 }} numberOfLines={1}>
+                    {'  '}{item.material.name}
+                    {item.display?.thickness
+                      ? ` · ${item.display.thickness} ${UNIT_LABEL[item.display.thicknessUnit]}`
+                      : ''}
+                  </Text>
+                  <Text variant="small" tone="accent" bold>×{item.quantity}</Text>
+                </View>
+              ))}
+            </Card>
+          </Animated.View>
+        ))
+      )}
+
+      <Sheet visible={filterSheet} title="Filter orders" onClose={() => setFilterSheet(false)}>
+        <Text variant="label" tone="muted" style={styles.sheetLabel}>Status</Text>
+        <View style={styles.chipWrap}>
+          {workflow.data?.statuses.map((status) => (
+            <Chip
+              key={status.id}
+              label={status.name}
+              accent={status.color}
+              selected={statusId === status.id}
+              onPress={() => setStatusId(statusId === status.id ? null : status.id)}
+            />
+          ))}
+        </View>
+
+        <Text variant="label" tone="muted" style={styles.sheetLabel}>Material</Text>
+        <View style={styles.chipWrap}>
+          {materials.data?.map((m) => (
+            <Chip
+              key={m.id}
+              label={m.name}
+              accent={m.color}
+              selected={materialId === m.id}
+              onPress={() => setMaterialId(materialId === m.id ? null : m.id)}
+            />
+          ))}
+        </View>
+      </Sheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: colors.bg},
-  content: {padding: spacing.md, paddingBottom: spacing.xl},
-  unitBar: {
+  unitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
-  unitLabel: {color: colors.textMuted, fontSize: font.tiny, marginRight: spacing.xs},
-  unitChip: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
+  card: { marginBottom: spacing.md, padding: spacing.lg },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.28)',
   },
-  unitChipActive: {backgroundColor: colors.primary, borderColor: colors.primary},
-  unitChipText: {color: colors.textMuted, fontSize: font.tiny, fontWeight: '700'},
-  unitChipTextActive: {color: '#fff'},
-  head: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  code: {color: colors.text, fontSize: font.body, fontWeight: '700'},
-  meta: {color: colors.textMuted, fontSize: font.small, marginTop: 2},
-  size: {color: colors.text, fontSize: font.small, marginTop: spacing.xs, fontWeight: '600'},
+  materialDot: { width: 8, height: 8, borderRadius: 4, marginRight: spacing.sm },
+  sheetLabel: { marginTop: spacing.md, marginBottom: spacing.sm },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });
