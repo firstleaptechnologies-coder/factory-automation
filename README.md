@@ -46,7 +46,18 @@ npm run dev:mobile   # Metro; then npm run ios  or  npm run android
 ```
 
 For iOS you also need `cd apps/mobile/ios && pod install` once. Android builds
-need a JDK 17+ on the PATH.
+need a JDK 17+ on the PATH (Android Studio's bundled JBR works:
+`export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`).
+
+**Metro must own port 8081.** React Native 0.87 ships React-Core as a prebuilt
+binary with the packager port compiled in, so `RCT_METRO_PORT` and
+`--port` cannot move it — the app will silently load whatever project's bundle
+is answering on 8081, and fail with `'PlatformConstants' could not be found` and
+an empty native-module list. If you hit that, check who owns the port:
+
+```bash
+lsof -a -p "$(lsof -nP -iTCP:8081 -sTCP:LISTEN -t)" -d cwd -Fn
+```
 
 ## What is in place
 
