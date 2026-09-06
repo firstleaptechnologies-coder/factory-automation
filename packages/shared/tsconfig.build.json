@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    // The API is a CommonJS Nest app and requires this at runtime; the web and
+    // mobile apps bundle the TypeScript source directly through their own
+    // aliases, so they are unaffected by this target.
+    "module": "commonjs",
+    "moduleResolution": "node"
+  },
+  "include": ["src/**/*"]
+}

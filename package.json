@@ -12,7 +12,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build:shared && npm run build --workspace @decor/api && npm run build --workspace @decor/web",
     "dev:api": "npm run dev -w @decor/api",
     "dev:web": "npm run dev -w @decor/web",
     "dev:mobile": "npm start --prefix apps/mobile",
@@ -23,6 +23,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "ios": "npm run ios --prefix apps/mobile",
-    "android": "npm run android --prefix apps/mobile"
+    "android": "npm run android --prefix apps/mobile",
+    "build:shared": "npm run build --workspace @decor/shared"
   }
 }

@@ -1,85 +1,12 @@
-/**
- * Wire types shared by the API, the web app and the mobile app.
- *
- * These mirror the Prisma models but stay hand-written on purpose: the clients
- * should not depend on @prisma/client, and Decimal columns arrive as strings or
- * numbers over JSON rather than as Prisma Decimals.
- */
+import type { LengthUnit } from './units';
 
-export type UserRole =
-  | 'ADMIN'
-  | 'MANAGER'
-  | 'SALES'
-  | 'PLANNER'
-  | 'OPERATOR'
-  | 'STORE'
-  | 'QC'
-  | 'ACCOUNTS';
+/** Wire types. Every *Mm field is millimetres — the only stored unit. */
 
-export type Uom = 'SHEET' | 'SLAB' | 'SQM' | 'SQFT' | 'RMT' | 'KG' | 'PCS' | 'LTR';
-
-export type MachineType =
-  | 'CNC_ROUTER'
-  | 'CNC_LASER'
-  | 'WATERJET'
-  | 'PLASMA'
-  | 'EDGE_BANDER'
-  | 'PANEL_SAW'
-  | 'POLISHER'
-  | 'OTHER';
-
-export type MachineStatus =
-  | 'IDLE'
-  | 'SETUP'
-  | 'RUNNING'
-  | 'PAUSED'
-  | 'MAINTENANCE'
-  | 'BREAKDOWN'
-  | 'OFFLINE';
-
-export type JobStatus =
-  | 'PLANNED'
-  | 'QUEUED'
-  | 'SETUP'
-  | 'RUNNING'
-  | 'PAUSED'
-  | 'COMPLETED'
-  | 'ON_HOLD'
-  | 'CANCELLED';
-
-export type OrderStatus =
-  | 'DRAFT'
-  | 'CONFIRMED'
-  | 'IN_PRODUCTION'
-  | 'READY'
-  | 'PARTIALLY_DELIVERED'
-  | 'DELIVERED'
-  | 'CANCELLED';
-
+export type UserRole = 'ADMIN' | 'MANAGER' | 'SALES' | 'PRODUCTION' | 'VIEWER';
+export type StatusCategory = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
 export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
-
-export type StockUnitKind = 'FULL_SHEET' | 'PARTIAL' | 'OFFCUT' | 'BULK';
-
-export type StockUnitStatus =
-  | 'AVAILABLE'
-  | 'RESERVED'
-  | 'IN_USE'
-  | 'CONSUMED'
-  | 'SCRAPPED'
-  | 'QUARANTINED';
-
-export type WasteType =
-  | 'OFFCUT'
-  | 'KERF'
-  | 'TRIM'
-  | 'SETUP_LOSS'
-  | 'REJECTION'
-  | 'DAMAGE'
-  | 'TEST_CUT';
-
-export type WasteDisposition = 'REUSE' | 'RECYCLE' | 'SELL' | 'DISPOSE' | 'PENDING';
-
-export type QcResult = 'PASS' | 'FAIL' | 'REWORK';
+export type AttachmentKind = 'REFERENCE_IMAGE' | 'SIZE_IMAGE' | 'DOCUMENT';
+export type StorageBackend = 'S3' | 'DATABASE';
 
 export interface AuthUser {
   id: string;
@@ -98,242 +25,200 @@ export interface Paginated<T> {
   meta: { page: number; limit: number; total: number; pages: number };
 }
 
-export interface MaterialCategory {
+export interface ClientLocation {
+  id: string;
+  name: string;
+  address?: string | null;
+  useCount?: number;
+}
+
+export interface Client {
   id: string;
   code: string;
   name: string;
-  description?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  gstin?: string | null;
+  company?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  isActive: boolean;
+  locations?: ClientLocation[];
+  _count?: { orders: number };
+}
+
+export interface MaterialThickness {
+  id: string;
+  valueMm: string;
+  label?: string | null;
+  sortOrder: number;
+  isActive: boolean;
 }
 
 export interface Material {
   id: string;
   code: string;
   name: string;
-  categoryId: string;
-  category?: Pick<MaterialCategory, 'id' | 'code' | 'name'>;
-  uom: Uom;
-  isSheetGood: boolean;
+  description?: string | null;
+  color?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  thicknesses: MaterialThickness[];
+}
+
+export interface SizePreset {
+  id: string;
+  code: string;
+  name: string;
+  lengthMm: string;
+  widthMm: string;
   thicknessMm?: string | null;
-  lengthMm?: string | null;
-  widthMm?: string | null;
-  hasGrain: boolean;
-  defaultKerfMm: string;
-  standardCost: string;
+  sortOrder: number;
   isActive: boolean;
 }
 
-export interface StockUnit {
+export interface WorkflowStatus {
   id: string;
+  workflowId: string;
   code: string;
-  materialId: string;
-  material?: Pick<Material, 'id' | 'code' | 'name' | 'uom'>;
-  kind: StockUnitKind;
-  status: StockUnitStatus;
-  lengthMm?: string | null;
-  widthMm?: string | null;
-  thicknessMm?: string | null;
-  areaSqm?: string | null;
-  quantity?: string | null;
-  locationId?: string | null;
-  location?: { id: string; code: string; name: string } | null;
+  name: string;
+  color: string;
+  category: StatusCategory;
   parentId?: string | null;
-  receivedAt: string;
+  isInitial: boolean;
+  isTerminal: boolean;
+  sortOrder: number;
+  canvasX: number;
+  canvasY: number;
+  _count?: { ordersAtStatus: number };
 }
 
-export interface StockSummaryRow {
-  materialId: string;
-  materialCode?: string;
-  materialName?: string;
-  category?: string;
-  kind: StockUnitKind;
-  pieces: number;
-  areaSqm: number;
-  quantity: number;
-  belowReorderLevel: boolean;
+export interface WorkflowTransition {
+  id: string;
+  workflowId: string;
+  fromStatusId: string;
+  toStatusId: string;
+  label?: string | null;
+  requiresNote: boolean;
+  allowedRoles: UserRole[];
 }
 
-export interface Machine {
+export interface Workflow {
   id: string;
   code: string;
   name: string;
-  type: MachineType;
-  status: MachineStatus;
-  bedLengthMm?: string | null;
-  bedWidthMm?: string | null;
-  hourlyRate: string;
+  description?: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+  statuses: WorkflowStatus[];
+  transitions: WorkflowTransition[];
+  _count?: { statuses: number; transitions: number; orders: number };
 }
 
-export interface Job {
+export interface StoredFileRef {
   id: string;
-  code: string;
-  status: JobStatus;
-  priority: Priority;
-  sequence: number;
-  quantity: string;
-  completedQty: string;
-  rejectedQty: string;
-  machineId?: string | null;
-  machine?: Pick<Machine, 'id' | 'code' | 'name'> | null;
-  materialId: string;
-  material?: Pick<Material, 'id' | 'code' | 'name'>;
-  operator?: { id: string; name: string } | null;
-  order?: {
-    id?: string;
-    code: string;
-    dueDate?: string | null;
-    customer?: { name: string };
-  } | null;
-  nestPlan?: { id: string; code: string; utilizationPct: string } | null;
-  plannedStart?: string | null;
-  actualStart?: string | null;
-  actualEnd?: string | null;
-  estimatedMinutes?: number | null;
-  actualMinutes?: number | null;
-  notes?: string | null;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  originalByteSize?: number | null;
+  width?: number | null;
+  height?: number | null;
 }
 
-export interface MachineBoardEntry {
+export interface OrderAttachment {
   id: string;
-  code: string;
-  name: string;
-  type: MachineType;
-  status: MachineStatus;
-  currentJob: Job | null;
-  queueLength: number;
-  queue: Job[];
+  kind: AttachmentKind;
+  description?: string | null;
+  sortOrder: number;
+  file: StoredFileRef;
 }
 
 export interface OrderItem {
   id: string;
   lineNo: number;
-  description: string;
+  sizePresetId?: string | null;
+  sizePreset?: { id: string; code: string; name: string } | null;
+  lengthMm: string;
+  widthMm: string;
+  thicknessMm?: string | null;
   materialId: string;
-  material?: Pick<Material, 'id' | 'code' | 'name' | 'uom'>;
-  status: string;
-  quantity: string;
-  uom: Uom;
-  lengthMm?: string | null;
-  widthMm?: string | null;
-  unitPrice: string;
-  amount: string;
-  producedQty: string;
+  material: { id: string; code: string; name: string; color?: string | null };
+  materialThickness?: { id: string; valueMm: string; label?: string | null } | null;
+  quantity: number;
+  notes?: string | null;
+  /** Same dimensions converted to the unit the request asked for. */
+  display?: {
+    unit: LengthUnit;
+    length: number;
+    width: number;
+    /** Thickness carries its own unit — millimetres by default. */
+    thicknessUnit: LengthUnit;
+    thickness: number | null;
+  };
+}
+
+export interface OrderStatusHistoryEntry {
+  id: string;
+  fromStatus?: { id: string; name: string; color: string } | null;
+  toStatus: { id: string; name: string; color: string };
+  note?: string | null;
+  changedBy?: { id: string; name: string } | null;
+  changedAt: string;
 }
 
 export interface Order {
   id: string;
   code: string;
-  customerId: string;
-  customer?: { id: string; code: string; name: string };
-  poNumber?: string | null;
-  status: OrderStatus;
-  priority: Priority;
-  orderDate: string;
-  dueDate?: string | null;
-  subtotal: string;
-  taxAmount: string;
-  total: string;
-  items?: OrderItem[];
-  _count?: { items: number; jobs: number };
-}
-
-export interface Customer {
-  id: string;
-  code: string;
-  name: string;
-  contactPerson?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  gstin?: string | null;
-  isActive: boolean;
-  _count?: { orders: number };
-}
-
-export interface NestPlacement {
-  partId: string;
-  label: string;
-  sheetIndex: number;
-  xMm: number;
-  yMm: number;
-  lengthMm: number;
-  widthMm: number;
-  rotationDeg: 0 | 90;
-}
-
-export interface NestPreview {
-  material: { id: string; code: string; name: string };
-  sheetLengthMm: number;
-  sheetWidthMm: number;
-  kerfMm: number;
-  sheetsUsed: number;
-  sheetAreaSqm: number;
-  partsAreaSqm: number;
-  offcutAreaSqm: number;
-  utilizationPct: number;
-  wasteAreaSqm: number;
-  effectiveUtilizationPct: number;
-  wasteCost: number;
-  placements: NestPlacement[];
-  recoverableOffcuts: {
-    sheetIndex: number;
-    xMm: number;
-    yMm: number;
-    lengthMm: number;
-    widthMm: number;
-    areaSqm: number;
-  }[];
-  unplaced: { partId: string; label: string; quantity: number }[];
-}
-
-export interface WasteAnalytics {
-  totals: {
-    records: number;
-    areaSqm: number;
-    costImpact: number;
-    recoveryRatePct: number;
+  client: Pick<Client, 'id' | 'code' | 'name' | 'phone' | 'company'>;
+  location: string;
+  status: {
+    id: string;
+    code: string;
+    name: string;
+    color: string;
+    category: StatusCategory;
   };
-  byType: {
-    type: WasteType;
-    records: number;
-    areaSqm: number;
-    weightKg: number;
-    quantity: number;
-    costImpact: number;
-  }[];
-  byMaterial: {
-    materialId: string;
-    code?: string;
-    name?: string;
-    category?: string;
-    records: number;
-    areaSqm: number;
-    costImpact: number;
-  }[];
-  byDisposition: {
-    disposition: WasteDisposition;
-    records: number;
-    areaSqm: number;
-    costImpact: number;
-  }[];
+  workflow: { id: string; code: string; name: string };
+  priority: Priority;
+  dueDate?: string | null;
+  notes?: string | null;
+  createdBy?: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+  items: OrderItem[];
+  attachments: OrderAttachment[];
+  statusHistory?: OrderStatusHistoryEntry[];
 }
 
-export interface Dashboard {
-  orders: { open: number; overdue: number };
-  jobs: Partial<Record<JobStatus, number>>;
-  jobsCompletedToday: number;
-  machines: Pick<Machine, 'id' | 'code' | 'name' | 'status'>[];
-  wasteThisMonth: { areaSqm: number; cost: number };
-  offcutStock: { pieces: number; areaSqm: number; value: number };
+export interface OrderBoard {
+  workflow: { id: string; code: string; name: string };
+  columns: { status: WorkflowStatus; orders: Order[] }[];
 }
 
-export interface MachineUtilization {
-  machineId: string;
-  code: string;
-  name: string;
-  runningMinutes: number;
-  idleMinutes: number;
-  setupMinutes: number;
-  downMinutes: number;
-  downtimeByReason: Record<string, number>;
-  attendedMinutes: number;
-  utilizationPct: number;
+/** A value plus the unit it was typed in; the API converts to mm. */
+export interface Measurement {
+  value: number;
+  unit: LengthUnit;
+}
+
+export interface PunchItemInput {
+  sizePresetId?: string;
+  length?: Measurement;
+  width?: Measurement;
+  thickness?: Measurement;
+  materialId: string;
+  materialThicknessId?: string;
+  quantity?: number;
+  notes?: string;
+}
+
+export interface PunchOrderInput {
+  clientId?: string;
+  newClient?: { name: string; phone?: string; email?: string; company?: string; address?: string };
+  location: string;
+  workflowId?: string;
+  priority?: Priority;
+  dueDate?: string;
+  notes?: string;
+  items: PunchItemInput[];
 }

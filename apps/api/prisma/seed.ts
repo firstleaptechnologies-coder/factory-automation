@@ -1,285 +1,223 @@
 /**
- * Baseline data for a fresh install: the five material families the unit works
- * in, the four CNC machines, stock locations, and the reason codes the shop
- * floor picks from. Idempotent — safe to re-run after a schema change.
+ * Baseline configuration for a fresh install.
+ *
+ * Everything here is admin-editable afterwards — this only exists so the punch
+ * screen has something to work with on day one. Idempotent: safe to re-run.
  */
-import {
-  LocationType,
-  MachineType,
-  MaterialCategory,
-  PrismaClient,
-  Uom,
-  UserRole,
-} from '@prisma/client';
+import { PrismaClient, StatusCategory, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-const CATEGORIES = [
-  { code: 'WOOD', name: 'Wood', description: 'MDF, plywood, solid wood, veneer' },
-  { code: 'STONE', name: 'Stone', description: 'Marble, granite, quartz, Corian' },
-  { code: 'ACRYLIC', name: 'Acrylic', description: 'Cast and extruded acrylic sheet' },
-  { code: 'METAL', name: 'Metal', description: 'MS, SS, brass, aluminium sheet' },
-  { code: 'WPC', name: 'WPC', description: 'Wood-plastic composite board' },
-];
+/** Admin types feet; storage is millimetres. 1 ft = 304.8 mm exactly. */
+const FT = 304.8;
+const IN = 25.4;
 
 const MATERIALS = [
   {
-    code: 'MDF-18',
-    name: 'MDF 18mm',
-    category: 'WOOD',
-    uom: Uom.SHEET,
-    thicknessMm: 18,
-    lengthMm: 2440,
-    widthMm: 1220,
-    densityKgM3: 750,
-    standardCost: 2100,
-    defaultKerfMm: 6,
-    wastageAllowancePct: 8,
+    code: 'MDF',
+    name: 'MDF',
+    color: '#B98B54',
+    thicknessesMm: [6, 9, 12, 18, 25],
   },
   {
-    code: 'PLY-12',
-    name: 'Marine Plywood 12mm',
-    category: 'WOOD',
-    uom: Uom.SHEET,
-    thicknessMm: 12,
-    lengthMm: 2440,
-    widthMm: 1220,
-    densityKgM3: 680,
-    standardCost: 2600,
-    defaultKerfMm: 6,
+    code: 'PLY',
+    name: 'Plywood',
+    color: '#C4A484',
+    thicknessesMm: [6, 12, 18, 19],
   },
   {
-    code: 'VEN-OAK',
-    name: 'Oak Veneer Ply 4mm',
-    category: 'WOOD',
-    uom: Uom.SHEET,
-    thicknessMm: 4,
-    lengthMm: 2440,
-    widthMm: 1220,
-    standardCost: 3400,
-    hasGrain: true,
-    defaultKerfMm: 4,
+    code: 'ACRYLIC',
+    name: 'Acrylic',
+    color: '#7FD1E8',
+    thicknessesMm: [3, 5, 8, 10],
   },
   {
-    code: 'MRB-STAT',
-    name: 'Statuario Marble Slab 18mm',
-    category: 'STONE',
-    uom: Uom.SLAB,
-    thicknessMm: 18,
-    lengthMm: 2700,
-    widthMm: 1600,
-    densityKgM3: 2700,
-    standardCost: 34000,
-    hasGrain: true,
-    defaultKerfMm: 4,
-    wastageAllowancePct: 15,
+    code: 'MARBLE',
+    name: 'Marble',
+    color: '#D8D8D8',
+    thicknessesMm: [16, 18, 20],
   },
   {
-    code: 'ACR-CLR-5',
-    name: 'Clear Acrylic 5mm',
-    category: 'ACRYLIC',
-    uom: Uom.SHEET,
-    thicknessMm: 5,
-    lengthMm: 2440,
-    widthMm: 1220,
-    densityKgM3: 1190,
-    standardCost: 4200,
-    defaultKerfMm: 3,
+    code: 'GRANITE',
+    name: 'Granite',
+    color: '#6E6E6E',
+    thicknessesMm: [16, 18, 20, 30],
   },
   {
-    code: 'SS-304-1.2',
-    name: 'SS 304 Sheet 1.2mm',
-    category: 'METAL',
-    uom: Uom.SHEET,
-    thicknessMm: 1.2,
-    lengthMm: 2440,
-    widthMm: 1220,
-    densityKgM3: 8000,
-    standardCost: 7800,
-    defaultKerfMm: 1,
-    wastageAllowancePct: 5,
+    code: 'SS',
+    name: 'Stainless Steel',
+    color: '#A8B2BD',
+    thicknessesMm: [0.8, 1, 1.2, 1.5, 2],
   },
   {
-    code: 'BRASS-1',
-    name: 'Brass Sheet 1mm',
-    category: 'METAL',
-    uom: Uom.SHEET,
-    thicknessMm: 1,
-    lengthMm: 2440,
-    widthMm: 1220,
-    densityKgM3: 8500,
-    standardCost: 21000,
-    defaultKerfMm: 1,
+    code: 'BRASS',
+    name: 'Brass',
+    color: '#C9A227',
+    thicknessesMm: [0.8, 1, 1.5],
   },
   {
-    code: 'WPC-18',
-    name: 'WPC Board 18mm',
-    category: 'WPC',
-    uom: Uom.SHEET,
-    thicknessMm: 18,
-    lengthMm: 2440,
-    widthMm: 1220,
-    densityKgM3: 700,
-    standardCost: 2900,
-    defaultKerfMm: 6,
+    code: 'WPC',
+    name: 'WPC',
+    color: '#8FA98F',
+    thicknessesMm: [8, 12, 18],
   },
 ];
 
-const MACHINES = [
-  {
-    code: 'CNC-01',
-    name: 'CNC Router 1',
-    type: MachineType.CNC_ROUTER,
-    bedLengthMm: 3000,
-    bedWidthMm: 1500,
-    maxZMm: 200,
-    spindlePowerKw: 6,
-    hourlyRate: 900,
-    categories: ['WOOD', 'WPC', 'ACRYLIC'],
-  },
-  {
-    code: 'CNC-02',
-    name: 'CNC Router 2',
-    type: MachineType.CNC_ROUTER,
-    bedLengthMm: 2500,
-    bedWidthMm: 1300,
-    maxZMm: 150,
-    spindlePowerKw: 4.5,
-    hourlyRate: 750,
-    categories: ['WOOD', 'WPC'],
-  },
-  {
-    code: 'CNC-03',
-    name: 'Stone CNC',
-    type: MachineType.CNC_ROUTER,
-    bedLengthMm: 3200,
-    bedWidthMm: 2000,
-    maxZMm: 300,
-    spindlePowerKw: 11,
-    hourlyRate: 1800,
-    categories: ['STONE'],
-  },
-  {
-    code: 'CNC-04',
-    name: 'Laser Cutter',
-    type: MachineType.CNC_LASER,
-    bedLengthMm: 1300,
-    bedWidthMm: 900,
-    maxZMm: 50,
-    spindlePowerKw: 0,
-    hourlyRate: 650,
-    categories: ['ACRYLIC', 'WOOD', 'METAL'],
-  },
+/** Common sheet sizes, entered the way the shop says them. */
+const SIZE_PRESETS = [
+  { code: 'SHEET-8X4', name: '8 × 4 ft sheet', lengthFt: 8, widthFt: 4 },
+  { code: 'SHEET-7X4', name: '7 × 4 ft sheet', lengthFt: 7, widthFt: 4 },
+  { code: 'SHEET-6X4', name: '6 × 4 ft sheet', lengthFt: 6, widthFt: 4 },
+  { code: 'SLAB-9X5', name: '9 × 5 ft slab', lengthFt: 9, widthFt: 5 },
+  { code: 'DOOR-7X3', name: '7 × 3 ft door', lengthFt: 7, widthFt: 3 },
 ];
 
-const LOCATIONS = [
-  { code: 'RACK-A', name: 'Sheet Rack A', type: LocationType.RACK },
-  { code: 'RACK-B', name: 'Sheet Rack B', type: LocationType.RACK },
-  { code: 'STONE-YARD', name: 'Stone Slab Yard', type: LocationType.FLOOR },
-  { code: 'OFFCUT', name: 'Offcut Store', type: LocationType.OFFCUT_STORE },
-  { code: 'WIP', name: 'Work in Progress', type: LocationType.WIP },
-  { code: 'FG', name: 'Finished Goods', type: LocationType.FINISHED_GOODS },
-  { code: 'SCRAP', name: 'Scrap Yard', type: LocationType.SCRAP_YARD },
+/**
+ * A starting flow. Statuses are grouped so the hierarchy feature has something
+ * real in it: the three production steps sit under "In Production".
+ */
+const STATUSES = [
+  { code: 'NEW', name: 'New', color: '#6B7785', category: StatusCategory.OPEN, isInitial: true, x: 40, y: 200 },
+  { code: 'CONFIRMED', name: 'Confirmed', color: '#2F81F7', category: StatusCategory.OPEN, x: 260, y: 200 },
+  { code: 'PRODUCTION', name: 'In Production', color: '#D29922', category: StatusCategory.IN_PROGRESS, x: 480, y: 200 },
+  { code: 'CUTTING', name: 'Cutting', color: '#D29922', category: StatusCategory.IN_PROGRESS, parent: 'PRODUCTION', x: 480, y: 320 },
+  { code: 'FINISHING', name: 'Finishing', color: '#D29922', category: StatusCategory.IN_PROGRESS, parent: 'PRODUCTION', x: 480, y: 400 },
+  { code: 'QC', name: 'Quality Check', color: '#8957E5', category: StatusCategory.IN_PROGRESS, parent: 'PRODUCTION', x: 480, y: 480 },
+  { code: 'READY', name: 'Ready', color: '#2EA043', category: StatusCategory.IN_PROGRESS, x: 700, y: 200 },
+  { code: 'DELIVERED', name: 'Delivered', color: '#2EA043', category: StatusCategory.DONE, isTerminal: true, x: 920, y: 200 },
+  { code: 'ON_HOLD', name: 'On Hold', color: '#D29922', category: StatusCategory.OPEN, x: 260, y: 60 },
+  { code: 'CANCELLED', name: 'Cancelled', color: '#DA3633', category: StatusCategory.CANCELLED, isTerminal: true, x: 700, y: 60 },
 ];
 
-const DOWNTIME_REASONS = [
-  { code: 'TOOL-CHANGE', name: 'Tool change', isPlanned: true },
-  { code: 'SETUP', name: 'Job setup', isPlanned: true },
-  { code: 'MAINT', name: 'Scheduled maintenance', isPlanned: true },
-  { code: 'BREAKDOWN', name: 'Machine breakdown', isPlanned: false },
-  { code: 'NO-MATERIAL', name: 'Material not available', isPlanned: false },
-  { code: 'NO-OPERATOR', name: 'Operator unavailable', isPlanned: false },
-  { code: 'POWER', name: 'Power failure', isPlanned: false },
-  { code: 'PROGRAM', name: 'Waiting for program / design', isPlanned: false },
-];
-
-const REJECTION_REASONS = [
-  { code: 'CHIP', name: 'Chipping / tear-out', category: 'machine' },
-  { code: 'DIM', name: 'Dimensional error', category: 'machine' },
-  { code: 'BURN', name: 'Burn marks', category: 'machine' },
-  { code: 'CRACK', name: 'Material crack', category: 'material' },
-  { code: 'WARP', name: 'Warped sheet', category: 'material' },
-  { code: 'WRONG-PROG', name: 'Wrong program run', category: 'operator' },
-  { code: 'DESIGN', name: 'Design error', category: 'design' },
+const TRANSITIONS: [string, string, { label?: string; requiresNote?: boolean }?][] = [
+  ['NEW', 'CONFIRMED'],
+  ['NEW', 'CANCELLED', { requiresNote: true }],
+  ['CONFIRMED', 'PRODUCTION'],
+  ['CONFIRMED', 'ON_HOLD', { requiresNote: true }],
+  ['ON_HOLD', 'CONFIRMED'],
+  ['ON_HOLD', 'CANCELLED', { requiresNote: true }],
+  ['PRODUCTION', 'CUTTING'],
+  ['CUTTING', 'FINISHING'],
+  ['FINISHING', 'QC'],
+  ['QC', 'READY'],
+  ['QC', 'CUTTING', { label: 'Rework', requiresNote: true }],
+  ['PRODUCTION', 'READY'],
+  ['READY', 'DELIVERED'],
+  ['PRODUCTION', 'ON_HOLD', { requiresNote: true }],
 ];
 
 async function main() {
-  const categories = new Map<string, MaterialCategory>();
-  for (const category of CATEGORIES) {
-    const saved = await prisma.materialCategory.upsert({
-      where: { code: category.code },
-      update: { name: category.name, description: category.description },
-      create: category,
-    });
-    categories.set(category.code, saved);
-  }
-
-  for (const { category, ...material } of MATERIALS) {
-    await prisma.material.upsert({
+  for (const [index, material] of MATERIALS.entries()) {
+    const saved = await prisma.material.upsert({
       where: { code: material.code },
-      update: material,
-      create: { ...material, categoryId: categories.get(category)!.id },
+      update: { name: material.name, color: material.color, sortOrder: index },
+      create: {
+        code: material.code,
+        name: material.name,
+        color: material.color,
+        sortOrder: index,
+      },
     });
-  }
 
-  for (const { categories: cats, ...machine } of MACHINES) {
-    const saved = await prisma.machine.upsert({
-      where: { code: machine.code },
-      update: machine,
-      create: machine,
-    });
-    for (const code of cats) {
-      await prisma.machineMaterial.upsert({
-        where: {
-          machineId_categoryId: {
-            machineId: saved.id,
-            categoryId: categories.get(code)!.id,
-          },
-        },
-        update: {},
-        create: {
-          machineId: saved.id,
-          categoryId: categories.get(code)!.id,
-          setupMinutes: 15,
-        },
+    for (const [order, valueMm] of material.thicknessesMm.entries()) {
+      await prisma.materialThickness.upsert({
+        where: { materialId_valueMm: { materialId: saved.id, valueMm } },
+        update: { sortOrder: order },
+        create: { materialId: saved.id, valueMm, sortOrder: order },
       });
     }
   }
 
-  for (const location of LOCATIONS) {
-    await prisma.stockLocation.upsert({
-      where: { code: location.code },
-      update: location,
-      create: location,
+  for (const [index, preset] of SIZE_PRESETS.entries()) {
+    await prisma.sizePreset.upsert({
+      where: { code: preset.code },
+      update: { name: preset.name, sortOrder: index },
+      create: {
+        code: preset.code,
+        name: preset.name,
+        lengthMm: preset.lengthFt * FT,
+        widthMm: preset.widthFt * FT,
+        sortOrder: index,
+      },
     });
   }
 
-  for (const reason of DOWNTIME_REASONS) {
-    await prisma.downtimeReason.upsert({
-      where: { code: reason.code },
-      update: reason,
-      create: reason,
+  const workflow = await prisma.workflow.upsert({
+    where: { code: 'DEFAULT' },
+    update: {},
+    create: {
+      code: 'DEFAULT',
+      name: 'Standard order flow',
+      description: 'Edit the statuses and arrows on the flow builder to match how the shop works.',
+      isDefault: true,
+    },
+  });
+
+  const statusIds = new Map<string, string>();
+  for (const [index, status] of STATUSES.entries()) {
+    const saved = await prisma.workflowStatus.upsert({
+      where: { workflowId_code: { workflowId: workflow.id, code: status.code } },
+      update: {
+        name: status.name,
+        color: status.color,
+        category: status.category,
+        isInitial: status.isInitial ?? false,
+        isTerminal: status.isTerminal ?? false,
+        sortOrder: index,
+        canvasX: status.x,
+        canvasY: status.y,
+      },
+      create: {
+        workflowId: workflow.id,
+        code: status.code,
+        name: status.name,
+        color: status.color,
+        category: status.category,
+        isInitial: status.isInitial ?? false,
+        isTerminal: status.isTerminal ?? false,
+        sortOrder: index,
+        canvasX: status.x,
+        canvasY: status.y,
+      },
+    });
+    statusIds.set(status.code, saved.id);
+  }
+
+  // Parents are set in a second pass so a child can reference a later status.
+  for (const status of STATUSES) {
+    if (!status.parent) continue;
+    await prisma.workflowStatus.update({
+      where: { id: statusIds.get(status.code)! },
+      data: { parentId: statusIds.get(status.parent)! },
     });
   }
 
-  for (const reason of REJECTION_REASONS) {
-    await prisma.rejectionReason.upsert({
-      where: { code: reason.code },
-      update: reason,
-      create: reason,
+  for (const [from, to, options] of TRANSITIONS) {
+    await prisma.workflowTransition.upsert({
+      where: {
+        workflowId_fromStatusId_toStatusId: {
+          workflowId: workflow.id,
+          fromStatusId: statusIds.get(from)!,
+          toStatusId: statusIds.get(to)!,
+        },
+      },
+      update: { label: options?.label, requiresNote: options?.requiresNote ?? false },
+      create: {
+        workflowId: workflow.id,
+        fromStatusId: statusIds.get(from)!,
+        toStatusId: statusIds.get(to)!,
+        label: options?.label,
+        requiresNote: options?.requiresNote ?? false,
+      },
     });
   }
 
-  // Starter logins. Change these passwords before the system leaves the office.
   const users = [
     { code: 'ADMIN', name: 'Administrator', role: UserRole.ADMIN, password: 'admin123' },
-    { code: 'PLAN01', name: 'Production Planner', role: UserRole.PLANNER, password: 'plan123' },
-    { code: 'OP01', name: 'Operator 1', role: UserRole.OPERATOR, password: 'op123' },
-    { code: 'OP02', name: 'Operator 2', role: UserRole.OPERATOR, password: 'op123' },
-    { code: 'STORE01', name: 'Store Keeper', role: UserRole.STORE, password: 'store123' },
+    { code: 'SALES01', name: 'Sales Desk', role: UserRole.SALES, password: 'sales123' },
+    { code: 'PROD01', name: 'Production', role: UserRole.PRODUCTION, password: 'prod123' },
   ];
-
   for (const { password, ...user } of users) {
     await prisma.user.upsert({
       where: { code: user.code },
@@ -288,15 +226,21 @@ async function main() {
     });
   }
 
-  const counts = {
-    categories: await prisma.materialCategory.count(),
-    materials: await prisma.material.count(),
-    machines: await prisma.machine.count(),
-    locations: await prisma.stockLocation.count(),
-    users: await prisma.user.count(),
-  };
+  await prisma.appSetting.upsert({
+    where: { key: 'defaultDisplayUnit' },
+    update: {},
+    create: { key: 'defaultDisplayUnit', value: 'FT' },
+  });
+
   // eslint-disable-next-line no-console
-  console.log('Seed complete:', counts);
+  console.log('Seed complete:', {
+    materials: await prisma.material.count(),
+    thicknesses: await prisma.materialThickness.count(),
+    sizePresets: await prisma.sizePreset.count(),
+    statuses: await prisma.workflowStatus.count(),
+    transitions: await prisma.workflowTransition.count(),
+    users: await prisma.user.count(),
+  });
 }
 
 main()

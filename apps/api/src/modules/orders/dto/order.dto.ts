@@ -3,49 +3,85 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
-import { OrderStatus, Priority, Uom } from '@prisma/client';
+import { AttachmentKind, Priority } from '@prisma/client';
+import { LENGTH_UNITS, LengthUnit } from '@decor/shared';
+import { MeasurementDto } from '../../config/dto/config.dto';
+import { CreateClientDto } from '../../clients/dto/client.dto';
 
-export class OrderItemDto {
-  @IsString() description: string;
-  @IsOptional() @IsString() designId?: string;
+export class PunchItemDto {
+  /** Pick a configured size, or give explicit dimensions, or both (explicit wins). */
+  @IsOptional() @IsString() sizePresetId?: string;
+  @IsOptional() @ValidateNested() @Type(() => MeasurementDto) length?: MeasurementDto;
+  @IsOptional() @ValidateNested() @Type(() => MeasurementDto) width?: MeasurementDto;
+  @IsOptional() @ValidateNested() @Type(() => MeasurementDto) thickness?: MeasurementDto;
+
   @IsString() materialId: string;
-  @Type(() => Number) @IsNumber() @Min(0.001) quantity: number;
-  @IsEnum(Uom) uom: Uom;
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) lengthMm?: number;
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) widthMm?: number;
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) thicknessMm?: number;
-  @Type(() => Number) @IsNumber() @Min(0) unitPrice: number;
+  /** A configured thickness option for that material. */
+  @IsOptional() @IsString() materialThicknessId?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) quantity?: number;
+  @IsOptional() @IsString() notes?: string;
 }
 
-export class CreateOrderDto {
-  @IsString() customerId: string;
-  @IsOptional() @IsString() poNumber?: string;
+/**
+ * Punching an order. The client is either an existing id or a new one created
+ * inline — the person taking the order should never have to leave the screen to
+ * add a client first.
+ */
+export class PunchOrderDto {
+  @IsOptional() @IsString() clientId?: string;
+  @IsOptional() @ValidateNested() @Type(() => CreateClientDto) newClient?: CreateClientDto;
+
+  @IsString() @MinLength(1) location: string;
+
+  @IsOptional() @IsString() workflowId?: string;
   @IsOptional() @IsEnum(Priority) priority?: Priority;
   @IsOptional() @IsDateString() dueDate?: string;
   @IsOptional() @IsString() notes?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => OrderItemDto)
-  items: OrderItemDto[];
+  @Type(() => PunchItemDto)
+  items: PunchItemDto[];
 }
 
-export class UpdateOrderStatusDto {
-  @IsEnum(OrderStatus) status: OrderStatus;
+export class UpdateOrderDto {
+  @IsOptional() @IsString() location?: string;
+  @IsOptional() @IsEnum(Priority) priority?: Priority;
+  @IsOptional() @IsDateString() dueDate?: string;
+  @IsOptional() @IsString() notes?: string;
+}
+
+export class ChangeStatusDto {
+  @IsString() toStatusId: string;
   @IsOptional() @IsString() note?: string;
 }
 
+export class AttachmentMetaDto {
+  @IsEnum(AttachmentKind) kind: AttachmentKind;
+  /** Required for reference images — a picture with no context is not useful. */
+  @IsOptional() @IsString() description?: string;
+}
+
 export class OrderQueryDto {
-  @IsOptional() @IsEnum(OrderStatus) status?: OrderStatus;
-  @IsOptional() @IsString() customerId?: string;
+  @IsOptional() @IsString() clientId?: string;
+  @IsOptional() @IsString() statusId?: string;
+  @IsOptional() @IsString() materialId?: string;
   @IsOptional() @IsString() search?: string;
+  @IsOptional() @IsDateString() from?: string;
+  @IsOptional() @IsDateString() to?: string;
+
+  /** Unit the caller wants dimensions rendered in. Storage is always mm. */
+  @IsOptional() @IsIn(LENGTH_UNITS as unknown as string[]) unit?: LengthUnit;
+
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) limit = 25;
 

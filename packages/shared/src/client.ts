@@ -1,23 +1,20 @@
+import type { LengthUnit } from './units';
 import type {
+  AttachmentKind,
   AuthUser,
-  Customer,
-  Dashboard,
-  Job,
-  JobStatus,
+  Client,
+  ClientLocation,
   LoginResponse,
-  Machine,
-  MachineBoardEntry,
-  MachineStatus,
-  MachineUtilization,
   Material,
-  MaterialCategory,
-  NestPreview,
   Order,
+  OrderAttachment,
+  OrderBoard,
   Paginated,
-  QcResult,
-  StockSummaryRow,
-  StockUnit,
-  WasteAnalytics,
+  PunchOrderInput,
+  SizePreset,
+  Workflow,
+  WorkflowStatus,
+  WorkflowTransition,
 } from './types';
 
 export class ApiError extends Error {
@@ -33,16 +30,12 @@ export class ApiError extends Error {
 
 export interface ApiClientOptions {
   baseUrl: string;
-  /** Called on 401 so the app can drop the session and show the login screen. */
   onUnauthorized?: () => void;
 }
 
 type Query = Record<string, string | number | boolean | undefined | null>;
 
-/**
- * One HTTP client for both the web app and the React Native app — no framework
- * imports, just fetch, which both platforms provide.
- */
+/** One fetch-based client for the web app and the React Native app. */
 export class ApiClient {
   private token: string | null = null;
 
@@ -56,7 +49,14 @@ export class ApiClient {
     return this.token;
   }
 
-  // -- plumbing -------------------------------------------------------------
+  get baseUrl(): string {
+    return this.options.baseUrl.replace(/\/$/, '');
+  }
+
+  /** Absolute URL for an attachment, for <img src>. */
+  fileUrl(fileId: string): string {
+    return `${this.baseUrl}/files/${fileId}`;
+  }
 
   private async request<T>(
     method: string,
@@ -64,9 +64,7 @@ export class ApiClient {
     body?: unknown,
     query?: Query,
   ): Promise<T> {
-    const url = new URL(
-      `${this.options.baseUrl.replace(/\/$/, '')}${path}`,
-    );
+    const url = new URL(`${this.baseUrl}${path}`);
     if (query) {
       for (const [key, value] of Object.entries(query)) {
         if (value !== undefined && value !== null && value !== '') {
@@ -84,9 +82,21 @@ export class ApiClient {
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
 
-    if (response.status === 401) {
-      this.options.onUnauthorized?.();
-    }
+    return this.handle<T>(response);
+  }
+
+  /** Multipart upload; the browser sets the boundary, so no Content-Type here. */
+  private async upload<T>(path: string, form: FormData): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+      body: form,
+    });
+    return this.handle<T>(response);
+  }
+
+  private async handle<T>(response: Response): Promise<T> {
+    if (response.status === 401) this.options.onUnauthorized?.();
 
     const text = await response.text();
     const payload = text ? safeParse(text) : null;
@@ -98,7 +108,6 @@ export class ApiClient {
         payload,
       );
     }
-
     return payload as T;
   }
 
@@ -111,14 +120,14 @@ export class ApiClient {
   private patch<T>(path: string, body?: unknown) {
     return this.request<T>('PATCH', path, body);
   }
+  private del<T>(path: string) {
+    return this.request<T>('DELETE', path);
+  }
 
   // -- auth -----------------------------------------------------------------
 
   async login(identifier: string, password: string): Promise<LoginResponse> {
-    const result = await this.post<LoginResponse>('/auth/login', {
-      identifier,
-      password,
-    });
+    const result = await this.post<LoginResponse>('/auth/login', { identifier, password });
     this.token = result.accessToken;
     return result;
   }
@@ -127,245 +136,173 @@ export class ApiClient {
     return this.get<AuthUser>('/auth/me');
   }
 
-  // -- masters --------------------------------------------------------------
+  // -- clients --------------------------------------------------------------
 
-  materialCategories() {
-    return this.get<MaterialCategory[]>('/materials/categories');
+  clients(query?: { search?: string; page?: number; limit?: number }) {
+    return this.get<Paginated<Client>>('/clients', query);
   }
 
-  materials(query?: { search?: string; categoryId?: string; page?: number; limit?: number }) {
-    return this.get<Paginated<Material>>('/materials', query);
+  /** Type-ahead for the punch screen. */
+  searchClients(term: string) {
+    return this.get<Client[]>('/clients/search', { q: term });
   }
 
-  customers(query?: { search?: string; page?: number; limit?: number }) {
-    return this.get<Paginated<Customer>>('/customers', query);
+  client(id: string) {
+    return this.get<Client>(`/clients/${id}`);
   }
 
-  createCustomer(body: Partial<Customer> & { code: string; name: string }) {
-    return this.post<Customer>('/customers', body);
+  createClient(body: { name: string; phone?: string; email?: string; company?: string; address?: string }) {
+    return this.post<Client>('/clients', body);
   }
 
-  // -- inventory ------------------------------------------------------------
-
-  stock(query?: {
-    materialId?: string;
-    locationId?: string;
-    kind?: string;
-    status?: string;
-    search?: string;
-    offcutsOnly?: boolean;
-    page?: number;
-    limit?: number;
-  }) {
-    return this.get<Paginated<StockUnit>>('/inventory/stock', query);
+  addClientLocation(clientId: string, body: { name: string; address?: string }) {
+    return this.post<ClientLocation>(`/clients/${clientId}/locations`, body);
   }
 
-  stockSummary() {
-    return this.get<StockSummaryRow[]>('/inventory/stock/summary');
+  // -- configuration --------------------------------------------------------
+
+  materials(includeInactive = false) {
+    return this.get<Material[]>('/config/materials', { includeInactive });
   }
 
-  stockUnit(id: string) {
-    return this.get<StockUnit>(`/inventory/stock/${id}`);
+  sizePresets(includeInactive = false) {
+    return this.get<SizePreset[]>('/config/size-presets', { includeInactive });
   }
 
-  stockLocations() {
-    return this.get<{ id: string; code: string; name: string; type: string }[]>(
-      '/inventory/locations',
+  createMaterial(body: unknown) {
+    return this.post<Material>('/config/materials', body);
+  }
+
+  updateMaterial(id: string, body: unknown) {
+    return this.patch<Material>(`/config/materials/${id}`, body);
+  }
+
+  addThickness(materialId: string, body: { value: { value: number; unit: LengthUnit }; label?: string }) {
+    return this.post<unknown>(`/config/materials/${materialId}/thicknesses`, body);
+  }
+
+  removeThickness(id: string) {
+    return this.del<unknown>(`/config/thicknesses/${id}`);
+  }
+
+  createSizePreset(body: unknown) {
+    return this.post<SizePreset>('/config/size-presets', body);
+  }
+
+  updateSizePreset(id: string, body: unknown) {
+    return this.patch<SizePreset>(`/config/size-presets/${id}`, body);
+  }
+
+  settings() {
+    return this.get<Record<string, unknown>>('/config/settings');
+  }
+
+  setSetting(key: string, value: unknown) {
+    return this.patch<unknown>(`/config/settings/${key}`, { value });
+  }
+
+  // -- workflows ------------------------------------------------------------
+
+  workflows() {
+    return this.get<Workflow[]>('/workflows');
+  }
+
+  defaultWorkflow() {
+    return this.get<Workflow>('/workflows/default');
+  }
+
+  workflow(id: string) {
+    return this.get<Workflow>(`/workflows/${id}`);
+  }
+
+  createWorkflow(body: { code: string; name: string; description?: string }) {
+    return this.post<Workflow>('/workflows', body);
+  }
+
+  addStatus(workflowId: string, body: Partial<WorkflowStatus> & { code: string; name: string }) {
+    return this.post<WorkflowStatus>(`/workflows/${workflowId}/statuses`, body);
+  }
+
+  updateStatus(statusId: string, body: Partial<WorkflowStatus>) {
+    return this.patch<WorkflowStatus>(`/workflows/statuses/${statusId}`, body);
+  }
+
+  removeStatus(statusId: string) {
+    return this.del<unknown>(`/workflows/statuses/${statusId}`);
+  }
+
+  /** Save the whole canvas: node positions plus every arrow. */
+  saveWorkflowGraph(
+    workflowId: string,
+    body: {
+      positions: { id: string; canvasX: number; canvasY: number }[];
+      transitions: Omit<WorkflowTransition, 'id' | 'workflowId'>[];
+    },
+  ) {
+    return this.post<Workflow>(`/workflows/${workflowId}/graph`, body);
+  }
+
+  allowedNext(statusId: string) {
+    return this.get<(WorkflowTransition & { toStatus: WorkflowStatus })[]>(
+      `/workflows/statuses/${statusId}/next`,
     );
-  }
-
-  receiveStock(body: {
-    materialId: string;
-    locationId?: string;
-    pieces: number;
-    lengthMm?: number;
-    widthMm?: number;
-    thicknessMm?: number;
-    quantity?: number;
-    unitCost?: number;
-    batchNo?: string;
-    note?: string;
-  }) {
-    return this.post<{ received: number; units: StockUnit[] }>('/inventory/receive', body);
-  }
-
-  issueStock(body: { jobId: string; stockUnitIds: string[]; note?: string }) {
-    return this.post<{ issued: number }>('/inventory/issue', body);
-  }
-
-  closeSheet(body: {
-    stockUnitId: string;
-    jobId?: string;
-    offcuts?: { lengthMm: number; widthMm: number; locationId?: string }[];
-    remarks?: string;
-  }) {
-    return this.post<{
-      stockUnit: string;
-      sheetAreaSqm: number;
-      recoveredOffcuts: number;
-      recoveredAreaSqm: number;
-    }>('/inventory/close-sheet', body);
-  }
-
-  // -- machines -------------------------------------------------------------
-
-  machines() {
-    return this.get<Machine[]>('/machines');
-  }
-
-  machineBoard() {
-    return this.get<MachineBoardEntry[]>('/machines/board');
-  }
-
-  downtimeReasons() {
-    return this.get<{ id: string; code: string; name: string; isPlanned: boolean }[]>(
-      '/machines/downtime-reasons',
-    );
-  }
-
-  setMachineStatus(id: string, body: { status: MachineStatus; downtimeReasonId?: string; note?: string }) {
-    return this.patch<Machine>(`/machines/${id}/status`, body);
   }
 
   // -- orders ---------------------------------------------------------------
 
-  orders(query?: { status?: string; customerId?: string; search?: string; page?: number; limit?: number }) {
-    return this.get<Paginated<Order>>('/orders', query);
-  }
-
-  order(id: string) {
-    return this.get<Order>(`/orders/${id}`);
-  }
-
-  createOrder(body: unknown) {
-    return this.post<Order>('/orders', body);
-  }
-
-  setOrderStatus(id: string, status: string) {
-    return this.patch<Order>(`/orders/${id}/status`, { status });
-  }
-
-  pendingForPlanning() {
-    return this.get<unknown[]>('/orders/pending-planning');
-  }
-
-  // -- production -----------------------------------------------------------
-
-  jobs(query?: {
-    status?: JobStatus;
-    machineId?: string;
-    orderId?: string;
+  orders(query?: {
+    clientId?: string;
+    statusId?: string;
+    materialId?: string;
     search?: string;
+    from?: string;
+    to?: string;
+    unit?: LengthUnit;
     page?: number;
     limit?: number;
   }) {
-    return this.get<Paginated<Job>>('/jobs', query);
+    return this.get<Paginated<Order> & { unit: LengthUnit }>('/orders', query);
   }
 
-  myQueue() {
-    return this.get<Job[]>('/jobs/my-queue');
+  orderBoard(workflowId?: string) {
+    return this.get<OrderBoard>('/orders/board', { workflowId });
   }
 
-  job(id: string) {
-    return this.get<Job>(`/jobs/${id}`);
+  order(id: string, unit?: LengthUnit) {
+    return this.get<Order>(`/orders/${id}`, { unit });
   }
 
-  createJob(body: unknown) {
-    return this.post<Job>('/jobs', body);
+  punchOrder(body: PunchOrderInput) {
+    return this.post<Order>('/orders', body);
   }
 
-  assignJob(id: string, body: { machineId: string; operatorId?: string; sequence?: number }) {
-    return this.patch<Job>(`/jobs/${id}/assign`, body);
+  updateOrder(id: string, body: { location?: string; priority?: string; dueDate?: string; notes?: string }) {
+    return this.patch<Order>(`/orders/${id}`, body);
   }
 
-  resequenceJobs(body: { machineId: string; jobIds: string[] }) {
-    return this.post<Job[]>('/jobs/resequence', body);
+  changeOrderStatus(id: string, body: { toStatusId: string; note?: string }) {
+    return this.post<Order>(`/orders/${id}/status`, body);
   }
 
-  startJob(id: string) {
-    return this.post<Job>(`/jobs/${id}/start`);
-  }
-
-  pauseJob(id: string, body?: { downtimeReasonId?: string; note?: string }) {
-    return this.post<Job>(`/jobs/${id}/pause`, body ?? {});
-  }
-
-  updateJobProgress(id: string, body: { completedQty?: number; rejectedQty?: number; note?: string }) {
-    return this.patch<Job>(`/jobs/${id}/progress`, body);
-  }
-
-  completeJob(id: string) {
-    return this.post<Job>(`/jobs/${id}/complete`);
-  }
-
-  recordQualityCheck(
-    id: string,
-    body: {
-      result: QcResult;
-      qtyChecked: number;
-      qtyPassed: number;
-      qtyRejected?: number;
-      reasonId?: string;
-      remarks?: string;
-    },
+  /**
+   * Files must already be optimised by the caller — see `optimizeImage` in the
+   * web app. The server re-optimises regardless, but sending a 12 MP original
+   * over a shop wifi is the thing worth avoiding.
+   */
+  addAttachments(
+    orderId: string,
+    files: File[],
+    meta: { kind: AttachmentKind; description?: string },
   ) {
-    return this.post<unknown>(`/jobs/${id}/quality-check`, body);
+    const form = new FormData();
+    for (const file of files) form.append('files', file);
+    form.append('kind', meta.kind);
+    if (meta.description) form.append('description', meta.description);
+    return this.upload<OrderAttachment[]>(`/orders/${orderId}/attachments`, form);
   }
 
-  // -- nesting --------------------------------------------------------------
-
-  previewNest(body: {
-    materialId: string;
-    sheetLengthMm?: number;
-    sheetWidthMm?: number;
-    kerfMm?: number;
-    marginMm?: number;
-    parts: {
-      orderItemId?: string;
-      label: string;
-      lengthMm: number;
-      widthMm: number;
-      quantity: number;
-      allowRotation?: boolean;
-    }[];
-  }) {
-    return this.post<NestPreview>('/nesting/preview', body);
-  }
-
-  createNestPlan(body: unknown) {
-    return this.post<unknown>('/nesting/plans', body);
-  }
-
-  nestPlans(status?: string) {
-    return this.get<unknown[]>('/nesting/plans', { status });
-  }
-
-  // -- waste & reports ------------------------------------------------------
-
-  wasteAnalytics(query?: { from?: string; to?: string; materialId?: string }) {
-    return this.get<WasteAnalytics>('/waste/analytics', query);
-  }
-
-  wasteRecords(query?: { materialId?: string; type?: string; page?: number; limit?: number }) {
-    return this.get<Paginated<unknown>>('/waste', query);
-  }
-
-  offcutInventory() {
-    return this.get<
-      { materialId: string; code?: string; name?: string; pieces: number; areaSqm: number; value: number }[]
-    >('/waste/offcut-inventory');
-  }
-
-  dashboard() {
-    return this.get<Dashboard>('/reports/dashboard');
-  }
-
-  machineUtilization(query?: { from?: string; to?: string }) {
-    return this.get<MachineUtilization[]>('/reports/machine-utilization', query);
-  }
-
-  materialYield(query?: { from?: string; to?: string }) {
-    return this.get<unknown[]>('/reports/material-yield', query);
+  removeAttachment(attachmentId: string) {
+    return this.del<unknown>(`/orders/attachments/${attachmentId}`);
   }
 }
 
