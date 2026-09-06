@@ -1,75 +1,104 @@
 'use client';
 
-import Link from 'next/link';
-import type { OrderBoard } from '@decor/shared';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { Order, OrderBoard } from '@decor/shared';
 import { UNIT_LABEL } from '@decor/shared';
 import { Shell } from '@/components/Shell';
+import { KanbanBoard } from '@/components/KanbanBoard';
 import { api } from '@/lib/api';
-import { useApi } from '@/lib/useApi';
 
-/** Orders grouped under the statuses the admin configured. */
+/** Orders grouped by status. Drag a card to move it along the flow. */
 export default function BoardPage() {
-  const { data, error, loading, reload } = useApi<OrderBoard>(() => api.orderBoard());
+  const router = useRouter();
+  const [board, setBoard] = useState<OrderBoard | null>(null);
+  const [message, setMessage] = useState<{ text: string; tone: 'success' | 'danger' } | null>(null);
+
+  const load = useCallback(async () => {
+    setBoard(await api.orderBoard());
+  }, []);
+
+  useEffect(() => {
+    load().catch((e) =>
+      setMessage({ text: e instanceof Error ? e.message : 'Could not load', tone: 'danger' }),
+    );
+  }, [load]);
+
+  const move = async (order: Order, toStatusId: string) => {
+    setMessage(null);
+    const target = board?.columns.find((c) => c.status.id === toStatusId)?.status;
+
+    // The server refuses a move that requires a note without one, so ask first
+    // rather than letting the drop fail and having to explain afterwards.
+    const transitions = await api.allowedNext(order.status.id);
+    const transition = transitions.find((t) => t.toStatusId === toStatusId);
+
+    let note: string | undefined;
+    if (transition?.requiresNote) {
+      const entered = window.prompt(
+        `Moving ${order.code} to ${target?.name} needs a note. Why?`,
+      );
+      if (!entered?.trim()) {
+        setMessage({ text: 'Move cancelled — a note is required.', tone: 'danger' });
+        return;
+      }
+      note = entered.trim();
+    }
+
+    try {
+      await api.changeOrderStatus(order.id, { toStatusId, note });
+      await load();
+      setMessage({ text: `${order.code} moved to ${target?.name}.`, tone: 'success' });
+    } catch (e) {
+      // Reload so the card snaps back to where it actually is.
+      await load();
+      setMessage({
+        text: e instanceof Error ? e.message : 'Could not move the order',
+        tone: 'danger',
+      });
+    }
+  };
 
   return (
     <Shell>
       <h1 className="page-title">Board</h1>
-      <p className="page-sub">{data?.workflow.name ?? 'Loading…'}</p>
+      <p className="page-sub">
+        {board?.workflow.name ?? 'Loading…'} — drag a card to move it. Moves the flow
+        does not allow are refused.
+      </p>
 
-      {error ? <div className="banner danger">{error}</div> : null}
+      {message ? <div className={`banner ${message.tone}`}>{message.text}</div> : null}
 
-      {loading || !data ? (
+      {!board ? (
         <p className="muted">Loading…</p>
       ) : (
-        <div className="scroll-x">
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', paddingBottom: 8 }}>
-            {data.columns.map((column) => (
-              <div
-                key={column.status.id}
-                className="card"
-                style={{ minWidth: 260, borderTop: `3px solid ${column.status.color}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <strong>{column.status.name}</strong>
-                  <span className="muted">{column.orders.length}</span>
+        <KanbanBoard
+          columns={board.columns.map((column) => ({
+            status: column.status,
+            items: column.orders,
+          }))}
+          onMove={move}
+          renderCard={(order) => (
+            <div onDoubleClick={() => router.push(`/orders/${order.id}`)}>
+              <div className="code">{order.code}</div>
+              <div className="sub">{order.client.name}</div>
+              <div className="sub">{order.location}</div>
+              {order.items[0]?.display ? (
+                <div style={{ fontSize: 12, marginTop: 4 }}>
+                  {order.items[0].display.length} × {order.items[0].display.width}{' '}
+                  {UNIT_LABEL[order.items[0].display.unit]}
+                  {order.items.length > 1 ? ` +${order.items.length - 1}` : ''}
                 </div>
-
-                {column.orders.length === 0 ? (
-                  <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Empty</p>
-                ) : (
-                  column.orders.map((order) => (
-                    <Link
-                      key={order.id}
-                      href={`/orders/${order.id}`}
-                      style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
-                      <div
-                        style={{
-                          background: 'var(--surface-alt)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 8,
-                          padding: 10,
-                          marginTop: 10,
-                        }}>
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>{order.code}</div>
-                        <div className="muted" style={{ fontSize: 12 }}>{order.client.name}</div>
-                        <div className="muted" style={{ fontSize: 12 }}>{order.location}</div>
-                        {order.items[0]?.display ? (
-                          <div style={{ fontSize: 12, marginTop: 4 }}>
-                            {order.items[0].display.length} × {order.items[0].display.width}{' '}
-                            {UNIT_LABEL[order.items[0].display.unit]}
-                            {order.items.length > 1 ? ` +${order.items.length - 1}` : ''}
-                          </div>
-                        ) : null}
-                      </div>
-                    </Link>
-                  ))
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+              ) : null}
+              {order.priority !== 'NORMAL' ? (
+                <div className="sub" style={{ color: 'var(--warning)' }}>{order.priority}</div>
+              ) : null}
+            </div>
+          )}
+        />
       )}
 
-      <button style={{ marginTop: 14 }} onClick={reload}>Refresh</button>
+      <p className="muted" style={{ fontSize: 12 }}>Double-click a card to open it.</p>
     </Shell>
   );
 }

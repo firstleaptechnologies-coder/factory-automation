@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 
 const NAV = [
   { href: '/punch', label: 'Punch order' },
+  { href: '/leads', label: 'Leads' },
   { href: '/orders', label: 'Orders' },
   { href: '/board', label: 'Board' },
   { href: '/clients', label: 'Clients' },
@@ -15,6 +16,7 @@ const NAV = [
 const ADMIN_NAV = [
   { href: '/admin/materials', label: 'Materials' },
   { href: '/admin/sizes', label: 'Sizes' },
+  { href: '/admin/lead-fields', label: 'Lead fields' },
   { href: '/admin/flow', label: 'Status flow' },
 ];
 

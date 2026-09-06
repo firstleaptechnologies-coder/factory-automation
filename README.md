@@ -61,43 +61,65 @@ lsof -a -p "$(lsof -nP -iTCP:8081 -sTCP:LISTEN -t)" -d cwd -Fn
 
 ## What is in place
 
-**Masters** — material categories and materials (sheet size, thickness, density,
-kerf, grain, GST, reorder level), machines with per-category cut rates, tools,
-stock locations, customers, vendors, users with roles.
+**Order punching** — client, location, sizes, material, thickness, photos. The
+client can be found or created inline; a phone match reuses the existing client
+so punching the same customer twice does not create a duplicate. Sizes accept
+what people actually type — `8`, `8' 6"`, `2440mm`, `3/4in` — and the resolved
+millimetres are shown before saving.
 
-**Inventory** — receive stock as individually-labelled pieces, issue to a job,
-transfer, adjust, scrap. Every movement is an append-only ledger row.
+**Leads** — a pipeline board with drag-and-drop, and one-click conversion into
+an order. Leads carry admin-defined fields, so the shop captures what it needs
+(site area, architect, budget band) without a schema change. Converting keeps
+the lead and links it to the order, so the pipeline can report what actually
+converted.
 
-**Nesting** — MaxRects nesting with kerf and grain handling. Reports sheets
-needed, utilisation, the offcuts you can recover, and what the rest costs.
-Sheets are drawn to scale in the browser.
+**Configurable statuses** — statuses, their hierarchy, and the arrows between
+them are drawn on a canvas by the admin. The graph *is* the rule: a status move
+is allowed only if an arrow exists, and redrawing it immediately changes what
+orders and leads can do. Orders and leads each get their own pipeline, edited
+with the same builder.
 
-**Production** — jobs on a machine queue, routing steps, start/pause/complete
-from the shop floor, machine run log behind every state change, QC with
-rejection reasons.
+**Boards** — orders and leads both use a drag-and-drop board. A card dropped on
+a column that the flow does not allow is refused, snaps back, and says why.
 
-**Waste** — offcut recovery, trim, kerf, rejections and damage, each with a cost
-impact and a disposition. Analytics by type, material and disposition, plus the
-value of offcut stock sitting on a rack.
+**Admin configuration** — materials and their thickness options, size presets,
+lead fields, lead sources. Everything is entered in whatever unit suits and
+stored in millimetres.
 
-**Reports** — dashboard, machine utilisation and downtime, material yield,
-planned vs. actual job time.
+## Units
+
+Millimetres are the only unit stored. Feet is the default the UI shows, and any
+screen can switch between mm, cm, m, in and ft without another round trip —
+the API returns both the stored millimetres and the converted display values.
+
+Thickness is the exception to the display unit: it always renders in
+millimetres, because an 18 mm board shown in feet reads "0.059 ft".
 
 ## Design notes worth knowing
 
-- **Offcut threshold** (`apps/api/src/common/utils/geometry.ts`): a drop only
-  becomes a `StockUnit` if it can still hold a real part. Below that it is
-  booked as waste. Calling every scrap "inventory" inflates stock on paper.
-- **Area always balances**: for any sheet, parts + offcuts + waste equals the
-  sheet area. The nester's free rectangles overlap by design, so a disjoint set
-  is selected before any area is summed.
+- **One encryption function** (`apps/api/src/common/crypto/encryption.service.ts`):
+  AES-256-GCM, authenticated, fresh random IV per call, versioned envelope with
+  rotatable keys. Everything needing protection goes through it. Files stored in
+  Postgres are always encrypted.
+- **Images are optimised twice**: in the browser before upload, so a 12 MP site
+  photo never crosses shop wifi at full size, and again on the server, because a
+  client can be bypassed. EXIF is stripped after orientation is baked in — site
+  photos carry GPS. If a file still exceeds its budget, quality and then
+  dimensions are stepped down rather than the upload being refused.
+- **Storage spans S3 and Postgres** behind one interface. Ordinary optimised
+  photos stay in the database, where they are inside the same backup and
+  transaction as the order; larger files go to S3.
+- **Orders snapshot their sizes.** A size preset edited next month must not
+  rewrite what was ordered today.
 - **Document numbers** come from an atomic counter (`DocumentSequence`), not
-  "max existing + 1", so two people receiving stock at once cannot collide.
-- **Money and quantities are `Decimal`**, never `Float`.
+  "max existing + 1", so two people punching at once cannot collide.
+- **Money and dimensions are `Decimal`**, never `Float`.
 
 ## Not built yet
 
-Purchase orders and goods receipts have schema and no UI. Dispatch, invoicing
-and payments are modelled but not wired up. There is no G-code generation and no
-direct machine connectivity — ArtCAM stays the CAM tool, and this system plans,
-costs and records around it.
+Attaching photos from the phone needs a camera module
+(`react-native-image-picker` or similar) plus a `pod install` and rebuild; the
+mobile punch screen says so. Custom fields exist for leads only — the same
+machinery covers orders and clients but has no UI yet. There is no production
+scheduling, dispatch or invoicing, and no G-code generation or machine
+connectivity: ArtCAM stays the CAM tool.

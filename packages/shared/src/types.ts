@@ -7,6 +7,18 @@ export type StatusCategory = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
 export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 export type AttachmentKind = 'REFERENCE_IMAGE' | 'SIZE_IMAGE' | 'DOCUMENT';
 export type StorageBackend = 'S3' | 'DATABASE';
+export type WorkflowKind = 'ORDER' | 'LEAD';
+export type CustomFieldType =
+  | 'TEXT'
+  | 'LONG_TEXT'
+  | 'NUMBER'
+  | 'DATE'
+  | 'BOOLEAN'
+  | 'SELECT'
+  | 'MULTI_SELECT'
+  | 'PHONE'
+  | 'EMAIL';
+export type CustomFieldEntity = 'LEAD' | 'ORDER' | 'CLIENT';
 
 export interface AuthUser {
   id: string;
@@ -108,6 +120,7 @@ export interface Workflow {
   code: string;
   name: string;
   description?: string | null;
+  kind: WorkflowKind;
   isDefault: boolean;
   isActive: boolean;
   statuses: WorkflowStatus[];
@@ -221,4 +234,83 @@ export interface PunchOrderInput {
   dueDate?: string;
   notes?: string;
   items: PunchItemInput[];
+}
+
+
+// -- leads ------------------------------------------------------------------
+
+export interface LeadSource {
+  id: string;
+  code: string;
+  name: string;
+  color?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+/** Admin-defined field. Lead forms are generated from these. */
+export interface CustomFieldDefinition {
+  id: string;
+  entity: CustomFieldEntity;
+  key: string;
+  label: string;
+  type: CustomFieldType;
+  options: string[];
+  helpText?: string | null;
+  required: boolean;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface Lead {
+  id: string;
+  code: string;
+  title: string;
+  client?: Pick<Client, 'id' | 'code' | 'name' | 'phone'> | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  company?: string | null;
+  location?: string | null;
+  source?: LeadSource | null;
+  status: {
+    id: string;
+    code: string;
+    name: string;
+    color: string;
+    category: StatusCategory;
+  };
+  owner?: { id: string; name: string } | null;
+  priority: Priority;
+  estimatedValue?: string | null;
+  expectedDate?: string | null;
+  notes?: string | null;
+  customFields: Record<string, unknown>;
+  convertedOrderId?: string | null;
+  convertedOrder?: { id: string; code: string } | null;
+  convertedAt?: string | null;
+  createdAt: string;
+  statusHistory?: OrderStatusHistoryEntry[];
+}
+
+export interface LeadBoard {
+  workflow: { id: string; code: string; name: string };
+  columns: { status: WorkflowStatus; leads: Lead[]; value: number }[];
+}
+
+export interface CreateLeadInput {
+  title: string;
+  clientId?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  company?: string;
+  location?: string;
+  sourceId?: string;
+  ownerId?: string;
+  priority?: Priority;
+  estimatedValue?: number;
+  expectedDate?: string;
+  notes?: string;
+  customFields?: Record<string, unknown>;
 }

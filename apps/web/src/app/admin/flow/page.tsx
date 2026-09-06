@@ -57,6 +57,8 @@ function StatusNode({ data }: NodeProps) {
 const nodeTypes = { status: StatusNode };
 
 export default function FlowBuilderPage() {
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [selectedId, setSelectedId] = useState<string>('');
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -65,7 +67,15 @@ export default function FlowBuilderPage() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const wf = await api.defaultWorkflow();
+    // Orders and leads are both driven by workflows, so the same canvas edits
+    // either one — the picker chooses which.
+    const all = await api.workflows();
+    setWorkflows(all);
+    const targetId = selectedId || all.find((w) => w.isDefault)?.id || all[0]?.id;
+    if (!targetId) throw new Error('No workflow is configured');
+    setSelectedId(targetId);
+
+    const wf = await api.workflow(targetId);
     setWorkflow(wf);
     setNodes(
       wf.statuses.map((status) => ({
@@ -91,7 +101,7 @@ export default function FlowBuilderPage() {
       })),
     );
     setDirty(false);
-  }, [setNodes, setEdges]);
+  }, [selectedId, setNodes, setEdges]);
 
   useEffect(() => {
     load().catch((e) =>
@@ -160,6 +170,25 @@ export default function FlowBuilderPage() {
       <p className="page-sub">
         {workflow ? workflow.name : 'Loading…'} — this graph is what the API enforces.
       </p>
+
+      <div className="row" style={{ marginBottom: 12 }}>
+        <div style={{ width: 300 }}>
+          <label htmlFor="wf">Editing</label>
+          <select
+            id="wf"
+            value={selectedId}
+            onChange={(event) => {
+              setSelectedId(event.target.value);
+              setDirty(false);
+            }}>
+            {workflows.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name} ({w.kind === 'LEAD' ? 'leads' : 'orders'})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {message ? <div className={`banner ${message.tone}`}>{message.text}</div> : null}
 

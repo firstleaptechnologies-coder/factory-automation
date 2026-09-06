@@ -3,6 +3,11 @@ import type {
   AttachmentKind,
   AuthUser,
   Client,
+  CreateLeadInput,
+  CustomFieldDefinition,
+  Lead,
+  LeadBoard,
+  LeadSource,
   ClientLocation,
   LoginResponse,
   Material,
@@ -10,6 +15,8 @@ import type {
   OrderAttachment,
   OrderBoard,
   Paginated,
+  Priority,
+  PunchItemInput,
   PunchOrderInput,
   SizePreset,
   Workflow,
@@ -303,6 +310,80 @@ export class ApiClient {
 
   removeAttachment(attachmentId: string) {
     return this.del<unknown>(`/orders/attachments/${attachmentId}`);
+  }
+
+  // -- leads ----------------------------------------------------------------
+
+  leads(query?: {
+    statusId?: string;
+    ownerId?: string;
+    sourceId?: string;
+    search?: string;
+    converted?: boolean;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.get<Paginated<Lead>>('/leads', query);
+  }
+
+  leadBoard(workflowId?: string) {
+    return this.get<LeadBoard>('/leads/board', { workflowId });
+  }
+
+  lead(id: string) {
+    return this.get<Lead>(`/leads/${id}`);
+  }
+
+  createLead(body: CreateLeadInput) {
+    return this.post<Lead>('/leads', body);
+  }
+
+  updateLead(id: string, body: Partial<CreateLeadInput>) {
+    return this.patch<Lead>(`/leads/${id}`, body);
+  }
+
+  changeLeadStatus(id: string, body: { toStatusId: string; note?: string }) {
+    return this.post<Lead>(`/leads/${id}/status`, body);
+  }
+
+  /** Turn an enquiry into work. Sizes are supplied here, not on the lead. */
+  convertLead(
+    id: string,
+    body: {
+      location: string;
+      priority?: Priority;
+      dueDate?: string;
+      notes?: string;
+      items: PunchItemInput[];
+      convertedStatusId?: string;
+    },
+  ) {
+    return this.post<{ lead: Lead; order: Order }>(`/leads/${id}/convert`, body);
+  }
+
+  leadSources(includeInactive = false) {
+    return this.get<LeadSource[]>('/leads/sources', { includeInactive });
+  }
+
+  createLeadSource(body: { code: string; name: string; color?: string }) {
+    return this.post<LeadSource>('/leads/sources', body);
+  }
+
+  /** Definitions the lead form builds itself from. */
+  leadFields(includeInactive = false) {
+    return this.get<CustomFieldDefinition[]>('/leads/fields', { includeInactive });
+  }
+
+  createLeadField(body: Partial<CustomFieldDefinition> & { key: string; label: string }) {
+    return this.post<CustomFieldDefinition>('/leads/fields', { entity: 'LEAD', ...body });
+  }
+
+  updateLeadField(id: string, body: Partial<CustomFieldDefinition>) {
+    return this.patch<CustomFieldDefinition>(`/leads/fields/${id}`, body);
+  }
+
+  deactivateLeadField(id: string) {
+    return this.del<unknown>(`/leads/fields/${id}`);
   }
 }
 

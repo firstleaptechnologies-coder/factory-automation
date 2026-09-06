@@ -14,6 +14,7 @@ import { ConfigurationModule } from './modules/config/config.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { FilesModule } from './modules/files/files.module';
+import { LeadsModule } from './modules/leads/leads.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { FilesModule } from './modules/files/files.module';
     WorkflowsModule,
     OrdersModule,
     FilesModule,
+    LeadsModule,
   ],
   providers: [
     // Auth is on by default; endpoints opt out with @Public().

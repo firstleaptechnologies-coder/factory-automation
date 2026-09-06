@@ -49,6 +49,9 @@ model User {
   filesUploaded   StoredFile[]
   clientsCreated  Client[]             @relation("ClientCreatedBy")
   auditLogs       AuditLog[]
+  leadsOwned      Lead[]               @relation("LeadOwner")
+  leadsCreated    Lead[]               @relation("LeadCreatedBy")
+  leadStatusChanges LeadStatusHistory[] @relation("LeadStatusChangedBy")
 
   @@index([role, isActive])
 }
@@ -78,6 +81,7 @@ model Client {
 
   orders    Order[]
   locations ClientLocation[]
+  leads     Lead[]
 
   @@index([name])
   @@index([isActive])
@@ -165,12 +169,21 @@ model SizePreset {
 
 /// A named set of statuses and the moves allowed between them. More than one
 /// can exist (e.g. a short flow for samples), one is the default.
+/// Which entity a workflow drives. Leads and orders share the whole status,
+/// hierarchy and transition machinery — and therefore the same admin canvas.
+enum WorkflowKind {
+  ORDER
+  LEAD
+}
+
 model Workflow {
-  id          String  @id @default(cuid())
-  code        String  @unique
+  id          String       @id @default(cuid())
+  code        String       @unique
   name        String
   description String?
-  isDefault   Boolean @default(false)
+  kind        WorkflowKind @default(ORDER)
+  /// One default per kind.
+  isDefault   Boolean      @default(false)
   isActive    Boolean @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -178,8 +191,9 @@ model Workflow {
   statuses    WorkflowStatus[]
   transitions WorkflowTransition[]
   orders      Order[]
+  leads       Lead[]
 
-  @@index([isActive])
+  @@index([kind, isActive])
 }
 
 /// System meaning of a status, independent of what the admin names it.
@@ -221,8 +235,11 @@ model WorkflowStatus {
   incoming WorkflowTransition[] @relation("ToStatus")
 
   ordersAtStatus Order[]
+  leadsAtStatus  Lead[]
   historyFrom    OrderStatusHistory[] @relation("HistoryFrom")
   historyTo      OrderStatusHistory[] @relation("HistoryTo")
+  leadHistoryFrom LeadStatusHistory[] @relation("LeadHistoryFrom")
+  leadHistoryTo   LeadStatusHistory[] @relation("LeadHistoryTo")
 
   @@unique([workflowId, code])
   @@index([workflowId, sortOrder])
@@ -337,6 +354,8 @@ model Order {
   items         OrderItem[]
   attachments   OrderAttachment[]
   statusHistory OrderStatusHistory[]
+  /// Set when this order came from a lead.
+  fromLead      Lead?                @relation("LeadConversion")
 
   @@index([clientId, createdAt])
   @@index([statusId])
@@ -413,6 +432,138 @@ model OrderStatusHistory {
   changedAt   DateTime @default(now())
 
   @@index([orderId, changedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Leads
+// ---------------------------------------------------------------------------
+
+/// Where an enquiry came from. Admin-managed so the list matches how this shop
+/// actually gets work, rather than a fixed set someone guessed.
+model LeadSource {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  name      String
+  color     String?
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  leads Lead[]
+
+  @@index([isActive, sortOrder])
+}
+
+enum CustomFieldType {
+  TEXT
+  LONG_TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+  MULTI_SELECT
+  PHONE
+  EMAIL
+}
+
+enum CustomFieldEntity {
+  LEAD
+  ORDER
+  CLIENT
+}
+
+/// Admin-defined fields. The shop can capture whatever it needs on a lead —
+/// site area, architect's name, budget band — without a schema change, and the
+/// forms build themselves from these rows.
+model CustomFieldDefinition {
+  id       String            @id @default(cuid())
+  entity   CustomFieldEntity
+  key      String
+  label    String
+  type     CustomFieldType   @default(TEXT)
+  /// Choices for SELECT and MULTI_SELECT.
+  options  String[]          @default([])
+  helpText String?
+  required Boolean           @default(false)
+  sortOrder Int              @default(0)
+  isActive Boolean           @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([entity, key])
+  @@index([entity, isActive, sortOrder])
+}
+
+/// An enquiry, before it is work.
+///
+/// A lead may name an existing client or just a person who rang; the contact
+/// fields cover the second case so nothing is lost while it is still vague.
+model Lead {
+  id    String @id @default(cuid())
+  code  String @unique
+  title String
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  company      String?
+  location     String?
+
+  sourceId String?
+  source   LeadSource? @relation(fields: [sourceId], references: [id])
+
+  workflowId String
+  workflow   Workflow       @relation(fields: [workflowId], references: [id])
+  statusId   String
+  status     WorkflowStatus @relation(fields: [statusId], references: [id])
+
+  ownerId String?
+  owner   User?   @relation("LeadOwner", fields: [ownerId], references: [id])
+
+  estimatedValue Decimal?  @db.Decimal(14, 2)
+  expectedDate   DateTime?
+  priority       Priority  @default(NORMAL)
+  notes          String?
+
+  /// Values for the admin-defined fields above, keyed by their `key`.
+  customFields Json @default("{}")
+
+  /// Set once the lead becomes work. Kept rather than deleted so the pipeline
+  /// can report how many enquiries actually converted.
+  convertedOrderId String?  @unique
+  convertedOrder   Order?   @relation("LeadConversion", fields: [convertedOrderId], references: [id])
+  convertedAt      DateTime?
+
+  createdById String?
+  createdBy   User?    @relation("LeadCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  statusHistory LeadStatusHistory[]
+
+  @@index([statusId])
+  @@index([ownerId])
+  @@index([createdAt])
+}
+
+model LeadStatusHistory {
+  id     String @id @default(cuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  fromStatusId String?
+  fromStatus   WorkflowStatus? @relation("LeadHistoryFrom", fields: [fromStatusId], references: [id])
+  toStatusId   String
+  toStatus     WorkflowStatus  @relation("LeadHistoryTo", fields: [toStatusId], references: [id])
+
+  note        String?
+  changedById String?
+  changedBy   User?    @relation("LeadStatusChangedBy", fields: [changedById], references: [id])
+  changedAt   DateTime @default(now())
+
+  @@index([leadId, changedAt])
 }
 
 // ---------------------------------------------------------------------------

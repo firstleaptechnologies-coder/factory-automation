@@ -2,11 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-type Sequenced = 'order' | 'client';
+type Sequenced = 'order' | 'client' | 'lead';
 
 const PREFIX: Record<Sequenced, string> = {
   order: 'ORD',
   client: 'CL',
+  lead: 'LD',
 };
 
 /** Anything that can run a query: the client, or an open transaction. */
