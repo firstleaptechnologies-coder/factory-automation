@@ -40,6 +40,10 @@ export function Screen({
     <View
       style={[
         padded && styles.padded,
+        // A non-scrolling screen has to fill its parent, or children that use
+        // flex — the punch keypad pinned to the bottom, for one — have nothing
+        // to size against and collapse to nothing.
+        !scroll && styles.fill,
         { paddingBottom: tabBarPadding ? 120 : spacing.xl },
         style,
       ]}>
@@ -81,5 +85,6 @@ export function Screen({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: palette.bg },
+  fill: { flex: 1 },
   padded: { paddingHorizontal: spacing.lg },
 });
