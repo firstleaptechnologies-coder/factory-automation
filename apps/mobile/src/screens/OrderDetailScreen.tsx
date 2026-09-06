@@ -3,11 +3,11 @@ import { Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-nat
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import type { Order, WorkflowStatus, WorkflowTransition } from '@decor/shared';
 import { LENGTH_UNITS, UNIT_LABEL } from '@decor/shared';
-import LinearGradient from 'react-native-linear-gradient';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useDisplayUnit } from '../hooks/useUnit';
 import {
+  AccentSurface,
   Avatar,
   Button,
   Card,
@@ -23,7 +23,7 @@ import {
   Text,
   haptic,
 } from '../ui';
-import { gradients, palette, radius, shadow, spacing } from '../theme';
+import { palette, radius, spacing } from '../theme';
 import { formatDateTime, relativeTime } from '../lib/format';
 
 type NextMove = WorkflowTransition & { toStatus: WorkflowStatus };
@@ -95,20 +95,20 @@ export function OrderDetailScreen({ route, navigation }: { route: any; navigatio
       ) : null}
 
       {/* The order rendered as a physical card. */}
-      <Animated.View entering={FadeInDown.duration(420).springify()} style={shadow.glow}>
-        <LinearGradient
-          colors={gradients.accent}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.orderCard}>
+      <Animated.View entering={FadeInDown.duration(420).springify()}>
+        <AccentSurface contentStyle={styles.orderCard}>
           <View style={styles.orderCardTop}>
-            <View style={{ flex: 1 }}>
-              <Text variant="h1" tone="onAccent" numberOfLines={1}>{data.client.name}</Text>
-              <Text variant="small" tone="onAccent" style={{ opacity: 0.72 }}>
+            {/* minWidth 0 lets the name actually ellipsize; without it a long
+                client name pushes the status pill off the card. */}
+            <View style={styles.orderCardTitle}>
+              <Text variant="h2" tone="onAccent" numberOfLines={2}>{data.client.name}</Text>
+              <Text variant="small" tone="onAccent" style={{ opacity: 0.72 }} numberOfLines={1}>
                 {data.location}
               </Text>
             </View>
-            <Pill label={data.status.name} color={palette.textOnAccent} small />
+            <View style={styles.orderCardPill}>
+              <Pill label={data.status.name} color={palette.textOnAccent} small />
+            </View>
           </View>
 
           <View style={styles.orderCardBottom}>
@@ -127,7 +127,7 @@ export function OrderDetailScreen({ route, navigation }: { route: any; navigatio
               </View>
             ) : null}
           </View>
-        </LinearGradient>
+        </AccentSurface>
       </Animated.View>
 
       <View style={styles.unitRow}>
@@ -299,8 +299,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     marginBottom: spacing.lg,
   },
-  orderCard: { borderRadius: radius.xl, padding: spacing.xl, minHeight: 170, justifyContent: 'space-between' },
+  orderCard: { padding: spacing.xl },
   orderCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  orderCardTitle: { flex: 1, minWidth: 0 },
+  orderCardPill: { flexShrink: 0 },
   orderCardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -104,6 +104,9 @@ function DraggableCard<T extends BoardItem>({
   const [pending, setPending] = useState(false);
 
   const commit = async (statusId: string) => {
+    // `pending` lives on the JS thread and the gesture runs on the UI thread,
+    // so the flag can lag by a frame. Checking it here closes that window.
+    if (pending) return;
     setPending(true);
     try {
       await onMove(item, statusId);
@@ -118,6 +121,11 @@ function DraggableCard<T extends BoardItem>({
   };
 
   const pan = Gesture.Pan()
+    // A card that is already moving must not accept another drag. Without this
+    // a single swipe can commit several stages in a row: the move is async, the
+    // board re-renders underneath it, and the gesture stays live the whole time
+    // — so the card walks along the flow instead of advancing one stage.
+    .enabled(!pending)
     .activeOffsetX([-14, 14])
     // Vertical movement belongs to the column's scroll view, so the horizontal
     // threshold above has to be crossed before this gesture takes over.
@@ -187,7 +195,9 @@ function DraggableCard<T extends BoardItem>({
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingRight: spacing.lg, gap: spacing.md },
+  // Padding on both sides: the screen itself is unpadded so the columns can
+  // run to the edge when scrolled, but the first one must not sit flush.
+  scroll: { paddingHorizontal: spacing.lg, gap: spacing.md },
   column: { width: COLUMN_WIDTH },
   columnHead: {
     flexDirection: 'row',
