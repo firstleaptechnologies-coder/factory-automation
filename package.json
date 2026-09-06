@@ -1,0 +1,28 @@
+{
+  "name": "decor-bucket",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Manufacturing ERP for a CNC-based architectural decor unit",
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev:api": "npm run dev -w @decor/api",
+    "dev:web": "npm run dev -w @decor/web",
+    "dev:mobile": "npm start --prefix apps/mobile",
+    "db:generate": "npm run prisma:generate -w @decor/api",
+    "db:migrate": "npm run prisma:migrate -w @decor/api",
+    "db:seed": "npm run prisma:seed -w @decor/api",
+    "db:studio": "npm run prisma:studio -w @decor/api",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "ios": "npm run ios --prefix apps/mobile",
+    "android": "npm run android --prefix apps/mobile"
+  }
+}

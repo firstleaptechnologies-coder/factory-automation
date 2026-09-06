@@ -1,0 +1,1031 @@
+// Decor Bucket — Manufacturing ERP for a CNC-based architectural decor unit.
+// Domain notes:
+//  - Sheet goods (wood/acrylic/WPC/metal sheet) are tracked as individual physical
+//    StockUnits so that offcuts stay traceable to their parent sheet. This is what
+//    makes real waste management possible instead of a bulk quantity guess.
+//  - Stone is handled as slabs: same StockUnit model, different UOM and costing.
+//  - Money and quantities use Decimal, never Float.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  SALES
+  PLANNER
+  OPERATOR
+  STORE
+  QC
+  ACCOUNTS
+}
+
+model User {
+  id           String   @id @default(cuid())
+  code         String   @unique // employee code, used for shop-floor login
+  name         String
+  email        String?  @unique
+  phone        String?  @unique
+  passwordHash String
+  role         UserRole @default(OPERATOR)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  jobsOperated      Job[]             @relation("JobOperator")
+  operations        JobOperation[]
+  runLogs           MachineRunLog[]
+  stockMovements    StockMovement[]
+  qualityChecks     QualityCheck[]
+  wasteRecords      WasteRecord[]
+  designVersions    DesignVersion[]
+  auditLogs         AuditLog[]
+
+  @@index([role, isActive])
+}
+
+// ---------------------------------------------------------------------------
+// Material masters
+// ---------------------------------------------------------------------------
+
+enum Uom {
+  SHEET
+  SLAB
+  SQM
+  SQFT
+  RMT // running metre
+  KG
+  PCS
+  LTR
+}
+
+/// Wood, Stone, Acrylic, Metal, WPC — and whatever gets added later.
+model MaterialCategory {
+  id          String     @id @default(cuid())
+  code        String     @unique
+  name        String
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  materials         Material[]
+  machineCategories MachineMaterial[]
+}
+
+model Material {
+  id         String           @id @default(cuid())
+  code       String           @unique
+  name       String
+  categoryId String
+  category   MaterialCategory @relation(fields: [categoryId], references: [id])
+
+  uom          Uom
+  isSheetGood  Boolean @default(true)
+  /// Standard incoming size. Individual StockUnits may differ.
+  thicknessMm  Decimal? @db.Decimal(8, 2)
+  lengthMm     Decimal? @db.Decimal(10, 2)
+  widthMm      Decimal? @db.Decimal(10, 2)
+  densityKgM3  Decimal? @db.Decimal(10, 2)
+
+  /// Grain/veining direction matters for wood veneer and stone — blocks free
+  /// rotation during nesting.
+  hasGrain              Boolean @default(false)
+  /// Expected process loss (kerf + trim), used for quoting before a nest exists.
+  wastageAllowancePct   Decimal @default(8) @db.Decimal(5, 2)
+  /// Kerf for this material on a typical tool, mm. Feeds nest + waste maths.
+  defaultKerfMm         Decimal @default(6) @db.Decimal(6, 2)
+
+  standardCost  Decimal @default(0) @db.Decimal(14, 4)
+  currency      String  @default("INR")
+  reorderLevel  Decimal @default(0) @db.Decimal(14, 3)
+  hsnCode       String?
+  gstRatePct    Decimal @default(18) @db.Decimal(5, 2)
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  stockUnits         StockUnit[]
+  orderItems         OrderItem[]
+  jobs               Job[]
+  nestPlans          NestPlan[]
+  wasteRecords       WasteRecord[]
+  purchaseOrderItems PurchaseOrderItem[]
+
+  @@index([categoryId, isActive])
+}
+
+// ---------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------
+
+enum LocationType {
+  RACK
+  FLOOR
+  WIP
+  FINISHED_GOODS
+  SCRAP_YARD
+  OFFCUT_STORE
+}
+
+model StockLocation {
+  id       String       @id @default(cuid())
+  code     String       @unique
+  name     String
+  type     LocationType @default(RACK)
+  isActive Boolean      @default(true)
+
+  stockUnits   StockUnit[]
+  movesFrom    StockMovement[] @relation("MoveFrom")
+  movesTo      StockMovement[] @relation("MoveTo")
+}
+
+enum StockUnitKind {
+  FULL_SHEET
+  PARTIAL
+  OFFCUT
+  BULK
+}
+
+enum StockUnitStatus {
+  AVAILABLE
+  RESERVED
+  IN_USE
+  CONSUMED
+  SCRAPPED
+  QUARANTINED
+}
+
+/// One physical piece of material: a sheet, a slab, or a tracked offcut.
+model StockUnit {
+  id         String @id @default(cuid())
+  /// Printed on the barcode/QR label stuck to the piece.
+  code       String @unique
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+
+  kind   StockUnitKind   @default(FULL_SHEET)
+  status StockUnitStatus @default(AVAILABLE)
+
+  lengthMm    Decimal? @db.Decimal(10, 2)
+  widthMm     Decimal? @db.Decimal(10, 2)
+  thicknessMm Decimal? @db.Decimal(8, 2)
+  /// Derived from L×W at write time for sheet goods; the queryable truth for
+  /// area-based stock and yield reporting.
+  areaSqm     Decimal? @db.Decimal(12, 4)
+  /// For BULK (kg / rmt / pcs) materials.
+  quantity    Decimal? @db.Decimal(14, 3)
+
+  locationId String?
+  location   StockLocation? @relation(fields: [locationId], references: [id])
+
+  /// An offcut points back at the sheet it was cut from — the chain that lets
+  /// you answer "how much of that ₹X slab actually became product?".
+  parentId String?
+  parent   StockUnit?  @relation("Offcut", fields: [parentId], references: [id])
+  children StockUnit[] @relation("Offcut")
+
+  batchNo      String?
+  purchaseCost Decimal? @db.Decimal(14, 4)
+  receivedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  movements        StockMovement[]
+  issues           JobMaterialIssue[]
+  recoveredFrom    WasteRecord[]      @relation("RecoveredStock")
+  goodsReceiptItem GoodsReceiptItem?  @relation(fields: [goodsReceiptItemId], references: [id])
+  goodsReceiptItemId String?
+
+  @@index([materialId, status])
+  @@index([kind, status])
+  @@index([locationId])
+}
+
+enum MovementType {
+  RECEIPT
+  ISSUE
+  RETURN
+  TRANSFER
+  ADJUSTMENT
+  SCRAP
+  OFFCUT_RECOVERY
+}
+
+/// Append-only stock ledger. Never update a row here; write a compensating one.
+model StockMovement {
+  id          String       @id @default(cuid())
+  stockUnitId String
+  stockUnit   StockUnit    @relation(fields: [stockUnitId], references: [id])
+  type        MovementType
+
+  areaSqm  Decimal? @db.Decimal(12, 4)
+  quantity Decimal? @db.Decimal(14, 3)
+
+  fromLocationId String?
+  fromLocation   StockLocation? @relation("MoveFrom", fields: [fromLocationId], references: [id])
+  toLocationId   String?
+  toLocation     StockLocation? @relation("MoveTo", fields: [toLocationId], references: [id])
+
+  jobId  String?
+  job    Job?    @relation(fields: [jobId], references: [id])
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([stockUnitId, createdAt])
+  @@index([type, createdAt])
+  @@index([jobId])
+}
+
+// ---------------------------------------------------------------------------
+// Procurement
+// ---------------------------------------------------------------------------
+
+model Vendor {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  name     String
+  gstin    String?
+  phone    String?
+  email    String?
+  address  String?
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id        String              @id @default(cuid())
+  code      String              @unique
+  vendorId  String
+  vendor    Vendor              @relation(fields: [vendorId], references: [id])
+  status    PurchaseOrderStatus @default(DRAFT)
+  orderDate DateTime            @default(now())
+  expectedAt DateTime?
+  subtotal  Decimal             @default(0) @db.Decimal(14, 2)
+  taxAmount Decimal             @default(0) @db.Decimal(14, 2)
+  total     Decimal             @default(0) @db.Decimal(14, 2)
+  notes     String?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  items    PurchaseOrderItem[]
+  receipts GoodsReceipt[]
+
+  @@index([status, orderDate])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  materialId      String
+  material        Material      @relation(fields: [materialId], references: [id])
+  lineNo          Int
+  quantity        Decimal       @db.Decimal(14, 3)
+  uom             Uom
+  lengthMm        Decimal?      @db.Decimal(10, 2)
+  widthMm         Decimal?      @db.Decimal(10, 2)
+  thicknessMm     Decimal?      @db.Decimal(8, 2)
+  rate            Decimal       @db.Decimal(14, 4)
+  amount          Decimal       @db.Decimal(14, 2)
+  receivedQty     Decimal       @default(0) @db.Decimal(14, 3)
+
+  receiptItems GoodsReceiptItem[]
+
+  @@unique([purchaseOrderId, lineNo])
+}
+
+model GoodsReceipt {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  receivedAt      DateTime      @default(now())
+  invoiceNo       String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+
+  items GoodsReceiptItem[]
+}
+
+model GoodsReceiptItem {
+  id             String  @id @default(cuid())
+  goodsReceiptId String
+  goodsReceipt   GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderItemId String?
+  purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id])
+  quantity       Decimal @db.Decimal(14, 3)
+  rate           Decimal @db.Decimal(14, 4)
+
+  /// The physical pieces created by this receipt line.
+  stockUnits StockUnit[]
+}
+
+// ---------------------------------------------------------------------------
+// Customers, designs & sales orders
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id             String  @id @default(cuid())
+  code           String  @unique
+  name           String
+  contactPerson  String?
+  phone          String?
+  email          String?
+  gstin          String?
+  billingAddress String?
+  shippingAddress String?
+  creditDays     Int     @default(0)
+  isActive       Boolean @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orders   Order[]
+  designs  Design[]
+  invoices Invoice[]
+}
+
+enum DesignFileType {
+  ARTCAM
+  DXF
+  DWG
+  SVG
+  STEP
+  GCODE
+  PDF
+  IMAGE
+  OTHER
+}
+
+/// A reusable design/pattern. Versioned, because the shop floor must never be
+/// looking at a superseded file.
+model Design {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  name       String
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  notes      String?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  versions   DesignVersion[]
+  orderItems OrderItem[]
+}
+
+model DesignVersion {
+  id        String         @id @default(cuid())
+  designId  String
+  design    Design         @relation(fields: [designId], references: [id], onDelete: Cascade)
+  version   Int
+  fileType  DesignFileType
+  fileName  String
+  filePath  String
+  fileSize  Int?
+  checksum  String?
+  isCurrent Boolean        @default(true)
+  uploadedById String?
+  uploadedBy   User?       @relation(fields: [uploadedById], references: [id])
+  createdAt DateTime       @default(now())
+
+  @@unique([designId, version])
+  @@index([designId, isCurrent])
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  IN_PRODUCTION
+  READY
+  PARTIALLY_DELIVERED
+  DELIVERED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  code       String      @unique
+  customerId String
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  poNumber   String?
+  status     OrderStatus @default(DRAFT)
+  priority   Priority    @default(NORMAL)
+  orderDate  DateTime    @default(now())
+  dueDate    DateTime?
+  subtotal   Decimal     @default(0) @db.Decimal(14, 2)
+  taxAmount  Decimal     @default(0) @db.Decimal(14, 2)
+  total      Decimal     @default(0) @db.Decimal(14, 2)
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  items      OrderItem[]
+  jobs       Job[]
+  dispatches Dispatch[]
+  invoices   Invoice[]
+
+  @@index([status, dueDate])
+  @@index([customerId, orderDate])
+}
+
+enum OrderItemStatus {
+  PENDING
+  PLANNED
+  IN_PRODUCTION
+  COMPLETED
+  CANCELLED
+}
+
+model OrderItem {
+  id          String          @id @default(cuid())
+  orderId     String
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineNo      Int
+  description String
+  designId    String?
+  design      Design?         @relation(fields: [designId], references: [id])
+  materialId  String
+  material    Material        @relation(fields: [materialId], references: [id])
+  status      OrderItemStatus @default(PENDING)
+
+  quantity    Decimal @db.Decimal(14, 3)
+  uom         Uom
+  lengthMm    Decimal? @db.Decimal(10, 2)
+  widthMm     Decimal? @db.Decimal(10, 2)
+  thicknessMm Decimal? @db.Decimal(8, 2)
+
+  unitPrice Decimal @db.Decimal(14, 4)
+  amount    Decimal @db.Decimal(14, 2)
+
+  producedQty Decimal @default(0) @db.Decimal(14, 3)
+
+  jobs          Job[]
+  nestParts     NestPart[]
+  dispatchItems DispatchItem[]
+
+  @@unique([orderId, lineNo])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Machines
+// ---------------------------------------------------------------------------
+
+enum MachineType {
+  CNC_ROUTER
+  CNC_LASER
+  WATERJET
+  PLASMA
+  EDGE_BANDER
+  PANEL_SAW
+  POLISHER
+  OTHER
+}
+
+enum MachineStatus {
+  IDLE
+  SETUP
+  RUNNING
+  PAUSED
+  MAINTENANCE
+  BREAKDOWN
+  OFFLINE
+}
+
+model Machine {
+  id       String        @id @default(cuid())
+  code     String        @unique
+  name     String
+  type     MachineType   @default(CNC_ROUTER)
+  status   MachineStatus @default(IDLE)
+  make     String?
+  model    String?
+  controller String?     // Syntec, Mach3, Fanuc, NcStudio…
+  bedLengthMm    Decimal? @db.Decimal(10, 2)
+  bedWidthMm     Decimal? @db.Decimal(10, 2)
+  maxZMm         Decimal? @db.Decimal(10, 2)
+  spindlePowerKw Decimal? @db.Decimal(8, 2)
+  /// Costing rate used for job estimates and actuals.
+  hourlyRate     Decimal  @default(0) @db.Decimal(12, 2)
+  installedAt    DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  materials    MachineMaterial[]
+  jobs         Job[]
+  operations   JobOperation[]
+  runLogs      MachineRunLog[]
+  maintenances Maintenance[]
+  tools        Tool[]
+
+  @@index([status, isActive])
+}
+
+/// Which machine is allowed to cut which material category, with the machine's
+/// realistic cut rate for that category — the basis of scheduling estimates.
+model MachineMaterial {
+  id         String           @id @default(cuid())
+  machineId  String
+  machine    Machine          @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   MaterialCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  /// Typical cutting throughput, metres of cut per minute.
+  cutRateMPerMin Decimal? @db.Decimal(8, 3)
+  setupMinutes   Int      @default(15)
+
+  @@unique([machineId, categoryId])
+}
+
+model Tool {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  name        String
+  type        String? // end mill, V-bit, ball nose, drag knife…
+  diameterMm  Decimal? @db.Decimal(8, 2)
+  fluteCount  Int?
+  machineId   String?
+  machine     Machine? @relation(fields: [machineId], references: [id])
+  /// Rated life and running total, so a blunt tool is a scheduled swap and not
+  /// a scrapped sheet.
+  ratedLifeMinutes Int?
+  usedMinutes      Int     @default(0)
+  isActive         Boolean @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  BREAKDOWN
+  CALIBRATION
+}
+
+model Maintenance {
+  id          String          @id @default(cuid())
+  machineId   String
+  machine     Machine         @relation(fields: [machineId], references: [id])
+  type        MaintenanceType @default(PREVENTIVE)
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  cost        Decimal?        @db.Decimal(12, 2)
+  performedBy String?
+  notes       String?
+  createdAt   DateTime        @default(now())
+
+  @@index([machineId, scheduledAt])
+}
+
+// ---------------------------------------------------------------------------
+// Nesting — where material efficiency is won or lost
+// ---------------------------------------------------------------------------
+
+enum NestPlanStatus {
+  DRAFT
+  APPROVED
+  IN_PRODUCTION
+  COMPLETED
+  CANCELLED
+}
+
+model NestPlan {
+  id         String         @id @default(cuid())
+  code       String         @unique
+  materialId String
+  material   Material       @relation(fields: [materialId], references: [id])
+  status     NestPlanStatus @default(DRAFT)
+
+  sheetLengthMm Decimal @db.Decimal(10, 2)
+  sheetWidthMm  Decimal @db.Decimal(10, 2)
+  sheetCount    Int     @default(1)
+
+  /// sheetArea = L×W×sheetCount; partsArea = Σ nested part areas.
+  sheetAreaSqm   Decimal @default(0) @db.Decimal(12, 4)
+  partsAreaSqm   Decimal @default(0) @db.Decimal(12, 4)
+  /// Reclaimable area above the offcut threshold, vs. genuinely lost area.
+  offcutAreaSqm  Decimal @default(0) @db.Decimal(12, 4)
+  wasteAreaSqm   Decimal @default(0) @db.Decimal(12, 4)
+  utilizationPct Decimal @default(0) @db.Decimal(5, 2)
+
+  kerfMm    Decimal @default(6) @db.Decimal(6, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parts        NestPart[]
+  jobs         Job[]
+  wasteRecords WasteRecord[]
+
+  @@index([status, materialId])
+}
+
+model NestPart {
+  id          String    @id @default(cuid())
+  nestPlanId  String
+  nestPlan    NestPlan  @relation(fields: [nestPlanId], references: [id], onDelete: Cascade)
+  orderItemId String?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
+  label       String
+  quantity    Int       @default(1)
+  lengthMm    Decimal   @db.Decimal(10, 2)
+  widthMm     Decimal   @db.Decimal(10, 2)
+  /// Placement on the sheet, mm from bottom-left origin.
+  sheetIndex  Int       @default(0)
+  posXMm      Decimal?  @db.Decimal(10, 2)
+  posYMm      Decimal?  @db.Decimal(10, 2)
+  rotationDeg Int       @default(0)
+
+  @@index([nestPlanId, sheetIndex])
+}
+
+// ---------------------------------------------------------------------------
+// Production
+// ---------------------------------------------------------------------------
+
+enum JobStatus {
+  PLANNED
+  QUEUED
+  SETUP
+  RUNNING
+  PAUSED
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  orderId     String?
+  order       Order?    @relation(fields: [orderId], references: [id])
+  orderItemId String?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
+  nestPlanId  String?
+  nestPlan    NestPlan? @relation(fields: [nestPlanId], references: [id])
+  machineId   String?
+  machine     Machine?  @relation(fields: [machineId], references: [id])
+  materialId  String
+  material    Material  @relation(fields: [materialId], references: [id])
+
+  status   JobStatus @default(PLANNED)
+  priority Priority  @default(NORMAL)
+  /// Position in that machine's queue. Lower runs first.
+  sequence Int       @default(0)
+
+  quantity     Decimal @db.Decimal(14, 3)
+  completedQty Decimal @default(0) @db.Decimal(14, 3)
+  rejectedQty  Decimal @default(0) @db.Decimal(14, 3)
+
+  plannedStart DateTime?
+  plannedEnd   DateTime?
+  actualStart  DateTime?
+  actualEnd    DateTime?
+  estimatedMinutes Int?
+  actualMinutes    Int?
+
+  operatorId String?
+  operator   User?   @relation("JobOperator", fields: [operatorId], references: [id])
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  operations     JobOperation[]
+  materialIssues JobMaterialIssue[]
+  runLogs        MachineRunLog[]
+  qualityChecks  QualityCheck[]
+  wasteRecords   WasteRecord[]
+  stockMovements StockMovement[]
+
+  @@index([machineId, status, sequence])
+  @@index([status, plannedStart])
+  @@index([orderId])
+}
+
+enum OperationType {
+  CUT
+  ENGRAVE
+  DRILL
+  ROUTING
+  SANDING
+  POLISHING
+  EDGE_BANDING
+  PAINTING
+  ASSEMBLY
+  QC
+  PACKING
+}
+
+enum OperationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+model JobOperation {
+  id        String          @id @default(cuid())
+  jobId     String
+  job       Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  seq       Int
+  type      OperationType
+  status    OperationStatus @default(PENDING)
+  machineId String?
+  machine   Machine?        @relation(fields: [machineId], references: [id])
+  operatorId String?
+  operator   User?          @relation(fields: [operatorId], references: [id])
+  startedAt DateTime?
+  endedAt   DateTime?
+  estimatedMinutes Int?
+  actualMinutes    Int?
+  notes     String?
+
+  @@unique([jobId, seq])
+  @@index([status])
+}
+
+/// Material physically issued to a job. The link from a costed sheet to the
+/// job that consumed it.
+model JobMaterialIssue {
+  id          String    @id @default(cuid())
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  stockUnitId String
+  stockUnit   StockUnit @relation(fields: [stockUnitId], references: [id])
+  areaSqm     Decimal?  @db.Decimal(12, 4)
+  quantity    Decimal?  @db.Decimal(14, 3)
+  cost        Decimal?  @db.Decimal(14, 4)
+  issuedAt    DateTime  @default(now())
+
+  @@index([jobId])
+  @@index([stockUnitId])
+}
+
+enum MachineState {
+  RUNNING
+  IDLE
+  SETUP
+  DOWN
+}
+
+/// Time-sliced machine state. OEE, utilisation and downtime analysis all read
+/// from here.
+model MachineRunLog {
+  id        String       @id @default(cuid())
+  machineId String
+  machine   Machine      @relation(fields: [machineId], references: [id])
+  jobId     String?
+  job       Job?         @relation(fields: [jobId], references: [id])
+  state     MachineState
+  startedAt DateTime
+  endedAt   DateTime?
+  durationMinutes Int?
+  downtimeReasonId String?
+  downtimeReason   DowntimeReason? @relation(fields: [downtimeReasonId], references: [id])
+  operatorId String?
+  operator   User?  @relation(fields: [operatorId], references: [id])
+  note       String?
+
+  @@index([machineId, startedAt])
+  @@index([state, startedAt])
+}
+
+model DowntimeReason {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  name     String
+  isPlanned Boolean @default(false)
+  isActive Boolean @default(true)
+
+  runLogs MachineRunLog[]
+}
+
+// ---------------------------------------------------------------------------
+// Quality
+// ---------------------------------------------------------------------------
+
+enum QcResult {
+  PASS
+  FAIL
+  REWORK
+}
+
+model QualityCheck {
+  id          String  @id @default(cuid())
+  jobId       String
+  job         Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  result      QcResult
+  qtyChecked  Decimal @db.Decimal(14, 3)
+  qtyPassed   Decimal @db.Decimal(14, 3)
+  qtyRejected Decimal @default(0) @db.Decimal(14, 3)
+  reasonId    String?
+  reason      RejectionReason? @relation(fields: [reasonId], references: [id])
+  checkedById String?
+  checkedBy   User?   @relation(fields: [checkedById], references: [id])
+  remarks     String?
+  checkedAt   DateTime @default(now())
+
+  @@index([jobId])
+}
+
+model RejectionReason {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  name     String
+  category String? // machine, material, operator, design
+  isActive Boolean @default(true)
+
+  qualityChecks QualityCheck[]
+  wasteRecords  WasteRecord[]
+}
+
+// ---------------------------------------------------------------------------
+// Waste management
+// ---------------------------------------------------------------------------
+
+enum WasteType {
+  OFFCUT
+  KERF
+  TRIM
+  SETUP_LOSS
+  REJECTION
+  DAMAGE
+  TEST_CUT
+}
+
+enum WasteDisposition {
+  REUSE
+  RECYCLE
+  SELL
+  DISPOSE
+  PENDING
+}
+
+/// Every gram and square metre that did not become product. Offcuts above the
+/// reuse threshold get a StockUnit of their own and come back as inventory.
+model WasteRecord {
+  id         String   @id @default(cuid())
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+  jobId      String?
+  job        Job?     @relation(fields: [jobId], references: [id])
+  nestPlanId String?
+  nestPlan   NestPlan? @relation(fields: [nestPlanId], references: [id])
+
+  type        WasteType
+  disposition WasteDisposition @default(PENDING)
+
+  areaSqm  Decimal? @db.Decimal(12, 4)
+  weightKg Decimal? @db.Decimal(12, 3)
+  quantity Decimal? @db.Decimal(14, 3)
+
+  lengthMm Decimal? @db.Decimal(10, 2)
+  widthMm  Decimal? @db.Decimal(10, 2)
+
+  isReusable Boolean @default(false)
+  /// Set when a reusable offcut has been labelled and returned to stock.
+  recoveredStockUnitId String?
+  recoveredStockUnit   StockUnit? @relation("RecoveredStock", fields: [recoveredStockUnitId], references: [id])
+
+  reasonId String?
+  reason   RejectionReason? @relation(fields: [reasonId], references: [id])
+
+  costImpact Decimal? @db.Decimal(14, 4)
+  recordedById String?
+  recordedBy   User?  @relation(fields: [recordedById], references: [id])
+  remarks    String?
+  recordedAt DateTime @default(now())
+
+  @@index([materialId, recordedAt])
+  @@index([type, disposition])
+  @@index([jobId])
+}
+
+// ---------------------------------------------------------------------------
+// Dispatch & billing
+// ---------------------------------------------------------------------------
+
+model Dispatch {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  dispatchedAt DateTime @default(now())
+  vehicleNo   String?
+  driverName  String?
+  ewayBillNo  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  items DispatchItem[]
+}
+
+model DispatchItem {
+  id          String    @id @default(cuid())
+  dispatchId  String
+  dispatch    Dispatch  @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  quantity    Decimal   @db.Decimal(14, 3)
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+model Invoice {
+  id         String        @id @default(cuid())
+  code       String        @unique
+  orderId    String?
+  order      Order?        @relation(fields: [orderId], references: [id])
+  customerId String
+  customer   Customer      @relation(fields: [customerId], references: [id])
+  status     InvoiceStatus @default(DRAFT)
+  invoiceDate DateTime     @default(now())
+  dueDate    DateTime?
+  subtotal   Decimal       @default(0) @db.Decimal(14, 2)
+  taxAmount  Decimal       @default(0) @db.Decimal(14, 2)
+  total      Decimal       @default(0) @db.Decimal(14, 2)
+  paidAmount Decimal       @default(0) @db.Decimal(14, 2)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  payments Payment[]
+
+  @@index([status, invoiceDate])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(14, 2)
+  mode      String? // cash, neft, upi, cheque
+  reference String?
+  paidAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id       String  @id @default(cuid())
+  entity   String
+  entityId String
+  action   String
+  before   Json?
+  after    Json?
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+/// Atomic counters behind human-readable document numbers. A read-then-increment
+/// on the documents themselves loses races — two people receiving stock at the
+/// same second would both compute the same next number.
+model DocumentSequence {
+  id        String   @id @default(cuid())
+  /// Prefix plus financial year, e.g. "SU-2526".
+  key       String   @unique
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
