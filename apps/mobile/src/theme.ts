@@ -37,18 +37,3 @@ export const font = {
   small: 14,
   tiny: 12,
 };
-
-export const statusColor: Record<string, string> = {
-  RUNNING: colors.running,
-  IDLE: colors.idle,
-  SETUP: colors.warning,
-  PAUSED: colors.warning,
-  QUEUED: colors.primary,
-  PLANNED: colors.idle,
-  COMPLETED: colors.success,
-  ON_HOLD: colors.warning,
-  CANCELLED: colors.danger,
-  BREAKDOWN: colors.danger,
-  MAINTENANCE: colors.warning,
-  OFFLINE: colors.idle,
-};

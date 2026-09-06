@@ -5,11 +5,9 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {useAuth} from '../auth/AuthContext';
 import {LoginScreen} from '../screens/LoginScreen';
-import {HomeScreen} from '../screens/HomeScreen';
-import {JobDetailScreen} from '../screens/JobDetailScreen';
-import {MachinesScreen} from '../screens/MachinesScreen';
-import {StockScreen} from '../screens/StockScreen';
-import {CloseSheetScreen} from '../screens/CloseSheetScreen';
+import {PunchScreen} from '../screens/PunchScreen';
+import {OrdersScreen} from '../screens/OrdersScreen';
+import {OrderDetailScreen} from '../screens/OrderDetailScreen';
 import {colors} from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -39,9 +37,8 @@ function MainTabs() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
       }}>
-      <Tabs.Screen name="Home" component={HomeScreen} options={{title: 'My work'}} />
-      <Tabs.Screen name="Machines" component={MachinesScreen} options={{title: 'Machines'}} />
-      <Tabs.Screen name="Stock" component={StockScreen} options={{title: 'Stock'}} />
+      <Tabs.Screen name="Punch" component={PunchScreen} options={{title: 'Punch'}} />
+      <Tabs.Screen name="Orders" component={OrdersScreen} options={{title: 'Orders'}} />
     </Tabs.Navigator>
   );
 }
@@ -68,8 +65,7 @@ export function RootNavigator() {
         {user ? (
           <>
             <Stack.Screen name="Main" component={MainTabs} options={{headerShown: false}} />
-            <Stack.Screen name="JobDetail" component={JobDetailScreen} options={{title: 'Job'}} />
-            <Stack.Screen name="CloseSheet" component={CloseSheetScreen} options={{title: 'Close sheet'}} />
+            <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{title: 'Order'}} />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} options={{headerShown: false}} />

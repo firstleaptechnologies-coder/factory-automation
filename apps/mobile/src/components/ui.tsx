@@ -7,7 +7,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import {colors, font, radius, spacing, statusColor} from '../theme';
+import {colors, font, radius, spacing} from '../theme';
 
 export function Card({
   children,
@@ -27,11 +27,11 @@ export function Card({
   );
 }
 
-export function StatusPill({status}: {status: string}) {
-  const background = statusColor[status] ?? colors.idle;
+/** Colour comes from the admin-configured status, not a hard-coded map. */
+export function StatusPill({label, color}: {label: string; color?: string}) {
   return (
-    <View style={[styles.pill, {backgroundColor: background}]}>
-      <Text style={styles.pillText}>{status.replace(/_/g, ' ')}</Text>
+    <View style={[styles.pill, {backgroundColor: color ?? colors.idle}]}>
+      <Text style={styles.pillText}>{label.replace(/_/g, ' ')}</Text>
     </View>
   );
 }
