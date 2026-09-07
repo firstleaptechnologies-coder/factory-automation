@@ -1,11 +1,18 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AttachmentKind, Prisma, UserRole } from '@prisma/client';
+import {
+  AttachmentKind,
+  PricingMode,
+  Prisma,
+  RateUnit,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CodeGeneratorService } from '../../common/utils/code-generator.service';
 import { paginate } from '../../common/dto/pagination.dto';
 import { FilesService, IncomingFile } from '../files/files.service';
 import { ClientsService } from '../clients/clients.service';
 import { DEFAULT_UNIT, LengthUnit, fromMm, toMm } from '@decor/shared';
+import { lineAmount, round2 } from '../../common/utils/pricing';
 
 /** Thickness is spoken in millimetres regardless of the sheet's display unit. */
 const THICKNESS_UNIT: LengthUnit = 'MM';
@@ -91,14 +98,26 @@ export class OrdersService {
       );
     }
 
-    const initial = workflow.statuses.find((status) => status.isInitial);
+    // An order punched directly has never been an enquiry, so it must be able
+    // to start partway along — at "Order confirmed" rather than "Lead". Any
+    // stage the admin marked as an entry point is a legal place to begin.
+    const entryPoints = workflow.statuses.filter((status) => status.isEntryPoint);
+    const initial = dto.startStatusId
+      ? workflow.statuses.find((status) => status.id === dto.startStatusId)
+      : (entryPoints.find((status) => !status.isInitial) ??
+         workflow.statuses.find((status) => status.isInitial));
+
     if (!initial) {
       throw new BadRequestException(
-        `Workflow "${workflow.name}" has no starting status. Mark one status as the initial status.`,
+        `Workflow "${workflow.name}" has no stage an order can start at. Mark one on the flow builder.`,
       );
+    }
+    if (dto.startStatusId && !initial.isEntryPoint && !initial.isInitial) {
+      throw new BadRequestException(`${initial.name} is not a stage an order may start at`);
     }
 
     const items = await Promise.all(dto.items.map((item) => this.resolveItem(item)));
+    const money = totalsFor(dto.pricingMode ?? PricingMode.ITEMISED, items, dto.discount, dto.total);
     const code = await this.codes.next('order');
 
     return this.prisma.$transaction(async (tx) => {
@@ -123,6 +142,10 @@ export class OrdersService {
           dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
           notes: dto.notes,
           createdById: userId,
+          pricingMode: money.pricingMode,
+          subtotal: money.subtotal,
+          discount: money.discount,
+          total: money.total,
           items: {
             create: items.map((item, index) => ({ lineNo: index + 1, ...item })),
           },
@@ -208,6 +231,10 @@ export class OrdersService {
     });
     if (!material) throw new NotFoundException(`Material ${item.materialId} not found`);
 
+    const quantity = item.quantity ?? 1;
+    const rateUnit = item.rateUnit ?? RateUnit.PER_SQFT;
+    const rate = item.rate ?? null;
+
     return {
       sizePresetId: item.sizePresetId,
       lengthMm,
@@ -215,8 +242,13 @@ export class OrdersService {
       thicknessMm: thickness.valueMm,
       materialId: item.materialId,
       materialThicknessId: thickness.optionId,
-      quantity: item.quantity ?? 1,
+      quantity,
       notes: item.notes,
+      rate,
+      rateUnit,
+      // Priced now and stored: a rate edited next month must not restate what
+      // this order was worth today.
+      amount: lineAmount({ rate, rateUnit, lengthMm, widthMm, quantity }),
     };
   }
 
@@ -341,7 +373,23 @@ export class OrdersService {
   // -- writing --------------------------------------------------------------
 
   async update(id: string, dto: UpdateOrderDto) {
-    await this.findOne(id);
+    const existing = await this.prisma.order.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!existing) throw new NotFoundException(`Order ${id} not found`);
+
+    const pricingMode = dto.pricingMode ?? existing.pricingMode;
+    const money =
+      dto.pricingMode !== undefined || dto.discount !== undefined || dto.total !== undefined
+        ? totalsFor(
+            pricingMode,
+            existing.items.map((item) => ({ amount: Number(item.amount) })),
+            dto.discount ?? Number(existing.discount),
+            dto.total ?? Number(existing.total),
+          )
+        : null;
+
     return this.prisma.order.update({
       where: { id },
       data: {
@@ -349,6 +397,14 @@ export class OrdersService {
         priority: dto.priority,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         notes: dto.notes,
+        ...(money
+          ? {
+              pricingMode: money.pricingMode,
+              subtotal: money.subtotal,
+              discount: money.discount,
+              total: money.total,
+            }
+          : {}),
       },
       include: ORDER_INCLUDE,
     });
@@ -503,4 +559,38 @@ export class OrdersService {
 
 function measure(input: MeasurementDto): number {
   return toMm(input.value, input.unit);
+}
+
+
+/**
+ * The order's money, from however it was quoted.
+ *
+ * ITEMISED adds the priced lines and subtracts a discount. LUMP_SUM keeps the
+ * figure that was actually given to the client and leaves the lines unpriced —
+ * back-calculating a rate from it would invent a number nobody agreed to, and
+ * that number would drift the moment a size was corrected.
+ */
+function totalsFor(
+  pricingMode: PricingMode,
+  items: { amount: number }[],
+  discount = 0,
+  quotedTotal = 0,
+): { pricingMode: PricingMode; subtotal: number; discount: number; total: number } {
+  if (pricingMode === PricingMode.LUMP_SUM) {
+    return {
+      pricingMode,
+      subtotal: round2(quotedTotal),
+      discount: 0,
+      total: round2(quotedTotal),
+    };
+  }
+
+  const subtotal = round2(items.reduce((sum, item) => sum + item.amount, 0));
+  const applied = Math.min(round2(discount), subtotal);
+  return {
+    pricingMode,
+    subtotal,
+    discount: applied,
+    total: round2(subtotal - applied),
+  };
 }

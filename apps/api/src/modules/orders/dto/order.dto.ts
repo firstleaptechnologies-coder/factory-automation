@@ -5,13 +5,14 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { AttachmentKind, Priority } from '@prisma/client';
+import { AttachmentKind, PricingMode, Priority, RateUnit } from '@prisma/client';
 import { LENGTH_UNITS, LengthUnit } from '@decor/shared';
 import { MeasurementDto } from '../../config/dto/config.dto';
 import { CreateClientDto } from '../../clients/dto/client.dto';
@@ -29,6 +30,14 @@ export class PunchItemDto {
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) quantity?: number;
   @IsOptional() @IsString() notes?: string;
+
+  /**
+   * Priced the way it was quoted. `rateUnit` decides what `rate` means — a
+   * price per square foot, per piece, per running foot, or the line total
+   * itself when it was quoted as one figure.
+   */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) rate?: number;
+  @IsOptional() @IsEnum(RateUnit) rateUnit?: RateUnit;
 }
 
 /**
@@ -47,6 +56,15 @@ export class PunchOrderDto {
   @IsOptional() @IsDateString() dueDate?: string;
   @IsOptional() @IsString() notes?: string;
 
+  /** Which stage to start at. Defaults to the workflow's default entry point. */
+  @IsOptional() @IsString() startStatusId?: string;
+
+  /** ITEMISED adds up the lines; LUMP_SUM uses `total` as quoted. */
+  @IsOptional() @IsEnum(PricingMode) pricingMode?: PricingMode;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) discount?: number;
+  /** Required for LUMP_SUM — the single figure that was quoted. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) total?: number;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => PunchItemDto)
@@ -55,6 +73,9 @@ export class PunchOrderDto {
 
 export class UpdateOrderDto {
   @IsOptional() @IsString() location?: string;
+  @IsOptional() @IsEnum(PricingMode) pricingMode?: PricingMode;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) discount?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) total?: number;
   @IsOptional() @IsEnum(Priority) priority?: Priority;
   @IsOptional() @IsDateString() dueDate?: string;
   @IsOptional() @IsString() notes?: string;

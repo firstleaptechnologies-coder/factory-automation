@@ -81,41 +81,54 @@ const SIZE_PRESETS = [
 ];
 
 /**
- * A starting flow. Statuses are grouped so the hierarchy feature has something
- * real in it: the three production steps sit under "In Production".
+ * The order journey.
+ *
+ * Nine stages, and two ways in. An enquiry that becomes work starts at Lead; an
+ * order taken already confirmed starts at Order confirmed. Both are marked as
+ * entry points so neither has to pretend it went through the other.
+ *
+ * Payment is deliberately not a gate here. Money arrives in instalments and
+ * often before production — an advance at confirmation is normal — so it is
+ * tracked as its own ledger and the "Payment" stage marks the point where the
+ * shop chases the balance, not a wall the order cannot pass.
  */
 const STATUSES = [
-  { code: 'NEW', name: 'New', color: '#6B7785', category: StatusCategory.OPEN, isInitial: true, x: 40, y: 200 },
-  { code: 'CONFIRMED', name: 'Confirmed', color: '#2F81F7', category: StatusCategory.OPEN, x: 260, y: 200 },
-  { code: 'PRODUCTION', name: 'In Production', color: '#D29922', category: StatusCategory.IN_PROGRESS, x: 480, y: 200 },
-  { code: 'CUTTING', name: 'Cutting', color: '#D29922', category: StatusCategory.IN_PROGRESS, parent: 'PRODUCTION', x: 480, y: 320 },
-  { code: 'FINISHING', name: 'Finishing', color: '#D29922', category: StatusCategory.IN_PROGRESS, parent: 'PRODUCTION', x: 480, y: 400 },
-  { code: 'QC', name: 'Quality Check', color: '#8957E5', category: StatusCategory.IN_PROGRESS, parent: 'PRODUCTION', x: 480, y: 480 },
-  { code: 'READY', name: 'Ready', color: '#2EA043', category: StatusCategory.IN_PROGRESS, x: 700, y: 200 },
-  { code: 'DELIVERED', name: 'Delivered', color: '#2EA043', category: StatusCategory.DONE, isTerminal: true, x: 920, y: 200 },
-  { code: 'ON_HOLD', name: 'On Hold', color: '#D29922', category: StatusCategory.OPEN, x: 260, y: 60 },
-  { code: 'CANCELLED', name: 'Cancelled', color: '#DA3633', category: StatusCategory.CANCELLED, isTerminal: true, x: 700, y: 60 },
+  { code: 'LEAD', name: 'Lead', color: '#8B949E', category: StatusCategory.OPEN, isInitial: true, isEntryPoint: true, x: 40, y: 200 },
+  { code: 'ORDER_FINAL', name: 'Order confirmed', color: '#FF6B1A', category: StatusCategory.OPEN, isEntryPoint: true, x: 260, y: 200 },
+  { code: 'DESIGN', name: 'Design', color: '#8957E5', category: StatusCategory.IN_PROGRESS, x: 480, y: 200 },
+  { code: 'DESIGN_APPROVAL', name: 'Design approval', color: '#B392F0', category: StatusCategory.IN_PROGRESS, x: 700, y: 200 },
+  { code: 'PRODUCTION', name: 'Production', color: '#D29922', category: StatusCategory.IN_PROGRESS, x: 920, y: 200 },
+  { code: 'QC_SANDING', name: 'QC & Sanding', color: '#E3B341', category: StatusCategory.IN_PROGRESS, x: 1140, y: 200 },
+  { code: 'PAYMENT', name: 'Payment', color: '#58A6FF', category: StatusCategory.IN_PROGRESS, x: 1360, y: 200 },
+  { code: 'READY_DISPATCH', name: 'Ready to dispatch', color: '#3FB950', category: StatusCategory.IN_PROGRESS, x: 1580, y: 200 },
+  { code: 'DELIVERED', name: 'Delivered', color: '#2EA043', category: StatusCategory.DONE, isTerminal: true, x: 1800, y: 200 },
+  { code: 'ON_HOLD', name: 'On hold', color: '#D29922', category: StatusCategory.OPEN, x: 700, y: 60 },
+  { code: 'CANCELLED', name: 'Cancelled', color: '#DA3633', category: StatusCategory.CANCELLED, isTerminal: true, x: 1360, y: 60 },
 ];
 
 const TRANSITIONS: [string, string, { label?: string; requiresNote?: boolean }?][] = [
-  ['NEW', 'CONFIRMED'],
-  ['NEW', 'CANCELLED', { requiresNote: true }],
-  ['CONFIRMED', 'PRODUCTION'],
-  ['CONFIRMED', 'ON_HOLD', { requiresNote: true }],
-  ['ON_HOLD', 'CONFIRMED'],
-  ['ON_HOLD', 'CANCELLED', { requiresNote: true }],
-  ['PRODUCTION', 'CUTTING'],
-  ['CUTTING', 'FINISHING'],
-  ['FINISHING', 'QC'],
-  ['QC', 'READY'],
-  ['QC', 'CUTTING', { label: 'Rework', requiresNote: true }],
-  ['PRODUCTION', 'READY'],
-  ['READY', 'DELIVERED'],
+  ['LEAD', 'ORDER_FINAL', { label: 'Confirm' }],
+  ['LEAD', 'CANCELLED', { requiresNote: true }],
+  ['ORDER_FINAL', 'DESIGN'],
+  ['DESIGN', 'DESIGN_APPROVAL', { label: 'Send to client' }],
+  // The client asked for changes: back to the board it goes.
+  ['DESIGN_APPROVAL', 'DESIGN', { label: 'Changes requested', requiresNote: true }],
+  ['DESIGN_APPROVAL', 'PRODUCTION', { label: 'Approved' }],
+  ['PRODUCTION', 'QC_SANDING'],
+  // Rework found at QC.
+  ['QC_SANDING', 'PRODUCTION', { label: 'Rework', requiresNote: true }],
+  ['QC_SANDING', 'PAYMENT'],
+  ['PAYMENT', 'READY_DISPATCH'],
+  ['READY_DISPATCH', 'DELIVERED'],
+  ['ORDER_FINAL', 'ON_HOLD', { requiresNote: true }],
+  ['DESIGN', 'ON_HOLD', { requiresNote: true }],
   ['PRODUCTION', 'ON_HOLD', { requiresNote: true }],
+  ['ON_HOLD', 'ORDER_FINAL'],
+  ['ON_HOLD', 'PRODUCTION'],
+  ['ON_HOLD', 'CANCELLED', { requiresNote: true }],
+  ['ORDER_FINAL', 'CANCELLED', { requiresNote: true }],
 ];
 
-
-/** A starting lead pipeline. Every stage and arrow is editable on the canvas. */
 const LEAD_STAGES = [
   { code: 'NEW_ENQUIRY', name: 'New enquiry', color: '#6B7785', category: StatusCategory.OPEN, isInitial: true, x: 40, y: 160 },
   { code: 'CONTACTED', name: 'Contacted', color: '#2F81F7', category: StatusCategory.IN_PROGRESS, x: 260, y: 160 },
@@ -302,6 +315,7 @@ async function main() {
         color: status.color,
         category: status.category,
         isInitial: status.isInitial ?? false,
+        isEntryPoint: status.isEntryPoint ?? false,
         isTerminal: status.isTerminal ?? false,
         sortOrder: index,
         canvasX: status.x,
@@ -314,6 +328,7 @@ async function main() {
         color: status.color,
         category: status.category,
         isInitial: status.isInitial ?? false,
+        isEntryPoint: status.isEntryPoint ?? false,
         isTerminal: status.isTerminal ?? false,
         sortOrder: index,
         canvasX: status.x,
@@ -321,15 +336,6 @@ async function main() {
       },
     });
     statusIds.set(status.code, saved.id);
-  }
-
-  // Parents are set in a second pass so a child can reference a later status.
-  for (const status of STATUSES) {
-    if (!status.parent) continue;
-    await prisma.workflowStatus.update({
-      where: { id: statusIds.get(status.code)! },
-      data: { parentId: statusIds.get(status.parent)! },
-    });
   }
 
   for (const [from, to, options] of TRANSITIONS) {

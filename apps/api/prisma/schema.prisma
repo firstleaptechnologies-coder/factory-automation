@@ -52,6 +52,8 @@ model User {
   leadsOwned      Lead[]               @relation("LeadOwner")
   leadsCreated    Lead[]               @relation("LeadCreatedBy")
   leadStatusChanges LeadStatusHistory[] @relation("LeadStatusChangedBy")
+  paymentsReceived  Payment[]           @relation("PaymentReceivedBy")
+  cashDeposited     CashDeposit[]       @relation("CashDepositedBy")
 
   @@index([role, isActive])
 }
@@ -224,6 +226,10 @@ model WorkflowStatus {
   /// Exactly one initial status per workflow; terminal statuses have no
   /// outgoing transitions in normal use.
   isInitial Boolean @default(false)
+  /// A stage an order is allowed to be created at. The journey starts at "Lead"
+  /// when an enquiry came first and at "Order confirmed" when it did not, so
+  /// more than one stage has to be a legal entry point.
+  isEntryPoint Boolean @default(false)
   isTerminal Boolean @default(false)
   sortOrder Int     @default(0)
 
@@ -346,6 +352,19 @@ model Order {
   dueDate  DateTime?
   notes    String?
 
+  /// Money. Under ITEMISED, `subtotal` is the sum of item amounts and `total`
+  /// is that less any discount. Under LUMP_SUM, `total` is the figure that was
+  /// quoted and the items carry no prices. Both are stored, so an order's value
+  /// is a fact rather than a recalculation.
+  pricingMode PricingMode @default(ITEMISED)
+  subtotal    Decimal     @default(0) @db.Decimal(14, 2)
+  discount    Decimal     @default(0) @db.Decimal(14, 2)
+  total       Decimal     @default(0) @db.Decimal(14, 2)
+
+  /// Derived from the payments below and kept here so orders can be filtered
+  /// by it without summing a ledger on every query.
+  paymentStatus PaymentStatus @default(PENDING)
+
   createdById String?
   createdBy   User?    @relation("OrderCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
@@ -354,16 +373,44 @@ model Order {
   items         OrderItem[]
   attachments   OrderAttachment[]
   statusHistory OrderStatusHistory[]
+  payments      Payment[]
   /// Set when this order came from a lead.
   fromLead      Lead?                @relation("LeadConversion")
 
   @@index([clientId, createdAt])
   @@index([statusId])
   @@index([createdAt])
+  @@index([paymentStatus])
 }
 
 /// One punched spec. Dimensions are a snapshot in millimetres — a size preset
 /// edited next month must not silently change what was ordered today.
+/// How an item is priced. The rate means a different thing in each case, so the
+/// unit is stored beside the number rather than assumed.
+///
+/// LUMP_SUM is not a rate at all — it is the amount itself, for when a price
+/// was quoted as one figure for the line rather than derived from its size.
+enum RateUnit {
+  PER_SQFT
+  PER_SQM
+  PER_PIECE
+  PER_RFT
+  LUMP_SUM
+}
+
+/// Whether the order's value is built up from its items or was quoted as a
+/// single figure.
+///
+/// This exists because the price has to be recorded the way it was actually
+/// given to the client. Someone quoted "₹85 a square foot" and someone quoted
+/// "₹40,000 for the job"; storing the second as a back-calculated rate would be
+/// inventing a number nobody agreed to, and it would drift the moment a size
+/// was corrected.
+enum PricingMode {
+  ITEMISED
+  LUMP_SUM
+}
+
 model OrderItem {
   id      String @id @default(cuid())
   orderId String
@@ -383,6 +430,13 @@ model OrderItem {
 
   quantity Int     @default(1)
   notes    String?
+
+  /// Pricing. `amount` is computed from rate, rate unit, size and quantity, and
+  /// then stored — a rate edited later must not silently restate what an old
+  /// order was worth.
+  rate     Decimal? @db.Decimal(14, 2)
+  rateUnit RateUnit @default(PER_SQFT)
+  amount   Decimal  @default(0) @db.Decimal(14, 2)
 
   @@unique([orderId, lineNo])
   @@index([materialId])
@@ -432,6 +486,75 @@ model OrderStatusHistory {
   changedAt   DateTime @default(now())
 
   @@index([orderId, changedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+enum PaymentStatus {
+  /// Nothing received yet.
+  PENDING
+  /// Some received, some still owed.
+  PARTIAL
+  /// Fully paid.
+  RECEIVED
+}
+
+enum PaymentMode {
+  CASH
+  ONLINE
+}
+
+/// One collection against an order. Orders are usually paid in instalments, so
+/// this is a ledger rather than a field — the order's status is derived from
+/// the sum, and every receipt keeps its own mode and date.
+model Payment {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  amount Decimal     @db.Decimal(14, 2)
+  mode   PaymentMode
+
+  /// UTR, cheque number or whatever identifies an online transfer.
+  reference String?
+  note      String?
+
+  receivedAt   DateTime @default(now())
+  receivedById String?
+  receivedBy   User?    @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  /// Only meaningful for CASH: where that cash went afterwards.
+  deposits CashDeposit[]
+
+  @@index([orderId, receivedAt])
+  @@index([mode])
+}
+
+/// Cash moving from the shop's hands into the bank.
+///
+/// A deposit may be tied to the cash payment it came from, which makes an
+/// order's cash-in-hand exact. It may also stand alone, because in practice one
+/// trip to the bank covers takings from several orders — those reduce the
+/// shop's cash position without being attributable to a single order.
+model CashDeposit {
+  id        String   @id @default(cuid())
+  paymentId String?
+  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  amount        Decimal  @db.Decimal(14, 2)
+  depositedAt   DateTime @default(now())
+  bankReference String?
+  note          String?
+
+  depositedById String?
+  depositedBy   User?    @relation("CashDepositedBy", fields: [depositedById], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([depositedAt])
 }
 
 // ---------------------------------------------------------------------------
