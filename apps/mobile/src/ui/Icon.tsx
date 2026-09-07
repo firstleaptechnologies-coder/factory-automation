@@ -20,6 +20,7 @@ export type IconName =
   | 'search'
   | 'bell'
   | 'settings'
+  | 'tune'
   | 'user'
   | 'users'
   | 'ruler'
@@ -80,8 +81,16 @@ const PATHS: Record<IconName, React.ReactNode> = {
   bell: <Path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9ZM10 18.5a2 2 0 0 0 4 0" />,
   settings: (
     <>
-      <Circle cx={12} cy={12} r={3} />
-      <Path d="M12 3v2.2M12 18.8V21M4.2 7.5l1.9 1.1M17.9 15.4l1.9 1.1M4.2 16.5l1.9-1.1M17.9 8.6l1.9-1.1" />
+      <Circle cx={12} cy={12} r={3.2} />
+      <Path d="M19.4 14.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9h-.2a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.4-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1A1.7 1.7 0 0 0 10 3.6v-.2a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.6 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+    </>
+  ),
+  /** Sliders — used for the admin area, which is about configuration. */
+  tune: (
+    <>
+      <Path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+      <Circle cx={16} cy={7} r={2.2} />
+      <Circle cx={10} cy={17} r={2.2} />
     </>
   ),
   user: (

@@ -23,6 +23,7 @@ import { ClientsScreen } from '../screens/ClientsScreen';
 import { ClientDetailScreen } from '../screens/ClientDetailScreen';
 import { SearchScreen } from '../screens/SearchScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { AdminHomeScreen } from '../screens/admin/AdminHomeScreen';
 import { AdminMaterialsScreen } from '../screens/admin/AdminMaterialsScreen';
 import { AdminSizesScreen } from '../screens/admin/AdminSizesScreen';
 import { AdminFlowScreen } from '../screens/admin/AdminFlowScreen';
@@ -91,6 +92,7 @@ export function RootNavigator() {
             <Stack.Screen name="Clients" component={ClientsScreen} />
             <Stack.Screen name="ClientDetail" component={ClientDetailScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="Admin" component={AdminHomeScreen} />
             <Stack.Screen name="AdminMaterials" component={AdminMaterialsScreen} />
             <Stack.Screen name="AdminSizes" component={AdminSizesScreen} />
             <Stack.Screen name="AdminFlow" component={AdminFlowScreen} />
