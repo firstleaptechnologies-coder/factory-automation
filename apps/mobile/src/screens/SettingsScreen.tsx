@@ -9,7 +9,6 @@ import {
   Button,
   Card,
   Chip,
-  Icon,
   Screen,
   ScreenHeader,
   SectionHeader,
@@ -20,7 +19,6 @@ import { palette, spacing } from '../theme';
 export function SettingsScreen({ navigation }: { navigation: any }) {
   const { user, signOut } = useAuth();
   const [unit, setUnit] = useDisplayUnit();
-  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <Screen>
@@ -48,36 +46,6 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
         </View>
       </Card>
 
-      {isAdmin ? (
-        <>
-          <SectionHeader title="Configuration" />
-          <ConfigRow
-            icon="layers"
-            title="Materials & thicknesses"
-            subtitle="What can be picked while punching"
-            onPress={() => navigation.navigate('AdminMaterials')}
-          />
-          <ConfigRow
-            icon="ruler"
-            title="Size presets"
-            subtitle="Common sizes, entered in any unit"
-            onPress={() => navigation.navigate('AdminSizes')}
-          />
-          <ConfigRow
-            icon="flow"
-            title="Status flow"
-            subtitle="Stages and the moves allowed between them"
-            onPress={() => navigation.navigate('AdminFlow')}
-          />
-          <ConfigRow
-            icon="tag"
-            title="Lead fields & sources"
-            subtitle="What you capture on an enquiry"
-            onPress={() => navigation.navigate('AdminLeadFields')}
-          />
-        </>
-      ) : null}
-
       <SectionHeader title="About" />
       <Card tone="dark">
         <Row label="Server" value={API_BASE_URL.replace('/api', '')} />
@@ -100,31 +68,6 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
   );
 }
 
-function ConfigRow({
-  icon,
-  title,
-  subtitle,
-  onPress,
-}: {
-  icon: any;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-}) {
-  return (
-    <Card tone="dark" style={styles.configRow} onPress={onPress}>
-      <View style={styles.configIcon}>
-        <Icon name={icon} size={19} color={palette.accent} />
-      </View>
-      <View style={{ flex: 1, marginLeft: spacing.md }}>
-        <Text variant="body" bold>{title}</Text>
-        <Text variant="tiny" tone="muted">{subtitle}</Text>
-      </View>
-      <Icon name="chevronRight" size={16} color={palette.textFaint} />
-    </Card>
-  );
-}
-
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.row}>
@@ -139,20 +82,6 @@ function Row({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   profile: { flexDirection: 'row', alignItems: 'center' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  configRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-  },
-  configIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: palette.surfaceLit,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
