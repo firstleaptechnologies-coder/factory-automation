@@ -163,38 +163,6 @@ export function HomeScreen({ navigation }: { navigation: any }) {
         ))
       )}
 
-      {isAdmin ? (
-        <>
-          <SectionHeader
-            title="Shop setup"
-            actionLabel="All settings"
-            onAction={() => navigation.navigate('Admin')}
-          />
-          <View style={styles.adminRow}>
-            <IconTile
-              icon="layers"
-              label="Materials"
-              onPress={() => navigation.navigate('AdminMaterials')}
-            />
-            <IconTile
-              icon="ruler"
-              label="Sizes"
-              onPress={() => navigation.navigate('AdminSizes')}
-            />
-            <IconTile
-              icon="flow"
-              label="Status flow"
-              onPress={() => navigation.navigate('AdminFlow')}
-            />
-            <IconTile
-              icon="tag"
-              label="Lead fields"
-              onPress={() => navigation.navigate('AdminLeadFields')}
-            />
-          </View>
-        </>
-      ) : null}
-
       <SectionHeader
         title="Live pipeline"
         actionLabel="Open"
@@ -261,7 +229,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.xl,
   },
-  adminRow: { flexDirection: 'row', justifyContent: 'space-between' },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, padding: spacing.md },
   rowIcon: {
     width: 38,
