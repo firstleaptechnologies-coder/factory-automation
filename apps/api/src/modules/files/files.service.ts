@@ -10,6 +10,7 @@ import {
   isAcceptedDocument,
   isAcceptedImage,
 } from '@decor/shared';
+import { tenantId } from '../../common/tenancy/tenant-context';
 
 export interface IncomingFile {
   buffer: Buffer;
@@ -118,6 +119,7 @@ export class FilesService {
   ): Promise<StoredFile> {
     return this.prisma.storedFile.create({
       data: {
+        tenantId: tenantId(),
         backend: stored.backend,
         bucket: stored.bucket,
         objectKey: stored.objectKey,

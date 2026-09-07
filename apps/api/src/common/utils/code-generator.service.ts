@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { tenantId } from '../tenancy/tenant-context';
 
 type Sequenced = 'order' | 'client' | 'lead';
 
@@ -10,18 +11,15 @@ const PREFIX: Record<Sequenced, string> = {
   lead: 'LD',
 };
 
-/** Anything that can run a query: the client, or an open transaction. */
 type Client = PrismaService | Prisma.TransactionClient;
 
 /**
- * Human-readable document numbers (SO-2526-0001). The financial-year segment is
- * what the shop floor and the accountant both expect to see on paper.
+ * Human-readable document numbers (ORD-2526-0001). The financial-year segment
+ * is what the shop floor and the accountant both expect to see on paper.
  *
  * Numbers come from an atomic counter row rather than "max existing + 1", so
- * concurrent callers — and repeated calls inside one transaction — cannot
- * collide. Pass the transaction client when generating inside a transaction;
- * the counter row then stays locked until commit, which serialises the handful
- * of callers that matter and keeps the sequence gap-free on rollback.
+ * concurrent callers cannot collide. Counters are per tenant, so two businesses
+ * on the platform both start at 0001 rather than sharing a sequence.
  */
 @Injectable()
 export class CodeGeneratorService {
@@ -35,9 +33,12 @@ export class CodeGeneratorService {
   }
 
   private async increment(db: Client, key: string): Promise<number> {
+    const tenant = tenantId();
+    const where = { tenantId_key: { tenantId: tenant, key } };
+
     try {
       const row = await db.documentSequence.update({
-        where: { key },
+        where,
         data: { value: { increment: 1 } },
         select: { value: true },
       });
@@ -48,7 +49,7 @@ export class CodeGeneratorService {
 
     try {
       const row = await db.documentSequence.create({
-        data: { key, value: 1 },
+        data: { tenantId: tenant, key, value: 1 },
         select: { value: true },
       });
       return row.value;
@@ -56,7 +57,7 @@ export class CodeGeneratorService {
       // Someone created the counter between our update and our create.
       if (!isUniqueViolation(error)) throw error;
       const row = await db.documentSequence.update({
-        where: { key },
+        where,
         data: { value: { increment: 1 } },
         select: { value: true },
       });

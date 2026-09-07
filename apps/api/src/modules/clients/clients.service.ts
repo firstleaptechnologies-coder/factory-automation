@@ -9,6 +9,7 @@ import {
   CreateClientDto,
   UpdateClientDto,
 } from './dto/client.dto';
+import { tenantId } from '../../common/tenancy/tenant-context';
 
 @Injectable()
 export class ClientsService {
@@ -79,7 +80,7 @@ export class ClientsService {
   async create(dto: CreateClientDto, userId?: string) {
     const code = await this.codes.next('client');
     return this.prisma.client.create({
-      data: { ...dto, code, createdById: userId },
+      data: { ...dto, code, tenantId: tenantId(), createdById: userId },
     });
   }
 
@@ -93,7 +94,7 @@ export class ClientsService {
     return this.prisma.clientLocation.upsert({
       where: { clientId_name: { clientId, name: dto.name } },
       update: { address: dto.address },
-      create: { clientId, name: dto.name, address: dto.address },
+      create: { tenantId: tenantId(), clientId, name: dto.name, address: dto.address },
     });
   }
 

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { ChangePasswordDto, CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { tenantId } from '../../common/tenancy/tenant-context';
 
 const SAFE_FIELDS = {
   id: true,
@@ -34,7 +35,7 @@ export class UsersService {
   async create(dto: CreateUserDto) {
     const { password, ...rest } = dto;
     return this.prisma.user.create({
-      data: { ...rest, passwordHash: await AuthService.hash(password) },
+      data: { ...rest, tenantId: tenantId(), passwordHash: await AuthService.hash(password) },
       select: SAFE_FIELDS,
     });
   }

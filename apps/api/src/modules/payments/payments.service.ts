@@ -7,6 +7,7 @@ import {
   RecordDepositDto,
   RecordPaymentDto,
 } from './dto/payment.dto';
+import { tenantId } from '../../common/tenancy/tenant-context';
 
 @Injectable()
 export class PaymentsService {
@@ -26,7 +27,7 @@ export class PaymentsService {
     });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
-    const total = Number(order.total);
+    const total = Number(order.grandTotal);
     const already = order.payments.reduce((sum, p) => sum + Number(p.amount), 0);
     const outstanding = round2(total - already);
 
@@ -52,6 +53,7 @@ export class PaymentsService {
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
         data: {
+          tenantId: tenantId(),
           orderId,
           amount: dto.amount,
           mode: dto.mode,
@@ -62,6 +64,7 @@ export class PaymentsService {
           deposits: dto.depositedAmount
             ? {
                 create: {
+                  tenantId: tenantId(),
                   amount: dto.depositedAmount,
                   bankReference: dto.bankReference,
                   depositedById: userId,
@@ -107,6 +110,7 @@ export class PaymentsService {
 
     return this.prisma.cashDeposit.create({
       data: {
+        tenantId: tenantId(),
         paymentId: dto.paymentId,
         amount: dto.amount,
         depositedAt: dto.depositedAt ? new Date(dto.depositedAt) : undefined,
@@ -133,7 +137,7 @@ export class PaymentsService {
     });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
-    const total = Number(order.total);
+    const total = Number(order.grandTotal);
     const received = sum(order.payments.map((p) => Number(p.amount)));
     const cash = sum(
       order.payments.filter((p) => p.mode === PaymentMode.CASH).map((p) => Number(p.amount)),
@@ -264,7 +268,7 @@ export class PaymentsService {
 
       await tx.order.update({
         where: { id: payment.orderId },
-        data: { paymentStatus: deriveStatus(Number(payment.order.total), remaining) },
+        data: { paymentStatus: deriveStatus(Number(payment.order.grandTotal), remaining) },
       });
 
       return { deleted: paymentId };

@@ -20,7 +20,7 @@ export class RolesGuard implements CanActivate {
     // ADMIN is deliberately a master key — a four-machine shop should not be
     // locked out of its own ERP at 2am.
     if (user.role === UserRole.ADMIN) return true;
-    if (!required.includes(user.role)) {
+    if (!user.role || !required.includes(user.role as UserRole)) {
       throw new ForbiddenException(`Requires role: ${required.join(', ')}`);
     }
     return true;

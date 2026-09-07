@@ -1,0 +1,194 @@
+/**
+ * What a role is allowed to do.
+ *
+ * Permissions are string keys rather than a fixed role enum because every shop
+ * divides work differently — one has a dedicated QC person, another has the
+ * owner doing everything. A tenant admin composes roles from these; the API
+ * checks the key, never the role name.
+ */
+
+export const PERMISSIONS = {
+  // Orders
+  ORDER_VIEW: 'order.view',
+  ORDER_PUNCH: 'order.punch',
+  ORDER_EDIT: 'order.edit',
+  ORDER_MOVE_STATUS: 'order.move_status',
+  ORDER_ATTACH: 'order.attach',
+
+  // Leads
+  LEAD_VIEW: 'lead.view',
+  LEAD_CREATE: 'lead.create',
+  LEAD_EDIT: 'lead.edit',
+  LEAD_MOVE_STATUS: 'lead.move_status',
+  LEAD_CONVERT: 'lead.convert',
+
+  // Clients
+  CLIENT_VIEW: 'client.view',
+  CLIENT_MANAGE: 'client.manage',
+
+  // Money
+  PAYMENT_VIEW: 'payment.view',
+  PAYMENT_RECORD: 'payment.record',
+  PAYMENT_DELETE: 'payment.delete',
+  CASH_DEPOSIT: 'payment.deposit',
+  CASH_POSITION_VIEW: 'payment.cash_position',
+  PRICING_EDIT: 'pricing.edit',
+
+  // Shop configuration
+  CONFIG_VIEW: 'config.view',
+  CONFIG_MANAGE: 'config.manage',
+  WORKFLOW_MANAGE: 'workflow.manage',
+  GST_MANAGE: 'gst.manage',
+
+  // People
+  USER_VIEW: 'user.view',
+  USER_MANAGE: 'user.manage',
+  ROLE_MANAGE: 'role.manage',
+
+  // Platform — only ever granted to platform users, never to a tenant role.
+  PLATFORM_TENANT_MANAGE: 'platform.tenant.manage',
+  PLATFORM_TENANT_VIEW: 'platform.tenant.view',
+} as const;
+
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
+
+/** Permissions a tenant role may hold — everything except the platform keys. */
+export const TENANT_PERMISSIONS: Permission[] = ALL_PERMISSIONS.filter(
+  (permission) => !permission.startsWith('platform.'),
+);
+
+/** Grouped for the role editor, so the UI does not have to know the taxonomy. */
+export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
+  {
+    label: 'Orders',
+    permissions: [
+      PERMISSIONS.ORDER_VIEW,
+      PERMISSIONS.ORDER_PUNCH,
+      PERMISSIONS.ORDER_EDIT,
+      PERMISSIONS.ORDER_MOVE_STATUS,
+      PERMISSIONS.ORDER_ATTACH,
+    ],
+  },
+  {
+    label: 'Leads',
+    permissions: [
+      PERMISSIONS.LEAD_VIEW,
+      PERMISSIONS.LEAD_CREATE,
+      PERMISSIONS.LEAD_EDIT,
+      PERMISSIONS.LEAD_MOVE_STATUS,
+      PERMISSIONS.LEAD_CONVERT,
+    ],
+  },
+  {
+    label: 'Clients',
+    permissions: [PERMISSIONS.CLIENT_VIEW, PERMISSIONS.CLIENT_MANAGE],
+  },
+  {
+    label: 'Money',
+    permissions: [
+      PERMISSIONS.PAYMENT_VIEW,
+      PERMISSIONS.PAYMENT_RECORD,
+      PERMISSIONS.PAYMENT_DELETE,
+      PERMISSIONS.CASH_DEPOSIT,
+      PERMISSIONS.CASH_POSITION_VIEW,
+      PERMISSIONS.PRICING_EDIT,
+    ],
+  },
+  {
+    label: 'Configuration',
+    permissions: [
+      PERMISSIONS.CONFIG_VIEW,
+      PERMISSIONS.CONFIG_MANAGE,
+      PERMISSIONS.WORKFLOW_MANAGE,
+      PERMISSIONS.GST_MANAGE,
+    ],
+  },
+  {
+    label: 'People',
+    permissions: [
+      PERMISSIONS.USER_VIEW,
+      PERMISSIONS.USER_MANAGE,
+      PERMISSIONS.ROLE_MANAGE,
+    ],
+  },
+];
+
+/** Human labels, so neither client has to invent its own wording. */
+export const PERMISSION_LABELS: Record<string, string> = {
+  [PERMISSIONS.ORDER_VIEW]: 'View orders',
+  [PERMISSIONS.ORDER_PUNCH]: 'Punch orders',
+  [PERMISSIONS.ORDER_EDIT]: 'Edit orders',
+  [PERMISSIONS.ORDER_MOVE_STATUS]: 'Move order status',
+  [PERMISSIONS.ORDER_ATTACH]: 'Attach photos',
+  [PERMISSIONS.LEAD_VIEW]: 'View leads',
+  [PERMISSIONS.LEAD_CREATE]: 'Create leads',
+  [PERMISSIONS.LEAD_EDIT]: 'Edit leads',
+  [PERMISSIONS.LEAD_MOVE_STATUS]: 'Move lead stage',
+  [PERMISSIONS.LEAD_CONVERT]: 'Convert leads to orders',
+  [PERMISSIONS.CLIENT_VIEW]: 'View clients',
+  [PERMISSIONS.CLIENT_MANAGE]: 'Add and edit clients',
+  [PERMISSIONS.PAYMENT_VIEW]: 'View payments',
+  [PERMISSIONS.PAYMENT_RECORD]: 'Record payments',
+  [PERMISSIONS.PAYMENT_DELETE]: 'Delete payments',
+  [PERMISSIONS.CASH_DEPOSIT]: 'Record bank deposits',
+  [PERMISSIONS.CASH_POSITION_VIEW]: 'View cash position',
+  [PERMISSIONS.PRICING_EDIT]: 'Set rates and prices',
+  [PERMISSIONS.CONFIG_VIEW]: 'View configuration',
+  [PERMISSIONS.CONFIG_MANAGE]: 'Manage materials and sizes',
+  [PERMISSIONS.WORKFLOW_MANAGE]: 'Manage the status flow',
+  [PERMISSIONS.GST_MANAGE]: 'Manage GST slabs',
+  [PERMISSIONS.USER_VIEW]: 'View people',
+  [PERMISSIONS.USER_MANAGE]: 'Add and edit people',
+  [PERMISSIONS.ROLE_MANAGE]: 'Manage roles',
+  [PERMISSIONS.PLATFORM_TENANT_VIEW]: 'View tenants',
+  [PERMISSIONS.PLATFORM_TENANT_MANAGE]: 'Create and manage tenants',
+};
+
+/** Roles a new tenant starts with. The admin can edit or add to them. */
+export const DEFAULT_ROLES: {
+  code: string;
+  name: string;
+  description: string;
+  permissions: Permission[];
+}[] = [
+  {
+    code: 'OWNER',
+    name: 'Owner',
+    description: 'Full access to everything in this shop',
+    permissions: TENANT_PERMISSIONS,
+  },
+  {
+    code: 'MANAGER',
+    name: 'Manager',
+    description: 'Runs the shop day to day, but cannot change roles',
+    permissions: TENANT_PERMISSIONS.filter(
+      (p) => p !== PERMISSIONS.ROLE_MANAGE && p !== PERMISSIONS.PAYMENT_DELETE,
+    ),
+  },
+  {
+    code: 'SALES',
+    name: 'Sales',
+    description: 'Punches orders, works leads, takes payments',
+    permissions: [
+      PERMISSIONS.ORDER_VIEW, PERMISSIONS.ORDER_PUNCH, PERMISSIONS.ORDER_EDIT,
+      PERMISSIONS.ORDER_MOVE_STATUS, PERMISSIONS.ORDER_ATTACH,
+      PERMISSIONS.LEAD_VIEW, PERMISSIONS.LEAD_CREATE, PERMISSIONS.LEAD_EDIT,
+      PERMISSIONS.LEAD_MOVE_STATUS, PERMISSIONS.LEAD_CONVERT,
+      PERMISSIONS.CLIENT_VIEW, PERMISSIONS.CLIENT_MANAGE,
+      PERMISSIONS.PAYMENT_VIEW, PERMISSIONS.PAYMENT_RECORD,
+      PERMISSIONS.PRICING_EDIT, PERMISSIONS.CONFIG_VIEW,
+    ],
+  },
+  {
+    code: 'PRODUCTION',
+    name: 'Production',
+    description: 'Moves work through the floor; sees no money',
+    permissions: [
+      PERMISSIONS.ORDER_VIEW, PERMISSIONS.ORDER_MOVE_STATUS,
+      PERMISSIONS.ORDER_ATTACH, PERMISSIONS.CLIENT_VIEW,
+      PERMISSIONS.CONFIG_VIEW,
+    ],
+  },
+];

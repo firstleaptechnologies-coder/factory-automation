@@ -8,6 +8,7 @@ import {
   TransitionDto,
   UpdateStatusDto,
 } from './dto/workflow.dto';
+import { tenantId } from '../../common/tenancy/tenant-context';
 
 @Injectable()
 export class WorkflowsService {
@@ -58,7 +59,7 @@ export class WorkflowsService {
   async create(dto: CreateWorkflowDto) {
     const isFirst = (await this.prisma.workflow.count()) === 0;
     return this.prisma.workflow.create({
-      data: { ...dto, isDefault: isFirst },
+      data: { ...dto, tenantId: tenantId(), isDefault: isFirst },
       include: { statuses: true, transitions: true },
     });
   }
@@ -84,6 +85,7 @@ export class WorkflowsService {
       if (dto.isInitial) await this.clearInitial(tx, workflowId);
       return tx.workflowStatus.create({
         data: {
+          tenantId: tenantId(),
           workflowId,
           code: dto.code,
           name: dto.name,
@@ -191,6 +193,7 @@ export class WorkflowsService {
       if (deduped.length) {
         await tx.workflowTransition.createMany({
           data: deduped.map((transition) => ({
+            tenantId: tenantId(),
             workflowId,
             fromStatusId: transition.fromStatusId,
             toStatusId: transition.toStatusId,

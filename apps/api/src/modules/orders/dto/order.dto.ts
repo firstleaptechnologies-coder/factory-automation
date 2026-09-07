@@ -38,6 +38,8 @@ export class PunchItemDto {
    */
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) rate?: number;
   @IsOptional() @IsEnum(RateUnit) rateUnit?: RateUnit;
+  /** GST slab for this line. Falls back to the tenant's default. */
+  @IsOptional() @IsString() gstSlabId?: string;
 }
 
 /**
@@ -64,6 +66,8 @@ export class PunchOrderDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) discount?: number;
   /** Required for LUMP_SUM — the single figure that was quoted. */
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) total?: number;
+  /** GST slab for a LUMP_SUM order, applied to the whole quoted figure. */
+  @IsOptional() @IsString() gstSlabId?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

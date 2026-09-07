@@ -25,6 +25,7 @@ import {
   UpdateOrderDto,
 } from './dto/order.dto';
 import { MeasurementDto } from '../config/dto/config.dto';
+import { tenantId } from '../../common/tenancy/tenant-context';
 
 const ORDER_INCLUDE = {
   client: { select: { id: true, code: true, name: true, phone: true, company: true } },
@@ -117,7 +118,22 @@ export class OrdersService {
     }
 
     const items = await Promise.all(dto.items.map((item) => this.resolveItem(item)));
-    const money = totalsFor(dto.pricingMode ?? PricingMode.ITEMISED, items, dto.discount, dto.total);
+    const lumpSumSlab =
+      (dto.pricingMode ?? PricingMode.ITEMISED) === PricingMode.LUMP_SUM
+        ? await this.prisma.gstSlab.findFirst({
+            where: dto.gstSlabId
+              ? { id: dto.gstSlabId }
+              : { isDefault: true, isActive: true },
+          })
+        : null;
+
+    const money = totalsFor(
+      dto.pricingMode ?? PricingMode.ITEMISED,
+      items,
+      dto.discount,
+      dto.total,
+      lumpSumSlab ? Number(lumpSumSlab.ratePct) : 0,
+    );
     const code = await this.codes.next('order');
 
     return this.prisma.$transaction(async (tx) => {
@@ -127,11 +143,12 @@ export class OrdersService {
       const location = await tx.clientLocation.upsert({
         where: { clientId_name: { clientId, name: dto.location } },
         update: { useCount: { increment: 1 } },
-        create: { clientId, name: dto.location, useCount: 1 },
+        create: { tenantId: tenantId(), clientId, name: dto.location, useCount: 1 },
       });
 
       const order = await tx.order.create({
         data: {
+          tenantId: tenantId(),
           code,
           clientId,
           location: dto.location,
@@ -146,11 +163,23 @@ export class OrdersService {
           subtotal: money.subtotal,
           discount: money.discount,
           total: money.total,
+          gstSlabId: lumpSumSlab?.id ?? null,
+          taxAmount: money.taxAmount,
+          grandTotal: money.grandTotal,
           items: {
-            create: items.map((item, index) => ({ lineNo: index + 1, ...item })),
+            create: items.map((item, index) => ({
+              tenantId: tenantId(),
+              lineNo: index + 1,
+              ...item,
+            })),
           },
           statusHistory: {
-            create: { toStatusId: initial.id, changedById: userId, note: 'Order punched' },
+            create: {
+              tenantId: tenantId(),
+              toStatusId: initial.id,
+              changedById: userId,
+              note: 'Order punched',
+            },
           },
         },
         include: ORDER_INCLUDE,
@@ -189,6 +218,7 @@ export class OrdersService {
     const created = await tx.client.create({
       data: {
         ...dto.newClient!,
+        tenantId: tenantId(),
         code: await this.codes.next('client', tx),
         createdById: userId,
       },
@@ -234,6 +264,16 @@ export class OrdersService {
     const quantity = item.quantity ?? 1;
     const rateUnit = item.rateUnit ?? RateUnit.PER_SQFT;
     const rate = item.rate ?? null;
+    const amount = lineAmount({ rate, rateUnit, lengthMm, widthMm, quantity });
+
+    // GST sits on what is sold, not on the board it was cut from — so the slab
+    // is a property of the line. Falling back to the tenant's default keeps
+    // punching fast without pretending the material decided it.
+    const slab = item.gstSlabId
+      ? await this.prisma.gstSlab.findFirst({ where: { id: item.gstSlabId } })
+      : await this.prisma.gstSlab.findFirst({ where: { isDefault: true, isActive: true } });
+
+    const gstRatePct = slab ? Number(slab.ratePct) : 0;
 
     return {
       sizePresetId: item.sizePresetId,
@@ -247,8 +287,11 @@ export class OrdersService {
       rate,
       rateUnit,
       // Priced now and stored: a rate edited next month must not restate what
-      // this order was worth today.
-      amount: lineAmount({ rate, rateUnit, lengthMm, widthMm, quantity }),
+      // this order was worth today. The same reasoning applies to the tax rate.
+      amount,
+      gstSlabId: slab?.id ?? null,
+      gstRatePct,
+      taxAmount: round2((amount * gstRatePct) / 100),
     };
   }
 
@@ -384,7 +427,10 @@ export class OrdersService {
       dto.pricingMode !== undefined || dto.discount !== undefined || dto.total !== undefined
         ? totalsFor(
             pricingMode,
-            existing.items.map((item) => ({ amount: Number(item.amount) })),
+            existing.items.map((item) => ({
+              amount: Number(item.amount),
+              taxAmount: Number(item.taxAmount),
+            })),
             dto.discount ?? Number(existing.discount),
             dto.total ?? Number(existing.total),
           )
@@ -403,6 +449,8 @@ export class OrdersService {
               subtotal: money.subtotal,
               discount: money.discount,
               total: money.total,
+              taxAmount: money.taxAmount,
+              grandTotal: money.grandTotal,
             }
           : {}),
       },
@@ -416,7 +464,7 @@ export class OrdersService {
    * The move is only allowed if an edge exists on the canvas, so the graph is
    * genuinely the source of truth rather than documentation of it.
    */
-  async changeStatus(id: string, dto: ChangeStatusDto, user?: { id: string; role: UserRole }) {
+  async changeStatus(id: string, dto: ChangeStatusDto, user?: { id: string; role?: string }) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: { status: true },
@@ -449,7 +497,7 @@ export class OrdersService {
       transition.allowedRoles.length > 0 &&
       user &&
       user.role !== UserRole.ADMIN &&
-      !transition.allowedRoles.includes(user.role)
+      !transition.allowedRoles.includes(user.role as UserRole)
     ) {
       throw new BadRequestException(
         `Your role cannot make this move — it is limited to ${transition.allowedRoles.join(', ')}`,
@@ -469,6 +517,7 @@ export class OrdersService {
       }),
       this.prisma.orderStatusHistory.create({
         data: {
+          tenantId: tenantId(),
           orderId: id,
           fromStatusId: order.statusId,
           toStatusId: dto.toStatusId,
@@ -508,6 +557,7 @@ export class OrdersService {
       created.push(
         await this.prisma.orderAttachment.create({
           data: {
+            tenantId: tenantId(),
             orderId,
             kind: meta.kind,
             description: meta.description,
@@ -572,25 +622,44 @@ function measure(input: MeasurementDto): number {
  */
 function totalsFor(
   pricingMode: PricingMode,
-  items: { amount: number }[],
+  items: { amount: number; taxAmount?: number }[],
   discount = 0,
   quotedTotal = 0,
-): { pricingMode: PricingMode; subtotal: number; discount: number; total: number } {
+  lumpSumTaxPct = 0,
+): {
+  pricingMode: PricingMode;
+  subtotal: number;
+  discount: number;
+  total: number;
+  taxAmount: number;
+  grandTotal: number;
+} {
   if (pricingMode === PricingMode.LUMP_SUM) {
+    const total = round2(quotedTotal);
+    // One slab covers the whole quoted figure, because a lump sum has no lines
+    // to tax individually.
+    const taxAmount = round2((total * lumpSumTaxPct) / 100);
     return {
       pricingMode,
-      subtotal: round2(quotedTotal),
+      subtotal: total,
       discount: 0,
-      total: round2(quotedTotal),
+      total,
+      taxAmount,
+      grandTotal: round2(total + taxAmount),
     };
   }
 
   const subtotal = round2(items.reduce((sum, item) => sum + item.amount, 0));
   const applied = Math.min(round2(discount), subtotal);
+  const total = round2(subtotal - applied);
+  const taxAmount = round2(items.reduce((sum, item) => sum + (item.taxAmount ?? 0), 0));
+
   return {
     pricingMode,
     subtotal,
     discount: applied,
-    total: round2(subtotal - applied),
+    total,
+    taxAmount,
+    grandTotal: round2(total + taxAmount),
   };
 }

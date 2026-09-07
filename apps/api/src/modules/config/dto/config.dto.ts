@@ -71,3 +71,25 @@ export class UpdateSizePresetDto {
   @IsOptional() @Type(() => Number) @IsInt() sortOrder?: number;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
+
+
+/**
+ * A GST rate the tenant can apply.
+ *
+ * Slabs are per tenant because rates differ by what a shop sells and change
+ * with the law; hard-coding 5/12/18/28 would date the product.
+ */
+export class GstSlabDto {
+  @IsString() @MinLength(1) name: string;
+  @Type(() => Number) @IsNumber() @Min(0) ratePct: number;
+  @IsOptional() @IsBoolean() isDefault?: boolean;
+  @IsOptional() @Type(() => Number) @IsInt() sortOrder?: number;
+}
+
+export class UpdateGstSlabDto {
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) ratePct?: number;
+  @IsOptional() @IsBoolean() isDefault?: boolean;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional() @Type(() => Number) @IsInt() sortOrder?: number;
+}

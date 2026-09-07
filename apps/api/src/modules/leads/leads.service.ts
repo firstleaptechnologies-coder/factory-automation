@@ -19,6 +19,7 @@ import {
   LeadSourceDto,
   UpdateLeadDto,
 } from './dto/lead.dto';
+import { tenantId } from '../../common/tenancy/tenant-context';
 
 const LEAD_INCLUDE = {
   client: { select: { id: true, code: true, name: true, phone: true } },
@@ -48,7 +49,7 @@ export class LeadsService {
   }
 
   createSource(dto: LeadSourceDto) {
-    return this.prisma.leadSource.create({ data: dto });
+    return this.prisma.leadSource.create({ data: { ...dto, tenantId: tenantId() } });
   }
 
   // -- leads ----------------------------------------------------------------
@@ -132,6 +133,7 @@ export class LeadsService {
 
     return this.prisma.lead.create({
       data: {
+        tenantId: tenantId(),
         code,
         title: dto.title,
         clientId: dto.clientId,
@@ -151,7 +153,12 @@ export class LeadsService {
         customFields: customFields as Prisma.InputJsonValue,
         createdById: userId,
         statusHistory: {
-          create: { toStatusId: initial.id, changedById: userId, note: 'Lead created' },
+          create: {
+            tenantId: tenantId(),
+            toStatusId: initial.id,
+            changedById: userId,
+            note: 'Lead created',
+          },
         },
       },
       include: LEAD_INCLUDE,
@@ -197,7 +204,7 @@ export class LeadsService {
   async changeStatus(
     id: string,
     dto: ChangeLeadStatusDto,
-    user?: { id: string; role: UserRole },
+    user?: { id: string; role?: string },
   ) {
     const lead = await this.prisma.lead.findUnique({
       where: { id },
@@ -230,7 +237,7 @@ export class LeadsService {
       transition.allowedRoles.length > 0 &&
       user &&
       user.role !== UserRole.ADMIN &&
-      !transition.allowedRoles.includes(user.role)
+      !transition.allowedRoles.includes(user.role as UserRole)
     ) {
       throw new BadRequestException(
         `Your role cannot make this move — it is limited to ${transition.allowedRoles.join(', ')}`,
@@ -247,6 +254,7 @@ export class LeadsService {
       this.prisma.lead.update({ where: { id }, data: { statusId: dto.toStatusId } }),
       this.prisma.leadStatusHistory.create({
         data: {
+          tenantId: tenantId(),
           leadId: id,
           fromStatusId: lead.statusId,
           toStatusId: dto.toStatusId,
@@ -267,7 +275,7 @@ export class LeadsService {
    * contact details, those become a real client here — that is the moment the
    * shop commits to them.
    */
-  async convert(id: string, dto: ConvertLeadDto, user?: { id: string; role: UserRole }) {
+  async convert(id: string, dto: ConvertLeadDto, user?: { id: string; role?: string }) {
     const lead = await this.findOne(id);
 
     if (lead.convertedOrderId) {
@@ -325,6 +333,7 @@ export class LeadsService {
       if (closingStatusId && closingStatusId !== lead.statusId) {
         await tx.leadStatusHistory.create({
           data: {
+            tenantId: tenantId(),
             leadId: id,
             fromStatusId: lead.statusId,
             toStatusId: closingStatusId,

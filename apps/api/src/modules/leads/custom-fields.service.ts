@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CustomFieldDefinition, CustomFieldEntity, CustomFieldType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CustomFieldDto, UpdateCustomFieldDto } from './dto/lead.dto';
+import { tenantId } from '../../common/tenancy/tenant-context';
 
 /**
  * Admin-defined fields.
@@ -31,6 +32,7 @@ export class CustomFieldsService {
     }
     return this.prisma.customFieldDefinition.create({
       data: {
+        tenantId: tenantId(),
         entity: dto.entity,
         key: slugify(dto.key),
         label: dto.label,

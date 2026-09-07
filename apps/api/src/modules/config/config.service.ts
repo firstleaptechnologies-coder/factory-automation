@@ -1,14 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { toMm } from '@decor/shared';
 import {
   CreateMaterialDto,
+  GstSlabDto,
+  UpdateGstSlabDto,
   CreateSizePresetDto,
   MeasurementDto,
   ThicknessDto,
   UpdateMaterialDto,
   UpdateSizePresetDto,
 } from './dto/config.dto';
+import { tenantId } from '../../common/tenancy/tenant-context';
 
 /** Admin-managed masters: materials, their thickness options, and size presets. */
 @Injectable()
@@ -35,8 +39,9 @@ export class ConfigurationService {
     return this.prisma.material.create({
       data: {
         ...material,
+        tenantId: tenantId(),
         thicknesses: thicknesses?.length
-          ? { create: thicknesses.map(toThicknessRow) }
+          ? { create: thicknesses.map((t) => ({ ...toThicknessRow(t), tenantId: tenantId() })) }
           : undefined,
       },
       include: { thicknesses: true },
@@ -55,7 +60,7 @@ export class ConfigurationService {
   async addThickness(materialId: string, dto: ThicknessDto) {
     await this.getMaterial(materialId);
     return this.prisma.materialThickness.create({
-      data: { materialId, ...toThicknessRow(dto) },
+      data: { materialId, tenantId: tenantId(), ...toThicknessRow(dto) },
     });
   }
 
@@ -86,6 +91,7 @@ export class ConfigurationService {
   createSizePreset(dto: CreateSizePresetDto) {
     return this.prisma.sizePreset.create({
       data: {
+        tenantId: tenantId(),
         code: dto.code,
         name: dto.name,
         sortOrder: dto.sortOrder ?? 0,
@@ -114,6 +120,52 @@ export class ConfigurationService {
     });
   }
 
+  // -- GST slabs ------------------------------------------------------------
+
+  listGstSlabs(includeInactive = false) {
+    return this.prisma.gstSlab.findMany({
+      where: includeInactive ? {} : { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { ratePct: 'asc' }],
+    });
+  }
+
+  async createGstSlab(dto: GstSlabDto) {
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.isDefault) await this.clearDefaultSlab(tx);
+      return tx.gstSlab.create({
+        data: {
+          tenantId: tenantId(),
+          name: dto.name,
+          ratePct: dto.ratePct,
+          isDefault: dto.isDefault ?? false,
+          sortOrder: dto.sortOrder ?? 0,
+        },
+      });
+    });
+  }
+
+  async updateGstSlab(id: string, dto: UpdateGstSlabDto) {
+    const slab = await this.prisma.gstSlab.findFirst({ where: { id } });
+    if (!slab) throw new NotFoundException(`GST slab ${id} not found`);
+
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.isDefault) await this.clearDefaultSlab(tx, id);
+      return tx.gstSlab.update({ where: { id }, data: dto });
+    });
+  }
+
+  /**
+   * Exactly one default. Two would make which rate an order picked up depend on
+   * row order, which is the kind of thing nobody notices until an invoice is
+   * wrong.
+   */
+  private async clearDefaultSlab(tx: Prisma.TransactionClient, exceptId?: string) {
+    await tx.gstSlab.updateMany({
+      where: { isDefault: true, ...(exceptId ? { id: { not: exceptId } } : {}) },
+      data: { isDefault: false },
+    });
+  }
+
   // -- app settings ---------------------------------------------------------
 
   async getSettings(): Promise<Record<string, unknown>> {
@@ -123,9 +175,9 @@ export class ConfigurationService {
 
   async setSetting(key: string, value: unknown) {
     return this.prisma.appSetting.upsert({
-      where: { key },
+      where: { tenantId_key: { tenantId: tenantId(), key } },
       update: { value: value as never },
-      create: { key, value: value as never },
+      create: { tenantId: tenantId(), key, value: value as never },
     });
   }
 }

@@ -3,6 +3,8 @@ import { UserRole } from '@prisma/client';
 import { ConfigurationService } from './config.service';
 import {
   CreateMaterialDto,
+  GstSlabDto,
+  UpdateGstSlabDto,
   CreateSizePresetDto,
   ThicknessDto,
   UpdateMaterialDto,
@@ -24,6 +26,11 @@ export class ConfigurationController {
   @Get('size-presets')
   listSizePresets(@Query('includeInactive') includeInactive?: string) {
     return this.config.listSizePresets(includeInactive === 'true');
+  }
+
+  @Get('gst-slabs')
+  listGstSlabs(@Query('includeInactive') includeInactive?: string) {
+    return this.config.listGstSlabs(includeInactive === 'true');
   }
 
   @Get('settings')
@@ -67,6 +74,18 @@ export class ConfigurationController {
   @Patch('size-presets/:id')
   updateSizePreset(@Param('id') id: string, @Body() dto: UpdateSizePresetDto) {
     return this.config.updateSizePreset(id, dto);
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Post('gst-slabs')
+  createGstSlab(@Body() dto: GstSlabDto) {
+    return this.config.createGstSlab(dto);
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Patch('gst-slabs/:id')
+  updateGstSlab(@Param('id') id: string, @Body() dto: UpdateGstSlabDto) {
+    return this.config.updateGstSlab(id, dto);
   }
 
   @Roles(UserRole.ADMIN)

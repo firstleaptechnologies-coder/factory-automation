@@ -21,6 +21,119 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
+// Platform (control plane)
+// ---------------------------------------------------------------------------
+//
+// This product is sold to several manufacturing businesses. Everything below
+// the platform layer belongs to exactly one tenant, and a tenant's data never
+// crosses into another's.
+//
+// Two isolation models are offered as commercial tiers. A SHARED tenant lives
+// in the platform database alongside others, separated by tenantId. A DEDICATED
+// tenant gets its own database. The schema is identical in both, and every row
+// carries tenantId even when it is alone in its database — that is what makes
+// moving a tenant between tiers a data copy rather than a migration project.
+
+enum TenantIsolation {
+  /// Pooled in the platform database, separated by tenantId.
+  SHARED
+  /// Its own database, connection string held on the tenant record.
+  DEDICATED
+}
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+}
+
+model Tenant {
+  id   String @id @default(cuid())
+  /// Typed at sign-in to reach this tenant, and used in URLs. Lowercase.
+  slug String @unique
+  name String
+
+  isolation   TenantIsolation @default(SHARED)
+  /// Only for DEDICATED. Encrypted at rest through EncryptionService.
+  databaseUrl String?
+
+  status TenantStatus @default(TRIAL)
+  plan   String?
+
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  notes        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+/// Super admins. They belong to no tenant and can provision them.
+model PlatformUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// A named set of permissions inside one tenant.
+///
+/// Roles are per-tenant rather than a fixed enum because every shop divides
+/// work differently — one has a separate QC person, another has the owner doing
+/// everything. Permissions are string keys checked by the guard; the canonical
+/// list lives in @decor/shared.
+model Role {
+  id       String @id @default(cuid())
+  tenantId String
+
+  code        String
+  name        String
+  description String?
+  permissions String[] @default([])
+  /// Seeded roles a tenant admin may edit but not delete.
+  isSystem    Boolean  @default(false)
+
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+/// A GST rate a tenant can apply.
+///
+/// The slab is chosen on the order line, not on the material: the raw board is
+/// an input, and what leaves the shop after cutting and finishing is a
+/// different product that may be taxed differently. Tax is computed on the
+/// amount actually quoted to the client.
+model GstSlab {
+  id       String @id @default(cuid())
+  tenantId String
+
+  name      String
+  ratePct   Decimal @db.Decimal(5, 2)
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  orderItems OrderItem[]
+  orders     Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+// ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
 
@@ -33,29 +146,39 @@ enum UserRole {
 }
 
 model User {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId     String
   id           String   @id @default(cuid())
-  code         String   @unique
+  code         String
   name         String
-  email        String?  @unique
-  phone        String?  @unique
+  email        String?
+  phone        String?
   passwordHash String
+  /// Kept as a coarse label for display and seeding. Authorisation comes from
+  /// the role's permissions, not from this.
   role         UserRole @default(SALES)
+  roleId       String?
+  roleRef      Role?    @relation(fields: [roleId], references: [id])
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  ordersCreated   Order[]              @relation("OrderCreatedBy")
-  statusChanges   OrderStatusHistory[]
-  filesUploaded   StoredFile[]
-  clientsCreated  Client[]             @relation("ClientCreatedBy")
-  auditLogs       AuditLog[]
-  leadsOwned      Lead[]               @relation("LeadOwner")
-  leadsCreated    Lead[]               @relation("LeadCreatedBy")
-  leadStatusChanges LeadStatusHistory[] @relation("LeadStatusChangedBy")
-  paymentsReceived  Payment[]           @relation("PaymentReceivedBy")
-  cashDeposited     CashDeposit[]       @relation("CashDepositedBy")
+  ordersCreated     Order[]              @relation("OrderCreatedBy")
+  statusChanges     OrderStatusHistory[]
+  filesUploaded     StoredFile[]
+  clientsCreated    Client[]             @relation("ClientCreatedBy")
+  auditLogs         AuditLog[]
+  leadsOwned        Lead[]               @relation("LeadOwner")
+  leadsCreated      Lead[]               @relation("LeadCreatedBy")
+  leadStatusChanges LeadStatusHistory[]  @relation("LeadStatusChangedBy")
+  paymentsReceived  Payment[]            @relation("PaymentReceivedBy")
+  cashDeposited     CashDeposit[]        @relation("CashDepositedBy")
 
+  @@unique([tenantId, code])
+  @@unique([tenantId, email])
+  @@unique([tenantId, phone])
   @@index([role, isActive])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -65,45 +188,52 @@ model User {
 /// Searchable while punching; new ones can be created inline from the same
 /// screen, which is why only `name` is required.
 model Client {
-  id      String  @id @default(cuid())
-  code    String  @unique
-  name    String
-  phone   String?
-  email   String?
-  gstin   String?
-  company String?
-  address String?
-  notes   String?
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String  @id @default(cuid())
+  code     String
+  name     String
+  phone    String?
+  email    String?
+  gstin    String?
+  company  String?
+  address  String?
+  notes    String?
 
-  isActive  Boolean  @default(true)
+  isActive    Boolean  @default(true)
   createdById String?
   createdBy   User?    @relation("ClientCreatedBy", fields: [createdById], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   orders    Order[]
   locations ClientLocation[]
   leads     Lead[]
 
+  @@unique([tenantId, code])
   @@index([name])
   @@index([isActive])
+  @@index([tenantId])
 }
 
 /// Sites a client orders for. Populated as they are typed during punching, so
 /// the second order to the same site can pick it from a list.
 model ClientLocation {
-  id       String  @id @default(cuid())
-  clientId String
-  client   Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  name     String
-  address  String?
-  useCount Int     @default(0)
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name      String
+  address   String?
+  useCount  Int      @default(0)
   createdAt DateTime @default(now())
 
   orders Order[]
 
   @@unique([clientId, name])
   @@index([clientId, useCount])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -111,26 +241,32 @@ model ClientLocation {
 // ---------------------------------------------------------------------------
 
 model Material {
-  id          String  @id @default(cuid())
-  code        String  @unique
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId    String
+  id          String   @id @default(cuid())
+  code        String
   name        String
   description String?
   /// Hex, shown as a chip in lists and on the flow canvas.
   color       String?
-  sortOrder   Int     @default(0)
-  isActive    Boolean @default(true)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   thicknesses MaterialThickness[]
   orderItems  OrderItem[]
 
+  @@unique([tenantId, code])
   @@index([isActive, sortOrder])
+  @@index([tenantId])
 }
 
 /// The thickness options offered for a material. Stored in mm; the admin may
 /// type them in any unit and the UI converts before saving.
 model MaterialThickness {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
   id         String   @id @default(cuid())
   materialId String
   material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
@@ -144,25 +280,30 @@ model MaterialThickness {
 
   @@unique([materialId, valueMm])
   @@index([materialId, isActive])
+  @@index([tenantId])
 }
 
 /// A named size the shop uses often. Punching can pick one or enter a custom
 /// size; either way the order stores its own copy of the numbers.
 model SizePreset {
-  id          String  @id @default(cuid())
-  code        String  @unique
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId    String
+  id          String   @id @default(cuid())
+  code        String
   name        String
-  lengthMm    Decimal @db.Decimal(12, 3)
-  widthMm     Decimal @db.Decimal(12, 3)
+  lengthMm    Decimal  @db.Decimal(12, 3)
+  widthMm     Decimal  @db.Decimal(12, 3)
   thicknessMm Decimal? @db.Decimal(12, 3)
-  sortOrder   Int     @default(0)
-  isActive    Boolean @default(true)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   orderItems OrderItem[]
 
+  @@unique([tenantId, code])
   @@index([isActive, sortOrder])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -179,23 +320,27 @@ enum WorkflowKind {
 }
 
 model Workflow {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId    String
   id          String       @id @default(cuid())
-  code        String       @unique
+  code        String
   name        String
   description String?
   kind        WorkflowKind @default(ORDER)
   /// One default per kind.
   isDefault   Boolean      @default(false)
-  isActive    Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   statuses    WorkflowStatus[]
   transitions WorkflowTransition[]
   orders      Order[]
   leads       Lead[]
 
+  @@unique([tenantId, code])
   @@index([kind, isActive])
+  @@index([tenantId])
 }
 
 /// System meaning of a status, independent of what the admin names it.
@@ -208,6 +353,8 @@ enum StatusCategory {
 }
 
 model WorkflowStatus {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
   id         String   @id @default(cuid())
   workflowId String
   workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
@@ -225,13 +372,13 @@ model WorkflowStatus {
 
   /// Exactly one initial status per workflow; terminal statuses have no
   /// outgoing transitions in normal use.
-  isInitial Boolean @default(false)
+  isInitial    Boolean @default(false)
   /// A stage an order is allowed to be created at. The journey starts at "Lead"
   /// when an enquiry came first and at "Order confirmed" when it did not, so
   /// more than one stage has to be a legal entry point.
   isEntryPoint Boolean @default(false)
-  isTerminal Boolean @default(false)
-  sortOrder Int     @default(0)
+  isTerminal   Boolean @default(false)
+  sortOrder    Int     @default(0)
 
   /// Saved position on the drag-and-drop flow canvas.
   canvasX Float @default(0)
@@ -240,20 +387,23 @@ model WorkflowStatus {
   outgoing WorkflowTransition[] @relation("FromStatus")
   incoming WorkflowTransition[] @relation("ToStatus")
 
-  ordersAtStatus Order[]
-  leadsAtStatus  Lead[]
-  historyFrom    OrderStatusHistory[] @relation("HistoryFrom")
-  historyTo      OrderStatusHistory[] @relation("HistoryTo")
-  leadHistoryFrom LeadStatusHistory[] @relation("LeadHistoryFrom")
-  leadHistoryTo   LeadStatusHistory[] @relation("LeadHistoryTo")
+  ordersAtStatus  Order[]
+  leadsAtStatus   Lead[]
+  historyFrom     OrderStatusHistory[] @relation("HistoryFrom")
+  historyTo       OrderStatusHistory[] @relation("HistoryTo")
+  leadHistoryFrom LeadStatusHistory[]  @relation("LeadHistoryFrom")
+  leadHistoryTo   LeadStatusHistory[]  @relation("LeadHistoryTo")
 
   @@unique([workflowId, code])
   @@index([workflowId, sortOrder])
   @@index([parentId])
+  @@index([tenantId])
 }
 
 /// One arrow on the flow canvas.
 model WorkflowTransition {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
   id         String   @id @default(cuid())
   workflowId String
   workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
@@ -271,6 +421,7 @@ model WorkflowTransition {
 
   @@unique([workflowId, fromStatusId, toStatusId])
   @@index([fromStatusId])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -285,8 +436,10 @@ enum StorageBackend {
 /// One stored object. Small files can live in Postgres, large ones in S3; the
 /// row is the same either way so callers never branch on where a file lives.
 model StoredFile {
-  id      String         @id @default(cuid())
-  backend StorageBackend
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String         @id @default(cuid())
+  backend  StorageBackend
 
   /// S3 backend
   bucket    String?
@@ -295,28 +448,29 @@ model StoredFile {
   /// DATABASE backend. Encrypted when `isEncrypted` is set.
   data Bytes?
 
-  fileName     String
-  mimeType     String
-  byteSize     Int
+  fileName         String
+  mimeType         String
+  byteSize         Int
   /// Size before image optimisation, so the saving is visible.
   originalByteSize Int?
-  width        Int?
-  height       Int?
+  width            Int?
+  height           Int?
   /// SHA-256 of the stored bytes, for integrity checks and de-duplication.
-  checksum     String
+  checksum         String
 
   isEncrypted     Boolean @default(false)
   /// Which key version encrypted this, so keys can be rotated.
   encryptionKeyId String?
 
   uploadedById String?
-  uploadedBy   User?   @relation(fields: [uploadedById], references: [id])
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id])
   createdAt    DateTime @default(now())
 
   attachments OrderAttachment[]
 
   @@index([checksum])
   @@index([createdAt])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -331,16 +485,18 @@ enum Priority {
 }
 
 model Order {
-  id   String @id @default(cuid())
-  code String @unique
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  code     String
 
   clientId String
   client   Client @relation(fields: [clientId], references: [id])
 
   /// Free text as typed while punching; the ClientLocation link is set when it
   /// matches a saved site, so both a quick type and a reuse are possible.
-  location   String
-  locationId String?
+  location       String
+  locationId     String?
   clientLocation ClientLocation? @relation(fields: [locationId], references: [id])
 
   workflowId String
@@ -348,7 +504,7 @@ model Order {
   statusId   String
   status     WorkflowStatus @relation(fields: [statusId], references: [id])
 
-  priority Priority @default(NORMAL)
+  priority Priority  @default(NORMAL)
   dueDate  DateTime?
   notes    String?
 
@@ -359,7 +515,17 @@ model Order {
   pricingMode PricingMode @default(ITEMISED)
   subtotal    Decimal     @default(0) @db.Decimal(14, 2)
   discount    Decimal     @default(0) @db.Decimal(14, 2)
+  /// Taxable value: subtotal less discount, before GST.
   total       Decimal     @default(0) @db.Decimal(14, 2)
+
+  /// GST. Under ITEMISED this is the sum of the lines' tax. Under LUMP_SUM one
+  /// slab applies to the whole quoted figure, so the slab is held here instead.
+  gstSlabId  String?
+  gstSlab    GstSlab? @relation(fields: [gstSlabId], references: [id])
+  taxAmount  Decimal  @default(0) @db.Decimal(14, 2)
+  /// What the client actually owes: total + taxAmount. Payments settle against
+  /// this, never against the pre-tax figure.
+  grandTotal Decimal  @default(0) @db.Decimal(14, 2)
 
   /// Derived from the payments below and kept here so orders can be filtered
   /// by it without summing a ledger on every query.
@@ -377,10 +543,12 @@ model Order {
   /// Set when this order came from a lead.
   fromLead      Lead?                @relation("LeadConversion")
 
+  @@unique([tenantId, code])
   @@index([clientId, createdAt])
   @@index([statusId])
   @@index([createdAt])
   @@index([paymentStatus])
+  @@index([tenantId])
 }
 
 /// One punched spec. Dimensions are a snapshot in millimetres — a size preset
@@ -412,19 +580,21 @@ enum PricingMode {
 }
 
 model OrderItem {
-  id      String @id @default(cuid())
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  lineNo  Int
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineNo   Int
 
   sizePresetId String?
   sizePreset   SizePreset? @relation(fields: [sizePresetId], references: [id])
-  lengthMm    Decimal  @db.Decimal(12, 3)
-  widthMm     Decimal  @db.Decimal(12, 3)
-  thicknessMm Decimal? @db.Decimal(12, 3)
+  lengthMm     Decimal     @db.Decimal(12, 3)
+  widthMm      Decimal     @db.Decimal(12, 3)
+  thicknessMm  Decimal?    @db.Decimal(12, 3)
 
-  materialId String
-  material   Material @relation(fields: [materialId], references: [id])
+  materialId          String
+  material            Material           @relation(fields: [materialId], references: [id])
   materialThicknessId String?
   materialThickness   MaterialThickness? @relation(fields: [materialThicknessId], references: [id])
 
@@ -438,8 +608,18 @@ model OrderItem {
   rateUnit RateUnit @default(PER_SQFT)
   amount   Decimal  @default(0) @db.Decimal(14, 2)
 
+  /// GST on what is actually sold. The slab is chosen per line because the
+  /// finished product is not the raw board it was cut from. The rate is
+  /// snapshotted beside the slab so a later change to the slab cannot restate
+  /// an old order's tax.
+  gstSlabId  String?
+  gstSlab    GstSlab? @relation(fields: [gstSlabId], references: [id])
+  gstRatePct Decimal  @default(0) @db.Decimal(5, 2)
+  taxAmount  Decimal  @default(0) @db.Decimal(14, 2)
+
   @@unique([orderId, lineNo])
   @@index([materialId])
+  @@index([tenantId])
 }
 
 enum AttachmentKind {
@@ -451,14 +631,16 @@ enum AttachmentKind {
 }
 
 model OrderAttachment {
-  id      String @id @default(cuid())
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   kind        AttachmentKind
   /// Required for reference images: what the client said about this picture.
   description String?
-  sortOrder   Int    @default(0)
+  sortOrder   Int            @default(0)
 
   fileId String
   file   StoredFile @relation(fields: [fileId], references: [id])
@@ -466,14 +648,17 @@ model OrderAttachment {
   createdAt DateTime @default(now())
 
   @@index([orderId, kind, sortOrder])
+  @@index([tenantId])
 }
 
 /// Every status move, with who made it and why. The audit an admin-configurable
 /// workflow needs in order to be trusted.
 model OrderStatusHistory {
-  id      String @id @default(cuid())
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   fromStatusId String?
   fromStatus   WorkflowStatus? @relation("HistoryFrom", fields: [fromStatusId], references: [id])
@@ -486,6 +671,7 @@ model OrderStatusHistory {
   changedAt   DateTime @default(now())
 
   @@index([orderId, changedAt])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -510,9 +696,11 @@ enum PaymentMode {
 /// this is a ledger rather than a field — the order's status is derived from
 /// the sum, and every receipt keeps its own mode and date.
 model Payment {
-  id      String @id @default(cuid())
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   amount Decimal     @db.Decimal(14, 2)
   mode   PaymentMode
@@ -531,6 +719,7 @@ model Payment {
 
   @@index([orderId, receivedAt])
   @@index([mode])
+  @@index([tenantId])
 }
 
 /// Cash moving from the shop's hands into the bank.
@@ -540,6 +729,8 @@ model Payment {
 /// trip to the bank covers takings from several orders — those reduce the
 /// shop's cash position without being attributable to a single order.
 model CashDeposit {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
   id        String   @id @default(cuid())
   paymentId String?
   payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: Cascade)
@@ -555,6 +746,7 @@ model CashDeposit {
 
   @@index([paymentId])
   @@index([depositedAt])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -564,8 +756,10 @@ model CashDeposit {
 /// Where an enquiry came from. Admin-managed so the list matches how this shop
 /// actually gets work, rather than a fixed set someone guessed.
 model LeadSource {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
   id        String  @id @default(cuid())
-  code      String  @unique
+  code      String
   name      String
   color     String?
   sortOrder Int     @default(0)
@@ -573,7 +767,9 @@ model LeadSource {
 
   leads Lead[]
 
+  @@unique([tenantId, code])
   @@index([isActive, sortOrder])
+  @@index([tenantId])
 }
 
 enum CustomFieldType {
@@ -598,22 +794,25 @@ enum CustomFieldEntity {
 /// site area, architect's name, budget band — without a schema change, and the
 /// forms build themselves from these rows.
 model CustomFieldDefinition {
-  id       String            @id @default(cuid())
-  entity   CustomFieldEntity
-  key      String
-  label    String
-  type     CustomFieldType   @default(TEXT)
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
+  id        String            @id @default(cuid())
+  entity    CustomFieldEntity
+  key       String
+  label     String
+  type      CustomFieldType   @default(TEXT)
   /// Choices for SELECT and MULTI_SELECT.
-  options  String[]          @default([])
-  helpText String?
-  required Boolean           @default(false)
-  sortOrder Int              @default(0)
-  isActive Boolean           @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  options   String[]          @default([])
+  helpText  String?
+  required  Boolean           @default(false)
+  sortOrder Int               @default(0)
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
-  @@unique([entity, key])
+  @@unique([tenantId, entity, key])
   @@index([entity, isActive, sortOrder])
+  @@index([tenantId])
 }
 
 /// An enquiry, before it is work.
@@ -621,9 +820,11 @@ model CustomFieldDefinition {
 /// A lead may name an existing client or just a person who rang; the contact
 /// fields cover the second case so nothing is lost while it is still vague.
 model Lead {
-  id    String @id @default(cuid())
-  code  String @unique
-  title String
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  code     String
+  title    String
 
   clientId String?
   client   Client? @relation(fields: [clientId], references: [id])
@@ -655,8 +856,8 @@ model Lead {
 
   /// Set once the lead becomes work. Kept rather than deleted so the pipeline
   /// can report how many enquiries actually converted.
-  convertedOrderId String?  @unique
-  convertedOrder   Order?   @relation("LeadConversion", fields: [convertedOrderId], references: [id])
+  convertedOrderId String?   @unique
+  convertedOrder   Order?    @relation("LeadConversion", fields: [convertedOrderId], references: [id])
   convertedAt      DateTime?
 
   createdById String?
@@ -666,15 +867,19 @@ model Lead {
 
   statusHistory LeadStatusHistory[]
 
+  @@unique([tenantId, code])
   @@index([statusId])
   @@index([ownerId])
   @@index([createdAt])
+  @@index([tenantId])
 }
 
 model LeadStatusHistory {
-  id     String @id @default(cuid())
-  leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  leadId   String
+  lead     Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   fromStatusId String?
   fromStatus   WorkflowStatus? @relation("LeadHistoryFrom", fields: [fromStatusId], references: [id])
@@ -687,6 +892,7 @@ model LeadStatusHistory {
   changedAt   DateTime @default(now())
 
   @@index([leadId, changedAt])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
@@ -696,31 +902,45 @@ model LeadStatusHistory {
 /// Runtime configuration the admin can change without a deploy: default
 /// display unit, image optimisation targets, storage backend preference.
 model AppSetting {
-  key       String   @id
+  id        String   @id @default(cuid())
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
+  key       String
   value     Json
   updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
 }
 
 /// Atomic counters behind human-readable document numbers. A read-then-increment
 /// on the documents themselves loses races.
 model DocumentSequence {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
   id        String   @id @default(cuid())
-  key       String   @unique
+  key       String
   value     Int      @default(0)
   updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
 }
 
 model AuditLog {
-  id       String  @id @default(cuid())
-  entity   String
-  entityId String
-  action   String
-  before   Json?
-  after    Json?
-  userId   String?
-  user     User?   @relation(fields: [userId], references: [id])
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
+  id        String   @id @default(cuid())
+  entity    String
+  entityId  String
+  action    String
+  before    Json?
+  after     Json?
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
 
   @@index([entity, entityId])
   @@index([createdAt])
+  @@index([tenantId])
 }

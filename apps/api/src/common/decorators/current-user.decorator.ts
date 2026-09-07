@@ -1,16 +1,17 @@
-import { ExecutionContext, createParamDecorator } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import type { TenantContext } from '../tenancy/tenant-context';
 
 export interface AuthUser {
   id: string;
-  code: string;
-  name: string;
-  role: UserRole;
+  code?: string;
+  name?: string;
+  role?: string;
+  permissions: string[];
+  tenant?: TenantContext;
+  isPlatform?: boolean;
 }
 
 export const CurrentUser = createParamDecorator(
-  (data: keyof AuthUser | undefined, ctx: ExecutionContext) => {
-    const user = ctx.switchToHttp().getRequest().user as AuthUser;
-    return data ? user?.[data] : user;
-  },
+  (_data: unknown, context: ExecutionContext): AuthUser =>
+    context.switchToHttp().getRequest().user,
 );
