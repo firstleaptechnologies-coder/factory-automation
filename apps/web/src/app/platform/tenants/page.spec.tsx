@@ -325,3 +325,51 @@ describe('opening a workspace', () => {
     expect(openWorkspace).toHaveBeenCalledWith('t1', 'Their board is not loading');
   });
 });
+
+
+/**
+ * Is anybody using it, and is it working for them?
+ *
+ * A workspace full of orders that nobody has opened for three weeks is a
+ * different problem from a quiet one.
+ */
+describe('how a workspace is doing', () => {
+  const withHealth = (health: Record<string, unknown> | undefined) => [
+    { ...TENANT, health },
+  ];
+
+  const daysAgo = (days: number) =>
+    new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  it('says when it was last used, and how much', async () => {
+    await mount(withHealth({ lastSeenAt: daysAgo(0), writes: 42, failures: 0, clientErrors: 0 }));
+    expect(await screen.findByText('Active today · 42 changes')).toBeInTheDocument();
+  });
+
+  it('counts the days since, rather than showing a timestamp', async () => {
+    await mount(withHealth({ lastSeenAt: daysAgo(5), writes: 3, failures: 0, clientErrors: 0 }));
+    expect(await screen.findByText('Last used 5 days ago')).toBeInTheDocument();
+  });
+
+  it('says plainly when nobody has touched it', async () => {
+    await mount(withHealth({ lastSeenAt: null, writes: 0, failures: 0, clientErrors: 0 }));
+    expect(await screen.findByText('Not used in a fortnight')).toBeInTheDocument();
+  });
+
+  it('surfaces what broke for them', async () => {
+    await mount(withHealth({ lastSeenAt: daysAgo(1), writes: 8, failures: 3, clientErrors: 1 }));
+    expect(await screen.findByText('3 failed calls')).toBeInTheDocument();
+    expect(screen.getByText('1 app error')).toBeInTheDocument();
+  });
+
+  it('says nothing about failures where there were none', async () => {
+    await mount(withHealth({ lastSeenAt: daysAgo(1), writes: 8, failures: 0, clientErrors: 0 }));
+    await screen.findByText('Last used yesterday');
+    expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
+  });
+
+  it('copes with a workspace the API said nothing about', async () => {
+    await mount(withHealth(undefined));
+    expect(await screen.findByText('Not used in a fortnight')).toBeInTheDocument();
+  });
+});

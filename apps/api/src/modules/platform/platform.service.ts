@@ -71,6 +71,11 @@ export class PlatformService implements OnModuleInit {
   async list() {
     const tenants = await this.db.tenant.findMany({ orderBy: { createdAt: 'desc' } });
 
+    // One pass over the telemetry for everybody, rather than a query per
+    // workspace: it is all in the platform database precisely so that a view
+    // across tenants costs one read.
+    const health = await this.health();
+
     // Counts come from each tenant's own data, which for a dedicated tenant
     // lives in another database entirely — so they are gathered per tenant
     // rather than in one join.
@@ -78,8 +83,62 @@ export class PlatformService implements OnModuleInit {
       tenants.map(async (tenant) => ({
         ...redact(tenant),
         counts: await this.countsFor(tenant.id, tenant.databaseUrl),
+        health: health.get(tenant.id) ?? EMPTY_HEALTH,
       })),
     );
+  }
+
+  /**
+   * Is anybody using it, and is it working for them?
+   *
+   * Read from the operational log rather than from each shop's own data: a
+   * workspace with orders in it that nobody has opened for three weeks is a
+   * different problem from a quiet one, and only the log knows the difference.
+   *
+   * Nothing here reaches into a tenant's database.
+   */
+  private async health(): Promise<Map<string, TenantHealth>> {
+    const since = new Date(Date.now() - HEALTH_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    const [activity, failures, clientErrors] = await Promise.all([
+      this.db.serverLog.groupBy({
+        by: ['tenantId'],
+        where: { at: { gte: since } },
+        _count: { _all: true },
+        _max: { at: true },
+      }),
+      this.db.serverLog.groupBy({
+        by: ['tenantId'],
+        where: { at: { gte: since }, outcome: 'failed' },
+        _count: { _all: true },
+      }),
+      this.db.clientLog.groupBy({
+        by: ['tenantId'],
+        where: { receivedAt: { gte: since }, level: 'error' },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const health = new Map<string, TenantHealth>();
+    for (const row of activity) {
+      if (!row.tenantId) continue;
+      health.set(row.tenantId, {
+        ...EMPTY_HEALTH,
+        writes: row._count._all,
+        lastSeenAt: row._max.at?.toISOString() ?? null,
+      });
+    }
+    for (const row of failures) {
+      if (!row.tenantId) continue;
+      const found = health.get(row.tenantId) ?? { ...EMPTY_HEALTH };
+      health.set(row.tenantId, { ...found, failures: row._count._all });
+    }
+    for (const row of clientErrors) {
+      if (!row.tenantId) continue;
+      const found = health.get(row.tenantId) ?? { ...EMPTY_HEALTH };
+      health.set(row.tenantId, { ...found, clientErrors: row._count._all });
+    }
+    return health;
   }
 
   async findOne(id: string) {
@@ -207,6 +266,27 @@ export class PlatformService implements OnModuleInit {
 }
 
 /** Never return a connection string over the API, even to a platform admin. */
+/** How far back the health figures look. A fortnight sees a quiet week. */
+const HEALTH_WINDOW_DAYS = 14;
+
+export interface TenantHealth {
+  /** The last time anybody in this workspace changed anything. */
+  lastSeenAt: string | null;
+  /** Writes recorded in the window. Reads are not logged. */
+  writes: number;
+  /** Times the API broke for them. */
+  failures: number;
+  /** Errors their app or browser reported. */
+  clientErrors: number;
+}
+
+const EMPTY_HEALTH: TenantHealth = {
+  lastSeenAt: null,
+  writes: 0,
+  failures: 0,
+  clientErrors: 0,
+};
+
 function redact<T extends { databaseUrl: string | null; plan?: string | null; modules?: string[] }>(
   tenant: T,
 ) {

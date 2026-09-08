@@ -293,10 +293,21 @@ The ownership hierarchy, made real. Half of it already existed — `Tenant`,
   string**. Every signed-in person in such a shop was being handed it. It now
   returns named fields, with a spec that fails if that ever changes.
 
-**Still to do here:** FirstLeap staff roles (support, billing, engineering),
-impersonation with a banner, a time limit and an entry in the *tenant's* own
-audit log, tenant health from the telemetry tables, announcements, and
-subscription records.
+**Staff roles and impersonation — done:**
+
+- Platform people are OWNER, SUPPORT, BILLING or ENGINEER rather than one
+  undifferentiated super-user, with permissions resolved live from the role.
+- Opening a workspace to help is its own permission, needs a reason in words,
+  writes that reason into the *shop's own* audit trail, expires in half an
+  hour, borrows their administrator's account rather than inventing one, and
+  puts a banner on both clients for as long as it lasts.
+
+**Tenant health — done:** last used, changes made, calls that failed and errors
+their app reported, all read from the operational log rather than from anybody's
+data, in one query for every workspace.
+
+**Deliberately deferred:** announcements, and subscription records. Neither
+blocks anything, and the second wants a commercial answer first — see G11.
 
 ### Phase 4 · The ledger and Expenses — item 7 — **L**
 

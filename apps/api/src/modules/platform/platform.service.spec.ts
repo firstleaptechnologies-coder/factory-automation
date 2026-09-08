@@ -299,3 +299,91 @@ describe('update and isolation', () => {
     expect(encryption.encrypt).toHaveBeenCalledWith('postgres://new');
   });
 });
+
+/**
+ * Is anybody using it, and is it working for them?
+ *
+ * The answer comes from the operational log in the platform database, so it
+ * costs one read for every workspace and reaches into nobody's data.
+ */
+describe('how a workspace is doing', () => {
+  function build() {
+    const db = prismaMock() as never as Db;
+    (db as unknown as Record<string, unknown>).platform = db;
+    db.tenant.findMany = jest.fn(async () => [
+      { id: 't1', slug: 'decorbucket', databaseUrl: null, plan: 'shop', modules: [] },
+      { id: 't2', slug: 'quiet', databaseUrl: null, plan: 'shop', modules: [] },
+    ]);
+    db.serverLog.groupBy = jest.fn(async ({ where }: { where: Record<string, unknown> }) =>
+      where.outcome === 'failed'
+        ? [{ tenantId: 't1', _count: { _all: 2 } }]
+        : [
+            {
+              tenantId: 't1',
+              _count: { _all: 140 },
+              _max: { at: new Date('2026-09-08T10:00:00.000Z') },
+            },
+          ],
+    );
+    db.clientLog.groupBy = jest.fn(async () => [{ tenantId: 't1', _count: { _all: 5 } }]);
+    db.user.count = jest.fn(async () => 0);
+    db.order.count = jest.fn(async () => 0);
+    db.client.count = jest.fn(async () => 0);
+
+    return {
+      service: new PlatformService(
+        db as never,
+        { decryptToString: jest.fn() } as never,
+        { invalidate: jest.fn() } as never,
+        { seed: jest.fn(), syncSystemRoles: jest.fn() } as never,
+      ),
+      db,
+    };
+  }
+
+  it('says when somebody last changed something', async () => {
+    const [busy] = await build().service.list();
+    expect(busy.health).toMatchObject({
+      lastSeenAt: '2026-09-08T10:00:00.000Z',
+      writes: 140,
+      failures: 2,
+      clientErrors: 5,
+    });
+  });
+
+  it('says plainly that a quiet workspace is quiet', async () => {
+    const [, quiet] = await build().service.list();
+    // Not an error, and not a blank: nobody has touched it.
+    expect(quiet.health).toEqual({
+      lastSeenAt: null,
+      writes: 0,
+      failures: 0,
+      clientErrors: 0,
+    });
+  });
+
+  it('asks the log once for everybody, not once per workspace', async () => {
+    const { service, db } = build();
+    await service.list();
+    // Three queries for any number of tenants: activity, failures, client
+    // errors.
+    expect(db.serverLog.groupBy).toHaveBeenCalledTimes(2);
+    expect(db.clientLog.groupBy).toHaveBeenCalledTimes(1);
+  });
+
+  it('looks back a fortnight, which sees a quiet week', async () => {
+    const { service, db } = build();
+    await service.list();
+
+    const since = db.serverLog.groupBy.mock.calls[0][0].where.at.gte as Date;
+    const days = (Date.now() - since.getTime()) / (24 * 60 * 60 * 1000);
+    expect(Math.round(days)).toBe(14);
+  });
+
+  it('reaches into no tenant’s database to work it out', async () => {
+    const { service, db } = build();
+    await service.list();
+    // The counts do that; the health figures deliberately do not.
+    expect(db.serverLog.groupBy.mock.calls[0][0].where).not.toHaveProperty('databaseUrl');
+  });
+});

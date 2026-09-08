@@ -162,6 +162,30 @@ export default function TenantsPage() {
                   <Pill label={tenant.status} color={STATUS_COLOR[tenant.status]} />
                 </div>
               </div>
+              {/*
+                Is anybody using it, and is it working for them?
+
+                A workspace full of orders that nobody has opened for three
+                weeks is a different problem from a quiet one, and only the log
+                knows the difference.
+              */}
+              <div className="row" style={{ marginTop: 'var(--s-md)' }}>
+                <Pill
+                  label={activityLabel(tenant)}
+                  color={activityColour(tenant)}
+                />
+                {tenant.health?.failures ? (
+                  <span className="t-tiny danger">
+                    {tenant.health.failures} failed {tenant.health.failures === 1 ? 'call' : 'calls'}
+                  </span>
+                ) : null}
+                {tenant.health?.clientErrors ? (
+                  <span className="t-tiny warning">
+                    {tenant.health.clientErrors} app {tenant.health.clientErrors === 1 ? 'error' : 'errors'}
+                  </span>
+                ) : null}
+              </div>
+
               <div className="row-between" style={{ marginTop: 'var(--s-md)' }}>
                 <span className="t-tiny faint">
                   {tenant.counts?.unreachable
@@ -335,6 +359,27 @@ export default function TenantsPage() {
       </Sheet>
     </div>
   );
+}
+
+/** How long since anybody in there changed anything. */
+function activityLabel(tenant: Tenant): string {
+  const last = tenant.health?.lastSeenAt;
+  if (!last) return 'Not used in a fortnight';
+
+  const days = Math.floor((Date.now() - new Date(last).getTime()) / (24 * 60 * 60 * 1000));
+  if (days === 0) return `Active today · ${tenant.health?.writes ?? 0} changes`;
+  if (days === 1) return 'Last used yesterday';
+  return `Last used ${days} days ago`;
+}
+
+/** Quiet is amber rather than red: it is a question, not a fault. */
+function activityColour(tenant: Tenant): string {
+  const last = tenant.health?.lastSeenAt;
+  if (!last) return 'var(--warning)';
+  const days = (Date.now() - new Date(last).getTime()) / (24 * 60 * 60 * 1000);
+  if (days < 2) return 'var(--success)';
+  if (days < 7) return 'var(--info)';
+  return 'var(--warning)';
 }
 
 function slugify(value: string): string {

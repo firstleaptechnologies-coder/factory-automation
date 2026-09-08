@@ -83,6 +83,19 @@ export interface Tenant {
   notes?: string | null;
   hasDedicatedDatabase: boolean;
   createdAt: string;
+  /**
+   * Is anybody using it, and is it working for them?
+   *
+   * Read from the operational log rather than from the shop's own data: a
+   * workspace full of orders that nobody has opened for three weeks is a
+   * different problem from a quiet one.
+   */
+  health?: {
+    lastSeenAt: string | null;
+    writes: number;
+    failures: number;
+    clientErrors: number;
+  };
   counts?: {
     users: number | null;
     orders: number | null;
