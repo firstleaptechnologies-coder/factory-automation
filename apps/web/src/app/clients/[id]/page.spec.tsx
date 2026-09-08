@@ -3,7 +3,13 @@ import { act, render, screen, fireEvent } from '@testing-library/react';
 import ClientPage from './page';
 
 const clientCall = jest.fn();
-jest.mock('@/lib/api', () => ({ api: { client: (...a: unknown[]) => clientCall(...a) } }));
+const historyCall = jest.fn();
+jest.mock('@/lib/api', () => ({
+  api: {
+    client: (...a: unknown[]) => clientCall(...a),
+    history: (...a: unknown[]) => historyCall(...a),
+  },
+}));
 
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
@@ -35,6 +41,7 @@ const CLIENT = {
 };
 
 const open = async (client: unknown = CLIENT) => {
+  historyCall.mockResolvedValue([]);
   clientCall.mockResolvedValue(client);
   await act(async () => {
     render(

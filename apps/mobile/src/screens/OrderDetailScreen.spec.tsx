@@ -8,6 +8,7 @@ const mockAllowedNext = jest.fn();
 const mockAllowedBack = jest.fn();
 const mockChangeStatus = jest.fn();
 const mockReprice = jest.fn();
+const mockHistory = jest.fn();
 jest.mock('../api/client', () => ({
   api: {
     order: (...a: unknown[]) => mockOrder(...a),
@@ -15,6 +16,7 @@ jest.mock('../api/client', () => ({
     allowedBack: (...a: unknown[]) => mockAllowedBack(...a),
     changeOrderStatus: (...a: unknown[]) => mockChangeStatus(...a),
     repriceOrder: (...a: unknown[]) => mockReprice(...a),
+    history: (...a: unknown[]) => mockHistory(...a),
     fileUrl: (id: string) => `https://api.test/files/${id}`,
     getToken: () => 'tok',
   },
@@ -90,6 +92,7 @@ beforeEach(() => {
     { id: 't2', toStatusId: 's9', requiresNote: true, label: 'Put on hold', toStatus: { name: 'On hold', color: '#D29922' } },
   ]);
   mockChangeStatus.mockResolvedValue({});
+  mockHistory.mockResolvedValue([]);
   mockReprice.mockResolvedValue({});
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
@@ -347,19 +350,22 @@ describe('sending the order back', () => {
   });
 
   it('marks a reversal in the history, which otherwise reads as an ordinary step', async () => {
-    await mount({
-      statusHistory: [
-        {
-          id: 'h1',
-          fromStatus: { name: 'Production', color: '#D29922' },
-          toStatus: { name: 'Design', color: '#8957E5' },
-          note: 'Client changed it',
-          reversed: true,
-          changedBy: { name: 'Nakul' },
-          changedAt: '2026-09-02T10:00:00Z',
-        },
-      ],
-    });
+    mockHistory.mockResolvedValue([
+      {
+        id: 'h1',
+        at: '2026-09-02T10:00:00Z',
+        kind: 'moved',
+        action: 'order.moved_back',
+        entity: 'Order',
+        entityId: 'o1',
+        from: 'Production',
+        to: 'Design',
+        reversed: true,
+        reason: 'Client changed it',
+        by: 'Nakul',
+      },
+    ]);
+    await mount();
     expect(await screen.findByText(/went back/)).toBeTruthy();
   });
 });
@@ -418,11 +424,39 @@ it('opens the photo screen', async () => {
   expect(navigate).toHaveBeenCalledWith('OrderPhotos', { orderId: 'o1' });
 });
 
-it('shows the history as a table, not a paragraph', async () => {
+it('shows what happened to the order, not only where it went', async () => {
+  mockHistory.mockResolvedValue([
+    {
+      id: 'h1',
+      at: '2026-09-06T10:00:00Z',
+      kind: 'moved',
+      action: 'order.moved',
+      entity: 'Order',
+      entityId: 'o1',
+      from: null,
+      to: 'Order confirmed',
+      by: 'Ravi',
+    },
+    {
+      id: 'h2',
+      at: '2026-09-07T10:00:00Z',
+      kind: 'changed',
+      action: 'orderItem.updated',
+      entity: 'OrderItem',
+      entityId: 'i1',
+      by: 'Ravi',
+      reason: 'Rate was mis-typed',
+      changes: [{ field: 'rate', from: 100, to: 150 }],
+    },
+  ]);
   await mount();
+
   expect(screen.getByText('History')).toBeTruthy();
-  expect(screen.getByText('Ravi')).toBeTruthy();
-  expect(screen.getByText('Order punched')).toBeTruthy();
+  expect(await screen.findByText('Punched at Order confirmed')).toBeTruthy();
+  // The half a status table could never hold: what was edited, and why.
+  expect(screen.getByText('Rate changed')).toBeTruthy();
+  expect(screen.getByText(/100 →/)).toBeTruthy();
+  expect(screen.getByText(/Rate was mis-typed/)).toBeTruthy();
 });
 
 it('shows the order number in the header and on the card', async () => {

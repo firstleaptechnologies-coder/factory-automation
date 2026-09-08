@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Estimate, EstimateStatus } from '@decor/shared';
+import type { Estimate, EstimateStatus, HistoryEntry } from '@decor/shared';
 import { PERMISSIONS } from '@decor/shared';
 import { api } from '../api/client';
+import { HistoryTimeline } from '../components/HistoryTimeline';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';
 import { shareDocument } from '../lib/documents';
@@ -31,6 +32,12 @@ const STATUSES: EstimateStatus[] = ['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED', 'EX
 export function EstimateDetailScreen({ route, navigation }: { route: any; navigation: any }) {
   const { estimateId } = route.params as { estimateId: string };
   const { can } = useAuth();
+
+  /* What has been changed on this, and by whom. */
+  const history = useApi<HistoryEntry[]>(
+    () => api.history('quotes', estimateId),
+    [estimateId],
+  );
 
   const estimate = useApi<Estimate>(() => api.estimate(estimateId), [estimateId]);
   const [sharing, setSharing] = useState(false);
@@ -280,6 +287,8 @@ export function EstimateDetailScreen({ route, navigation }: { route: any; naviga
           />
         ))}
       </Sheet>
+      <Text variant="label" tone="muted" style={historyStyles.label}>History</Text>
+      <HistoryTimeline entries={history.data ?? []} empty="Nothing has changed since this quote was written" />
     </Screen>
   );
 }
@@ -294,6 +303,11 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
     </View>
   );
 }
+
+/** The heading over the trail, spaced off what comes above it. */
+const historyStyles = StyleSheet.create({
+  label: { marginTop: spacing.xl, marginBottom: spacing.sm },
+});
 
 const styles = StyleSheet.create({
   heroFoot: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg },

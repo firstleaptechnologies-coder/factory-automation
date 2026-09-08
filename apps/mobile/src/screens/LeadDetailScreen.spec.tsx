@@ -13,6 +13,7 @@ const mockAllowedNext = jest.fn();
 const mockAllowedBack = jest.fn();
 const mockChangeStatus = jest.fn();
 const mockLeadFields = jest.fn();
+const mockHistory = jest.fn();
 jest.mock('../api/client', () => ({
   api: {
     lead: (...a: unknown[]) => mockLead(...a),
@@ -20,6 +21,7 @@ jest.mock('../api/client', () => ({
     allowedBack: (...a: unknown[]) => mockAllowedBack(...a),
     changeLeadStatus: (...a: unknown[]) => mockChangeStatus(...a),
     leadFields: () => mockLeadFields(),
+    history: (...a: unknown[]) => mockHistory(...a),
   },
 }));
 
@@ -67,6 +69,7 @@ async function mount(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockHistory.mockResolvedValue([]);
   mockPermissions = [];
   mockAllowedBack.mockResolvedValue([]);
   mockAllowedNext.mockResolvedValue([
@@ -117,10 +120,37 @@ it('shows the admin’s own custom fields, by their labels', async () => {
   expect(screen.getByText('Rao')).toBeTruthy();
 });
 
-it('shows the history of how it got here', async () => {
+it('shows the history of how it got here, and what was edited on the way', async () => {
+  mockHistory.mockResolvedValue([
+    {
+      id: 'h1',
+      at: '2026-09-01T10:00:00Z',
+      kind: 'moved',
+      action: 'lead.moved',
+      entity: 'Lead',
+      entityId: 'l1',
+      from: null,
+      to: 'New enquiry',
+      reason: 'Lead created',
+      by: 'Ravi',
+    },
+    {
+      id: 'h2',
+      at: '2026-09-02T10:00:00Z',
+      kind: 'changed',
+      action: 'lead.updated',
+      entity: 'Lead',
+      entityId: 'l1',
+      by: 'Ravi',
+      changes: [{ field: 'estimatedValue', from: 50000, to: 65000 }],
+    },
+  ]);
   await mount();
-  expect(screen.getByText('New enquiry')).toBeTruthy();
+
+  expect(await screen.findByText('Punched at New enquiry')).toBeTruthy();
   expect(screen.getByText(/Lead created/)).toBeTruthy();
+  // A status list could never have shown this.
+  expect(screen.getByText('Estimated value changed')).toBeTruthy();
 });
 
 describe('converting', () => {
@@ -344,19 +374,22 @@ describe('sending the enquiry back', () => {
 
   it('marks a reversal in the history', async () => {
     allowed();
-    await mount({
-      statusHistory: [
-        {
-          id: 'h9',
-          fromStatus: { name: 'Quoted', color: '#D29922' },
-          toStatus: { name: 'Contacted', color: '#2F81F7' },
-          note: 'Talking again',
-          reversed: true,
-          changedBy: { name: 'Nakul' },
-          changedAt: '2026-09-02T10:00:00Z',
-        },
-      ],
-    });
+    mockHistory.mockResolvedValue([
+      {
+        id: 'h9',
+        at: '2026-09-02T10:00:00Z',
+        kind: 'moved',
+        action: 'lead.moved_back',
+        entity: 'Lead',
+        entityId: 'l1',
+        from: 'Quoted',
+        to: 'Contacted',
+        reversed: true,
+        reason: 'Talking again',
+        by: 'Nakul',
+      },
+    ]);
+    await mount();
     expect(await screen.findByText(/went back/)).toBeTruthy();
   });
 });

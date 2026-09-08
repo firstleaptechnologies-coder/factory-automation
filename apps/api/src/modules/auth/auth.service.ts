@@ -86,6 +86,9 @@ export class AuthService {
       accessToken: await this.jwt.signAsync({
         sub: admin.id,
         isPlatform: true,
+        // Carried so a change made while helping a shop is signed with a name
+        // in their own audit trail, not with an id from another database.
+        name: admin.name,
         permissions: ['platform.tenant.view', 'platform.tenant.manage'],
       }),
       user: { id: admin.id, name: admin.name, email: admin.email, isPlatform: true },

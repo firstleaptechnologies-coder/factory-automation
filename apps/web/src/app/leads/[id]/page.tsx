@@ -4,6 +4,7 @@ import { use, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
   CustomFieldDefinition,
+  HistoryEntry,
   Lead,
   Material,
   Order,
@@ -13,6 +14,7 @@ import type {
 import { PERMISSIONS } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { useAuth } from '@/lib/auth';
 import { Shell } from '@/components/Shell';
 import { ConvertLeadDialog } from '@/components/ConvertLeadDialog';
@@ -78,6 +80,17 @@ function LeadDetail({ leadId }: { leadId: string }) {
 
   const canMoveBack = can(PERMISSIONS.LEAD_MOVE_BACK);
 
+  /*
+   * The history is its own request rather than part of the record.
+   *
+   * It is no longer only the stages this passed through: it holds what was
+   * edited and by whom, which comes from the trail rather than from the row.
+   */
+  const history = useApi<HistoryEntry[]>(
+    () => api.history('leads', leadId),
+    [leadId],
+  );
+
   const lead = useApi<Lead>(
     useCallback(async () => {
       const fresh = await api.lead(leadId);
@@ -101,6 +114,7 @@ function LeadDetail({ leadId }: { leadId: string }) {
       setPending(null);
       setNote('');
       lead.reload();
+      history.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not move it');
     } finally {
@@ -122,6 +136,7 @@ function LeadDetail({ leadId }: { leadId: string }) {
       setPendingBack(null);
       setNote('');
       lead.reload();
+      history.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not move it back');
     } finally {
@@ -295,36 +310,8 @@ function LeadDetail({ leadId }: { leadId: string }) {
       )}
 
       <SectionHead title="History" />
-      <Card size="sm" className="scroll-x">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Moved</th>
-              <th>Note</th>
-              <th>By</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data.statusHistory ?? []).map((entry) => (
-              <tr key={entry.id}>
-                <td className="muted">{formatDateTime(entry.changedAt)}</td>
-                <td>
-                  {entry.fromStatus ? (
-                    <span className="muted">{entry.fromStatus.name} → </span>
-                  ) : null}
-                  <span className="bold">{entry.toStatus.name}</span>
-                  {/* A step back reads as an ordinary one otherwise. */}
-                  {entry.reversed ? (
-                    <span className="t-tiny warning bold"> · went back</span>
-                  ) : null}
-                </td>
-                <td className="muted">{entry.note ?? '—'}</td>
-                <td className="muted">{entry.changedBy?.name ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <Card size="sm">
+        <HistoryTimeline entries={history.data ?? []} />
       </Card>
 
       <Sheet

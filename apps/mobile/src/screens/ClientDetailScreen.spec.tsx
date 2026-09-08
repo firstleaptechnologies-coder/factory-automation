@@ -2,7 +2,13 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { ClientDetailScreen } from './ClientDetailScreen';
 
 const mockClient = jest.fn();
-jest.mock('../api/client', () => ({ api: { client: (...a: unknown[]) => mockClient(...a) } }));
+const mockHistory = jest.fn();
+jest.mock('../api/client', () => ({
+  api: {
+    client: (...a: unknown[]) => mockClient(...a),
+    history: (...a: unknown[]) => mockHistory(...a),
+  },
+}));
 
 const CLIENT = {
   id: 'c1',
@@ -80,4 +86,21 @@ it('opens the firm details', async () => {
   await mount();
   await fireEvent.press(screen.getByText('Firm details'));
   expect(navigate).toHaveBeenCalledWith('ClientFirm', { clientId: 'c1' });
+});
+
+it('shows what has been changed on the client', async () => {
+  mockHistory.mockResolvedValue([
+    {
+      id: 'h1',
+      at: '2026-09-08T10:00:00.000Z',
+      kind: 'changed',
+      action: 'client.updated',
+      entity: 'Client',
+      entityId: 'c1',
+      by: 'Rajat',
+      changes: [{ field: 'phone', from: '9820012345', to: '9820099999' }],
+    },
+  ]);
+  await mount();
+  expect(await screen.findByText('Phone changed')).toBeTruthy();
 });

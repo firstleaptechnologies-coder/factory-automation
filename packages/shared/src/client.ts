@@ -1,4 +1,5 @@
 import type { LengthUnit } from './units';
+import type { HistoryEntry } from './history';
 import type {
   AttachmentKind,
   AuthUser,
@@ -433,6 +434,19 @@ export class ApiClient {
 
   order(id: string, unit?: LengthUnit) {
     return this.get<Order>(`/orders/${id}`, { unit });
+  }
+
+  /**
+   * Everything that happened to one thing, newest first.
+   *
+   * One method for every kind rather than one per screen: the shape that comes
+   * back is the same, and both clients render it the same way.
+   */
+  history(
+    kind: 'orders' | 'leads' | 'quotes' | 'clients' | 'payments',
+    id: string,
+  ) {
+    return this.get<HistoryEntry[]>(`/history/${kind}/${id}`);
   }
 
   punchOrder(body: PunchOrderInput) {

@@ -1133,18 +1133,37 @@ model DocumentSequence {
 
 model AuditLog {
   /// Owning tenant. No FK: a dedicated database holds no Tenant row.
-  tenantId  String
-  id        String   @id @default(cuid())
-  entity    String
-  entityId  String
-  action    String
-  before    Json?
-  after     Json?
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+  tenantId String
+  id       String @id @default(cuid())
+  entity   String
+  entityId String
+  /// Something a person recognises without a join — ORD-2627-0003, a client's
+  /// name — so a history reads on its own and survives the row being deleted.
+  entityCode String?
+  /// What happened: `order.updated`, `order.moved_back`, `payment.reversed`.
+  action     String
+  /// Only the fields that differed, both sides. A whole-row copy makes a
+  /// history nobody reads and a table nobody can afford.
+  before     Json?
+  after      Json?
+  /// Why, when somebody said. The half a diff cannot hold.
+  reason     String?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  /// Who, when they are not a user of this workspace — a platform admin
+  /// helping, or a scheduled job.
+  actorLabel String?
+  /// What this row belongs to, when it is part of something bigger: a line on
+  /// an order, a payment against it, a location under a client. Without it an
+  /// order's history would show the order's own columns changing and nothing
+  /// about the lines and the money underneath, which is where the argument
+  /// usually is.
+  rootEntity String?
+  rootId     String?
+  createdAt  DateTime @default(now())
 
-  @@index([entity, entityId])
+  @@index([rootEntity, rootId, createdAt])
+  @@index([entity, entityId, createdAt])
   @@index([createdAt])
   @@index([tenantId])
 }

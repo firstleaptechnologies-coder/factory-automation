@@ -1,8 +1,9 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Client, Order } from '@decor/shared';
+import type { Client, HistoryEntry, Order } from '@decor/shared';
 import { api } from '../api/client';
+import { HistoryTimeline } from '../components/HistoryTimeline';
 import { useApi } from '../hooks/useApi';
 import {
   Avatar,
@@ -20,6 +21,12 @@ import { relativeTime } from '../lib/format';
 
 export function ClientDetailScreen({ route, navigation }: { route: any; navigation: any }) {
   const { clientId } = route.params as { clientId: string };
+  /* What has been changed on this, and by whom. */
+  const history = useApi<HistoryEntry[]>(
+    () => api.history('clients', clientId),
+    [clientId],
+  );
+
   const client = useApi<Client & { orders?: Order[] }>(() => api.client(clientId), [clientId]);
 
   if (!client.data) return <Loader />;
@@ -108,9 +115,16 @@ export function ClientDetailScreen({ route, navigation }: { route: any; navigati
       ) : (
         <Text variant="small" tone="faint">No orders yet.</Text>
       )}
+      <Text variant="label" tone="muted" style={historyStyles.label}>History</Text>
+      <HistoryTimeline entries={history.data ?? []} empty="Nothing has changed since this client was added" />
     </Screen>
   );
 }
+
+/** The heading over the trail, spaced off what comes above it. */
+const historyStyles = StyleSheet.create({
+  label: { marginTop: spacing.xl, marginBottom: spacing.sm },
+});
 
 const styles = StyleSheet.create({
   firmRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

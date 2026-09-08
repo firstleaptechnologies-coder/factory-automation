@@ -11,9 +11,11 @@ jest.mock('../api/client', () => ({
     estimate: (...a: unknown[]) => mockEstimate(...a),
     setEstimateStatus: (...a: unknown[]) => mockSetStatus(...a),
     convertEstimate: (...a: unknown[]) => mockConvert(...a),
+    history: (...a: unknown[]) => mockHistory(...a),
   },
 }));
 
+const mockHistory = jest.fn();
 const mockShareDocument = jest.fn();
 jest.mock('../lib/documents', () => ({
   shareDocument: (...a: unknown[]) => mockShareDocument(...a),
@@ -79,6 +81,7 @@ async function mount(over: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  mockHistory.mockResolvedValue([]);
   jest.clearAllMocks();
   mockPermissions = [PERMISSIONS.ESTIMATE_MANAGE];
   mockShareDocument.mockResolvedValue(true);

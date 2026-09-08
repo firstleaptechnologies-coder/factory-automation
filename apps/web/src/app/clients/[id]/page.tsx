@@ -2,9 +2,10 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Client } from '@decor/shared';
+import type { Client, HistoryEntry } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { Shell } from '@/components/Shell';
 import { Avatar, Button, Card, EmptyState, Icon, Loader, PageHead, Pill, SectionHead } from '@/ui';
 import { formatInr, relativeTime } from '@/lib/format';
@@ -20,6 +21,12 @@ export default function ClientPage({ params }: { params: Promise<{ id: string }>
 
 function ClientDetail({ clientId }: { clientId: string }) {
   const router = useRouter();
+  /* What has been changed on this, and by whom. */
+  const history = useApi<HistoryEntry[]>(
+    () => api.history('clients', clientId),
+    [clientId],
+  );
+
   const client = useApi<Client & { orders?: any[] }>(() => api.client(clientId), [clientId]);
 
   if (client.loading) return <Loader />;
@@ -126,6 +133,11 @@ function ClientDetail({ clientId }: { clientId: string }) {
           ))}
         </div>
       )}
+
+      <SectionHead title="History" />
+      <Card size="sm">
+        <HistoryTimeline entries={history.data ?? []} empty="Nothing has changed since this client was added" />
+      </Card>
     </>
   );
 }

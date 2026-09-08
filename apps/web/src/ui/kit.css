@@ -1141,3 +1141,36 @@
   border-radius: 5px;
   flex: none;
 }
+
+/*
+ * A history, as one story.
+ *
+ * The dot carries the meaning a table column used to: a step back is not the
+ * same colour as a step forward, and something added is not something removed.
+ */
+.timeline { list-style: none; margin: 0; padding: 0; }
+
+.timeline-row {
+  display: flex;
+  gap: var(--s-md);
+  padding: var(--s-sm) 0;
+  align-items: flex-start;
+}
+
+.timeline-row + .timeline-row { border-top: 1px solid rgba(255, 255, 255, 0.05); }
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex: none;
+  background: var(--text-faint);
+}
+
+.timeline-row[data-kind='moved'] .timeline-dot { background: var(--accent); }
+.timeline-row[data-kind='reversed'] .timeline-dot { background: var(--warning); }
+.timeline-row[data-kind='created'] .timeline-dot { background: var(--success); }
+.timeline-row[data-kind='deleted'] .timeline-dot { background: var(--danger); }
+
+.timeline-reason { font-style: italic; }

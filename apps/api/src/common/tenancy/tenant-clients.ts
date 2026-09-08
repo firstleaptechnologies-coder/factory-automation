@@ -1,25 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { TenantContext, isPlatformContext } from './tenant-context';
+import { TENANT_SCOPED_MODELS } from './tenant-models';
+import { auditExtension } from '../audit/audit.extension';
 
 const logger = new Logger('TenantClients');
 
-/**
- * Models that hold one tenant's business data.
- *
- * Anything listed here is filtered by tenantId on every read and stamped with
- * it on every write. Tenant and PlatformUser are deliberately absent: they are
- * the control plane and span tenants by definition.
- */
-export const TENANT_SCOPED_MODELS = new Set([
-  'User', 'Role', 'GstSlab', 'Client', 'ClientLocation', 'Material',
-  'MaterialThickness', 'SizePreset', 'Workflow', 'WorkflowStatus',
-  'WorkflowTransition', 'StoredFile', 'Order', 'OrderItem', 'OrderAttachment',
-  'OrderStatusHistory', 'Payment', 'CashDeposit', 'LeadSource',
-  'CustomFieldDefinition', 'Lead', 'LeadStatusHistory', 'AppSetting',
-  'DocumentSequence', 'AuditLog', 'Disbursement', 'DisbursementCategory',
-  'Estimate', 'EstimateItem', 'FirmProfile',
-]);
+export { TENANT_SCOPED_MODELS } from './tenant-models';
 
 /** Operations whose `where` should be narrowed to the tenant. */
 const FILTERED = new Set([
@@ -74,6 +61,21 @@ export function scopeToTenant(client: PrismaClient, tenantId: string) {
 export type ScopedClient = ReturnType<typeof scopeToTenant>;
 
 /**
+ * Scoping first, then the trail on top of it.
+ *
+ * The order matters both ways. The audit layer's own reads and writes go
+ * through the scoped client underneath it, so they are confined to the tenant
+ * like everything else — and they do not pass through the audit layer again,
+ * which is what keeps recording a change from recording itself.
+ */
+export function tenantClient(base: PrismaClient, tenantId: string) {
+  const scoped = scopeToTenant(base, tenantId);
+  return (scoped as unknown as PrismaClient).$extends(
+    auditExtension(scoped, tenantId) as never,
+  );
+}
+
+/**
  * One client per physical database, kept alive between requests.
  *
  * Pooled tenants all share the platform client; a dedicated tenant gets its own
@@ -102,7 +104,7 @@ export class TenantClientRegistry {
       ? this.clientFor(context.databaseUrl)
       : this.platformClient;
 
-    const scoped = scopeToTenant(base, context.tenantId);
+    const scoped = tenantClient(base, context.tenantId) as unknown as ScopedClient;
     this.scoped.set(cacheKey, scoped);
     return scoped;
   }

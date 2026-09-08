@@ -9,11 +9,13 @@ import { StorageModule } from './common/storage/storage.module';
 import { JobsModule } from './common/jobs/jobs.module';
 import { TenancyModule } from './common/tenancy/tenancy.module';
 import { TenantInterceptor } from './common/tenancy/tenant.interceptor';
+import { ActorInterceptor } from './common/audit/actor.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
+import { HistoryModule } from './modules/history/history.module';
 import { UsersModule } from './modules/users/users.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { ConfigurationModule } from './modules/config/config.module';
@@ -45,6 +47,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     JobsModule,
     AuthModule,
     HealthModule,
+    HistoryModule,
     UsersModule,
     ClientsModule,
     ConfigurationModule,
@@ -58,10 +61,11 @@ import { PlatformModule } from './modules/platform/platform.module';
     PlatformModule,
   ],
   providers: [
-    // Order matters: authenticate, then put the tenant in context, then check
-    // what the caller is allowed to do.
+    // Order matters: authenticate, then put the tenant and the person in
+    // context, then check what the caller is allowed to do.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: ActorInterceptor },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],

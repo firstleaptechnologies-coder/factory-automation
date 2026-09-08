@@ -16,8 +16,11 @@ jest.mock('@prisma/client', () => {
       constructor(options?: { datasources: { db: { url: string } } }) {
         opened.push(options?.datasources.db.url ?? 'default');
       }
-      $extends() {
-        return { extendedFrom: this };
+      // Extendable more than once: the registry layers tenant scoping and
+      // then the audit trail on top of it.
+      $extends(): unknown {
+        const from = this;
+        return { extendedFrom: from, $extends: () => ({ extendedFrom: from }) };
       }
       $disconnect = jest.fn(async () => undefined);
     },
@@ -167,6 +170,11 @@ describe('models outside the scope', () => {
 
 describe('TenantClientRegistry', () => {
   const platform = { id: 'platform' } as never;
+  /*
+   * A client that can be extended more than once: the registry layers tenant
+   * scoping and then the audit trail on top of it.
+   */
+  const extendable = (): never => ({ $extends: () => extendable() } as never);
   const tenant = (over: Partial<TenantContext> = {}): TenantContext => ({
     tenantId: 'tenant-a',
     slug: 'a',
@@ -181,20 +189,20 @@ describe('TenantClientRegistry', () => {
   });
 
   it('reuses the scoped client between requests for the same tenant', () => {
-    const registry = new TenantClientRegistry({ $extends: () => ({}) } as never);
+    const registry = new TenantClientRegistry(extendable());
     const first = registry.for(tenant());
     expect(registry.for(tenant())).toBe(first);
   });
 
   it('keeps tenants on separate scoped clients', () => {
-    const registry = new TenantClientRegistry({ $extends: () => ({}) } as never);
+    const registry = new TenantClientRegistry(extendable());
     const a = registry.for(tenant());
     const b = registry.for(tenant({ tenantId: 'tenant-b' }));
     expect(a).not.toBe(b);
   });
 
   it('opens one connection pool per dedicated database, not one per request', () => {
-    const registry = new TenantClientRegistry({ $extends: () => ({}) } as never);
+    const registry = new TenantClientRegistry(extendable());
     const dedicated = tenant({
       isolation: TenantIsolation.DEDICATED,
       databaseUrl: 'postgres://dedicated',
@@ -206,7 +214,7 @@ describe('TenantClientRegistry', () => {
   });
 
   it('closes every dedicated pool on shutdown', async () => {
-    const registry = new TenantClientRegistry({ $extends: () => ({}) } as never);
+    const registry = new TenantClientRegistry(extendable());
     registry.for(
       tenant({ isolation: TenantIsolation.DEDICATED, databaseUrl: 'postgres://dedicated' }),
     );

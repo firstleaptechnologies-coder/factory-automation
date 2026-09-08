@@ -11,6 +11,7 @@ const apiMock: Record<string, jest.Mock> = {
   repriceOrder: jest.fn(),
   fileUrl: jest.fn((id: string) => `https://api.test/files/${id}`),
   getToken: jest.fn(() => 'tok'),
+  history: jest.fn(),
 };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
@@ -99,6 +100,7 @@ beforeEach(() => {
     PERMISSIONS.PAYMENT_VIEW,
   ];
   apiMock.fileUrl.mockImplementation((id: string) => `https://api.test/files/${id}`);
+  apiMock.history.mockResolvedValue([]);
   apiMock.getToken.mockReturnValue('tok');
   apiMock.allowedNext.mockResolvedValue([]);
   apiMock.allowedBack.mockResolvedValue([]);
@@ -128,8 +130,7 @@ it('leads with the order code, the client and where it is going', async () => {
   await mount();
   expect(screen.getByText('ORD-2627-0003')).toBeInTheDocument();
   expect(screen.getByText('Verma Interiors · Andheri')).toBeInTheDocument();
-  // Twice: the stage pill at the top, and where the history left it.
-  expect(screen.getAllByText('Cutting')).toHaveLength(2);
+  expect(screen.getByText('Cutting')).toBeInTheDocument();
 });
 
 describe('the items', () => {
@@ -493,34 +494,60 @@ describe('sending the order back', () => {
 });
 
 describe('the history', () => {
+  const moved = {
+    id: 'h9',
+    at: '2026-09-02T10:00:00Z',
+    kind: 'moved',
+    action: 'order.moved_back',
+    entity: 'Order',
+    entityId: 'o1',
+    from: 'Production',
+    to: 'Design',
+    reversed: true,
+    reason: 'Client changed it',
+    by: 'Nakul',
+  };
+
   it('marks a step that went back, which reads as an ordinary one otherwise', async () => {
-    await mount({
-      ...ORDER,
-      statusHistory: [
-        {
-          id: 'h9',
-          fromStatus: { id: 's2', name: 'Production', color: '#D29922' },
-          toStatus: { id: 's1', name: 'Design', color: '#8957E5' },
-          note: 'Client changed it',
-          reversed: true,
-          changedBy: { id: 'u1', name: 'Nakul' },
-          changedAt: '2026-09-02T10:00:00Z',
-        },
-      ],
-    });
-    expect(screen.getByText('· went back')).toBeInTheDocument();
+    apiMock.history.mockResolvedValue([moved]);
+    await mount();
+    expect(screen.getByText('Production → Design · went back')).toBeInTheDocument();
   });
 
   it('says what moved, when, why and who did it', async () => {
+    apiMock.history.mockResolvedValue([moved]);
     await mount();
-    expect(screen.getByText('Punched →')).toBeInTheDocument();
-    expect(screen.getByText('Sheet loaded')).toBeInTheDocument();
-    expect(screen.getByText('Production')).toBeInTheDocument();
+    expect(screen.getByText(/Client changed it/)).toBeInTheDocument();
+    expect(screen.getByText(/Nakul/)).toBeInTheDocument();
+  });
+
+  it('shows what was edited on the order, not only where it went', async () => {
+    apiMock.history.mockResolvedValue([
+      {
+        id: 'h10',
+        at: '2026-09-03T10:00:00Z',
+        kind: 'changed',
+        action: 'orderItem.updated',
+        entity: 'OrderItem',
+        entityId: 'i1',
+        by: 'Nakul',
+        reason: 'Rate was mis-typed',
+        changes: [{ field: 'rate', from: 100, to: 150 }],
+      },
+    ]);
+    await mount();
+
+    // The line whose rate was corrected hangs off the order in the trail, so
+    // the order's own history holds it.
+    expect(screen.getByText('Rate changed')).toBeInTheDocument();
+    expect(screen.getByText(/100 →/)).toBeInTheDocument();
+    expect(screen.getByText(/· line/)).toBeInTheDocument();
   });
 
   it('copes with an order that has no history yet', async () => {
-    await mount({ ...ORDER, statusHistory: undefined });
+    await mount();
     expect(screen.getByText('History')).toBeInTheDocument();
+    expect(screen.getByText('Nothing has happened yet')).toBeInTheDocument();
   });
 });
 

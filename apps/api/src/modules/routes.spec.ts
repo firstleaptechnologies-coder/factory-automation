@@ -13,6 +13,7 @@ import { DisbursementsController } from './disbursements/disbursements.controlle
 import { EstimatesController } from './estimates/estimates.controller';
 import { FilesController } from './files/files.controller';
 import { HealthController } from './health/health.controller';
+import { HistoryController } from './history/history.controller';
 import { LeadsController } from './leads/leads.controller';
 import { OrdersController } from './orders/orders.controller';
 import { PaymentsController } from './payments/payments.controller';
@@ -36,6 +37,7 @@ const CONTROLLERS = [
   EstimatesController,
   FilesController,
   HealthController,
+  HistoryController,
   LeadsController,
   OrdersController,
   PaymentsController,
@@ -125,6 +127,18 @@ it('leaves nothing but signing in reachable without a token', () => {
     'POST /auth/platform/login',
     'POST /auth/workspace',
   ]);
+});
+
+describe('history', () => {
+  it('guards a thing’s history with the permission that guards the thing', () => {
+    // Being able to read an order's history is being able to read the order —
+    // it holds its rates, its client and its money.
+    expect(find('HistoryController', 'order').permissions).toEqual(['order.view']);
+    expect(find('HistoryController', 'lead').permissions).toEqual(['lead.view']);
+    expect(find('HistoryController', 'quote').permissions).toEqual(['estimate.view']);
+    expect(find('HistoryController', 'client').permissions).toEqual(['client.view']);
+    expect(find('HistoryController', 'payments').permissions).toEqual(['payment.view']);
+  });
 });
 
 describe('money', () => {

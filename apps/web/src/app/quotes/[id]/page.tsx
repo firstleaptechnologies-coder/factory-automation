@@ -2,10 +2,11 @@
 
 import { use, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { Estimate, EstimateStatus } from '@decor/shared';
+import type { Estimate, EstimateStatus, HistoryEntry } from '@decor/shared';
 import { PERMISSIONS } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { useAuth } from '@/lib/auth';
 import { Shell } from '@/components/Shell';
 import { EstimateForm } from '@/components/EstimateForm';
@@ -35,6 +36,12 @@ export default function EstimatePage({ params }: { params: Promise<{ id: string 
 function EstimateDetail({ estimateId }: { estimateId: string }) {
   const router = useRouter();
   const { can } = useAuth();
+  /* What has been changed on this, and by whom. */
+  const history = useApi<HistoryEntry[]>(
+    () => api.history('quotes', estimateId),
+    [estimateId],
+  );
+
   const estimate = useApi<Estimate>(() => api.estimate(estimateId), [estimateId]);
 
   const [statusSheet, setStatusSheet] = useState(false);
@@ -274,6 +281,11 @@ function EstimateDetail({ estimateId }: { estimateId: string }) {
           }}
         />
       </Sheet>
+
+      <SectionHead title="History" />
+      <Card size="sm">
+        <HistoryTimeline entries={history.data ?? []} empty="Nothing has changed since this quote was written" />
+      </Card>
     </>
   );
 }

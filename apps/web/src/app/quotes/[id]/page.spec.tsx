@@ -8,6 +8,7 @@ const apiMock = {
   setEstimateStatus: jest.fn(),
   convertEstimate: jest.fn(),
   estimateDocumentUrl: jest.fn(() => 'https://api.test/estimates/e1/document'),
+  history: jest.fn(),
 };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
@@ -104,6 +105,7 @@ beforeEach(() => {
   editing = false;
   granted = [PERMISSIONS.ESTIMATE_MANAGE];
   apiMock.setEstimateStatus.mockResolvedValue({});
+  apiMock.history.mockResolvedValue([]);
   apiMock.convertEstimate.mockResolvedValue({ id: 'o9' });
   apiMock.estimateDocumentUrl.mockReturnValue('https://api.test/estimates/e1/document');
   jest.spyOn(window, 'open').mockImplementation(() => null);

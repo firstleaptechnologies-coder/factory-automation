@@ -9,6 +9,7 @@ const apiMock: Record<string, jest.Mock> = {
   allowedNext: jest.fn(),
   allowedBack: jest.fn(),
   changeLeadStatus: jest.fn(),
+  history: jest.fn(),
 };
 jest.mock('@/lib/api', () => ({
   api: new Proxy({}, { get: (_t, key: string) => (...args: unknown[]) => apiMock[key](...args) }),
@@ -87,6 +88,7 @@ beforeEach(() => {
   ]);
   apiMock.allowedBack.mockResolvedValue([]);
   apiMock.changeLeadStatus.mockResolvedValue({});
+  apiMock.history.mockResolvedValue([]);
 });
 
 it('opens the enquiry rather than the whole pipeline', async () => {
@@ -130,22 +132,38 @@ it('says nothing about fields nobody filled in', async () => {
   expect(screen.queryByText('Architect')).not.toBeInTheDocument();
 });
 
-it('reads the history, including a step that went back', async () => {
-  await mount({
-    statusHistory: [
-      {
-        id: 'h9',
-        changedAt: '2026-09-02T10:00:00Z',
-        fromStatus: { id: 's1', name: 'Quoted', color: '#D29922' },
-        toStatus: { id: 's0', name: 'Contacted', color: '#2F81F7' },
-        note: 'Talking again',
-        reversed: true,
-        changedBy: { id: 'u1', name: 'Nakul' },
-      },
-    ],
-  });
-  expect(screen.getByText('· went back')).toBeInTheDocument();
-  expect(screen.getByText('Talking again')).toBeInTheDocument();
+it('reads the history, including a step that went back and what was edited', async () => {
+  apiMock.history.mockResolvedValue([
+    {
+      id: 'h9',
+      at: '2026-09-02T10:00:00Z',
+      kind: 'moved',
+      action: 'lead.moved_back',
+      entity: 'Lead',
+      entityId: 'l1',
+      from: 'Quoted',
+      to: 'Contacted',
+      reversed: true,
+      reason: 'Talking again',
+      by: 'Nakul',
+    },
+    {
+      id: 'h10',
+      at: '2026-09-03T10:00:00Z',
+      kind: 'changed',
+      action: 'lead.updated',
+      entity: 'Lead',
+      entityId: 'l1',
+      by: 'Nakul',
+      changes: [{ field: 'estimatedValue', from: 50000, to: 65000 }],
+    },
+  ]);
+  await mount();
+
+  expect(screen.getByText('Quoted → Contacted · went back')).toBeInTheDocument();
+  expect(screen.getByText(/Talking again/)).toBeInTheDocument();
+  // The half a status list could never hold.
+  expect(screen.getByText('Estimated value changed')).toBeInTheDocument();
 });
 
 describe('the quotes on it', () => {

@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
-import type { Order, WorkflowStatus, WorkflowTransition } from '@decor/shared';
+import type { HistoryEntry, Order, WorkflowStatus, WorkflowTransition } from '@decor/shared';
 import { LENGTH_UNITS, PERMISSIONS, UNIT_LABEL } from '@decor/shared';
 import type { TaxTreatment } from '@decor/shared';
 import { api } from '../api/client';
@@ -26,8 +26,9 @@ import {
   Text,
   haptic,
 } from '../ui';
+import { HistoryTimeline } from '../components/HistoryTimeline';
 import { palette, radius, spacing } from '../theme';
-import { formatDateTime, formatInr, relativeTime } from '../lib/format';
+import { formatInr, relativeTime } from '../lib/format';
 
 /** What each GST treatment means, in the words the shop would use. */
 const TAX_TREATMENT_LABEL: Record<string, string> = {
@@ -90,6 +91,18 @@ export function OrderDetailScreen({ route, navigation }: { route: any; navigatio
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
+  /*
+   * The history is its own request rather than part of the order.
+   *
+   * It is no longer only the stages this order passed through — it holds the
+   * line whose rate was corrected and the money taken against it, which come
+   * from the trail rather than from the order row.
+   */
+  const history = useApi<HistoryEntry[]>(
+    useCallback(() => api.history('orders', orderId), [orderId]),
+    [orderId],
+  );
+
   const order = useApi<Order>(
     useCallback(async () => {
       const fresh = await api.order(orderId, unit);
@@ -117,6 +130,7 @@ export function OrderDetailScreen({ route, navigation }: { route: any; navigatio
       setPendingBack(null);
       setNote('');
       order.reload();
+      history.reload();
     } catch (e) {
       haptic('notificationError');
       Alert.alert('Could not move it back', e instanceof Error ? e.message : 'Unknown error');
@@ -134,6 +148,7 @@ export function OrderDetailScreen({ route, navigation }: { route: any; navigatio
       setPendingMove(null);
       setNote('');
       order.reload();
+      history.reload();
     } catch (e) {
       haptic('notificationError');
       Alert.alert('Could not move', e instanceof Error ? e.message : 'Unknown error');
@@ -481,64 +496,8 @@ export function OrderDetailScreen({ route, navigation }: { route: any; navigatio
       ) : null}
 
       <Text variant="label" tone="muted" style={styles.blockLabel}>History</Text>
-      <Card tone="dark">
-        <DataTable
-          minWidth={480}
-          rows={data.statusHistory ?? []}
-          empty="Nothing has happened yet"
-          columns={[
-            {
-              key: 'when',
-              header: 'When',
-              flex: 1.5,
-              render: (entry) => (
-                <Text variant="tiny" tone="muted">{formatDateTime(entry.changedAt)}</Text>
-              ),
-            },
-            {
-              key: 'moved',
-              header: 'Moved',
-              flex: 2,
-              render: (entry) => (
-                <View style={styles.cellMeta}>
-                  <View
-                    style={[styles.materialDot, { backgroundColor: entry.toStatus.color }]}
-                  />
-                  <Text variant="small" numberOfLines={2}>
-                    {entry.fromStatus ? (
-                      <Text variant="small" tone="muted">{entry.fromStatus.name} → </Text>
-                    ) : null}
-                    <Text variant="small" bold>{entry.toStatus.name}</Text>
-                    {/* A step back reads as an ordinary one otherwise. */}
-                    {entry.reversed ? (
-                      <Text variant="tiny" tone="warning" bold> · went back</Text>
-                    ) : null}
-                  </Text>
-                </View>
-              ),
-            },
-            {
-              key: 'note',
-              header: 'Note',
-              flex: 1.6,
-              render: (entry) => (
-                <Text variant="tiny" tone="muted" numberOfLines={3}>
-                  {entry.note ?? '—'}
-                </Text>
-              ),
-            },
-            {
-              key: 'by',
-              header: 'By',
-              flex: 1.2,
-              render: (entry) => (
-                <Text variant="tiny" tone="muted" numberOfLines={1}>
-                  {entry.changedBy?.name ?? '—'}
-                </Text>
-              ),
-            },
-          ]}
-        />
+      <Card tone="dark" style={styles.historyCard}>
+        <HistoryTimeline entries={history.data ?? []} />
       </Card>
 
       <Sheet
@@ -688,6 +647,7 @@ export function OrderDetailScreen({ route, navigation }: { route: any; navigatio
               setPriceSheet(false);
               setQuoted('');
               order.reload();
+              history.reload();
             } catch (e) {
               haptic('notificationError');
               Alert.alert(
@@ -720,6 +680,7 @@ export function OrderDetailScreen({ route, navigation }: { route: any; navigatio
                 haptic('notificationSuccess');
                 setTermsSheet(false);
                 order.reload();
+                history.reload();
               } catch (e) {
                 haptic('notificationError');
                 Alert.alert(
@@ -784,8 +745,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: palette.surfaceLit,
   },
-  historyRow: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.sm },
-  historyDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
+  historyCard: { padding: spacing.md },
   moneyHead: {
     flexDirection: 'row',
     alignItems: 'center',

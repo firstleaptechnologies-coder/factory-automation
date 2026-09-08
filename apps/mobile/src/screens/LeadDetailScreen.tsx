@@ -1,7 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { CustomFieldDefinition, Lead, WorkflowStatus, WorkflowTransition } from '@decor/shared';
+import type {
+  CustomFieldDefinition,
+  HistoryEntry,
+  Lead,
+  WorkflowStatus,
+  WorkflowTransition,
+} from '@decor/shared';
 import { PERMISSIONS } from '@decor/shared';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -21,6 +27,7 @@ import {
   Text,
   haptic,
 } from '../ui';
+import { HistoryTimeline } from '../components/HistoryTimeline';
 import { palette, spacing } from '../theme';
 import { formatDateTime, formatInr, relativeTime } from '../lib/format';
 
@@ -50,6 +57,15 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
   const [busy, setBusy] = useState(false);
 
   const fields = useApi<CustomFieldDefinition[]>(() => api.leadFields(), []);
+  /*
+   * The history is its own request: it is no longer only the stages this
+   * enquiry passed through, but what was edited on it and by whom.
+   */
+  const history = useApi<HistoryEntry[]>(
+    useCallback(() => api.history('leads', leadId), [leadId]),
+    [leadId],
+  );
+
   const lead = useApi<Lead>(
     useCallback(async () => {
       const fresh = await api.lead(leadId);
@@ -74,6 +90,7 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
       setPendingBack(null);
       setNote('');
       lead.reload();
+      history.reload();
     } catch (e) {
       haptic('notificationError');
       Alert.alert('Could not move it back', e instanceof Error ? e.message : 'Unknown error');
@@ -91,6 +108,7 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
       setPendingMove(null);
       setNote('');
       lead.reload();
+      history.reload();
     } catch (e) {
       haptic('notificationError');
       Alert.alert('Could not move', e instanceof Error ? e.message : 'Unknown error');
@@ -268,26 +286,7 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
       ) : null}
 
       <Text variant="label" tone="muted" style={styles.blockLabel}>History</Text>
-      {data.statusHistory?.map((entry) => (
-        <View key={entry.id} style={styles.historyRow}>
-          <View style={[styles.historyDot, { backgroundColor: entry.toStatus.color }]} />
-          <View style={{ flex: 1 }}>
-            <Text variant="small" bold>
-              {entry.fromStatus ? `${entry.fromStatus.name} → ` : ''}{entry.toStatus.name}
-              {entry.reversed ? (
-                <Text variant="tiny" tone="warning" bold> · went back</Text>
-              ) : null}
-            </Text>
-            <Text variant="tiny" tone="faint">
-              {formatDateTime(entry.changedAt)}
-              {entry.changedBy ? ` · ${entry.changedBy.name}` : ''}
-            </Text>
-            {entry.note ? (
-              <Text variant="tiny" tone="muted" style={{ marginTop: 2 }}>{entry.note}</Text>
-            ) : null}
-          </View>
-        </View>
-      ))}
+      <HistoryTimeline entries={history.data ?? []} />
 
       <Sheet
         visible={moveSheet}

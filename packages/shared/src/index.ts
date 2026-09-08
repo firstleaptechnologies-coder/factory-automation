@@ -6,3 +6,4 @@ export * from './client';
 export * from './color';
 export * from './navigation';
 export * from './navigation-doc';
+export * from './history';

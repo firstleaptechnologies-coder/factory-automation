@@ -10,6 +10,7 @@ export interface JwtPayload {
   sub: string;
   tenantId?: string;
   code?: string;
+  name?: string;
   role?: string;
   permissions?: string[];
   isPlatform?: boolean;
@@ -40,6 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.isPlatform) {
       return {
         id: payload.sub,
+        name: payload.name,
         isPlatform: true,
         permissions: payload.permissions ?? [],
       };
@@ -63,7 +65,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await runInTenant(tenant, () =>
       this.prisma.user.findFirst({
         where: { id: payload.sub, isActive: true },
-        select: { role: true, roleRef: { select: { permissions: true } } },
+        select: { name: true, role: true, roleRef: { select: { permissions: true } } },
       }),
     );
     if (!user) throw new UnauthorizedException('This account is no longer active');
@@ -71,6 +73,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       id: payload.sub,
       code: payload.code,
+      // Read here rather than carried in the token, so a person who changes
+      // their name is named correctly in what they do next.
+      name: user.name,
       role: user.role ?? payload.role,
       permissions: user.roleRef?.permissions ?? [],
       tenant,

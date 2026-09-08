@@ -2,11 +2,18 @@
 
 import { use, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Order, TaxTreatment, WorkflowStatus, WorkflowTransition } from '@decor/shared';
+import type {
+  HistoryEntry,
+  Order,
+  TaxTreatment,
+  WorkflowStatus,
+  WorkflowTransition,
+} from '@decor/shared';
 import { LENGTH_UNITS, PERMISSIONS, UNIT_LABEL } from '@decor/shared';
 import type { LengthUnit } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { useAuth } from '@/lib/auth';
 import { Shell } from '@/components/Shell';
 import {
@@ -65,6 +72,17 @@ function OrderDetail({ orderId }: { orderId: string }) {
   const { can } = useAuth();
   const [unit, setUnit] = useState<LengthUnit>('FT');
 
+  /*
+   * The history is its own request rather than part of the record.
+   *
+   * It is no longer only the stages this passed through: it holds what was
+   * edited and by whom, which comes from the trail rather than from the row.
+   */
+  const history = useApi<HistoryEntry[]>(
+    () => api.history('orders', orderId),
+    [orderId],
+  );
+
   const order = useApi<Order>(() => api.order(orderId, unit), [orderId, unit]);
 
   const [moves, setMoves] = useState<NextMove[]>([]);
@@ -105,6 +123,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
       setPendingBack(null);
       setNote('');
       order.reload();
+      history.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not move it back');
     } finally {
@@ -124,6 +143,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
       setPending(null);
       setNote('');
       order.reload();
+      history.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not move it');
     } finally {
@@ -383,36 +403,8 @@ function OrderDetail({ orderId }: { orderId: string }) {
       />
 
       <SectionHead title="History" />
-      <Card size="sm" className="scroll-x">
-        <table className="table">
-          <thead>
-            <tr>
-              <th style={{ width: 170 }}>When</th>
-              <th>Moved</th>
-              <th>Note</th>
-              <th>By</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data.statusHistory ?? []).map((entry) => (
-              <tr key={entry.id}>
-                <td className="muted">{formatDateTime(entry.changedAt)}</td>
-                <td>
-                  {entry.fromStatus ? (
-                    <span className="muted">{entry.fromStatus.name} → </span>
-                  ) : null}
-                  <span className="bold">{entry.toStatus.name}</span>
-                  {/* A step back reads as an ordinary one otherwise. */}
-                  {entry.reversed ? (
-                    <span className="t-tiny warning bold"> · went back</span>
-                  ) : null}
-                </td>
-                <td className="muted">{entry.note ?? '—'}</td>
-                <td className="muted">{entry.changedBy?.name ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <Card size="sm">
+        <HistoryTimeline entries={history.data ?? []} />
       </Card>
 
       <Sheet
@@ -554,6 +546,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
               setPriceSheet(false);
               setQuoted('');
               order.reload();
+      history.reload();
             } finally {
               setBusy(false);
             }
@@ -579,6 +572,7 @@ function OrderDetail({ orderId }: { orderId: string }) {
                 await api.repriceOrder(orderId, { taxTreatment: treatment });
                 setTermsSheet(false);
                 order.reload();
+      history.reload();
               } finally {
                 setBusy(false);
               }
