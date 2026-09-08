@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Tenant, TenantIsolation } from '@decor/shared';
+import { MODULE_CATALOGUE, PLANS, planFor } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
@@ -53,6 +54,33 @@ export default function TenantsPage() {
   const [ownerPassword, setOwnerPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /* Which workspace's plan is being changed, if any. */
+  const [planFor_, setPlanFor] = useState<Tenant | null>(null);
+  const [plan, setPlan] = useState('shop');
+  const [extras, setExtras] = useState<string[]>([]);
+
+  const openPlan = (tenant: Tenant) => {
+    setPlanFor(tenant);
+    setPlan(tenant.plan ?? 'shop');
+    setExtras(tenant.modules ?? []);
+    setError(null);
+  };
+
+  const savePlan = async () => {
+    if (!planFor_) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateTenant(planFor_.id, { plan, modules: extras });
+      setPlanFor(null);
+      tenants.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not change the plan');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const create = async () => {
     setBusy(true);
@@ -118,17 +146,65 @@ export default function TenantsPage() {
                   <Pill label={tenant.status} color={STATUS_COLOR[tenant.status]} />
                 </div>
               </div>
-              <div className="wrap" style={{ marginTop: 'var(--s-md)' }}>
+              <div className="row-between" style={{ marginTop: 'var(--s-md)' }}>
                 <span className="t-tiny faint">
                   {tenant.counts?.unreachable
                     ? 'Database unreachable'
                     : `${tenant.counts?.users ?? 0} users · ${tenant.counts?.orders ?? 0} orders · ${tenant.counts?.clients ?? 0} clients`}
                 </span>
+                <div className="row">
+                  <span className="t-tiny muted" data-testid="tenant-plan">
+                    {planFor(tenant.plan).label} · {tenant.effectiveModules?.length ?? 0} modules
+                  </span>
+                  <Chip label="Plan" onClick={() => openPlan(tenant)} />
+                </div>
               </div>
             </Card>
           ))}
         </div>
       )}
+
+      <Sheet
+        open={Boolean(planFor_)}
+        title={`What ${planFor_?.name ?? ''} has`}
+        subtitle="A plan, plus anything granted on top of it"
+        onClose={() => setPlanFor(null)}>
+        <span className="field-label">Plan</span>
+        <div className="wrap" style={{ marginBottom: 'var(--s-lg)' }}>
+          {PLANS.map((one) => (
+            <Chip
+              key={one.key}
+              label={one.label}
+              selected={plan === one.key}
+              onClick={() => setPlan(one.key)}
+            />
+          ))}
+        </div>
+        <p className="t-tiny muted">{planFor(plan).blurb}</p>
+
+        <span className="field-label">On top of it</span>
+        <div className="wrap" style={{ marginBottom: 'var(--s-lg)' }}>
+          {MODULE_CATALOGUE.filter((module) => !planFor(plan).modules.includes(module.key)).map(
+            (module) => (
+              <Chip
+                key={module.key}
+                label={module.comingSoon ? `${module.label} (soon)` : module.label}
+                selected={extras.includes(module.key)}
+                onClick={() =>
+                  setExtras((current) =>
+                    current.includes(module.key)
+                      ? current.filter((one) => one !== module.key)
+                      : [...current, module.key],
+                  )
+                }
+              />
+            ),
+          )}
+        </div>
+
+        {error ? <p className="t-small danger">{error}</p> : null}
+        <Button title="Save the plan" block loading={busy} onClick={savePlan} />
+      </Sheet>
 
       <Sheet
         open={sheet}

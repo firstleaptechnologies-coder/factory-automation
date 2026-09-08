@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@decor/shared';
 import { PaymentsService } from './payments.service';
 import {
   CashPositionQueryDto,
@@ -9,6 +9,7 @@ import {
   TransactionQueryDto,
 } from './dto/payment.dto';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { RequireModule } from '../../common/decorators/module.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
 /*
@@ -21,6 +22,7 @@ import { AuthUser, CurrentUser } from '../../common/decorators/current-user.deco
  * reorganised its people got the wrong answer, and that somebody in Sales could
  * bank cash through the API although nothing had granted them that.
  */
+@RequireModule(MODULES.FINANCE)
 @Controller()
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}

@@ -25,7 +25,7 @@ const CLOSED_KEY = 'decor.nav.closed';
  * without anyone editing a list.
  */
 export function Shell({ children }: { children: React.ReactNode }) {
-  const { user, loading, signOut, can } = useAuth();
+  const { user, loading, signOut, can, has } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -82,8 +82,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
   if (loading) return <Loader label="Loading" />;
   if (!user) return null;
 
+  /*
+   * Two gates, and both have to pass.
+   *
+   * The plan decides what the business bought, the role decides who inside it
+   * may touch it. Hiding the item is a courtesy — the API refuses the route
+   * either way — but a menu full of screens that say no is not a product.
+   */
   const visible = (item: NavItem) =>
-    Boolean(item.web) && (!item.permission || can(item.permission));
+    Boolean(item.web) &&
+    (!item.permission || can(item.permission)) &&
+    (!item.module || has(item.module));
 
   /** A group is worth showing when anything inside it is. */
   const groupHas = (group: NavGroup): boolean =>

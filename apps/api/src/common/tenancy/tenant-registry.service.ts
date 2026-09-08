@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Tenant, TenantStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../crypto/encryption.service';
+import { modulesFor } from '@decor/shared';
 import { TenantContext } from './tenant-context';
 
 /**
@@ -64,6 +65,9 @@ export class TenantRegistryService {
       databaseUrl: tenant.databaseUrl
         ? this.encryption.decryptToString(tenant.databaseUrl)
         : null,
+      // Resolved here so a module check is a lookup in memory rather than a
+      // query in front of every request.
+      modules: modulesFor(tenant.plan, tenant.modules ?? []),
     };
 
     this.bySlug.set(tenant.slug, context);

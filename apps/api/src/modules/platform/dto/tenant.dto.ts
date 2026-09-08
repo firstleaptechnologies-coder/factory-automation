@@ -1,12 +1,15 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsEmail,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   Matches,
   MinLength,
 } from 'class-validator';
+import { ALL_MODULES } from '@decor/shared';
 import { TenantIsolation, TenantStatus } from '@prisma/client';
 
 export class CreateTenantDto {
@@ -44,6 +47,17 @@ export class UpdateTenantDto {
   @IsOptional() @IsString() name?: string;
   @IsOptional() @IsEnum(TenantStatus) status?: TenantStatus;
   @IsOptional() @IsString() plan?: string;
+  /**
+   * Modules granted on top of the plan.
+   *
+   * A shop that wants one thing from the next tier up should not have to buy
+   * the tier. Only real module keys are kept — a typo here would otherwise sit
+   * on the row for ever, granting nothing and explaining nothing.
+   */
+  @IsOptional()
+  @IsArray()
+  @IsIn(ALL_MODULES, { each: true })
+  modules?: string[];
   @IsOptional() @IsString() contactName?: string;
   @IsOptional() @IsEmail() contactEmail?: string;
   @IsOptional() @IsString() contactPhone?: string;

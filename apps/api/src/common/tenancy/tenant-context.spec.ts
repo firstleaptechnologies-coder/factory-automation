@@ -1,4 +1,5 @@
 import { TenantIsolation } from '@prisma/client';
+import { ALL_MODULES } from '@decor/shared';
 import {
   PLATFORM_CONTEXT,
   currentTenant,
@@ -13,6 +14,8 @@ const SHOP = {
   tenantId: 'tenant-a',
   slug: 'shop-a',
   isolation: TenantIsolation.SHARED,
+  // What the workspace bought; irrelevant to these tests, so: everything.
+  modules: ALL_MODULES,
 };
 
 describe('tenant context', () => {

@@ -7,6 +7,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { PrismaClient, TenantIsolation, TenantStatus } from '@prisma/client';
+import { modulesFor } from '@decor/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';
@@ -206,7 +207,15 @@ export class PlatformService implements OnModuleInit {
 }
 
 /** Never return a connection string over the API, even to a platform admin. */
-function redact<T extends { databaseUrl: string | null }>(tenant: T) {
+function redact<T extends { databaseUrl: string | null; plan?: string | null; modules?: string[] }>(
+  tenant: T,
+) {
   const { databaseUrl, ...rest } = tenant;
-  return { ...rest, hasDedicatedDatabase: Boolean(databaseUrl) };
+  return {
+    ...rest,
+    hasDedicatedDatabase: Boolean(databaseUrl),
+    // What the plan and the extras add up to, so the console does not have to
+    // work it out a second time — and cannot work it out differently.
+    effectiveModules: modulesFor(tenant.plan ?? null, tenant.modules ?? []),
+  };
 }

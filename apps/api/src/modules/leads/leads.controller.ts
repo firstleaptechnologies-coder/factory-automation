@@ -12,11 +12,13 @@ import {
   UpdateCustomFieldDto,
   UpdateLeadDto,
 } from './dto/lead.dto';
-import { PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@decor/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { RequireModule } from '../../common/decorators/module.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
+@RequireModule(MODULES.LEADS)
 @Controller('leads')
 export class LeadsController {
   constructor(

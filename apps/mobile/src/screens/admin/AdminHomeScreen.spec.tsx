@@ -16,8 +16,13 @@ jest.mock('../../api/client', () => ({
 }));
 
 let mockGranted: string[] = [];
+let mockModules: string[] | null = null;
 jest.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ can: (permission: string) => mockGranted.includes(permission) }),
+  useAuth: () => ({
+    can: (permission: string) => mockGranted.includes(permission),
+    // A workspace with everything, unless a test says otherwise.
+    has: (module: string) => mockModules === null || mockModules.includes(module),
+  }),
 }));
 
 const navigate = jest.fn();
@@ -38,6 +43,7 @@ async function mount({
 }
 
 beforeEach(() => {
+  mockModules = null;
   jest.clearAllMocks();
   // The settings rows are gated the same way the web sidebar gates them.
   mockGranted = [PERMISSIONS.CONFIG_VIEW];
@@ -196,5 +202,25 @@ describe('the categories', () => {
     expect(screen.getByText('Transactions')).toBeTruthy();
     expect(screen.getByText('Clients')).toBeTruthy();
     expect(screen.getByText('Materials')).toBeTruthy();
+  });
+});
+
+
+describe('what a plan reaches', () => {
+  it('hides a module the workspace has not bought', async () => {
+    mockGranted = [PERMISSIONS.LEAD_VIEW, PERMISSIONS.ORDER_VIEW];
+    mockModules = ['orders', 'clients'];
+    await mount();
+
+    // Two gates, and both have to pass.
+    expect(screen.queryByText('Leads')).toBeNull();
+    expect(screen.getByText('Orders')).toBeTruthy();
+  });
+
+  it('keeps what they did buy', async () => {
+    mockGranted = [PERMISSIONS.LEAD_VIEW];
+    mockModules = ['orders', 'clients', 'leads'];
+    await mount();
+    expect(screen.getByText('Leads')).toBeTruthy();
   });
 });

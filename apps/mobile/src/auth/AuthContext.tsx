@@ -7,7 +7,8 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AuthUser } from '@decor/shared';
+import type { AuthUser, ModuleKey } from '@decor/shared';
+import { hasModule } from '@decor/shared';
 import { api, setUnauthorizedHandler } from '../api/client';
 
 const TOKEN_KEY = 'decor.token';
@@ -25,6 +26,13 @@ interface AuthState {
   /** Forget the workspace too, for a device moving between businesses. */
   forgetWorkspace: () => Promise<void>;
   can: (permission: string) => boolean;
+  /**
+   * Whether the workspace bought this part of the product.
+   *
+   * Beside `can`, not instead of it: the plan decides what the business has,
+   * the role decides who inside it may touch it.
+   */
+  has: (module: ModuleKey) => boolean;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -92,7 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(
     async (slug: string, identifier: string, password: string) => {
       const result = await api.login(slug, identifier, password);
-      await persist(result.accessToken, result.user, result.workspace?.slug ?? slug);
+      // The workspace comes back beside the user; the menu needs both.
+      await persist(
+        result.accessToken,
+        { ...result.user, workspace: result.workspace },
+        result.workspace?.slug ?? slug,
+      );
     },
     [persist],
   );
@@ -120,6 +133,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const has = useCallback(
+    (module: ModuleKey) => hasModule(user?.workspace?.modules, module),
+    [user],
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -130,8 +148,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       forgetWorkspace,
       can,
+      has,
     }),
-    [user, workspace, loading, signIn, signInAsPlatform, signOut, forgetWorkspace, can],
+    [user, workspace, loading, signIn, signInAsPlatform, signOut, forgetWorkspace, can, has],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

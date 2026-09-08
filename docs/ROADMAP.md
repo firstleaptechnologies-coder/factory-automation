@@ -270,25 +270,33 @@ channels — which waits on the Firebase account.
 
 **Also in this release, because it is native:** crash reporting in the app.
 
-### Phase 3 · FirstLeap, the platform layer — **M**
+### Phase 3 · FirstLeap, the platform layer — **M** — *entitlements shipped 8 September 2026*
 
-The ownership hierarchy you described, made real. Half of it exists — `Tenant`,
-`PlatformUser`, provisioning, `/platform/tenants`. What is missing:
+The ownership hierarchy, made real. Half of it already existed — `Tenant`,
+`PlatformUser`, provisioning, `/platform/tenants`.
 
-- **Plans and entitlements** (D4): a plan is a set of module keys; a tenant has
-  a plan plus overrides; `ModuleGuard` and the nav tree enforce it.
-- **FirstLeap staff roles** — support, billing, engineering. Today a platform
-  user is all-or-nothing.
-- **Impersonation** — signing into a tenant as their admin to help them, with a
-  banner the whole time, a hard time limit, and an `AuditEvent` in *their* log
-  saying FirstLeap did it. This is the single most-requested support capability
-  and the single most dangerous one; it does not ship without the audit half.
-- **Tenant health** — last activity, orders punched this week, storage used,
-  seats, plan, trial end. Read from the telemetry tables built in Phase 1.
-- **Provisioning from the dashboard** — the API exists; the screen does not.
-- **Announcements** — a message FirstLeap can put in front of every tenant.
-- **Subscription records** — plan, price, billing period, invoices to the tenant.
-  (Taking the money is a separate question; see G11.)
+**Plans and entitlements (D4) — done:**
+
+- A module catalogue and three plans in `@decor/shared`, including the modules
+  that do not exist yet, so nothing has to be renamed when they arrive.
+- A tenant is on a plan, plus anything granted on top of it — a shop that wants
+  one thing from the next tier up should not have to buy the tier. Additive
+  only: taking a module away from a shop that is using it is a conversation,
+  not a checkbox.
+- Two independent gates on the same routes: `ModuleGuard` beside
+  `PermissionsGuard`, and both halves asserted in `routes.spec.ts`. A tenant
+  admin with every permission still cannot open a module their plan excludes.
+- Both menus filter on it, and a plan change takes effect on the next request.
+- The plan editor lives in the platform console.
+- On the way through, a real leak: `/auth/me` spread the whole identity, and the
+  identity carries a dedicated workspace's **decrypted database connection
+  string**. Every signed-in person in such a shop was being handed it. It now
+  returns named fields, with a spec that fails if that ever changes.
+
+**Still to do here:** FirstLeap staff roles (support, billing, engineering),
+impersonation with a banner, a time limit and an entry in the *tenant's* own
+audit log, tenant health from the telemetry tables, announcements, and
+subscription records.
 
 ### Phase 4 · The ledger and Expenses — item 7 — **L**
 

@@ -12,7 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@decor/shared';
 import { EstimatesService } from './estimates.service';
 import { renderEstimateHtml } from './estimate-document';
 import {
@@ -24,6 +24,7 @@ import {
   UpdateEstimateDto,
 } from './dto/estimate.dto';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { RequireModule } from '../../common/decorators/module.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { FilesService, IncomingFile } from '../files/files.service';
 import { AttachmentKind } from '@prisma/client';
@@ -96,12 +97,14 @@ export class EstimatesController {
   // -- estimates -------------------------------------------------------------
 
   @RequirePermissions(PERMISSIONS.ESTIMATE_VIEW)
+  @RequireModule(MODULES.QUOTES)
   @Get('estimates')
   list(@Query() query: EstimateQueryDto) {
     return this.estimates.list(query);
   }
 
   @RequirePermissions(PERMISSIONS.ESTIMATE_VIEW)
+  @RequireModule(MODULES.QUOTES)
   @Get('estimates/:id')
   findOne(@Param('id') id: string) {
     return this.estimates.findOne(id);
@@ -113,6 +116,7 @@ export class EstimatesController {
    * single step — while the web can print the very same markup.
    */
   @RequirePermissions(PERMISSIONS.ESTIMATE_VIEW)
+  @RequireModule(MODULES.QUOTES)
   @Get('estimates/:id/document')
   @Header('Content-Type', 'text/html; charset=utf-8')
   async document(@Param('id') id: string) {
@@ -128,18 +132,21 @@ export class EstimatesController {
   }
 
   @RequirePermissions(PERMISSIONS.ESTIMATE_MANAGE)
+  @RequireModule(MODULES.QUOTES)
   @Post('estimates')
   create(@Body() dto: CreateEstimateDto, @CurrentUser() user: AuthUser) {
     return this.estimates.create(dto, user?.id);
   }
 
   @RequirePermissions(PERMISSIONS.ESTIMATE_MANAGE)
+  @RequireModule(MODULES.QUOTES)
   @Patch('estimates/:id')
   update(@Param('id') id: string, @Body() dto: UpdateEstimateDto) {
     return this.estimates.update(id, dto);
   }
 
   @RequirePermissions(PERMISSIONS.ESTIMATE_MANAGE)
+  @RequireModule(MODULES.QUOTES)
   @Post('estimates/:id/status')
   setStatus(
     @Param('id') id: string,
@@ -151,6 +158,7 @@ export class EstimatesController {
 
   /** Turn an accepted quotation into a real order. The estimate is kept. */
   @RequirePermissions(PERMISSIONS.ESTIMATE_MANAGE, PERMISSIONS.ORDER_PUNCH)
+  @RequireModule(MODULES.QUOTES)
   @Post('estimates/:id/convert')
   convert(
     @Param('id') id: string,
@@ -161,6 +169,7 @@ export class EstimatesController {
   }
 
   @RequirePermissions(PERMISSIONS.ESTIMATE_MANAGE)
+  @RequireModule(MODULES.QUOTES)
   @Delete('estimates/:id')
   remove(@Param('id') id: string) {
     return this.estimates.remove(id);

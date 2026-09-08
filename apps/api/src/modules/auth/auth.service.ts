@@ -4,7 +4,11 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';
 import { PLATFORM_PERMISSIONS } from '@decor/shared';
-import { runInTenant, runAsPlatform } from '../../common/tenancy/tenant-context';
+import {
+  runInTenant,
+  runAsPlatform,
+  type TenantContext,
+} from '../../common/tenancy/tenant-context';
 import { LoginDto, PlatformLoginDto } from './dto/login.dto';
 
 @Injectable()
@@ -67,7 +71,12 @@ export class AuthService {
         roleName: user.roleRef?.name ?? user.role,
         permissions,
       },
-      workspace: { slug: tenant.slug, tenantId: tenant.tenantId },
+      workspace: {
+        slug: tenant.slug,
+        tenantId: tenant.tenantId,
+        // What they have bought, so the menu shows what they can open.
+        modules: tenant.modules,
+      },
     };
   }
 
@@ -121,7 +130,13 @@ export class AuthService {
         where: { id: identity.id },
         select: { id: true, name: true, email: true },
       });
-      return { ...identity, name: admin?.name, email: admin?.email };
+      return {
+        id: identity.id,
+        isPlatform: true,
+        permissions: identity.permissions ?? [],
+        name: admin?.name,
+        email: admin?.email,
+      };
     }
 
     const user = await this.prisma.user.findFirst({
@@ -129,11 +144,26 @@ export class AuthService {
       select: { id: true, code: true, name: true, role: true, roleRef: { select: { name: true } } },
     });
 
+    /*
+     * Named fields rather than a spread of the identity.
+     *
+     * The identity carries the whole tenant context, and that context carries a
+     * dedicated workspace's decrypted database connection string. Spreading it
+     * handed that to every signed-in person in the shop — including whoever has
+     * the fewest permissions in it. Nothing here is copied by accident now.
+     */
+    const tenant = identity.tenant as TenantContext | undefined;
+
     return {
-      ...identity,
-      name: user?.name,
+      id: identity.id,
       code: user?.code ?? identity.code,
+      name: user?.name,
+      role: user?.role ?? identity.role,
       roleName: user?.roleRef?.name ?? user?.role ?? identity.role,
+      permissions: identity.permissions ?? [],
+      workspace: tenant
+        ? { slug: tenant.slug, tenantId: tenant.tenantId, modules: tenant.modules }
+        : undefined,
     };
   }
 

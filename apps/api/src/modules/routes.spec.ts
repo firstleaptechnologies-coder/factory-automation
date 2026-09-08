@@ -5,6 +5,7 @@ import { DEFAULT_ROLES } from '@decor/shared';
 import { PERMISSIONS_KEY } from '../common/decorators/permissions.decorator';
 import { ROLES_KEY } from '../common/decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
+import { MODULE_KEY } from '../common/decorators/module.decorator';
 
 import { AuthController } from './auth/auth.controller';
 import { ClientsController } from './clients/clients.controller';
@@ -70,6 +71,8 @@ interface Route {
   permissions: string[];
   roles: string[];
   isPublic: boolean;
+  /** What the workspace must have bought, where the route says. */
+  module?: string;
 }
 
 const routes: Route[] = CONTROLLERS.flatMap((controller) => {
@@ -101,6 +104,9 @@ const routes: Route[] = CONTROLLERS.flatMap((controller) => {
       isPublic:
         Boolean(Reflect.getMetadata(IS_PUBLIC_KEY, prototype[name])) ||
         Boolean(Reflect.getMetadata(IS_PUBLIC_KEY, controller)),
+      module:
+        (Reflect.getMetadata(MODULE_KEY, prototype[name]) as string) ??
+        (Reflect.getMetadata(MODULE_KEY, controller) as string),
     }));
 });
 
@@ -157,6 +163,31 @@ it('takes what the clients saw behind a token, and slowly', () => {
   // not be able to fill the table while it is at it.
   expect(find('LogsController', 'record').isPublic).toBe(false);
   expect(guards).toContain('ThrottlerGuard');
+});
+
+describe('what a plan reaches', () => {
+  it('marks the modules that are sold separately', () => {
+    // The plan decides what the business bought; the role decides who inside
+    // it may touch it. Both gates, on the same routes.
+    expect(find('LeadsController', 'list').module).toBe('leads');
+    expect(find('PaymentsController', 'summary').module).toBe('finance');
+    expect(find('DisbursementsController', 'ledger').module).toBe('finance');
+    expect(find('OrdersController', 'list').module).toBe('orders');
+    expect(find('ClientsController', 'list').module).toBe('clients');
+    expect(find('EstimatesController', 'list').module).toBe('quotes');
+  });
+
+  it('leaves the firm’s own details outside every plan', () => {
+    // A letterhead is not a module anybody buys; it is the shop's own name on
+    // its own paper.
+    expect(find('EstimatesController', 'firm').module).toBeUndefined();
+  });
+
+  it('leaves the platform’s own screens out of it', () => {
+    // The control plane sells the modules; it is not inside a plan.
+    expect(find('PlatformController', 'list').module).toBeUndefined();
+    expect(find('ReleasesController', 'list').module).toBeUndefined();
+  });
 });
 
 describe('notifications', () => {

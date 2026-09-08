@@ -1,4 +1,5 @@
 import { PERMISSIONS, type Permission } from './permissions';
+import { MODULES, type ModuleKey } from './modules';
 
 /**
  * Where everything lives, once, for both clients and the documentation.
@@ -23,6 +24,14 @@ export interface NavItem {
   icon: string;
   /** Everything under a group needs the same permission to be worth showing. */
   permission?: Permission;
+  /**
+   * What the workspace must have bought for this to exist for them.
+   *
+   * Two gates, not one: a shop that has not bought quotes should not see the
+   * screen at all, and a shop that has should still only let the right people
+   * into it.
+   */
+  module?: ModuleKey;
   /** Where the web serves it. Absent when the screen is app-only. */
   web?: string;
   /** The app's route name. Absent when the screen is web-only. */
@@ -71,6 +80,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         key: 'punch',
+        module: MODULES.ORDERS,
         label: 'Punch order',
         icon: 'plus',
         permission: PERMISSIONS.ORDER_PUNCH,
@@ -79,6 +89,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         key: 'orders',
+        module: MODULES.ORDERS,
         label: 'Orders',
         icon: 'clipboard',
         permission: PERMISSIONS.ORDER_VIEW,
@@ -114,6 +125,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         key: 'leads',
+        module: MODULES.LEADS,
         label: 'Leads',
         icon: 'trend',
         permission: PERMISSIONS.LEAD_VIEW,
@@ -154,6 +166,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         key: 'quotes',
+        module: MODULES.QUOTES,
         label: 'Quotes',
         icon: 'tag',
         permission: PERMISSIONS.ESTIMATE_VIEW,
@@ -230,6 +243,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         key: 'transactions',
+        module: MODULES.FINANCE,
         label: 'Transactions',
         icon: 'card',
         permission: PERMISSIONS.CASH_POSITION_VIEW,
@@ -238,6 +252,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         key: 'payouts',
+        module: MODULES.FINANCE,
         label: 'Payout ledger',
         icon: 'arrowUpRight',
         permission: PERMISSIONS.DISBURSEMENT_VIEW,
@@ -253,6 +268,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         key: 'clients',
+        module: MODULES.CLIENTS,
         label: 'Clients',
         icon: 'users',
         permission: PERMISSIONS.CLIENT_VIEW,

@@ -9,7 +9,8 @@ import {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import type { AuthUser } from '@decor/shared';
+import type { AuthUser, ModuleKey } from '@decor/shared';
+import { hasModule } from '@decor/shared';
 import { api, clearToken, loadToken, saveToken } from './api';
 
 const WORKSPACE_KEY = 'decor.workspace';
@@ -26,6 +27,13 @@ interface AuthState {
   forgetWorkspace: () => void;
   /** Whether the signed-in user's role allows something. */
   can: (permission: string) => boolean;
+  /**
+   * Whether the workspace bought this part of the product.
+   *
+   * Beside `can`, not instead of it: the plan decides what the business has,
+   * the role decides who inside it may touch it.
+   */
+  has: (module: ModuleKey) => boolean;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -58,7 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveToken(result.accessToken);
       window.localStorage.setItem(WORKSPACE_KEY, slug);
       setWorkspace(slug);
-      setUser(result.user);
+      // The workspace comes back beside the user; the menu needs both.
+      setUser({ ...result.user, workspace: result.workspace });
       router.push('/');
     },
     [router],
@@ -92,6 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const has = useCallback(
+    (module: ModuleKey) => hasModule(user?.workspace?.modules, module),
+    [user],
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -102,8 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       forgetWorkspace,
       can,
+      has,
     }),
-    [user, workspace, loading, signIn, signInAsPlatform, signOut, forgetWorkspace, can],
+    [user, workspace, loading, signIn, signInAsPlatform, signOut, forgetWorkspace, can, has],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

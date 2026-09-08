@@ -1,4 +1,5 @@
 import { TenantIsolation } from '@prisma/client';
+import { ALL_MODULES } from '@decor/shared';
 import { runInTenant } from '../src/common/tenancy/tenant-context';
 
 /**
@@ -102,7 +103,13 @@ export function prismaMock() {
 /** Runs a test body inside a tenant, as every request does. */
 export function inTenant<T>(fn: () => T): T {
   return runInTenant(
-    { tenantId: 'tenant-test', slug: 'test-shop', isolation: TenantIsolation.SHARED },
+    {
+      tenantId: 'tenant-test',
+      slug: 'test-shop',
+      isolation: TenantIsolation.SHARED,
+      // Everything, so a test about pricing is never about entitlements.
+      modules: ALL_MODULES,
+    },
     fn,
   );
 }

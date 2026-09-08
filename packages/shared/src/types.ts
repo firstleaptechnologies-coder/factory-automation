@@ -31,13 +31,26 @@ export interface AuthUser {
   permissions: string[];
   /** Set for platform admins, who belong to no workspace. */
   isPlatform?: boolean;
+  /**
+   * The workspace they signed into, and what it has bought.
+   *
+   * The menu is filtered by this as well as by permissions: the plan decides
+   * what the business has, the role decides who inside it may touch it.
+   */
+  workspace?: Workspace;
+}
+
+export interface Workspace {
+  slug: string;
+  tenantId: string;
+  modules?: string[];
 }
 
 export interface LoginResponse {
   accessToken: string;
   user: AuthUser;
   /** Which workspace was signed in to. Absent for a platform sign-in. */
-  workspace?: { slug: string; tenantId: string };
+  workspace?: Workspace;
 }
 
 export type TenantIsolation = 'SHARED' | 'DEDICATED';
@@ -50,6 +63,10 @@ export interface Tenant {
   isolation: TenantIsolation;
   status: TenantStatus;
   plan?: string | null;
+  /** Modules granted on top of the plan. */
+  modules?: string[];
+  /** What the plan and the extras add up to, worked out by the API. */
+  effectiveModules?: string[];
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;

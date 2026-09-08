@@ -1,4 +1,5 @@
 import { TenantIsolation } from '@prisma/client';
+import { ALL_MODULES } from '@decor/shared';
 import {
   TENANT_SCOPED_MODELS,
   TenantClientRegistry,
@@ -179,6 +180,8 @@ describe('TenantClientRegistry', () => {
     tenantId: 'tenant-a',
     slug: 'a',
     isolation: TenantIsolation.SHARED,
+    // What the workspace bought; irrelevant to these tests, so: everything.
+    modules: ALL_MODULES,
     ...over,
   });
 

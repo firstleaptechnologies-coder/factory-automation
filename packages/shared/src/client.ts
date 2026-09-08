@@ -875,7 +875,10 @@ export class ApiClient {
     );
   }
 
-  updateTenant(id: string, body: { name?: string; status?: TenantStatus; plan?: string }) {
+  updateTenant(
+    id: string,
+    body: { name?: string; status?: TenantStatus; plan?: string; modules?: string[] },
+  ) {
     return this.patch<Tenant>(`/platform/tenants/${id}`, body);
   }
 

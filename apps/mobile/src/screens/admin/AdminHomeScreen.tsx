@@ -22,7 +22,7 @@ import { palette, spacing } from '../../theme';
  * between punching being possible and not.
  */
 export function AdminHomeScreen({ navigation }: { navigation: any }) {
-  const { can } = useAuth();
+  const { can, has } = useAuth();
   const materials = useApi<Material[]>(() => api.materials(true), []);
   const sizes = useApi<SizePreset[]>(() => api.sizePresets(true), []);
   const fields = useApi<CustomFieldDefinition[]>(() => api.leadFields(true), []);
@@ -65,8 +65,14 @@ export function AdminHomeScreen({ navigation }: { navigation: any }) {
     settings: 'Display unit, account, sign out',
   };
 
+  /*
+   * Two gates, and both have to pass: the plan decides what the business
+   * bought, the role decides who inside it may touch it.
+   */
   const visible = (item: NavItem) =>
-    Boolean(item.app) && (!item.permission || can(item.permission));
+    Boolean(item.app) &&
+    (!item.permission || can(item.permission)) &&
+    (!item.module || has(item.module));
 
   const groupHas = (group: NavGroup): boolean =>
     group.items.some(visible) || (group.groups ?? []).some(groupHas);

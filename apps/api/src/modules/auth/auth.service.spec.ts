@@ -198,3 +198,60 @@ describe('me', () => {
     expect(db.user.findFirst).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * What signing in hands back.
+ *
+ * The identity the guard builds carries the whole tenant context, and that
+ * context carries a dedicated workspace's decrypted database connection string.
+ * Anything that spreads it leaks the keys to a business's entire database to
+ * every person signed into it.
+ */
+describe('what /auth/me returns', () => {
+  const identity = {
+    id: 'u1',
+    code: 'ADMIN',
+    role: 'ADMIN',
+    permissions: ['order.view'],
+    tenant: {
+      tenantId: 't1',
+      slug: 'decorbucket',
+      isolation: 'SHARED',
+      databaseUrl: 'postgresql://user:secret@elsewhere/db',
+      modules: ['orders', 'clients'],
+    },
+  };
+
+  function build() {
+    const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
+    db.user.findFirst = jest.fn(async () => ({
+      id: 'u1',
+      code: 'ADMIN',
+      name: 'Administrator',
+      role: 'ADMIN',
+      roleRef: { name: 'Owner' },
+    }));
+    return new AuthService(db as never, {} as never, {} as never);
+  }
+
+  it('never hands out the workspace’s connection string', async () => {
+    const me = (await build().me(identity as never)) as Record<string, unknown>;
+    expect(JSON.stringify(me)).not.toContain('secret@elsewhere');
+    expect(me).not.toHaveProperty('tenant');
+  });
+
+  it('says which workspace it is, and what they have bought', async () => {
+    const me = (await build().me(identity as never)) as Record<string, unknown>;
+    expect(me.workspace).toEqual({
+      slug: 'decorbucket',
+      tenantId: 't1',
+      modules: ['orders', 'clients'],
+    });
+  });
+
+  it('reads the name fresh, so renaming somebody shows up at once', async () => {
+    const me = (await build().me(identity as never)) as Record<string, unknown>;
+    expect(me.name).toBe('Administrator');
+    expect(me.roleName).toBe('Owner');
+  });
+});

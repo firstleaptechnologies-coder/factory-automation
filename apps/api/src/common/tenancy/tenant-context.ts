@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TenantIsolation } from '@prisma/client';
+import { CORE_MODULES, type ModuleKey } from '@decor/shared';
 
 export interface TenantContext {
   tenantId: string;
@@ -7,6 +8,12 @@ export interface TenantContext {
   isolation: TenantIsolation;
   /** Only set for DEDICATED tenants. */
   databaseUrl?: string | null;
+  /**
+   * What this workspace has bought, resolved from their plan and whatever was
+   * granted on top of it. Read on every request, so it is cached with the rest
+   * of the context rather than looked up per check.
+   */
+  modules: ModuleKey[];
 }
 
 /**
@@ -49,6 +56,8 @@ export const PLATFORM_CONTEXT: TenantContext = {
   tenantId: '__platform__',
   slug: '__platform__',
   isolation: TenantIsolation.SHARED,
+  // The control plane sells the modules; it does not use them.
+  modules: [...CORE_MODULES],
 };
 
 export function isPlatformContext(context?: TenantContext): boolean {

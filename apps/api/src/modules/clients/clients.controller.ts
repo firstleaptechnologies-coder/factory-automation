@@ -7,9 +7,12 @@ import {
   CreateClientDto,
   UpdateClientDto,
 } from './dto/client.dto';
+import { MODULES } from '@decor/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { RequireModule } from '../../common/decorators/module.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
+@RequireModule(MODULES.CLIENTS)
 @Controller('clients')
 export class ClientsController {
   constructor(private readonly clients: ClientsService) {}

@@ -1,7 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import TenantsPage from './page';
 
-const apiMock = { tenants: jest.fn(), createTenant: jest.fn() };
+const apiMock = { tenants: jest.fn(), createTenant: jest.fn(), updateTenant: jest.fn() };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
     {},
@@ -27,6 +27,9 @@ const TENANT = {
   hasDedicatedDatabase: false,
   createdAt: '2026-08-01T00:00:00.000Z',
   counts: { users: 3, orders: 12, clients: 5, unreachable: false },
+  plan: 'shop',
+  modules: [] as string[],
+  effectiveModules: ['orders', 'clients', 'leads', 'quotes', 'finance'],
 };
 
 const field = (label: string) =>
@@ -43,6 +46,7 @@ async function mount(rows: unknown[] = [TENANT]) {
 beforeEach(() => {
   jest.clearAllMocks();
   auth = { user: { id: 'p1', isPlatform: true }, loading: false, signOut };
+  apiMock.updateTenant.mockResolvedValue({});
   // The list is fetched whoever is looking, so it always needs an answer.
   apiMock.tenants.mockResolvedValue([]);
   apiMock.createTenant.mockResolvedValue({});
@@ -211,5 +215,58 @@ describe('creating a workspace', () => {
     fireEvent.click(screen.getByText('Create workspace'));
     expect(await screen.findByText('That slug is taken')).toBeInTheDocument();
     expect(field('Workspace name')).toHaveValue('Woodcraft Studio');
+  });
+});
+
+
+/**
+ * What a workspace has bought.
+ *
+ * A plan, plus anything granted on top of it — a shop that wants one thing
+ * from the next tier up should not have to buy the tier.
+ */
+describe('a workspace’s plan', () => {
+  const openPlan = async () => {
+    await mount();
+    fireEvent.click((await screen.findAllByText('Plan'))[0]);
+    await screen.findByText('A plan, plus anything granted on top of it');
+  };
+
+  it('says what each one is on', async () => {
+    await mount();
+    expect(await screen.findByTestId('tenant-plan')).toHaveTextContent('Shop · 5 modules');
+  });
+
+  it('offers the plans, and what each one is for', async () => {
+    await openPlan();
+    expect(screen.getByText('Punch')).toBeInTheDocument();
+    expect(screen.getByText('Works')).toBeInTheDocument();
+  });
+
+  it('offers only the modules the plan does not already hold', async () => {
+    await openPlan();
+    // Offering to add what they already have is offering nothing.
+    expect(screen.queryByText('Orders')).not.toBeInTheDocument();
+    expect(screen.getByText('People (soon)')).toBeInTheDocument();
+  });
+
+  it('saves the plan and the extras together', async () => {
+    await openPlan();
+    fireEvent.click(screen.getByText('Works'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save the plan'));
+    });
+
+    expect(apiMock.updateTenant).toHaveBeenCalledWith('t1', { plan: 'works', modules: [] });
+  });
+
+  it('grants one module without moving the tier', async () => {
+    await openPlan();
+    fireEvent.click(screen.getByText('People (soon)'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save the plan'));
+    });
+
+    expect(apiMock.updateTenant).toHaveBeenCalledWith('t1', { plan: 'shop', modules: ['hr'] });
   });
 });

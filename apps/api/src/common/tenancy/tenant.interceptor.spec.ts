@@ -1,4 +1,5 @@
 import { TenantIsolation } from '@prisma/client';
+import { ALL_MODULES } from '@decor/shared';
 import { TenantInterceptor } from './tenant.interceptor';
 import { currentTenant, isPlatformContext } from './tenant-context';
 
@@ -6,6 +7,8 @@ const TENANT = {
   tenantId: 'tenant-a',
   slug: 'a',
   isolation: TenantIsolation.SHARED,
+  // What the workspace bought; irrelevant to these tests, so: everything.
+  modules: ALL_MODULES,
 };
 
 /** The handler reports the context it was actually invoked inside. */

@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@decor/shared';
 import { DisbursementsService } from './disbursements.service';
 import {
   CategoryDto,
@@ -10,8 +10,10 @@ import {
   UpdateDisbursementDto,
 } from './dto/disbursement.dto';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { RequireModule } from '../../common/decorators/module.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
+@RequireModule(MODULES.FINANCE)
 @Controller('disbursements')
 export class DisbursementsController {
   constructor(private readonly disbursements: DisbursementsService) {}

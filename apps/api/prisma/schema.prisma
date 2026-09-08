@@ -58,7 +58,14 @@ model Tenant {
   databaseUrl String?
 
   status TenantStatus @default(TRIAL)
+  /// Which bundle they are on. The catalogue lives in @decor/shared.
   plan   String?
+  /// Modules granted on top of the plan.
+  ///
+  /// A shop that wants one thing from the next tier up should not have to buy
+  /// the tier. Additive only: taking a module away from a shop that is using it
+  /// is a conversation, not a checkbox.
+  modules String[] @default([])
 
   contactName  String?
   contactEmail String?

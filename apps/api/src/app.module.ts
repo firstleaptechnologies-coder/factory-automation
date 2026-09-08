@@ -14,6 +14,7 @@ import { ServerLogInterceptor } from './common/logs/server-log.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { ModuleGuard } from './common/guards/module.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { HistoryModule } from './modules/history/history.module';
@@ -81,6 +82,8 @@ import { PlatformModule } from './modules/platform/platform.module';
     { provide: APP_INTERCEPTOR, useClass: ServerLogInterceptor },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // What the workspace bought, beside what the person is allowed to do.
+    { provide: APP_GUARD, useClass: ModuleGuard },
   ],
 })
 export class AppModule {}

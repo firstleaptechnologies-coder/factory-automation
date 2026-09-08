@@ -54,7 +54,19 @@ describe('bySlugOrThrow', () => {
       slug: 'decorbucket',
       isolation: TenantIsolation.SHARED,
       databaseUrl: null,
+      // Resolved here so a module check is a lookup in memory rather than a
+      // query in front of every request.
+      modules: ['orders', 'leads', 'quotes', 'finance', 'clients'],
     });
+  });
+
+  it('works out what the workspace has bought, from the plan and the extras', async () => {
+    const { service } = build(tenant({ plan: 'punch', modules: ['hr'] }));
+    const context = await service.bySlugOrThrow('decorbucket');
+
+    // A shop that wants one thing from the next tier up should not have to buy
+    // the tier.
+    expect(context.modules).toEqual(['orders', 'clients', 'hr']);
   });
 });
 

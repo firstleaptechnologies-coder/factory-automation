@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
-import { PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@decor/shared';
 import { DEFAULT_UNIT, LengthUnit, isLengthUnit } from '@decor/shared';
 import { OrdersService } from './orders.service';
 import {
@@ -25,10 +25,12 @@ import {
 } from './dto/order.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { RequireModule } from '../../common/decorators/module.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { IncomingFile } from '../files/files.service';
 import { MAX_UPLOAD_BYTES } from '@decor/shared';
 
+@RequireModule(MODULES.ORDERS)
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}

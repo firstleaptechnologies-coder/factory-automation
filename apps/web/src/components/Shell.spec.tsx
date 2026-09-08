@@ -35,6 +35,8 @@ function mount(over: Record<string, unknown> = {}) {
     signOut,
     can: (permission: string) =>
       ((auth.user as { permissions: string[] } | null)?.permissions ?? []).includes(permission),
+    // A workspace with everything, unless a test says otherwise.
+    has: () => true,
     ...over,
   };
   return render(<Shell>page</Shell>);
@@ -299,5 +301,28 @@ describe('the bell', () => {
     mount();
     await screen.findByText('Notifications');
     expect(screen.queryByTestId('unread-badge')).not.toBeInTheDocument();
+  });
+});
+
+
+describe('what a plan reaches', () => {
+  it('hides a module the workspace has not bought', () => {
+    mount({
+      user: { name: 'Nakul', permissions: [PERMISSIONS.LEAD_VIEW, PERMISSIONS.ORDER_VIEW] },
+      has: (module: string) => module !== 'leads',
+    });
+
+    // Two gates, and both have to pass: they may see leads, their shop has not
+    // bought them.
+    expect(screen.queryByText('Leads')).not.toBeInTheDocument();
+    expect(screen.getByText('Orders')).toBeInTheDocument();
+  });
+
+  it('keeps what they did buy', () => {
+    mount({
+      user: { name: 'Nakul', permissions: [PERMISSIONS.LEAD_VIEW] },
+      has: () => true,
+    });
+    expect(screen.getByText('Leads')).toBeInTheDocument();
   });
 });

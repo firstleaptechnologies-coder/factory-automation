@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ALL_MODULES, MODULES } from './modules';
 import {
   NAV_GROUPS,
   NAV_HOME,
@@ -79,6 +80,32 @@ describe('docs/NAVIGATION.md', () => {
   it('names every screen the tree knows about', () => {
     for (const item of allNavItems()) {
       expect(committed).toContain(item.label);
+    }
+  });
+});
+
+describe('what a plan reaches', () => {
+  it('marks the screens that are sold separately', () => {
+    const byKey = new Map(allNavItems().map((item) => [item.key, item]));
+    expect(byKey.get('leads')?.module).toBe(MODULES.LEADS);
+    expect(byKey.get('quotes')?.module).toBe(MODULES.QUOTES);
+    expect(byKey.get('transactions')?.module).toBe(MODULES.FINANCE);
+    expect(byKey.get('payouts')?.module).toBe(MODULES.FINANCE);
+    expect(byKey.get('clients')?.module).toBe(MODULES.CLIENTS);
+  });
+
+  it('leaves the shop’s own settings inside no plan', () => {
+    const byKey = new Map(allNavItems().map((item) => [item.key, item]));
+    // Materials, sizes and the status flow are how the product is set up, not
+    // something sold beside it.
+    expect(byKey.get('materials')?.module).toBeUndefined();
+    expect(byKey.get('flow')?.module).toBeUndefined();
+    expect(byKey.get('settings')?.module).toBeUndefined();
+  });
+
+  it('names only real modules', () => {
+    for (const item of allNavItems()) {
+      if (item.module) expect(ALL_MODULES).toContain(item.module);
     }
   });
 });
