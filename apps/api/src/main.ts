@@ -27,6 +27,19 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Without this, Nest never hears SIGTERM, so a deploy severs whatever was
+  // in flight: the platform stops the container, open requests die mid-answer,
+  // and every Prisma pool — the platform one and each dedicated tenant's —
+  // is dropped rather than closed. With it, the server stops accepting new
+  // connections, finishes the ones it has, and runs onModuleDestroy, which is
+  // where PrismaService disconnects the registry.
+  //
+  // Money rows survive either way: postings are keyed on
+  // (tenantId, sourceType, sourceId), so a severed write cannot double when it
+  // is retried. What this protects is the operator, who otherwise sees a
+  // receipt fail for no reason they could have caused.
+  app.enableShutdownHooks();
+
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
 

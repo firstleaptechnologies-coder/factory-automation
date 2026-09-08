@@ -31,6 +31,9 @@ jobs:
       # in CI connects to a database — the API's specs are unit tests over
       # mocked clients — so any well-formed URL will do.
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+      # The schema declares directUrl for migrations; Prisma validates that the
+      # variable exists even though CI never migrates.
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
     steps:
       - uses: actions/checkout@v4
 

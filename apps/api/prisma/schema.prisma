@@ -17,7 +17,16 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // What the application connects with. In production this goes through a
+  // connection pooler, because a pool per instance against Postgres directly
+  // runs out of connections long before it runs out of instances.
+  url       = env("DATABASE_URL")
+  // What migrations connect with. A pooler in transaction mode cannot carry
+  // the session state the migration engine needs — advisory locks and the
+  // temporary objects a migration creates belong to a session the pooler is
+  // free to hand to somebody else between statements. Locally the two are the
+  // same string, and nothing is lost by saying so explicitly.
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------
