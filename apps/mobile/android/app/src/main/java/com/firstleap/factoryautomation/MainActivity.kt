@@ -1,4 +1,4 @@
-package com.decorbucket
+package com.firstleap.factoryautomation
 
 import expo.modules.ReactActivityDelegateWrapper
 
