@@ -7,14 +7,7 @@ import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Shell } from '@/components/Shell';
 import { Button, Card, EmptyState, Field, Loader, PageHead } from '@/ui';
-
-/** Hours and minutes, because 90 minutes reads worse than 1h 30m. */
-export function formatMinutes(minutes: number): string {
-  if (!minutes) return '—';
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return hours ? `${hours}h${rest ? ` ${rest}m` : ''}` : `${rest}m`;
-}
+import { formatMinutes } from './formatMinutes';
 
 export default function AttendanceMonthPage() {
   return (

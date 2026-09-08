@@ -10,11 +10,7 @@ import { Shell } from '@/components/Shell';
 import { Button, Card, EmptyState, Field, Loader, PageHead, Pill, Sheet } from '@/ui';
 import { Select } from '@/ui/Select';
 import { formatDateShort, formatInr } from '@/lib/format';
-
-/** What is still owed on one advance. */
-export function outstanding(advance: SalaryAdvance): number {
-  return Math.max(0, Number(advance.amount) - Number(advance.recoveredAmount));
-}
+import { outstanding } from './outstanding';
 
 export default function SalaryAdvancesPage() {
   return (

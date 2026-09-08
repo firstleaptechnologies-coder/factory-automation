@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PERMISSIONS } from '@decor/shared';
-import SalaryAdvancesPage, { outstanding } from './page';
+import SalaryAdvancesPage from './page';
+import { outstanding } from './outstanding';
 
 const apiMock = { salaryAdvances: jest.fn(), employees: jest.fn(), giveSalaryAdvance: jest.fn() };
 jest.mock('@/lib/api', () => ({

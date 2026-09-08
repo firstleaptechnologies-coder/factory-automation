@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import ExpenseAnalyticsPage, { windowStart } from './page';
+import ExpenseAnalyticsPage from './page';
+import { windowStart } from './windows';
 
 const apiMock = { expenseAnalytics: jest.fn() };
 jest.mock('@/lib/api', () => ({

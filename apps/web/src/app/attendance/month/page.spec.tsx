@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { shiftMonth, thisMonth } from '@decor/shared';
-import AttendanceMonthPage, { formatMinutes } from './page';
+import AttendanceMonthPage from './page';
+import { formatMinutes } from './formatMinutes';
 
 const apiMock = { attendanceSummary: jest.fn() };
 jest.mock('@/lib/api', () => ({

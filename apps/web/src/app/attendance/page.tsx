@@ -196,5 +196,3 @@ function Register() {
     </>
   );
 }
-
-export { TONE };
