@@ -67,6 +67,29 @@ Money rows are append-only. A receipt is corrected by recording its opposite,
 never by editing or deleting it; the same will hold for everything that posts
 to the ledger.
 
+## A schema change reaches every tenant, or none
+
+`prisma migrate deploy` migrates one database. That is the whole story only
+while every tenant is `SHARED`, because their rows live in the platform
+database and are kept apart by `tenantId`. A `DEDICATED` tenant has a database
+of its own, and nothing about a successful deploy tells you it was left behind.
+
+So migrations go through `npm run db:migrate:tenants`
+(`apps/api/scripts/migrate-tenants.ts`), which migrates the platform database,
+then every dedicated tenant's, and exits non-zero if any could not be reached.
+Run it *before* the new code starts serving.
+
+Two things it deliberately refuses to do:
+
+- **It never creates a database.** `migrate deploy` will happily create one
+  that does not exist and report success — which for a tenant means a stale
+  connection string silently gets a fresh empty database while the shop's real
+  data sits elsewhere. Every target is probed first; provisioning belongs in
+  the platform module.
+- **It never passes over a tenant it could not reach.** A dedicated tenant with
+  no URL, or one that will not decrypt, is a failure, not a skip. The dangerous
+  outcome here is not an error — it is a green deploy.
+
 ## Updates are signed, and the key is not in here
 
 The app carries `apps/mobile/certs/certificate.pem` and refuses any update that

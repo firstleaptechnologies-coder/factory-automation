@@ -18,6 +18,7 @@
     "dev:mobile": "npm start --prefix apps/mobile",
     "db:generate": "npm run prisma:generate -w @decor/api",
     "db:migrate": "npm run prisma:migrate -w @decor/api",
+    "db:migrate:tenants": "npm run migrate:tenants -w @decor/api",
     "db:seed": "npm run prisma:seed -w @decor/api",
     "db:studio": "npm run prisma:studio -w @decor/api",
     "lint": "npm run lint --workspaces --if-present",

@@ -15,7 +15,8 @@
     "prebuild": "npm run build --prefix ../../packages/shared",
     "prestart:dev": "npm run build --prefix ../../packages/shared",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "migrate:tenants": "ts-node --transpile-only scripts/migrate-tenants.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
