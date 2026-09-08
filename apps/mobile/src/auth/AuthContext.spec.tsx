@@ -113,7 +113,17 @@ it('keeps the token, the user and the workspace on sign-in', async () => {
 
   expect(storage.multiSet).toHaveBeenCalledWith([
     ['decor.token', 'tok'],
-    ['decor.user', JSON.stringify({ name: 'Nakul', permissions: [] })],
+    [
+      'decor.user',
+      // The workspace is kept with the user: the menu needs what the shop
+      // bought as well as what the person may do, and both have to survive the
+      // app being closed.
+      JSON.stringify({
+        name: 'Nakul',
+        permissions: [],
+        workspace: { slug: 'decorbucket' },
+      }),
+    ],
     ['decor.workspace', 'decorbucket'],
   ]);
   expect(await screen.findByText('Nakul')).toBeTruthy();
