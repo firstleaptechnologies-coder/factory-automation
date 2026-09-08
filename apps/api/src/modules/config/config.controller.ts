@@ -1,5 +1,4 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
 import { ConfigurationService } from './config.service';
 import {
   CreateMaterialDto,
@@ -10,7 +9,8 @@ import {
   UpdateMaterialDto,
   UpdateSizePresetDto,
 } from './dto/config.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { PERMISSIONS } from '@decor/shared';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 
 @Controller('config')
 export class ConfigurationController {
@@ -40,55 +40,55 @@ export class ConfigurationController {
 
   // Writes are admin-only.
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Post('materials')
   createMaterial(@Body() dto: CreateMaterialDto) {
     return this.config.createMaterial(dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Patch('materials/:id')
   updateMaterial(@Param('id') id: string, @Body() dto: UpdateMaterialDto) {
     return this.config.updateMaterial(id, dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Post('materials/:id/thicknesses')
   addThickness(@Param('id') id: string, @Body() dto: ThicknessDto) {
     return this.config.addThickness(id, dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Delete('thicknesses/:id')
   removeThickness(@Param('id') id: string) {
     return this.config.removeThickness(id);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Post('size-presets')
   createSizePreset(@Body() dto: CreateSizePresetDto) {
     return this.config.createSizePreset(dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Patch('size-presets/:id')
   updateSizePreset(@Param('id') id: string, @Body() dto: UpdateSizePresetDto) {
     return this.config.updateSizePreset(id, dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.GST_MANAGE)
   @Post('gst-slabs')
   createGstSlab(@Body() dto: GstSlabDto) {
     return this.config.createGstSlab(dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.GST_MANAGE)
   @Patch('gst-slabs/:id')
   updateGstSlab(@Param('id') id: string, @Body() dto: UpdateGstSlabDto) {
     return this.config.updateGstSlab(id, dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Patch('settings/:key')
   setSetting(@Param('key') key: string, @Body('value') value: unknown) {
     return this.config.setSetting(key, value);

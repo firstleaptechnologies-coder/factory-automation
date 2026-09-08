@@ -35,22 +35,25 @@ import { MAX_UPLOAD_BYTES } from '@decor/shared';
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
+  @RequirePermissions(PERMISSIONS.ORDER_VIEW)
   @Get()
   list(@Query() query: OrderQueryDto) {
     return this.orders.list(query);
   }
 
+  @RequirePermissions(PERMISSIONS.ORDER_VIEW)
   @Get('board')
   board(@Query('workflowId') workflowId?: string) {
     return this.orders.board(workflowId);
   }
 
+  @RequirePermissions(PERMISSIONS.ORDER_VIEW)
   @Get(':id')
   findOne(@Param('id') id: string, @Query('unit') unit?: string) {
     return this.orders.findOne(id, resolveUnit(unit));
   }
 
-  @Roles(UserRole.SALES, UserRole.MANAGER)
+  @RequirePermissions(PERMISSIONS.ORDER_PUNCH)
   @Post()
   punch(
     @Body() dto: PunchOrderDto,
@@ -60,7 +63,7 @@ export class OrdersController {
     return this.orders.punch(dto, user?.id, resolveUnit(unit));
   }
 
-  @Roles(UserRole.SALES, UserRole.MANAGER)
+  @RequirePermissions(PERMISSIONS.ORDER_EDIT)
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateOrderDto) {
     return this.orders.update(id, dto);
@@ -98,7 +101,7 @@ export class OrdersController {
    * decides how hard the optimiser compresses; reference images additionally
    * require a description.
    */
-  @Roles(UserRole.SALES, UserRole.MANAGER, UserRole.PRODUCTION)
+  @RequirePermissions(PERMISSIONS.ORDER_ATTACH)
   @Post(':id/attachments')
   @UseInterceptors(FilesInterceptor('files', 10, { limits: { fileSize: MAX_UPLOAD_BYTES } }))
   addAttachments(
@@ -110,7 +113,7 @@ export class OrdersController {
     return this.orders.addAttachments(id, files, meta, user?.id);
   }
 
-  @Roles(UserRole.SALES, UserRole.MANAGER)
+  @RequirePermissions(PERMISSIONS.ORDER_ATTACH)
   @Delete('attachments/:attachmentId')
   removeAttachment(@Param('attachmentId') attachmentId: string) {
     return this.orders.removeAttachment(attachmentId);

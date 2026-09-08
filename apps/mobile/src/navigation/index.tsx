@@ -57,6 +57,7 @@ import { ExpenseFormScreen } from '../screens/ExpenseFormScreen';
 import { ExpenseDetailScreen } from '../screens/ExpenseDetailScreen';
 import { ExpenseAnalyticsScreen } from '../screens/ExpenseAnalyticsScreen';
 import { AdminExpenseOptionsScreen } from '../screens/admin/AdminExpenseOptionsScreen';
+import { AdminRolesScreen } from '../screens/admin/AdminRolesScreen';
 import { TenantsScreen } from '../screens/platform/TenantsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -152,6 +153,7 @@ export function RootNavigator() {
             <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} />
             <Stack.Screen name="ExpenseAnalytics" component={ExpenseAnalyticsScreen} />
             <Stack.Screen name="AdminExpenseOptions" component={AdminExpenseOptionsScreen} />
+            <Stack.Screen name="AdminRoles" component={AdminRolesScreen} />
             <Stack.Screen name="Employees" component={EmployeesScreen} />
             <Stack.Screen name="EmployeeForm" component={EmployeeFormScreen} />
             <Stack.Screen name="EmployeeDetail" component={EmployeeDetailScreen} />

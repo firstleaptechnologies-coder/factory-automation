@@ -419,9 +419,22 @@ blocks anything, and the second wants a commercial answer first — see G11.
     the month reconciles person by person rather than as a total.
 - Letters — offer, NDA, responsibility — port from momentum's templates, which
   snapshot what was printed so history survives an edit to the employee.
-- **Roles and permissions UI** (item 12), which does not exist on either client
-  today: a role editor over `PERMISSION_GROUPS`, user invites, and per-module
-  permissions for everything phases 4–10 add.
+- **Roles and permissions UI (item 12) — done, 9 September.** A role editor
+  over `PERMISSION_GROUPS` on both clients, and putting people on roles. The
+  seeded four are a starting point, not a fixed set: a shop with a separate
+  accountant should be able to say so without asking us.
+  - A role cannot be saved if it would **leave nobody able to manage roles** —
+    a shop tidying its Owner role and unticking one box would otherwise lock
+    every one of them out, and the way back is somebody with database access.
+  - A seeded role can be **edited but not removed**; one the shop wrote can be
+    removed once nobody is on it.
+  - **The gap this made visible, and closed:** a good deal of the API was still
+    gated on the coarse `UserRole` enum rather than on permissions, and several
+    reads on nothing at all. A permissions editor that governs half the product
+    is worse than none — it tells somebody they may not do a thing they can.
+    Every write is now on a permission, every read of a shop's own rows too,
+    and `routes.spec.ts` fails on the next one that is not. The handful of
+    deliberately open reads are listed there by name with the reason.
 
 ### Phase 6 · Buying and stock — item 9 — **XL**
 

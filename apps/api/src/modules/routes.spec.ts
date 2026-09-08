@@ -25,6 +25,11 @@ import { PaymentsController } from './payments/payments.controller';
 import { PlatformController } from './platform/platform.controller';
 import { UsersController } from './users/users.controller';
 import { WorkflowsController } from './workflows/workflows.controller';
+import { ExpensesController } from './expenses/expenses.controller';
+import { EmployeesController } from './employees/employees.controller';
+import { AttendanceController } from './attendance/attendance.controller';
+import { PayrollController } from './payroll/payroll.controller';
+import { RolesController } from './roles/roles.controller';
 
 /**
  * The API's own wiring, read off the decorators.
@@ -53,6 +58,11 @@ const CONTROLLERS = [
   PlatformController,
   UsersController,
   WorkflowsController,
+  ExpensesController,
+  EmployeesController,
+  AttendanceController,
+  PayrollController,
+  RolesController,
 ];
 
 const METHOD_NAME: Record<number, string> = {
@@ -400,7 +410,11 @@ describe('configuration', () => {
     );
     expect(writes.length).toBeGreaterThan(5);
     for (const route of writes) {
-      expect(route.roles).toEqual(['ADMIN']);
+      // Tax rates are their own permission: a shop may let somebody add a
+      // material without letting them decide what GST is charged on it.
+      expect(route.permissions).toEqual([
+        route.handler.includes('GstSlab') ? 'gst.manage' : 'config.manage',
+      ]);
     }
   });
 
@@ -414,11 +428,13 @@ describe('configuration', () => {
   });
 
   it('guards changing the flow itself, expiry and all', () => {
-    expect(find('WorkflowsController', 'update').roles).toEqual(['ADMIN']);
+    expect(find('WorkflowsController', 'update').permissions).toEqual(['workflow.manage']);
   });
 
   it('guards which stages the home screen counts', () => {
-    expect(find('WorkflowsController', 'setHomeCard').roles).toEqual(['ADMIN']);
+    expect(find('WorkflowsController', 'setHomeCard').permissions).toEqual([
+      'workflow.manage',
+    ]);
   });
 
   it('guards editing the status flow the API enforces', () => {
@@ -427,7 +443,7 @@ describe('configuration', () => {
     );
     expect(writes.length).toBeGreaterThan(2);
     for (const route of writes) {
-      expect(route.roles).toEqual(['ADMIN']);
+      expect(route.permissions).toEqual(['workflow.manage']);
     }
   });
 });
@@ -502,4 +518,88 @@ describe('everything that changes something', () => {
       expect(route.permissions.length + route.roles.length).toBeGreaterThan(0);
     },
   );
+});
+
+describe('everything a shop can now be given', () => {
+  it('gates reading a shop’s own rows too, not only writing them', () => {
+    /*
+     * A role with nothing ticked could still read every order in the shop,
+     * because the reads had never been gated at all — nobody noticed while the
+     * only roles were the seeded four, all of which could see orders. The
+     * moment a shop can write its own roles, that is a screen telling somebody
+     * they may not see something they can.
+     *
+     * The exceptions are listed rather than filtered out quietly: each one is
+     * a deliberate decision about what a signed-in person may always do.
+     */
+    const ALWAYS_READABLE: Record<string, string> = {
+      'AuthController.me': 'who you are signed in as',
+      'EstimatesController.theme': 'the accent both clients paint themselves with',
+      'FilesController.download': 'guarded by the unguessable id of the file',
+      'NotificationsController.mine': 'your own notifications',
+      'NotificationsController.unread': 'your own unread count',
+      'NotificationsController.read': 'marking your own as read',
+      'NotificationsController.readAll': 'marking your own as read',
+      'HealthController.health': 'public, so a load balancer can ask',
+      'ConfigurationController.listMaterials': 'the punch screen needs them',
+      'ConfigurationController.listSizePresets': 'the punch screen needs them',
+      'ConfigurationController.listGstSlabs': 'the punch screen needs them',
+      'ConfigurationController.getSettings': 'how the shop measures and prices',
+    };
+
+    const ungated = routes.filter(
+      (route) =>
+        route.method === 'GET' &&
+        !route.isPublic &&
+        route.permissions.length === 0 &&
+        route.roles.length === 0 &&
+        !(`${route.controller}.${route.handler}` in ALWAYS_READABLE),
+    );
+    expect(ungated.map((route) => `${route.controller}.${route.handler}`)).toEqual([]);
+  });
+
+  it('gates every write on a permission, not on a coarse role', () => {
+    /*
+     * The roles screen is only real if the permissions on it govern the whole
+     * product. A route left on the old `@Roles(UserRole…)` gate would ignore
+     * whatever a shop ticked, which is worse than having no editor at all:
+     * the screen would say somebody may not do a thing they can still do.
+     */
+    const stragglers = routes.filter(
+      (route) =>
+        route.method !== 'GET' &&
+        !route.isPublic &&
+        route.roles.length > 0 &&
+        route.permissions.length === 0,
+    );
+    expect(stragglers.map((route) => `${route.controller}.${route.handler}`)).toEqual([]);
+  });
+
+  it('puts the people modules behind the module they were sold as', () => {
+    for (const controller of ['EmployeesController', 'AttendanceController', 'PayrollController']) {
+      const own = routes.filter((route) => route.controller === controller);
+      expect(own.length).toBeGreaterThan(0);
+      for (const route of own) expect(route.module).toBe('hr');
+    }
+  });
+
+  it('leaves roles outside every module, because every workspace has them', () => {
+    // A workspace that could not manage roles is one nobody could take a
+    // permission away in.
+    for (const route of routes.filter((r) => r.controller === 'RolesController')) {
+      expect(route.module).toBeUndefined();
+    }
+  });
+
+  it('keeps drafting a month apart from paying it', () => {
+    expect(find('PayrollController', 'open').permissions).toEqual(['salary.manage']);
+    expect(find('PayrollController', 'pay').permissions).toEqual(['salary.pay']);
+  });
+
+  it('keeps reading somebody’s Aadhaar apart from reading their record', () => {
+    expect(find('EmployeesController', 'get').permissions).toEqual(['employee.view']);
+    expect(find('EmployeesController', 'identifiers').permissions).toEqual([
+      'employee.identifiers',
+    ]);
+  });
 });

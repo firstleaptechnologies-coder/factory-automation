@@ -107,6 +107,7 @@ flowchart LR
   subgraph cat_workspace["Workspace"]
     direction TB
     firm["Firm details"]
+    roles["Roles and people"]
     settings["Settings"]
   end
   Home --> cat_workspace
@@ -205,6 +206,7 @@ flowchart LR
 | Screen | Web | App route | Permission |
 | --- | --- | --- | --- |
 | Firm details | `/admin/firm` | `FirmProfile` | `config.view` |
+| Roles and people | `/admin/roles` | `AdminRoles` | `user.view` |
 | Settings | — | `Settings` | — |
 
 ## Outside the menu

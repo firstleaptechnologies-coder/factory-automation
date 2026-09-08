@@ -57,6 +57,7 @@ import type {
   EmployeeIdentifiers,
   EmployeeInput,
   EmploymentStatus,
+  WorkspaceRole,
   WorkspaceUser,
   MarkInput,
   PayKind,
@@ -841,6 +842,29 @@ export class ApiClient {
   /** The logins this workspace has issued. */
   users() {
     return this.get<WorkspaceUser[]>('/users');
+  }
+
+  /** What each kind of person here may do. The shop writes these. */
+  roles() {
+    return this.get<WorkspaceRole[]>('/roles');
+  }
+
+  createRole(body: { name: string; description?: string; permissions: string[] }) {
+    return this.post<WorkspaceRole>('/roles', body);
+  }
+
+  updateRole(id: string, body: { name: string; description?: string; permissions: string[] }) {
+    return this.patch<WorkspaceRole>(`/roles/${id}`, body);
+  }
+
+  /** Only a role the shop wrote itself, and only one nobody is on. */
+  deleteRole(id: string) {
+    return this.del<{ id: string }>(`/roles/${id}`);
+  }
+
+  /** Puts somebody on a role. Null takes their role away. */
+  assignRole(userId: string, roleId: string | null) {
+    return this.patch<WorkspaceUser>(`/roles/users/${userId}`, { roleId });
   }
 
   /**

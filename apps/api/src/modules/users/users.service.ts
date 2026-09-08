@@ -13,6 +13,16 @@ const SAFE_FIELDS = {
   role: true,
   isActive: true,
   createdAt: true,
+  /*
+   * The role they are actually on, and its name.
+   *
+   * `role` above is a coarse label kept for display and seeding; what somebody
+   * may do comes from this one. A screen that showed only the label would say
+   * "SALES" beside a person whose role has been rewritten to something else
+   * entirely.
+   */
+  roleId: true,
+  roleRef: { select: { id: true, name: true } },
 } as const;
 
 @Injectable()

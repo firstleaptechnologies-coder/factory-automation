@@ -36,6 +36,7 @@ import { ExpensesModule } from './modules/expenses/expenses.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { RolesModule } from './modules/roles/roles.module';
 import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
@@ -75,6 +76,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     EmployeesModule,
     AttendanceModule,
     PayrollModule,
+    RolesModule,
     EstimatesModule,
     PlatformModule,
   ],

@@ -295,6 +295,11 @@ describe('endpoints', () => {
     ['cashInHand', (a) => a.cashInHand(), 'GET', '/payments/cash-in-hand'],
 
     ['users', (a) => a.users(), 'GET', '/users'],
+    ['roles', (a) => a.roles(), 'GET', '/roles'],
+    ['createRole', (a) => a.createRole({ name: 'A', permissions: [] }), 'POST', '/roles'],
+    ['updateRole', (a) => a.updateRole('r1', { name: 'A', permissions: [] }), 'PATCH', '/roles/r1'],
+    ['deleteRole', (a) => a.deleteRole('r1'), 'DELETE', '/roles/r1'],
+    ['assignRole', (a) => a.assignRole('u1', 'r1'), 'PATCH', '/roles/users/u1'],
     ['employees', (a) => a.employees(), 'GET', '/employees'],
     ['employee', (a) => a.employee('e1'), 'GET', '/employees/e1'],
     [

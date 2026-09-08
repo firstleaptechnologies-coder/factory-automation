@@ -990,7 +990,11 @@ export interface WorkspaceUser {
   name: string;
   email?: string | null;
   phone?: string | null;
+  /** A coarse label kept for display and seeding. */
   role: string;
+  /** The role they are actually on — what they may do comes from this. */
+  roleId?: string | null;
+  roleRef?: { id: string; name: string } | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -1264,4 +1268,16 @@ export interface SalaryRun {
 export interface SalaryRunDetail extends SalaryRun {
   payslips: Payslip[];
   totals: { gross: number; advances: number; deductions: number; net: number; count: number };
+}
+
+/** What a kind of person here may do. The shop writes these. */
+export interface WorkspaceRole {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  permissions: string[];
+  /** Seeded with the workspace: editable, but not removable. */
+  isSystem: boolean;
+  _count?: { users: number };
 }

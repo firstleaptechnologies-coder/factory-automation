@@ -26,39 +26,44 @@ export class LeadsController {
     private readonly customFields: CustomFieldsService,
   ) {}
 
+  @RequirePermissions(PERMISSIONS.LEAD_VIEW)
   @Get()
   list(@Query() query: LeadQueryDto) {
     return this.leads.list(query);
   }
 
+  @RequirePermissions(PERMISSIONS.LEAD_VIEW)
   @Get('board')
   board(@Query('workflowId') workflowId?: string) {
     return this.leads.board(workflowId);
   }
 
+  @RequirePermissions(PERMISSIONS.LEAD_VIEW)
   @Get('sources')
   listSources(@Query('includeInactive') includeInactive?: string) {
     return this.leads.listSources(includeInactive === 'true');
   }
 
   /** Field definitions the lead form builds itself from. */
+  @RequirePermissions(PERMISSIONS.LEAD_VIEW)
   @Get('fields')
   listFields(@Query('includeInactive') includeInactive?: string) {
     return this.customFields.list(CustomFieldEntity.LEAD, includeInactive === 'true');
   }
 
+  @RequirePermissions(PERMISSIONS.LEAD_VIEW)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.leads.findOne(id);
   }
 
-  @Roles(UserRole.SALES, UserRole.MANAGER)
+  @RequirePermissions(PERMISSIONS.LEAD_CREATE)
   @Post()
   create(@Body() dto: CreateLeadDto, @CurrentUser() user: AuthUser) {
     return this.leads.create(dto, user?.id);
   }
 
-  @Roles(UserRole.SALES, UserRole.MANAGER)
+  @RequirePermissions(PERMISSIONS.LEAD_EDIT)
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateLeadDto) {
     return this.leads.update(id, dto);
@@ -76,7 +81,7 @@ export class LeadsController {
     return this.leads.changeStatus(id, dto, user);
   }
 
-  @Roles(UserRole.SALES, UserRole.MANAGER)
+  @RequirePermissions(PERMISSIONS.LEAD_CONVERT)
   @Post(':id/convert')
   convert(
     @Param('id') id: string,
@@ -88,25 +93,25 @@ export class LeadsController {
 
   // -- admin configuration --------------------------------------------------
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Post('sources')
   createSource(@Body() dto: LeadSourceDto) {
     return this.leads.createSource(dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Post('fields')
   createField(@Body() dto: CustomFieldDto) {
     return this.customFields.create(dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Patch('fields/:fieldId')
   updateField(@Param('fieldId') fieldId: string, @Body() dto: UpdateCustomFieldDto) {
     return this.customFields.update(fieldId, dto);
   }
 
-  @Roles(UserRole.ADMIN)
+  @RequirePermissions(PERMISSIONS.CONFIG_MANAGE)
   @Delete('fields/:fieldId')
   deactivateField(@Param('fieldId') fieldId: string) {
     return this.customFields.deactivate(fieldId);
