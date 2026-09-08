@@ -294,6 +294,28 @@ describe('endpoints', () => {
     ['cashPosition', (a) => a.cashPosition(), 'GET', '/payments/cash-position'],
     ['cashInHand', (a) => a.cashInHand(), 'GET', '/payments/cash-in-hand'],
 
+    ['letterTemplates', (a) => a.letterTemplates(), 'GET', '/letters/templates'],
+    [
+      'createLetterTemplate',
+      (a) => a.createLetterTemplate({ kind: 'OFFER', name: 'Offer', body: 'x' }),
+      'POST',
+      '/letters/templates',
+    ],
+    [
+      'updateLetterTemplate',
+      (a) => a.updateLetterTemplate('t1', { kind: 'OFFER', name: 'Offer', body: 'x' }),
+      'PATCH',
+      '/letters/templates/t1',
+    ],
+    ['letterDraft', (a) => a.letterDraft('t1', 'e1'), 'GET', '/letters/draft'],
+    ['letters', (a) => a.letters(), 'GET', '/letters'],
+    [
+      'issueLetter',
+      (a) => a.issueLetter({ employeeId: 'e1', kind: 'OFFER', title: 'T', body: 'B' }),
+      'POST',
+      '/letters',
+    ],
+
     ['users', (a) => a.users(), 'GET', '/users'],
     ['roles', (a) => a.roles(), 'GET', '/roles'],
     ['createRole', (a) => a.createRole({ name: 'A', permissions: [] }), 'POST', '/roles'],

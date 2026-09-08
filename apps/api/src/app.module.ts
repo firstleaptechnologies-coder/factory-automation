@@ -37,6 +37,7 @@ import { EmployeesModule } from './modules/employees/employees.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { LettersModule } from './modules/letters/letters.module';
 import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
@@ -77,6 +78,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     AttendanceModule,
     PayrollModule,
     RolesModule,
+    LettersModule,
     EstimatesModule,
     PlatformModule,
   ],

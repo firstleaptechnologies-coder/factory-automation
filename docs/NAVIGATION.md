@@ -83,6 +83,10 @@ flowchart LR
     employees --> employee_form
     employee_detail["One employee"]
     employees --> employee_detail
+    employee_letters["Their letters"]
+    employee_detail --> employee_letters
+    letter_templates["Letter templates"]
+    employees --> letter_templates
     salary["Salary"]
     salary_run["One month"]
     salary --> salary_run
@@ -182,6 +186,8 @@ flowchart LR
 | Employees | `/employees` | `Employees` | `employee.view` |
 |   ↳ Add an employee | `/employees/new` | `EmployeeForm` | `employee.manage` |
 |   ↳ One employee | `/employees/[id]` | `EmployeeDetail` | — |
+|     ↳ Their letters | `/employees/[id]/letters` | `EmployeeLetters` | — |
+|   ↳ Letter templates | `/admin/letter-templates` | `AdminLetterTemplates` | `employee.manage` |
 | Salary | `/salary` | `Salary` | `salary.view` |
 |   ↳ One month | `/salary/[id]` | `SalaryRun` | — |
 |   ↳ How people are paid | `/salary/structures` | `PayStructures` | `salary.manage` |

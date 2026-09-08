@@ -30,6 +30,7 @@ import { EmployeesController } from './employees/employees.controller';
 import { AttendanceController } from './attendance/attendance.controller';
 import { PayrollController } from './payroll/payroll.controller';
 import { RolesController } from './roles/roles.controller';
+import { LettersController } from './letters/letters.controller';
 
 /**
  * The API's own wiring, read off the decorators.
@@ -63,6 +64,7 @@ const CONTROLLERS = [
   AttendanceController,
   PayrollController,
   RolesController,
+  LettersController,
 ];
 
 const METHOD_NAME: Record<number, string> = {
@@ -576,7 +578,12 @@ describe('everything a shop can now be given', () => {
   });
 
   it('puts the people modules behind the module they were sold as', () => {
-    for (const controller of ['EmployeesController', 'AttendanceController', 'PayrollController']) {
+    for (const controller of [
+      'EmployeesController',
+      'AttendanceController',
+      'PayrollController',
+      'LettersController',
+    ]) {
       const own = routes.filter((route) => route.controller === controller);
       expect(own.length).toBeGreaterThan(0);
       for (const route of own) expect(route.module).toBe('hr');

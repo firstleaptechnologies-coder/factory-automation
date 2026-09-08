@@ -355,7 +355,7 @@ blocks anything, and the second wants a commercial answer first — see G11.
     bill is read, not looked at, and the harder compression that suits a photo
     of a finished panel turns a printed rate into a smudge.
 
-### Phase 5 · People — items 8 and 12 — **L**
+### Phase 5 · People — items 8 and 12 — **L** · *complete, 9 September 2026*
 
 - **`Employee` is the person; `User` is the login. Done, 9 September.** Not
   every employee has an account, an account can be revoked without erasing the
@@ -417,8 +417,22 @@ blocks anything, and the second wants a commercial answer first — see G11.
     a month costs and handing the money over are different decisions. A paid
     month cannot be changed, and each payslip **posts its own ledger line**, so
     the month reconciles person by person rather than as a total.
-- Letters — offer, NDA, responsibility — port from momentum's templates, which
-  snapshot what was printed so history survives an edit to the employee.
+- **Letters — done, 9 September.** Offer, appointment, NDA, responsibilities,
+  experience, relieving and warning. Six templates are seeded with a new
+  workspace so a shop can hand somebody an offer letter in its first week, and
+  every word of them is the shop's to rewrite.
+  - **What was handed over is what is kept.** A letter stores its own body, not
+    a template id and a promise to render it again: a template edited next year
+    must not change what is in an employee's file from last March. The copy
+    they hold is the one that counts, and this is ours.
+  - Placeholders — `{{name}}`, `{{salary}}`, `{{joinedOn}}` — are filled in on
+    the server, so the preview somebody reads and the letter that is filed come
+    from the same substitution. One nothing can fill is **left standing**
+    rather than blanked: braces are a question somebody can answer, an empty
+    space in a sentence is a letter that goes out saying nothing. The template
+    screen names any placeholder nothing will ever fill.
+  - Printed as HTML on the shop's letterhead, like the estimate, so the app
+    turns it into a PDF on the device and the web prints the same markup.
 - **Roles and permissions UI (item 12) — done, 9 September.** A role editor
   over `PERMISSION_GROUPS` on both clients, and putting people on roles. The
   seeded four are a starting point, not a fixed set: a shop with a separate

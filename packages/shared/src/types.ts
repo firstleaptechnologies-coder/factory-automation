@@ -1,3 +1,5 @@
+import type { LetterKind } from './letters';
+
 import type { LengthUnit } from './units';
 
 /** Wire types. Every *Mm field is millimetres — the only stored unit. */
@@ -1280,4 +1282,32 @@ export interface WorkspaceRole {
   /** Seeded with the workspace: editable, but not removable. */
   isSystem: boolean;
   _count?: { users: number };
+}
+
+/** What a letter says, before it is about anybody. The shop writes these. */
+export interface LetterTemplate {
+  id: string;
+  kind: LetterKind;
+  name: string;
+  body: string;
+  isActive: boolean;
+}
+
+/** A letter somebody was actually given, kept as it was given. */
+export interface Letter {
+  id: string;
+  employeeId: string;
+  employee?: { id: string; code: string; name: string; designation?: string | null };
+  kind: LetterKind;
+  title: string;
+  body: string;
+  issuedOn: string;
+  createdAt: string;
+}
+
+/** A template, once it is about a particular person. */
+export interface LetterDraft {
+  kind: LetterKind;
+  title: string;
+  body: string;
 }

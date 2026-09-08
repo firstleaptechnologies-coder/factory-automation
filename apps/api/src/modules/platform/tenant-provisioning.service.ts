@@ -3,6 +3,7 @@ import {
   CustomFieldType,
   ExpenseOptionField,
   LedgerAccount,
+  LetterKind,
   PrismaClient,
   StatusCategory,
   UserRole,
@@ -35,6 +36,7 @@ export class TenantProvisioningService {
     await this.seedGstSlabs(db, tenantId);
     await this.seedDisbursementCategories(db, tenantId);
     await this.seedExpenseOptions(db, tenantId);
+    await this.seedLetterTemplates(db, tenantId);
     await this.seedMaterials(db, tenantId);
     await this.seedSizes(db, tenantId);
     await this.seedOrderWorkflow(db, tenantId);
@@ -170,6 +172,89 @@ export class TenantProvisioningService {
           sortOrder: index * 10,
         },
       });
+    }
+  }
+
+  /**
+   * A first set of letters, meant to be rewritten.
+   *
+   * Every one of these is a guess about a shop we have not met, and the words
+   * are the shop's to change — that is what the template screen is for. What
+   * matters is that a new workspace can hand somebody an offer letter in its
+   * first week instead of retyping one from a phone, and that the placeholders
+   * are already in the right places so the shape survives the rewrite.
+   */
+  private async seedLetterTemplates(db: PrismaClient, tenantId: string) {
+    const templates: { kind: LetterKind; name: string; body: string }[] = [
+      {
+        kind: LetterKind.OFFER,
+        name: 'Offer',
+        body: [
+          'Dear {{name}},',
+          'We are pleased to offer you the position of {{designation}} at {{firmName}}.',
+          'Your salary will be {{salary}}. You are expected to join on {{joinedOn}}.',
+          'Please sign and return a copy of this letter to confirm that you accept.',
+          'Yours sincerely,',
+        ].join('\n\n'),
+      },
+      {
+        kind: LetterKind.APPOINTMENT,
+        name: 'Appointment',
+        body: [
+          'Dear {{name}},',
+          'Further to your acceptance of our offer, this letter confirms your appointment as {{designation}} in the {{department}} department at {{firmName}}, with effect from {{joinedOn}}.',
+          'Your employee number is {{code}} and your salary is {{salary}}.',
+          'You are expected to keep the working hours of the shop, to look after the tools and materials in your care, and to treat what you learn here as confidential.',
+          'Yours sincerely,',
+        ].join('\n\n'),
+      },
+      {
+        kind: LetterKind.NDA,
+        name: 'Confidentiality undertaking',
+        body: [
+          'I, {{name}} ({{code}}), working as {{designation}} at {{firmName}}, undertake the following.',
+          'I will not disclose to anybody outside this firm the designs, drawings, programmes, rates, client names or methods of work that I come to know here, either during my employment or after it ends.',
+          'I will not take copies of any design or programme file out of the premises without written permission.',
+          'I understand that this undertaking continues to apply after I leave.',
+          'Signed on {{today}}.',
+        ].join('\n\n'),
+      },
+      {
+        kind: LetterKind.RESPONSIBILITY,
+        name: 'Responsibilities',
+        body: [
+          'Dear {{name}},',
+          'This letter sets out what your work as {{designation}} involves, so that there is no doubt about it on either side.',
+          'You are responsible for the machines and tools assigned to you, for the material you are issued, and for the quality of what you produce. You are to report any damage or breakdown the same day.',
+          'Please sign below to confirm that you have read and understood this.',
+          'For {{firmName}}',
+        ].join('\n\n'),
+      },
+      {
+        kind: LetterKind.EXPERIENCE,
+        name: 'Experience',
+        body: [
+          'To whomsoever it may concern',
+          'This is to certify that {{name}} ({{code}}) worked at {{firmName}} as {{designation}} from {{joinedOn}} to {{leftOn}}.',
+          'During this period we found the conduct and the work satisfactory.',
+          'We wish them well.',
+          'For {{firmName}}',
+        ].join('\n\n'),
+      },
+      {
+        kind: LetterKind.RELIEVING,
+        name: 'Relieving',
+        body: [
+          'Dear {{name}},',
+          'This is to confirm that you have been relieved from your duties as {{designation}} at {{firmName}} with effect from the close of {{leftOn}}.',
+          'All dues have been settled and no company property remains with you.',
+          'For {{firmName}}',
+        ].join('\n\n'),
+      },
+    ];
+
+    for (const template of templates) {
+      await db.letterTemplate.create({ data: { tenantId, ...template } });
     }
   }
 

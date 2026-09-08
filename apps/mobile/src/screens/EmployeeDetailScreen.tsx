@@ -167,6 +167,12 @@ export function EmployeeDetailScreen({ navigation, route }: { navigation: any; r
             onPress={() => navigation.navigate('EmployeeForm', { id })}
             style={{ flex: 1 }}
           />
+          <Button
+            title="Letters"
+            variant="dark"
+            onPress={() => navigation.navigate('EmployeeLetters', { id })}
+            style={{ flex: 1 }}
+          />
           {gone ? null : (
             <Button
               title="They have left"

@@ -1,5 +1,6 @@
 import type { LengthUnit } from './units';
 import type { HistoryEntry } from './history';
+import type { LetterKind } from './letters';
 import type { AppNotification, NotificationSetting } from './notifications';
 import type {
   AttachmentKind,
@@ -57,6 +58,9 @@ import type {
   EmployeeIdentifiers,
   EmployeeInput,
   EmploymentStatus,
+  Letter,
+  LetterDraft,
+  LetterTemplate,
   WorkspaceRole,
   WorkspaceUser,
   MarkInput,
@@ -1004,6 +1008,54 @@ export class ApiClient {
   /** A draft can be thrown away. Anything further along cannot. */
   discardSalaryRun(id: string) {
     return this.del<{ id: string }>(`/payroll/runs/${id}`);
+  }
+
+  // -- letters ---------------------------------------------------------------
+
+  /** What a letter says, before it is about anybody. */
+  letterTemplates(kind?: LetterKind) {
+    return this.get<LetterTemplate[]>('/letters/templates', kind ? { kind } : undefined);
+  }
+
+  createLetterTemplate(body: { kind: LetterKind; name: string; body: string }) {
+    return this.post<LetterTemplate>('/letters/templates', body);
+  }
+
+  updateLetterTemplate(
+    id: string,
+    body: { kind: LetterKind; name: string; body: string; isActive?: boolean },
+  ) {
+    return this.patch<LetterTemplate>(`/letters/templates/${id}`, body);
+  }
+
+  /**
+   * What a template says once it is about a particular person.
+   *
+   * Worked out on the server so the preview somebody reads and the letter that
+   * is filed come from the same substitution.
+   */
+  letterDraft(templateId: string, employeeId: string) {
+    return this.get<LetterDraft>('/letters/draft', { templateId, employeeId });
+  }
+
+  letters(query?: { employeeId?: string; kind?: LetterKind }) {
+    return this.get<Letter[]>('/letters', query);
+  }
+
+  /** Files a letter as it was given. The body is kept, not the template. */
+  issueLetter(body: {
+    employeeId: string;
+    kind: LetterKind;
+    title: string;
+    body: string;
+    issuedOn?: string;
+  }) {
+    return this.post<Letter>('/letters', body);
+  }
+
+  /** The letter itself, on the shop's letterhead. */
+  letterDocumentUrl(id: string): string {
+    return `${this.baseUrl}/letters/${id}/document`;
   }
 
   // -- the firm, and the documents it prints ---------------------------------

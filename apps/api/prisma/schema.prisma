@@ -1372,6 +1372,7 @@ model Employee {
   user   User?   @relation("EmployeeLogin", fields: [userId], references: [id], onDelete: SetNull)
 
   attendance    Attendance[]
+  letters       Letter[]
   payStructures PayStructure[]
   advances      SalaryAdvance[]
   payslips      Payslip[]
@@ -1613,6 +1614,69 @@ model Payslip {
 
   @@unique([tenantId, runId, employeeId])
   @@index([tenantId, employeeId])
+  @@index([tenantId])
+}
+
+/// The letters a shop gives its people.
+///
+/// A fixed set of kinds, because these are the ones an Indian shop is actually
+/// asked for and each has a shape the recipient's bank or landlord expects.
+/// What each one *says* is the shop's, through a template it edits.
+enum LetterKind {
+  OFFER
+  APPOINTMENT
+  /// What somebody may not repeat outside.
+  NDA
+  /// What the job actually is, signed.
+  RESPONSIBILITY
+  EXPERIENCE
+  RELIEVING
+  WARNING
+}
+
+/// What a letter says, before it is about anybody.
+///
+/// The shop writes these. Placeholders in double braces — `{{name}}`,
+/// `{{designation}}` — are filled in when a letter is issued, and the filled-in
+/// version is what gets kept.
+model LetterTemplate {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String     @id @default(cuid())
+  kind     LetterKind
+  name     String
+  body     String
+  isActive Boolean    @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, kind, isActive])
+  @@index([tenantId])
+}
+
+/// A letter somebody was actually given.
+model Letter {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
+  id         String     @id @default(cuid())
+  employeeId String
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  kind       LetterKind
+
+  title String
+  /// The body as it was printed, with the placeholders already filled in.
+  ///
+  /// Snapshotted on purpose. A template edited next year must not change what
+  /// somebody was handed last March — the copy in their file is the one that
+  /// counts, and this is ours.
+  body  String
+
+  issuedOn   DateTime @db.Date
+  issuedById String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, employeeId, issuedOn])
   @@index([tenantId])
 }
 

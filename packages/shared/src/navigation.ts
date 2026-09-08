@@ -329,6 +329,23 @@ export const NAV_GROUPS: NavGroup[] = [
             icon: 'user',
             web: '/employees/[id]',
             app: 'EmployeeDetail',
+            children: [
+              {
+                key: 'employee-letters',
+                label: 'Their letters',
+                icon: 'clipboard',
+                web: '/employees/[id]/letters',
+                app: 'EmployeeLetters',
+              },
+            ],
+          },
+          {
+            key: 'letter-templates',
+            label: 'Letter templates',
+            icon: 'tune',
+            permission: PERMISSIONS.EMPLOYEE_MANAGE,
+            web: '/admin/letter-templates',
+            app: 'AdminLetterTemplates',
           },
         ],
       },

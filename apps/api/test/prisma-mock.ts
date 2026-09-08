@@ -56,6 +56,8 @@ const MODELS = [
   'salaryAdvance',
   'salaryRun',
   'payslip',
+  'letterTemplate',
+  'letter',
   'notification',
   'notificationTemplate',
   'jobLease',

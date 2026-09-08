@@ -73,6 +73,12 @@ function Detail({ id }: { id: string }) {
                 icon="edit"
                 onClick={() => router.push(`/employees/${id}?edit=1`)}
               />
+              <Button
+                title="Letters"
+                variant="dark"
+                icon="clipboard"
+                onClick={() => router.push(`/employees/${id}/letters`)}
+              />
               {gone ? null : (
                 <Button
                   title="They have left"
