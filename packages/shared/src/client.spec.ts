@@ -294,6 +294,29 @@ describe('endpoints', () => {
     ['cashPosition', (a) => a.cashPosition(), 'GET', '/payments/cash-position'],
     ['cashInHand', (a) => a.cashInHand(), 'GET', '/payments/cash-in-hand'],
 
+    ['users', (a) => a.users(), 'GET', '/users'],
+    ['employees', (a) => a.employees(), 'GET', '/employees'],
+    ['employee', (a) => a.employee('e1'), 'GET', '/employees/e1'],
+    [
+      'employeeIdentifiers',
+      (a) => a.employeeIdentifiers('e1'),
+      'GET',
+      '/employees/e1/identifiers',
+    ],
+    ['createEmployee', (a) => a.createEmployee({ name: 'R' } as never), 'POST', '/employees'],
+    [
+      'updateEmployee',
+      (a) => a.updateEmployee('e1', { name: 'R' } as never),
+      'PATCH',
+      '/employees/e1',
+    ],
+    [
+      'markEmployeeLeft',
+      (a) => a.markEmployeeLeft('e1', '2026-09-30'),
+      'POST',
+      '/employees/e1/left',
+    ],
+
     ['expenses', (a) => a.expenses(), 'GET', '/expenses'],
     ['expense', (a) => a.expense('e1'), 'GET', '/expenses/e1'],
     ['createExpense', (a) => a.createExpense({ amount: 1 } as never), 'POST', '/expenses'],

@@ -434,6 +434,8 @@ model User {
   ledgerEntries     LedgerEntry[]
   expenses          Expense[]            @relation("ExpenseCreatedBy")
   expenseEdits      ExpenseEditHistory[] @relation("ExpenseEditBy")
+  employee          Employee?            @relation("EmployeeLogin")
+  employeesCreated  Employee[]           @relation("EmployeeCreatedBy")
 
   @@unique([tenantId, code])
   @@unique([tenantId, email])
@@ -775,6 +777,7 @@ model StoredFile {
   firmLetterhead FirmProfile[]     @relation("FirmLetterhead")
   firmLogo       FirmProfile[]     @relation("FirmLogo")
   expenseBills   Expense[]         @relation("ExpenseBill")
+  employeePhotos Employee[]        @relation("EmployeePhoto")
 
   @@index([checksum])
   @@index([createdAt])
@@ -1294,6 +1297,88 @@ model LedgerEntry {
   @@index([tenantId, at])
   @@index([tenantId, direction, at])
   @@index([tenantId, orderId])
+}
+
+// ---------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------
+
+/// Where somebody is with the shop.
+///
+/// LEFT rather than deleted: an employee who has gone still has last year's
+/// attendance and last month's payslip hanging off them, and the accountant
+/// will want both.
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  LEFT
+}
+
+/// A person the shop employs.
+///
+/// Deliberately not the same row as `User`. A login is a way into this system;
+/// an employee is somebody who works here. Most of the floor will never have an
+/// account, an account can be revoked without the person ceasing to exist, and
+/// an office account may belong to somebody who is not on the payroll at all.
+/// Where the two are the same person they are linked, and that link is
+/// optional in both directions.
+model Employee {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  /// EMP-0001, and it does not restart in April: an employee number that
+  /// changed with the financial year would be no use to anybody.
+  code     String
+
+  name     String
+  phone    String?
+  altPhone String?
+  email    String?
+
+  designation String?
+  department  String?
+
+  joinedOn DateTime         @db.Date
+  leftOn   DateTime?        @db.Date
+  status   EmploymentStatus @default(ACTIVE)
+
+  /// Government identifiers, encrypted at rest.
+  ///
+  /// The last four digits are kept in clear beside each one because that is
+  /// what a screen shows and what somebody reads back over the phone — and
+  /// decrypting the whole number to render a list would put every Aadhaar in
+  /// the shop through the application for no reason.
+  aadhaar      String?
+  aadhaarLast4 String?
+  pan          String?
+  panLast4     String?
+
+  /// Where the salary goes. The account number is encrypted like the rest.
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankAccountLast4  String?
+  bankIfsc          String?
+
+  address        String?
+  emergencyName  String?
+  emergencyPhone String?
+
+  photoFileId String?
+  photo       StoredFile? @relation("EmployeePhoto", fields: [photoFileId], references: [id], onDelete: SetNull)
+
+  /// The login, when this person has one. Not every employee does.
+  userId String? @unique
+  user   User?   @relation("EmployeeLogin", fields: [userId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?    @relation("EmployeeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, department])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------

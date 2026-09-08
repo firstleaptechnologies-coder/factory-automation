@@ -76,6 +76,15 @@ flowchart LR
     expenses --> expense_options
   end
   Home --> cat_finances
+  subgraph cat_people["People"]
+    direction TB
+    employees["Employees"]
+    employee_form["Add an employee"]
+    employees --> employee_form
+    employee_detail["One employee"]
+    employees --> employee_detail
+  end
+  Home --> cat_people
   subgraph cat_vendors["Vendor management"]
     direction TB
     clients["Clients"]
@@ -152,6 +161,16 @@ flowchart LR
 |   ↳ One expense | `/expenses/[id]` | `ExpenseDetail` | — |
 |   ↳ Where the money went | `/expenses/analytics` | `ExpenseAnalytics` | — |
 |   ↳ Expense dropdowns | `/admin/expense-options` | `AdminExpenseOptions` | `expense.config` |
+
+### People
+
+*Who works here, and what they are paid*
+
+| Screen | Web | App route | Permission |
+| --- | --- | --- | --- |
+| Employees | `/employees` | `Employees` | `employee.view` |
+|   ↳ Add an employee | `/employees/new` | `EmployeeForm` | `employee.manage` |
+|   ↳ One employee | `/employees/[id]` | `EmployeeDetail` | — |
 
 ### Vendor management
 

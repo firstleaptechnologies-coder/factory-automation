@@ -978,3 +978,93 @@ export interface ExpenseEdit {
   userName?: string | null;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------
+
+/** A login. Distinct from the person who uses it — see `Employee`. */
+export interface WorkspaceUser {
+  id: string;
+  code: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type EmploymentStatus = 'ACTIVE' | 'ON_LEAVE' | 'LEFT';
+
+export const EMPLOYMENT_STATUS_LABELS: Record<EmploymentStatus, string> = {
+  ACTIVE: 'Working',
+  ON_LEAVE: 'On leave',
+  LEFT: 'Left',
+};
+
+/**
+ * Somebody the shop employs.
+ *
+ * Not the same thing as a login: most of the floor will never have an account,
+ * and an account can be revoked without the person ceasing to exist. Where the
+ * two are the same person they are linked, and either can exist alone.
+ *
+ * The identifiers are last-four only. The whole number is a separate request
+ * with a permission of its own — see `employeeIdentifiers`.
+ */
+export interface Employee {
+  id: string;
+  code: string;
+  name: string;
+  phone?: string | null;
+  altPhone?: string | null;
+  email?: string | null;
+  designation?: string | null;
+  department?: string | null;
+  joinedOn: string;
+  leftOn?: string | null;
+  status: EmploymentStatus;
+  aadhaarLast4?: string | null;
+  panLast4?: string | null;
+  bankAccountName?: string | null;
+  bankAccountLast4?: string | null;
+  bankIfsc?: string | null;
+  address?: string | null;
+  emergencyName?: string | null;
+  emergencyPhone?: string | null;
+  photoFileId?: string | null;
+  userId?: string | null;
+  user?: { id: string; name: string; code: string; isActive: boolean } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The whole numbers, decrypted. Asked for by name, and audited. */
+export interface EmployeeIdentifiers {
+  aadhaar?: string | null;
+  pan?: string | null;
+  bankAccountNumber?: string | null;
+}
+
+/** What a form sends when adding or correcting an employee. */
+export interface EmployeeInput {
+  name: string;
+  phone?: string;
+  altPhone?: string;
+  email?: string;
+  designation?: string;
+  department?: string;
+  joinedOn: string;
+  status?: EmploymentStatus;
+  leftOn?: string;
+  aadhaar?: string;
+  pan?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+  bankIfsc?: string;
+  address?: string;
+  emergencyName?: string;
+  emergencyPhone?: string;
+  userId?: string;
+}

@@ -42,6 +42,7 @@ describe('the navigation tree', () => {
     expect(NAV_GROUPS.map((group) => group.label)).toEqual([
       'Order management',
       'Finances',
+      'People',
       'Vendor management',
       'Workspace',
     ]);

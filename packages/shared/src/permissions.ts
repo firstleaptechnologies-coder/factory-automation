@@ -77,6 +77,14 @@ export const PERMISSIONS = {
   EXPENSE_MANAGE: 'expense.manage',
   EXPENSE_CONFIG: 'expense.config',
 
+  // People — the employees the shop has, as distinct from the logins it
+  // issues. Seeing the staff list is one thing; reading somebody's Aadhaar is
+  // another, and is gated on its own so the question "who looked at that" has
+  // a small set of possible answers.
+  EMPLOYEE_VIEW: 'employee.view',
+  EMPLOYEE_MANAGE: 'employee.manage',
+  EMPLOYEE_IDENTIFIERS: 'employee.identifiers',
+
   // Shop configuration
   CONFIG_VIEW: 'config.view',
   CONFIG_MANAGE: 'config.manage',
@@ -182,6 +190,14 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
     ],
   },
   {
+    label: 'People',
+    permissions: [
+      PERMISSIONS.EMPLOYEE_VIEW,
+      PERMISSIONS.EMPLOYEE_MANAGE,
+      PERMISSIONS.EMPLOYEE_IDENTIFIERS,
+    ],
+  },
+  {
     label: 'Configuration',
     permissions: [
       PERMISSIONS.CONFIG_VIEW,
@@ -225,6 +241,9 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.EXPENSE_VIEW]: 'View expenses',
   [PERMISSIONS.EXPENSE_MANAGE]: 'Record and edit expenses',
   [PERMISSIONS.EXPENSE_CONFIG]: 'Edit the expense dropdowns',
+  [PERMISSIONS.EMPLOYEE_VIEW]: 'View the staff list',
+  [PERMISSIONS.EMPLOYEE_MANAGE]: 'Add and edit employees',
+  [PERMISSIONS.EMPLOYEE_IDENTIFIERS]: 'Read Aadhaar, PAN and bank details',
   [PERMISSIONS.PLATFORM_RELEASE_VIEW]: 'See app releases',
   [PERMISSIONS.PLATFORM_RELEASE_MANAGE]: 'Publish app releases',
   [PERMISSIONS.PLATFORM_TENANT_CREATE]: 'Provision workspaces',

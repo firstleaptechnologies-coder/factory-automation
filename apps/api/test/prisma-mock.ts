@@ -50,6 +50,7 @@ const MODELS = [
   'expense',
   'expenseOption',
   'expenseEditHistory',
+  'employee',
   'notification',
   'notificationTemplate',
   'jobLease',

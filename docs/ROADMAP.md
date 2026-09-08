@@ -357,11 +357,25 @@ blocks anything, and the second wants a commercial answer first — see G11.
 
 ### Phase 5 · People — items 8 and 12 — **L**
 
-- **`Employee` is the person; `User` is the login.** Not every employee has an
-  account, and an account can be revoked without erasing the person. Link them
-  optionally.
-- Employee master with encrypted Aadhaar/PAN through the existing
-  `EncryptionService`, and last-4 kept in clear for display, as momentum does.
+- **`Employee` is the person; `User` is the login. Done, 9 September.** Not
+  every employee has an account, an account can be revoked without erasing the
+  person, and an office account may belong to somebody who is not on the
+  payroll. Linked optionally, in both directions. Nobody is ever deleted:
+  somebody who leaves is marked LEFT — last year's attendance and last month's
+  payslip hang off the row — and their login is switched off in the same
+  breath.
+- **Encrypted Aadhaar, PAN and account number**, through the existing
+  `EncryptionService`, with the last four kept in clear because that is what a
+  screen shows and what somebody reads back over the phone. Two things running
+  it made obvious:
+  - The whole numbers are a **request of their own** (`GET
+    /employees/:id/identifiers`) behind a **permission of their own**, so
+    reading one is a deliberate act with a line in the trail rather than a side
+    effect of opening a screen.
+  - An edit that does not mention an identifier **leaves it alone**. The form
+    cannot show what it does not have, so treating absence as "clear it" wiped
+    the Aadhaar of anybody whose phone number was corrected. Sending it empty
+    still clears it, which is a thing somebody does on purpose.
 - **Attendance** — and a naming collision to settle: this app already means
   something specific by *punch*. Attendance should read **"mark in / mark out"**.
 - **Salary** — *decided 8 September: a mix, fully configurable.* Monthly salary,

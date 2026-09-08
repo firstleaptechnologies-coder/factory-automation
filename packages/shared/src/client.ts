@@ -51,6 +51,11 @@ import type {
   ReleaseAsset,
   ReleaseStatus,
   VersionGate,
+  Employee,
+  EmployeeIdentifiers,
+  EmployeeInput,
+  EmploymentStatus,
+  WorkspaceUser,
   Expense,
   ExpenseAnalytics,
   ExpenseEdit,
@@ -820,6 +825,51 @@ export class ApiClient {
 
   reorderExpenseOptions(field: ExpenseOptionField, orderedIds: string[]) {
     return this.patch<ExpenseOption[]>('/expenses/options/order', { field, orderedIds });
+  }
+
+  // -- people ----------------------------------------------------------------
+
+  /** The logins this workspace has issued. */
+  users() {
+    return this.get<WorkspaceUser[]>('/users');
+  }
+
+  /**
+   * The employees the shop has, as distinct from the logins it issues.
+   *
+   * Identifiers come back as last four only; the whole number is a separate
+   * request with a permission of its own, so reading one is a deliberate act.
+   */
+  employees(query?: {
+    status?: EmploymentStatus;
+    department?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.get<Paginated<Employee>>('/employees', query);
+  }
+
+  employee(id: string) {
+    return this.get<Employee>(`/employees/${id}`);
+  }
+
+  /** The whole Aadhaar, PAN and account number. Audited. */
+  employeeIdentifiers(id: string) {
+    return this.get<EmployeeIdentifiers>(`/employees/${id}/identifiers`);
+  }
+
+  createEmployee(body: EmployeeInput) {
+    return this.post<Employee>('/employees', body);
+  }
+
+  updateEmployee(id: string, body: EmployeeInput) {
+    return this.patch<Employee>(`/employees/${id}`, body);
+  }
+
+  /** Somebody has left. The row stays; their login is switched off. */
+  markEmployeeLeft(id: string, leftOn: string) {
+    return this.post<Employee>(`/employees/${id}/left`, { leftOn });
   }
 
   // -- the firm, and the documents it prints ---------------------------------

@@ -302,6 +302,39 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    key: 'people',
+    label: 'People',
+    blurb: 'Who works here, and what they are paid',
+    items: [
+      {
+        key: 'employees',
+        module: MODULES.HR,
+        label: 'Employees',
+        icon: 'users',
+        permission: PERMISSIONS.EMPLOYEE_VIEW,
+        web: '/employees',
+        app: 'Employees',
+        children: [
+          {
+            key: 'employee-form',
+            label: 'Add an employee',
+            icon: 'plus',
+            permission: PERMISSIONS.EMPLOYEE_MANAGE,
+            web: '/employees/new',
+            app: 'EmployeeForm',
+          },
+          {
+            key: 'employee-detail',
+            label: 'One employee',
+            icon: 'user',
+            web: '/employees/[id]',
+            app: 'EmployeeDetail',
+          },
+        ],
+      },
+    ],
+  },
+  {
     key: 'vendors',
     label: 'Vendor management',
     blurb: 'Everyone the shop deals with',

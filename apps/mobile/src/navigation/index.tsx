@@ -44,6 +44,9 @@ import { TransactionsScreen } from '../screens/TransactionsScreen';
 import { DisbursementsScreen } from '../screens/DisbursementsScreen';
 import { DisbursementLedgerScreen } from '../screens/DisbursementLedgerScreen';
 import { ExpensesScreen } from '../screens/ExpensesScreen';
+import { EmployeesScreen } from '../screens/EmployeesScreen';
+import { EmployeeFormScreen } from '../screens/EmployeeFormScreen';
+import { EmployeeDetailScreen } from '../screens/EmployeeDetailScreen';
 import { ExpenseFormScreen } from '../screens/ExpenseFormScreen';
 import { ExpenseDetailScreen } from '../screens/ExpenseDetailScreen';
 import { ExpenseAnalyticsScreen } from '../screens/ExpenseAnalyticsScreen';
@@ -143,6 +146,9 @@ export function RootNavigator() {
             <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} />
             <Stack.Screen name="ExpenseAnalytics" component={ExpenseAnalyticsScreen} />
             <Stack.Screen name="AdminExpenseOptions" component={AdminExpenseOptionsScreen} />
+            <Stack.Screen name="Employees" component={EmployeesScreen} />
+            <Stack.Screen name="EmployeeForm" component={EmployeeFormScreen} />
+            <Stack.Screen name="EmployeeDetail" component={EmployeeDetailScreen} />
             <Stack.Screen name="FirmProfile" component={FirmProfileScreen} />
             <Stack.Screen name="Estimates" component={EstimatesScreen} />
             <Stack.Screen name="EstimateEdit" component={EstimateEditScreen} />

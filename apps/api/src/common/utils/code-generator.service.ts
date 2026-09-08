@@ -3,13 +3,30 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { tenantId } from '../tenancy/tenant-context';
 
-type Sequenced = 'order' | 'client' | 'lead' | 'estimate';
+type Sequenced = 'order' | 'client' | 'lead' | 'estimate' | 'employee';
 
 const PREFIX: Record<Sequenced, string> = {
   order: 'ORD',
   client: 'CL',
   lead: 'LD',
   estimate: 'EST',
+  employee: 'EMP',
+};
+
+/**
+ * Which counters restart in April.
+ *
+ * Documents do, because that is what the shop floor and the accountant both
+ * expect on paper. An employee number does not: a person whose number changed
+ * with the financial year would be no use to anybody, least of all to the
+ * payroll of the year before.
+ */
+const BY_FINANCIAL_YEAR: Record<Sequenced, boolean> = {
+  order: true,
+  client: true,
+  lead: true,
+  estimate: true,
+  employee: false,
 };
 
 type Client = PrismaService | Prisma.TransactionClient;
@@ -28,7 +45,9 @@ export class CodeGeneratorService {
 
   async next(entity: Sequenced, client?: Client, at = new Date()): Promise<string> {
     const db = client ?? this.prisma;
-    const key = `${PREFIX[entity]}-${financialYear(at)}`;
+    const key = BY_FINANCIAL_YEAR[entity]
+      ? `${PREFIX[entity]}-${financialYear(at)}`
+      : PREFIX[entity];
     const value = await this.increment(db, key);
     return `${key}-${String(value).padStart(4, '0')}`;
   }

@@ -257,7 +257,8 @@ describe('a workspace’s plan', () => {
     await openPlan();
     // Offering to add what they already have is offering nothing.
     expect(screen.queryByText('Orders')).not.toBeInTheDocument();
-    expect(screen.getByText('People (soon)')).toBeInTheDocument();
+    expect(screen.getByText('People')).toBeInTheDocument();
+    expect(screen.getByText('Purchasing (soon)')).toBeInTheDocument();
   });
 
   it('saves the plan and the extras together', async () => {
@@ -272,7 +273,7 @@ describe('a workspace’s plan', () => {
 
   it('grants one module without moving the tier', async () => {
     await openPlan();
-    fireEvent.click(screen.getByText('People (soon)'));
+    fireEvent.click(screen.getByText('People'));
     await act(async () => {
       fireEvent.click(screen.getByText('Save the plan'));
     });
