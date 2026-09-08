@@ -192,6 +192,137 @@ model ClientLog {
   @@index([tenantId, at])
 }
 
+// ---------------------------------------------------------------------------
+// Releases (the app binary and what it runs)
+// ---------------------------------------------------------------------------
+//
+// The app in the stores is one product for every workspace, so all of this
+// belongs to the platform rather than to a tenant. A shop's admin decides how
+// their own shop works; only we decide what code the binary runs.
+//
+// The protocol is Expo Updates v1: the client asks for a manifest naming a JS
+// bundle and its assets, verifies the signature, downloads what it does not
+// have, and swaps it in on the next launch. Self-hosted, so a release does not
+// wait on anybody else's service.
+
+enum OtaPlatform {
+  ios
+  android
+}
+
+enum OtaReleaseKind {
+  /// An ordinary update: here is a newer bundle.
+  UPDATE
+  /// Go back to the bundle the store binary shipped with. The way out when an
+  /// update turns out to be worse than what it replaced.
+  ROLLBACK
+}
+
+enum OtaReleaseStatus {
+  /// Uploaded and inspectable, served to nobody.
+  DRAFT
+  /// Live, subject to the rollout percentage.
+  PUBLISHED
+  /// Retired. Kept, because what a shop was running last week is a question
+  /// that gets asked after the fact.
+  ARCHIVED
+}
+
+model OtaRelease {
+  /// Used verbatim as the manifest id, so it has to be UUID-shaped.
+  id             String           @id @default(uuid())
+  /// Which stream this belongs to: `production` or `staging`.
+  channel        String
+  /// Must match the native build's own runtime version. A bundle built against
+  /// different native code than the binary has is how an app crashes on launch
+  /// with no way back except the store.
+  runtimeVersion String
+  platform       OtaPlatform
+  kind           OtaReleaseKind   @default(UPDATE)
+  status         OtaReleaseStatus @default(DRAFT)
+  /// 0–100, sticky per install: a device that has seen an update keeps seeing
+  /// it, so a staged rollout does not flip people back and forth.
+  rolloutPercent Int              @default(0)
+  /// The build number within (channel, platform, runtimeVersion), shown in the
+  /// app as "OTA 7" so a person can say which one they are on.
+  sequence       Int              @default(0)
+
+  /// manifest.metadata and manifest.extra, as the client expects them.
+  metadata   Json      @default("{}")
+  extra      Json      @default("{}")
+  /// For a rollback: the commit time the client compares against.
+  commitTime DateTime?
+  changelog  String?
+  /// The platform user who put it live.
+  publishedBy String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  activatedAt DateTime?
+
+  assets OtaReleaseAsset[]
+
+  @@index([channel, runtimeVersion, platform, status, createdAt])
+}
+
+/// One file in a release: the JS bundle itself, or an image it needs.
+///
+/// Stored through the same StorageService as everything else — S3 where it is
+/// configured, the database where it is not — so a release does not need a
+/// second piece of infrastructure to exist.
+model OtaReleaseAsset {
+  id        String     @id @default(cuid())
+  releaseId String
+  release   OtaRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  /// True for the JS bundle. Exactly one per release.
+  isLaunchAsset Boolean @default(false)
+
+  /// hex MD5 of the bytes — the manifest's asset `key`.
+  key           String
+  /// base64url SHA-256 of the bytes — what the client checks the download
+  /// against. Not the same hash as `key`, and they must not be conflated.
+  hash          String
+  contentType   String
+  fileExtension String
+
+  backend         StorageBackend
+  bucket          String?
+  objectKey       String?
+  data            Bytes?
+  byteSize        Int
+  checksum        String
+  isEncrypted     Boolean @default(false)
+  encryptionKeyId String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([releaseId, key])
+  @@index([releaseId])
+}
+
+/// The floor under which a binary is asked, or told, to update.
+///
+/// Some changes cannot be delivered over the air — a native module, a
+/// permission, a new screen that needs one. This is how an old binary is told
+/// so, rather than failing in ways nobody can explain over the phone.
+model AppVersionGate {
+  id       String      @id @default(cuid())
+  platform OtaPlatform
+  channel  String
+
+  /// Below this, the app stops and says it must be updated.
+  minimumVersion     String
+  /// Below this, it says there is a newer one and carries on.
+  recommendedVersion String?
+  /// What the app shows. Left empty, it uses its own words.
+  message            String?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([platform, channel])
+}
+
 /// A named set of permissions inside one tenant.
 ///
 /// Roles are per-tenant rather than a fixed enum because every shop divides

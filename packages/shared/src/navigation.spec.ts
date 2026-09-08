@@ -52,7 +52,13 @@ describe('the navigation tree', () => {
   });
 
   it('leaves signing in and the platform outside every category', () => {
-    expect(NAV_OUTSIDE.map((item) => item.key)).toEqual(['login', 'platform-tenants']);
+    expect(NAV_OUTSIDE.map((item) => item.key)).toEqual([
+      'login',
+      'platform-tenants',
+      // The app in the stores is one product for every workspace, so a release
+      // belongs to whoever owns it rather than to any shop's menu.
+      'platform-releases',
+    ]);
   });
 });
 

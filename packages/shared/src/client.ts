@@ -46,6 +46,10 @@ import type {
   Tenant,
   TenantIsolation,
   TenantStatus,
+  Release,
+  ReleaseAsset,
+  ReleaseStatus,
+  VersionGate,
 } from './types';
 
 /** The editable fields of a client. Shared by create and update. */
@@ -769,6 +773,49 @@ export class ApiClient {
 
   tenants() {
     return this.get<Tenant[]>('/platform/tenants');
+  }
+
+  // -- releases (the app binary and what it runs) ---------------------------
+
+  releases(query?: { channel?: string; platform?: string }) {
+    return this.get<Release[]>('/platform/releases', query);
+  }
+
+  release(id: string) {
+    return this.get<Release & { assets: ReleaseAsset[] }>(`/platform/releases/${id}`);
+  }
+
+  createRelease(body: {
+    channel: string;
+    platform: 'ios' | 'android';
+    runtimeVersion: string;
+    kind?: 'UPDATE' | 'ROLLBACK';
+    changelog?: string;
+    extra?: Record<string, unknown>;
+  }) {
+    return this.post<Release>('/platform/releases', body);
+  }
+
+  /** Publish it, move the rollout, or retire it. */
+  updateRelease(
+    id: string,
+    body: { status?: ReleaseStatus; rolloutPercent?: number; changelog?: string },
+  ) {
+    return this.patch<Release>(`/platform/releases/${id}`, body);
+  }
+
+  versionGates() {
+    return this.get<VersionGate[]>('/platform/releases/gates/all');
+  }
+
+  setVersionGate(body: {
+    platform: 'ios' | 'android';
+    channel: string;
+    minimumVersion: string;
+    recommendedVersion?: string;
+    message?: string;
+  }) {
+    return this.request<VersionGate>('PUT', '/platform/releases/gates', body);
   }
 
   tenant(id: string) {

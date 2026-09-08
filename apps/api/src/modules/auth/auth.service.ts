@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';
+import { PLATFORM_PERMISSIONS } from '@decor/shared';
 import { runInTenant, runAsPlatform } from '../../common/tenancy/tenant-context';
 import { LoginDto, PlatformLoginDto } from './dto/login.dto';
 
@@ -89,7 +90,10 @@ export class AuthService {
         // Carried so a change made while helping a shop is signed with a name
         // in their own audit trail, not with an id from another database.
         name: admin.name,
-        permissions: ['platform.tenant.view', 'platform.tenant.manage'],
+        // Everything the platform side can do. There is one kind of platform
+        // user today; when there are several — support, billing, engineering —
+        // this becomes a role of their own rather than a list here.
+        permissions: PLATFORM_PERMISSIONS,
       }),
       user: { id: admin.id, name: admin.name, email: admin.email, isPlatform: true },
     };

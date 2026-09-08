@@ -84,11 +84,25 @@ export const PERMISSIONS = {
   // Platform — only ever granted to platform users, never to a tenant role.
   PLATFORM_TENANT_MANAGE: 'platform.tenant.manage',
   PLATFORM_TENANT_VIEW: 'platform.tenant.view',
+  /**
+   * The app binary and what it runs.
+   *
+   * There is one app in the stores for every workspace, so a release belongs to
+   * whoever owns the product rather than to any shop — a tenant admin decides
+   * how their shop works, not what code the phone in their hand is running.
+   */
+  PLATFORM_RELEASE_VIEW: 'platform.release.view',
+  PLATFORM_RELEASE_MANAGE: 'platform.release.manage',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
+
+/** Everything only the people who own the product may do. */
+export const PLATFORM_PERMISSIONS: Permission[] = ALL_PERMISSIONS.filter((permission) =>
+  permission.startsWith('platform.'),
+);
 
 /** Permissions a tenant role may hold — everything except the platform keys. */
 export const TENANT_PERMISSIONS: Permission[] = ALL_PERMISSIONS.filter(
@@ -182,6 +196,8 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.PAYMENT_VIEW]: 'View payments',
   [PERMISSIONS.PAYMENT_RECORD]: 'Record payments',
   [PERMISSIONS.PAYMENT_DELETE]: 'Take a receipt back',
+  [PERMISSIONS.PLATFORM_RELEASE_VIEW]: 'See app releases',
+  [PERMISSIONS.PLATFORM_RELEASE_MANAGE]: 'Publish app releases',
   [PERMISSIONS.CASH_DEPOSIT]: 'Record bank deposits',
   // The key stays as it is: renaming a permission string would silently strip
   // it from every role a tenant has already saved.

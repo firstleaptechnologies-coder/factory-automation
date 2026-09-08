@@ -349,6 +349,23 @@ describe('endpoints', () => {
     ['deactivateLeadField', (a) => a.deactivateLeadField('f1'), 'DELETE', '/leads/fields/f1'],
 
     ['tenants', (a) => a.tenants(), 'GET', '/platform/tenants'],
+
+    ['releases', (a) => a.releases(), 'GET', '/platform/releases'],
+    ['release', (a) => a.release('r1'), 'GET', '/platform/releases/r1'],
+    [
+      'createRelease',
+      (a) => a.createRelease({ channel: 'production', platform: 'ios', runtimeVersion: '1.0.0' }),
+      'POST',
+      '/platform/releases',
+    ],
+    ['updateRelease', (a) => a.updateRelease('r1', { rolloutPercent: 10 }), 'PATCH', '/platform/releases/r1'],
+    ['versionGates', (a) => a.versionGates(), 'GET', '/platform/releases/gates/all'],
+    [
+      'setVersionGate',
+      (a) => a.setVersionGate({ platform: 'ios', channel: 'production', minimumVersion: '1.0.0' }),
+      'PUT',
+      '/platform/releases/gates',
+    ],
     ['tenant', (a) => a.tenant('t1'), 'GET', '/platform/tenants/t1'],
     ['createTenant', (a) => a.createTenant({} as never), 'POST', '/platform/tenants'],
     ['updateTenant', (a) => a.updateTenant('t1', {}), 'PATCH', '/platform/tenants/t1'],

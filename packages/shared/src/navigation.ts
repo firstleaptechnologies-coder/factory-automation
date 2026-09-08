@@ -307,6 +307,20 @@ export const NAV_OUTSIDE: NavItem[] = [
     web: '/platform/tenants',
     app: 'Tenants',
   },
+  {
+    /*
+     * What the app is running, and who has it yet.
+     *
+     * There is one app in the stores for every workspace, so this belongs to
+     * whoever owns the product — a shop's admin decides how their shop works,
+     * not what code the phone in their hand is running.
+     */
+    key: 'platform-releases',
+    label: 'Releases',
+    icon: 'box',
+    permission: PERMISSIONS.PLATFORM_RELEASE_VIEW,
+    web: '/platform/releases',
+  },
 ];
 
 /** Every item in the tree, groups and children flattened out. */

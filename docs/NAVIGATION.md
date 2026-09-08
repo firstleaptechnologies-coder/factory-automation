@@ -167,3 +167,4 @@ whoever runs the product rather than to a shop.*
 | --- | --- | --- | --- |
 | Sign in | `/login` | `Login` | — |
 | Workspaces | `/platform/tenants` | `Tenants` | `platform.tenant.view` |
+| Releases | `/platform/releases` | — | `platform.release.view` |

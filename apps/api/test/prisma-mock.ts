@@ -49,6 +49,9 @@ const MODELS = [
   'jobRun',
   'serverLog',
   'clientLog',
+  'otaRelease',
+  'otaReleaseAsset',
+  'appVersionGate',
 ];
 
 const OPERATIONS = [

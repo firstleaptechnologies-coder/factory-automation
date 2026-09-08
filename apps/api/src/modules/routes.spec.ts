@@ -15,6 +15,8 @@ import { FilesController } from './files/files.controller';
 import { HealthController } from './health/health.controller';
 import { HistoryController } from './history/history.controller';
 import { LogsController } from './logs/logs.controller';
+import { UpdatesController } from './ota/updates.controller';
+import { ReleasesController } from './ota/releases.controller';
 import { LeadsController } from './leads/leads.controller';
 import { OrdersController } from './orders/orders.controller';
 import { PaymentsController } from './payments/payments.controller';
@@ -40,6 +42,8 @@ const CONTROLLERS = [
   HealthController,
   HistoryController,
   LogsController,
+  UpdatesController,
+  ReleasesController,
   LeadsController,
   OrdersController,
   PaymentsController,
@@ -77,7 +81,11 @@ const routes: Route[] = CONTROLLERS.flatMap((controller) => {
       controller: controller.name,
       handler: name,
       method: METHOD_NAME[Reflect.getMetadata(METHOD_METADATA, prototype[name]) as number],
-      path: `/${base}/${Reflect.getMetadata(PATH_METADATA, prototype[name]) ?? ''}`.replace(/\/+$/, ''),
+      // A controller with no prefix of its own leaves an empty segment, so
+      // repeated slashes are collapsed rather than shown to anyone.
+      path: `/${base}/${Reflect.getMetadata(PATH_METADATA, prototype[name]) ?? ''}`
+        .replace(/\/+/g, '/')
+        .replace(/\/+$/, ''),
       // A guard reads the handler first and the controller as a fallback, so
       // a class-level rule counts for every route under it.
       permissions:
@@ -122,9 +130,15 @@ it('leaves nothing but signing in reachable without a token', () => {
   const open = routes.filter((route) => route.isPublic);
   // Everything else runs behind the JWT guard, which is global.
   expect(open.map((route) => `${route.method} ${route.path}`).sort()).toEqual([
+    // The phone asking what to run has not signed in — it may have no account
+    // on it at all — and what it gets is the same signed code the stores hand
+    // out. Nothing here reads or returns a shop's data.
+    'GET /app/version-check',
     // Whether this instance is alive is not a secret, and a load balancer
     // asking has no token to offer.
     'GET /health',
+    'GET /updates/assets/:id',
+    'GET /updates/manifest',
     'POST /auth/login',
     'POST /auth/platform/login',
     'POST /auth/workspace',
@@ -141,6 +155,25 @@ it('takes what the clients saw behind a token, and slowly', () => {
   // not be able to fill the table while it is at it.
   expect(find('LogsController', 'record').isPublic).toBe(false);
   expect(guards).toContain('ThrottlerGuard');
+});
+
+describe('releases', () => {
+  it('keeps the app’s own code behind the platform’s permissions', () => {
+    // One app in the stores for every workspace: a shop's admin decides how
+    // their shop works, not what code the phone in their hand is running.
+    expect(find('ReleasesController', 'list').permissions).toEqual(['platform.release.view']);
+    expect(find('ReleasesController', 'create').permissions).toEqual(['platform.release.manage']);
+    expect(find('ReleasesController', 'upload').permissions).toEqual(['platform.release.manage']);
+    expect(find('ReleasesController', 'update').permissions).toEqual(['platform.release.manage']);
+    expect(find('ReleasesController', 'setGate').permissions).toEqual(['platform.release.manage']);
+  });
+
+  it('grants those to nobody in a tenant’s roles', () => {
+    for (const role of DEFAULT_ROLES) {
+      expect(role.permissions).not.toContain('platform.release.manage');
+      expect(role.permissions).not.toContain('platform.release.view');
+    }
+  });
 });
 
 describe('history', () => {

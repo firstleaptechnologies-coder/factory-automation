@@ -215,55 +215,44 @@ which needs an account.*
 - **Retention** — a nightly job keeps 30 days of both operational logs. The
   audit trail is not touched: it is the shop's record, and it is kept.
 
-### Phase 2 · Native release train — items 2 and 3 — **L**
+### Phase 2 · Native release train — items 2 and 3 — **L** — *server side shipped 8 September 2026*
 
 Both need native changes, and a native change means a store release, so they go
 out as one release rather than two.
 
-**OTA (item 3)** — ported from momentum-arena, which self-hosts Expo Updates:
+**OTA (item 3)** — the server half is built and proven end to end:
 
-- `lib/ota/signing.ts` and `lib/ota/manifest.ts` port **verbatim** (they are
-  Expo's reference implementation: base64url SHA-256 asset hashes, hex MD5
-  keys, RSA-SHA256 signed multipart parts).
-- The manifest and asset routes become a Nest module; assets go to S3 through
-  the existing `StorageService` instead of Vercel Blob.
-- `OtaRelease` / `OtaReleaseAsset` / `AppVersionGate` in the **platform** DB
-  (D5); draft → published → archived, sticky-bucket staged rollout,
-  rollback-to-embedded, `sequence` stamped into `extra.otaBuildNumber`.
-- `scripts/publish-ota.ts` + an `ota-publish` workflow that compares a **native
-  fingerprint** against a committed baseline and refuses to publish JS when the
-  native side moved.
-- The rollout console lives under FirstLeap, not under a tenant.
+- `common/ota/signing.ts` and `common/ota/manifest.ts`, ported from Expo's
+  reference server so the byte-level behaviour matches what the client
+  verifies — two hashes per asset (base64url SHA-256 for integrity, hex MD5 for
+  identity), RSA-SHA256 signed multipart parts, signing optional until a key is
+  configured.
+- `OtaRelease` / `OtaReleaseAsset` / `AppVersionGate` in the **platform**
+  database: draft → published → archived, sticky-bucket staged rollout,
+  rollback-to-embedded, and at most one live release per channel, platform and
+  runtime version.
+- Assets go through the existing `StorageService`, so a release needs no second
+  piece of infrastructure — S3 where it is configured, the database where it is
+  not.
+- `GET /api/updates/manifest`, `/api/updates/assets/:id` and
+  `/api/app/version-check`, all open: the phone asking has not signed in and
+  what it gets back is signed code, not a shop's data.
+- `npm run ota:publish` uploads what `expo export` produced and creates the
+  release, over HTTP rather than against a database, so the same script
+  publishes to staging and to production.
+- A release console at `/platform/releases` — walk a rollout up in steps, retire
+  a release, set the version floor.
 
-> **Blocker to decide now.** `expo-updates` needs the Expo modules in the bare
-> app. Expo SDK 57 (current) pins **react-native 0.86.3**; this app is on
-> **0.87.1**. Either pin back one minor for the adoption — which also means
-> re-checking Reanimated 4 and worklets — or wait for SDK 58. Momentum-arena
-> runs SDK 56 on RN 0.85.2, so the combination is proven one version back.
-> My recommendation: **pin to 0.86.3.** Waiting costs every later phase its
-> same-day delivery.
+*What is left for the app itself:* adopting `expo-updates`, which needs the
+React Native decision in [WAITING-ON-YOU.md](WAITING-ON-YOU.md).
 
-**Push (item 2)** — also ported, with two changes:
-
-- Native setup the app has none of today: `@react-native-firebase/{app,messaging}`,
-  an APNs key, `google-services.json` / `GoogleService-Info.plist`, the iOS push
-  capability, the Android 13 runtime permission and notification channels.
-- `PushDevice` (token + platform + app version + user), `PushDispatch` (delivery
-  log), `PushTemplate` (tenant overrides over a code-owned registry, so wording
-  changes without a deploy) — all in the tenant DB; fan-out iterates tenants for
-  dedicated databases.
-- **`Notification` rows are the source of truth**, the push only surfaces them —
-  this is what finally fills `NotificationsScreen`, which is a shell today.
-- Triggers for this product: status moved, **status reversed** (the reversal
-  already asks for confirmation; the people who did not do it should hear about
-  it), payment recorded, quote accepted or declined, lead assigned, payout due,
-  a daily digest of what is sitting in each stage.
-- Dead-token pruning on `registration-token-not-registered`.
+**Push (item 2)** — the transport needs a Firebase project, so it is being built
+from the inside out: `Notification` rows are the source of truth and the app's
+notification screen reads them; FCM only wakes the phone. Native setup —
+`@react-native-firebase/{app,messaging}`, an APNs key, the platform files, the
+Android 13 runtime permission and notification channels — waits on the account.
 
 **Also in this release, because it is native:** crash reporting in the app.
-
-*Reference: `lib/push.ts` (320 lines), `lib/push-templates.ts` (537 lines, a
-20-trigger registry), `app/api/mobile/admin/push/*`, `apps/mobile/src/lib/push.ts`.*
 
 ### Phase 3 · FirstLeap, the platform layer — **M**
 
@@ -438,6 +427,10 @@ Ordered by how much it would hurt to discover late.
 ---
 
 ## Part 5 — decisions I need from you
+
+*Everything waiting on you — these decisions plus the accounts and credentials
+— is collected in [WAITING-ON-YOU.md](WAITING-ON-YOU.md), with what each one
+blocks.*
 
 Each has my recommendation; none of them blocks Phase 0 or Phase 1.
 

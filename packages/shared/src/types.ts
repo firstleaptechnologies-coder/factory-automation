@@ -735,3 +735,53 @@ export interface EstimateInput {
   taxTreatment?: TaxTreatment;
   items: EstimateItemInput[];
 }
+
+// ---------------------------------------------------------------------------
+// Releases — the app binary and what it runs
+// ---------------------------------------------------------------------------
+//
+// One app in the stores for every workspace, so none of this belongs to a
+// tenant. A shop's admin decides how their shop works; only the people who own
+// the product decide what code the phone is running.
+
+export type ReleasePlatform = 'ios' | 'android';
+export type ReleaseKind = 'UPDATE' | 'ROLLBACK';
+export type ReleaseStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+export interface Release {
+  id: string;
+  channel: string;
+  runtimeVersion: string;
+  platform: ReleasePlatform;
+  kind: ReleaseKind;
+  status: ReleaseStatus;
+  /** 0–100, sticky per install: raising it only ever adds people. */
+  rolloutPercent: number;
+  /** The build number within its channel, platform and runtime version. */
+  sequence: number;
+  changelog?: string | null;
+  publishedBy?: string | null;
+  createdAt: string;
+  activatedAt?: string | null;
+  _count?: { assets: number };
+}
+
+export interface ReleaseAsset {
+  id: string;
+  isLaunchAsset: boolean;
+  key: string;
+  contentType: string;
+  fileExtension: string;
+  byteSize: number;
+}
+
+/** The floor under which a binary is asked, or told, to update. */
+export interface VersionGate {
+  id: string;
+  platform: ReleasePlatform;
+  channel: string;
+  minimumVersion: string;
+  recommendedVersion?: string | null;
+  message?: string | null;
+  updatedAt: string;
+}
