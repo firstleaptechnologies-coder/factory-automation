@@ -172,3 +172,115 @@ describe('banking cash later', () => {
 it('uses BadRequestException for rule violations', () => {
   expect(new BadRequestException('x')).toBeInstanceOf(BadRequestException);
 });
+
+/**
+ * Taking a receipt back.
+ *
+ * A receipt is never edited and never deleted. These are the rules that make
+ * that true — and the reason the standing constraint holds: there is no path
+ * that removes a collection row, so an order cannot be made to look settled by
+ * money nobody collected.
+ */
+describe('reversing a payment', () => {
+  const PAYMENT = {
+    id: 'p1',
+    orderId: 'order-1',
+    amount: 40000,
+    mode: PaymentMode.CASH,
+    reference: 'UTR-9',
+    receivedAt: new Date('2026-09-01T10:00:00Z'),
+    reversalOfId: null,
+    reversedBy: null,
+    deposits: [] as { id: string; amount: number; bankReference: string | null }[],
+    order: { id: 'order-1', grandTotal: 47200, payments: [{ amount: 40000 }] },
+  };
+
+  function serviceWithPayment(over: Record<string, unknown> = {}) {
+    const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
+    db.payment.findUnique = jest.fn(async () => ({ ...PAYMENT, ...over }));
+    db.payment.create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: 'p2',
+      ...data,
+    }));
+    return { service: new PaymentsService(db as never), db };
+  }
+
+  const reverse = (service: PaymentsService, reason = 'Entered twice') =>
+    inTenant(() => service.reverse('p1', reason, 'u1'));
+
+  it('records the opposite rather than removing the row', async () => {
+    const { service, db } = serviceWithPayment();
+    await reverse(service);
+
+    expect(db.payment.delete).not.toHaveBeenCalled();
+    const created = db.payment.create.mock.calls[0][0].data;
+    expect(created.amount).toBe(-40000);
+    expect(created.reversalOfId).toBe('p1');
+    expect(created.mode).toBe(PaymentMode.CASH);
+  });
+
+  it('keeps why it was taken back, and who did it', async () => {
+    const { service, db } = serviceWithPayment();
+    await reverse(service, 'Client’s cheque bounced');
+
+    const created = db.payment.create.mock.calls[0][0].data;
+    expect(created.reason).toBe('Client’s cheque bounced');
+    expect(created.receivedById).toBe('u1');
+  });
+
+  it('refuses without a reason', async () => {
+    const { service } = serviceWithPayment();
+    // A row saying money was taken back without saying why is deleting it, one
+    // step removed.
+    await expect(reverse(service, '   ')).rejects.toThrow(/why/i);
+  });
+
+  it('refuses to take the same receipt back twice', async () => {
+    const { service } = serviceWithPayment({ reversedBy: { id: 'p9' } });
+    await expect(reverse(service)).rejects.toThrow(/already been taken back/);
+  });
+
+  it('refuses to reverse a correction', async () => {
+    const { service } = serviceWithPayment({ reversalOfId: 'p0' });
+    await expect(reverse(service)).rejects.toThrow(/Record the payment again/);
+  });
+
+  it('un-banks the cash that had already gone to the bank', async () => {
+    const { service, db } = serviceWithPayment({
+      deposits: [{ id: 'd1', amount: 25000, bankReference: 'NEFT-2' }],
+    });
+    await reverse(service);
+
+    // Otherwise the shop's cash position is short by money that never left the
+    // drawer.
+    const created = db.payment.create.mock.calls[0][0].data;
+    expect(created.deposits.create).toEqual([
+      expect.objectContaining({ amount: -25000, reversalOfId: 'd1', bankReference: 'NEFT-2' }),
+    ]);
+  });
+
+  it('puts the order back to part-paid', async () => {
+    const { service, db } = serviceWithPayment();
+    await reverse(service);
+
+    // ₹40,000 was the whole of what had been collected on a ₹47,200 order.
+    expect(db.order.update.mock.calls[0][0].data.paymentStatus).toBe('PENDING');
+  });
+
+  it('leaves an order that was over-collected settled by what remains', async () => {
+    const { service, db } = serviceWithPayment({
+      order: { id: 'order-1', grandTotal: 47200, payments: [{ amount: 40000 }, { amount: 47200 }] },
+    });
+    await reverse(service);
+    expect(db.order.update.mock.calls[0][0].data.paymentStatus).toBe('RECEIVED');
+  });
+
+  it('says so when the receipt is not there', async () => {
+    const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
+    db.payment.findUnique = jest.fn(async () => null);
+    const service = new PaymentsService(db as never);
+    await expect(inTenant(() => service.reverse('nope', 'x', 'u1'))).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});

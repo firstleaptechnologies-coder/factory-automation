@@ -3,7 +3,7 @@ import { PaymentsController } from './payments.controller';
 const payments = {
   summary: jest.fn(async (..._a: unknown[]) => 'summary'),
   record: jest.fn(async (..._a: unknown[]) => 'recorded'),
-  remove: jest.fn(async (..._a: unknown[]) => 'removed'),
+  reverse: jest.fn(async (..._a: unknown[]) => 'reversed'),
   deposit: jest.fn(async (..._a: unknown[]) => 'deposited'),
   cashPosition: jest.fn(async (..._a: unknown[]) => 'position'),
   cashInHandByOrder: jest.fn(async (..._a: unknown[]) => 'in hand'),
@@ -37,9 +37,9 @@ it('records who banked the cash', async () => {
   expect(payments.deposit).toHaveBeenCalledWith(dto, 'u1');
 });
 
-it('deletes a receipt by its own id', async () => {
-  await controller.remove('p1');
-  expect(payments.remove).toHaveBeenCalledWith('p1');
+it('takes a receipt back, carrying the reason and who did it', async () => {
+  await controller.reverse('p1', { reason: 'Entered twice' } as never, USER);
+  expect(payments.reverse).toHaveBeenCalledWith('p1', 'Entered twice', 'u1');
 });
 
 it('passes the date range through to the cash position', async () => {

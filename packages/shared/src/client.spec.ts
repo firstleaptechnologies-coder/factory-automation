@@ -288,7 +288,7 @@ describe('endpoints', () => {
 
     ['paymentSummary', (a) => a.paymentSummary('o1'), 'GET', '/orders/o1/payments'],
     ['recordPayment', (a) => a.recordPayment('o1', { amount: 1 } as never), 'POST', '/orders/o1/payments'],
-    ['deletePayment', (a) => a.deletePayment('p1'), 'DELETE', '/payments/p1'],
+    ['reversePayment', (a) => a.reversePayment('p1', 'why'), 'POST', '/payments/p1/reverse'],
     ['recordDeposit', (a) => a.recordDeposit({ amount: 1 } as never), 'POST', '/payments/deposits'],
     ['cashPosition', (a) => a.cashPosition(), 'GET', '/payments/cash-position'],
     ['cashInHand', (a) => a.cashInHand(), 'GET', '/payments/cash-in-hand'],

@@ -147,6 +147,9 @@ export class PaymentsService {
           include: {
             deposits: { orderBy: { depositedAt: 'desc' } },
             receivedBy: { select: { id: true, name: true } },
+            // So a list can say "taken back" against the row it happened to,
+            // rather than only showing a negative figure further down.
+            reversedBy: { select: { id: true, receivedAt: true, reason: true } },
           },
         },
       },
@@ -383,7 +386,17 @@ export class PaymentsService {
   /** Cash still in hand, order by order — the list to take to the bank. */
   async cashInHandByOrder() {
     const payments = await this.prisma.payment.findMany({
-      where: { mode: PaymentMode.CASH },
+      where: {
+        mode: PaymentMode.CASH,
+        /*
+         * A receipt that was taken back, and the row that took it back, are
+         * not cash in anybody's hand. They net to nothing in every total; here
+         * the row is per receipt, so both sides have to be left out or the
+         * original would still be counted as sitting in the drawer.
+         */
+        reversalOfId: null,
+        reversedBy: { is: null },
+      },
       include: {
         deposits: true,
         order: {
@@ -410,28 +423,96 @@ export class PaymentsService {
       .filter((row) => row.inHand > 0.009);
   }
 
-  async remove(paymentId: string) {
+  /**
+   * Take a receipt back, without taking it away.
+   *
+   * A receipt is never edited and never deleted. Money that was entered wrongly
+   * is corrected by recording its opposite: both rows stand, the order's total
+   * is the sum of them, and what is left behind says what was entered, what
+   * took it back, who did it and why.
+   *
+   * Deleting the row would have been simpler and is exactly what must not be
+   * possible — it is the one edit that could make an order look settled by
+   * money nobody collected, with nothing left to show it ever happened.
+   */
+  async reverse(paymentId: string, reason: string, userId?: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
-      include: { order: { include: { payments: true } } },
+      include: {
+        deposits: true,
+        reversedBy: { select: { id: true } },
+        order: { include: { payments: true } },
+      },
     });
     if (!payment) throw new NotFoundException(`Payment ${paymentId} not found`);
 
-    return this.prisma.$transaction(async (tx) => {
-      await tx.payment.delete({ where: { id: paymentId } });
+    if (payment.reversedBy) {
+      throw new BadRequestException('That receipt has already been taken back');
+    }
+    if (payment.reversalOfId) {
+      // Reversing a reversal is re-recording the money; do that as a receipt,
+      // so the list says what actually happened.
+      throw new BadRequestException(
+        'That row is itself a correction. Record the payment again rather than reversing it.',
+      );
+    }
+    if (!reason?.trim()) {
+      throw new BadRequestException('Say why this receipt is being taken back');
+    }
 
-      const remaining = payment.order.payments
-        .filter((p) => p.id !== paymentId)
-        .reduce((total, p) => total + Number(p.amount), 0);
+    const amount = Number(payment.amount);
+
+    return this.prisma.$transaction(async (tx) => {
+      const reversal = await tx.payment.create({
+        data: {
+          tenantId: tenantId(),
+          orderId: payment.orderId,
+          amount: -amount,
+          mode: payment.mode,
+          reference: payment.reference,
+          note: `Takes back ${formatAmount(amount)} recorded on ${payment.receivedAt.toISOString().slice(0, 10)}`,
+          reason: reason.trim(),
+          reversalOfId: payment.id,
+          receivedById: userId,
+          /*
+           * Cash that had already been banked has to be un-banked with it, or
+           * the shop's cash position is short by money that never left the
+           * drawer.
+           */
+          deposits: payment.deposits.length
+            ? {
+                create: payment.deposits.map((deposit) => ({
+                  tenantId: tenantId(),
+                  amount: -Number(deposit.amount),
+                  bankReference: deposit.bankReference,
+                  note: 'Takes back a deposit against a reversed receipt',
+                  depositedById: userId,
+                  reversalOfId: deposit.id,
+                })),
+              }
+            : undefined,
+        },
+        include: { deposits: true },
+      });
+
+      const received = payment.order.payments.reduce(
+        (total, one) => total + Number(one.amount),
+        0,
+      ) - amount;
 
       await tx.order.update({
         where: { id: payment.orderId },
-        data: { paymentStatus: deriveStatus(Number(payment.order.grandTotal), remaining) },
+        data: { paymentStatus: deriveStatus(Number(payment.order.grandTotal), received) },
       });
 
-      return { deleted: paymentId };
+      return reversal;
     });
   }
+}
+
+/** ₹40,000.00, for a note somebody will read months later. */
+function formatAmount(amount: number): string {
+  return `₹${amount.toFixed(2)}`;
 }
 
 /** One rule for the order's payment status, used everywhere it is set. */

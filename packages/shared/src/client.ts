@@ -538,8 +538,14 @@ export class ApiClient {
     return this.post<Payment>(`/orders/${orderId}/payments`, body);
   }
 
-  deletePayment(paymentId: string) {
-    return this.del<unknown>(`/payments/${paymentId}`);
+  /**
+   * Take a receipt back.
+   *
+   * Not a delete: the correction is a new row recording the opposite, so both
+   * stand and the reason travels with it.
+   */
+  reversePayment(paymentId: string, reason: string) {
+    return this.post<Payment>(`/payments/${paymentId}/reverse`, { reason });
   }
 
   recordDeposit(body: {

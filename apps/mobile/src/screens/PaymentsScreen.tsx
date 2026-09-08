@@ -19,6 +19,7 @@ import {
   ScreenHeader,
   Sheet,
   Text,
+  ask,
   haptic,
 } from '../ui';
 import { palette, spacing } from '../theme';
@@ -57,6 +58,44 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
 
   const canRecord = can(PERMISSIONS.PAYMENT_RECORD);
   const canDeposit = can(PERMISSIONS.CASH_DEPOSIT);
+  /* Rare, and held apart from taking money in the first place. */
+  const canReverse = can(PERMISSIONS.PAYMENT_DELETE);
+
+  /**
+   * Take a receipt back.
+   *
+   * Asked for in words, because the reason is the point: nothing is deleted,
+   * so what is left behind has to say why the money went away again.
+   */
+  const takeBack = (paymentId: string, amountShown: string) =>
+    ask(
+      'Take this receipt back?',
+      `${amountShown} stays on the record with a correction beside it. Say why.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Take it back',
+          style: 'destructive',
+          onPress: async (reason?: string) => {
+            if (!reason?.trim()) {
+              Alert.alert('A reason is needed', 'Say why this receipt is being taken back.');
+              return;
+            }
+            try {
+              await api.reversePayment(paymentId, reason.trim());
+              haptic('notificationSuccess');
+              summary.reload();
+            } catch (e) {
+              haptic('notificationError');
+              Alert.alert(
+                'Could not take it back',
+                e instanceof Error ? e.message : 'Unknown error',
+              );
+            }
+          },
+        },
+      ],
+    );
 
   const record = async () => {
     setBusy(true);
@@ -185,22 +224,46 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
         data.payments.map((payment) => {
           const banked = payment.deposits.reduce((sum, d) => sum + Number(d.amount), 0);
           const inHand = Number(payment.amount) - banked;
+          /* The row that took an earlier receipt back, and the one it took. */
+          const isCorrection = Boolean(payment.reversalOfId);
+          const wasTakenBack = Boolean(payment.reversedBy);
           return (
             <Card key={payment.id} tone="dark" style={styles.receipt}>
               <View style={styles.receiptTop}>
                 <View style={{ flex: 1 }}>
-                  <Text variant="h3">{formatInr(Number(payment.amount))}</Text>
+                  <Text variant="h3" tone={isCorrection ? 'danger' : 'default'}>
+                    {formatInr(Number(payment.amount))}
+                  </Text>
                   <Text variant="tiny" tone="muted">
                     {formatDateTime(payment.receivedAt)}
                     {payment.receivedBy ? ` · ${payment.receivedBy.name}` : ''}
                   </Text>
                 </View>
                 <Pill
-                  label={payment.mode}
-                  color={payment.mode === 'CASH' ? palette.warning : palette.info}
+                  label={isCorrection ? 'Taken back' : payment.mode}
+                  color={
+                    isCorrection
+                      ? palette.danger
+                      : payment.mode === 'CASH'
+                        ? palette.warning
+                        : palette.info
+                  }
                   small
                 />
               </View>
+
+              {/* Why, on the correction — the half a figure cannot hold. */}
+              {payment.reason ? (
+                <Text variant="tiny" tone="warning" style={styles.reason}>
+                  “{payment.reason}”
+                </Text>
+              ) : null}
+
+              {wasTakenBack ? (
+                <Text variant="tiny" tone="danger" style={{ marginTop: 4 }}>
+                  Taken back on {formatDateTime(payment.reversedBy?.receivedAt)}
+                </Text>
+              ) : null}
 
               {payment.reference ? (
                 <Text variant="tiny" tone="faint" style={{ marginTop: 4 }}>
@@ -208,12 +271,12 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
                 </Text>
               ) : null}
 
-              {payment.mode === 'CASH' ? (
+              {payment.mode === 'CASH' && !isCorrection ? (
                 <View style={styles.cashRow}>
                   <Text variant="tiny" tone="muted">
                     banked {formatInr(banked)} · in hand {formatInr(inHand)}
                   </Text>
-                  {canDeposit && inHand > 0.009 ? (
+                  {canDeposit && !wasTakenBack && inHand > 0.009 ? (
                     <Chip
                       label="Bank it"
                       onPress={() => {
@@ -222,6 +285,15 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
                       }}
                     />
                   ) : null}
+                </View>
+              ) : null}
+
+              {canReverse && !isCorrection && !wasTakenBack ? (
+                <View style={styles.takeBackRow}>
+                  <Chip
+                    label="Take it back"
+                    onPress={() => takeBack(payment.id, formatInr(Number(payment.amount)))}
+                  />
                 </View>
               ) : null}
             </Card>
@@ -309,6 +381,8 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
 }
 
 const styles = StyleSheet.create({
+  reason: { marginTop: 4, fontStyle: 'italic' },
+  takeBackRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.sm },
   progressTrack: {
     height: 6,
     borderRadius: 3,

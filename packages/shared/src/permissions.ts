@@ -51,6 +51,14 @@ export const PERMISSIONS = {
   // Money
   PAYMENT_VIEW: 'payment.view',
   PAYMENT_RECORD: 'payment.record',
+  /**
+   * Taking a receipt back.
+   *
+   * The key still says delete because it is what tenants' roles already carry;
+   * nothing is deleted any more. A receipt entered wrongly is corrected by
+   * recording its opposite, which leaves both rows standing — so this permits a
+   * correction that is visible, never a removal that is not.
+   */
   PAYMENT_DELETE: 'payment.delete',
   CASH_DEPOSIT: 'payment.deposit',
   CASH_POSITION_VIEW: 'payment.cash_position',
@@ -173,7 +181,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.CLIENT_MANAGE]: 'Add and edit clients',
   [PERMISSIONS.PAYMENT_VIEW]: 'View payments',
   [PERMISSIONS.PAYMENT_RECORD]: 'Record payments',
-  [PERMISSIONS.PAYMENT_DELETE]: 'Delete payments',
+  [PERMISSIONS.PAYMENT_DELETE]: 'Take a receipt back',
   [PERMISSIONS.CASH_DEPOSIT]: 'Record bank deposits',
   // The key stays as it is: renaming a permission string would silently strip
   // it from every role a tenant has already saved.

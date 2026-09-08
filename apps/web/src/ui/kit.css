@@ -1174,3 +1174,10 @@
 .timeline-row[data-kind='deleted'] .timeline-dot { background: var(--danger); }
 
 .timeline-reason { font-style: italic; }
+
+/** An action that belongs at the end of a card rather than beside a label. */
+.row-right {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-sm);
+}

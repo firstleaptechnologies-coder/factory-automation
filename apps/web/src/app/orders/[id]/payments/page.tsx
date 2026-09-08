@@ -55,6 +55,9 @@ function Payments({ orderId }: { orderId: string }) {
   const [bankedNow, setBankedNow] = useState('');
   const [depositFor, setDepositFor] = useState<string | null>(null);
   const [depositAmount, setDepositAmount] = useState('');
+  /* Which receipt is being taken back, and why. */
+  const [reverseFor, setReverseFor] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +78,28 @@ function Payments({ orderId }: { orderId: string }) {
       summary.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Take a receipt back.
+   *
+   * Nothing is deleted: what this records is the opposite of the receipt, so
+   * both rows stand and the reason is what explains the pair.
+   */
+  const takeBack = async () => {
+    if (!reverseFor) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.reversePayment(reverseFor, reason.trim());
+      setReverseFor(null);
+      setReason('');
+      summary.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not take it back');
     } finally {
       setBusy(false);
     }
@@ -167,11 +192,16 @@ function Payments({ orderId }: { orderId: string }) {
           {data.payments.map((payment) => {
             const banked = payment.deposits.reduce((sum, d) => sum + Number(d.amount), 0);
             const inHand = Number(payment.amount) - banked;
+            /* The row that took an earlier receipt back, and the one it took. */
+            const isCorrection = Boolean(payment.reversalOfId);
+            const wasTakenBack = Boolean(payment.reversedBy);
             return (
               <Card key={payment.id} size="sm">
                 <div className="row-between">
                   <div>
-                    <div className="t-h3">{formatInr(payment.amount)}</div>
+                    <div className={isCorrection ? 't-h3 danger' : 't-h3'}>
+                      {formatInr(payment.amount)}
+                    </div>
                     <div className="t-tiny muted">
                       {formatDateTime(payment.receivedAt)}
                       {payment.receivedBy ? ` · ${payment.receivedBy.name}` : ''}
@@ -179,16 +209,34 @@ function Payments({ orderId }: { orderId: string }) {
                     </div>
                   </div>
                   <Pill
-                    label={payment.mode}
-                    color={payment.mode === 'CASH' ? 'var(--warning)' : 'var(--info)'}
+                    label={isCorrection ? 'Taken back' : payment.mode}
+                    color={
+                      isCorrection
+                        ? 'var(--danger)'
+                        : payment.mode === 'CASH'
+                          ? 'var(--warning)'
+                          : 'var(--info)'
+                    }
                   />
                 </div>
-                {payment.mode === 'CASH' ? (
+
+                {/* Why, on the correction — the half a figure cannot hold. */}
+                {payment.reason ? (
+                  <div className="t-tiny warning timeline-reason">“{payment.reason}”</div>
+                ) : null}
+
+                {wasTakenBack ? (
+                  <div className="t-tiny danger">
+                    Taken back on {formatDateTime(payment.reversedBy?.receivedAt)}
+                  </div>
+                ) : null}
+
+                {payment.mode === 'CASH' && !isCorrection ? (
                   <div className="row-between" style={{ marginTop: 'var(--s-md)' }}>
                     <span className="t-tiny muted">
                       banked {formatInr(banked)} · in hand {formatInr(inHand)}
                     </span>
-                    {can(PERMISSIONS.CASH_DEPOSIT) && inHand > 0.009 ? (
+                    {can(PERMISSIONS.CASH_DEPOSIT) && !wasTakenBack && inHand > 0.009 ? (
                       <Chip
                         label="Bank it"
                         onClick={() => {
@@ -197,6 +245,12 @@ function Payments({ orderId }: { orderId: string }) {
                         }}
                       />
                     ) : null}
+                  </div>
+                ) : null}
+
+                {can(PERMISSIONS.PAYMENT_DELETE) && !isCorrection && !wasTakenBack ? (
+                  <div className="row-right" style={{ marginTop: 'var(--s-md)' }}>
+                    <Chip label="Take it back" onClick={() => setReverseFor(payment.id)} />
                   </div>
                 ) : null}
               </Card>
@@ -247,6 +301,32 @@ function Payments({ orderId }: { orderId: string }) {
           loading={busy}
           disabled={!amount || Number(amount) <= 0}
           onClick={record}
+        />
+      </Sheet>
+
+      <Sheet
+        open={Boolean(reverseFor)}
+        title="Take this receipt back?"
+        subtitle="It stays on the record with a correction beside it"
+        onClose={() => {
+          setReverseFor(null);
+          setReason('');
+        }}>
+        <Field
+          label="Why is it being taken back?"
+          value={reason}
+          onChange={setReason}
+          autoFocus
+        />
+        {error ? <p className="t-small danger">{error}</p> : null}
+        <Button
+          title="Take it back"
+          block
+          loading={busy}
+          // A row saying money was taken back without saying why is the same
+          // problem as deleting it, one step removed.
+          disabled={reason.trim().length < 3}
+          onClick={takeBack}
         />
       </Sheet>
 

@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { PERMISSIONS } from '@decor/shared';
 import { PaymentsService } from './payments.service';
 import {
   CashPositionQueryDto,
   RecordDepositDto,
   RecordPaymentDto,
+  ReversePaymentDto,
   TransactionQueryDto,
 } from './dto/payment.dto';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
@@ -40,10 +41,20 @@ export class PaymentsController {
     return this.payments.record(orderId, dto, user?.id);
   }
 
+  /**
+   * Take a receipt back.
+   *
+   * A POST rather than a DELETE, because nothing is deleted: the correction is
+   * a new row that takes the old one back, and it needs a reason to carry.
+   */
   @RequirePermissions(PERMISSIONS.PAYMENT_DELETE)
-  @Delete('payments/:paymentId')
-  remove(@Param('paymentId') paymentId: string) {
-    return this.payments.remove(paymentId);
+  @Post('payments/:paymentId/reverse')
+  reverse(
+    @Param('paymentId') paymentId: string,
+    @Body() dto: ReversePaymentDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.payments.reverse(paymentId, dto.reason, user?.id);
   }
 
   @RequirePermissions(PERMISSIONS.CASH_DEPOSIT)

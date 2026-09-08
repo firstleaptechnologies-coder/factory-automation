@@ -107,6 +107,15 @@ export interface Payment {
   receivedAt: string;
   receivedBy?: { id: string; name: string } | null;
   deposits: CashDeposit[];
+  /**
+   * Set on a row that takes an earlier receipt back — its amount is negative.
+   * A receipt is never edited or deleted; it is corrected by its opposite.
+   */
+  reversalOfId?: string | null;
+  /** Why it was taken back. On the correction, not on the original. */
+  reason?: string | null;
+  /** Present on a receipt that has since been taken back. */
+  reversedBy?: { id: string; receivedAt: string; reason?: string | null } | null;
 }
 
 export interface PaymentSummary {

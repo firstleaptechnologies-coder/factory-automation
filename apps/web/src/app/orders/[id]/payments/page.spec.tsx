@@ -7,6 +7,7 @@ const apiMock = {
   paymentSummary: jest.fn(),
   recordPayment: jest.fn(),
   recordDeposit: jest.fn(),
+  reversePayment: jest.fn(),
 };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
@@ -324,5 +325,89 @@ describe('banking cash that was collected', () => {
     fireEvent.click(screen.getByText('Bank it'));
     fireEvent.click(await screen.findByText('Record deposit'));
     expect(await screen.findByText('More than was collected')).toBeInTheDocument();
+  });
+});
+
+
+/**
+ * Taking a receipt back.
+ *
+ * Nothing is deleted, so the page has to show both halves: the receipt that
+ * was entered and the row that took it back, with the reason on it.
+ */
+describe('taking a receipt back', () => {
+  const withReversal = {
+    ...SUMMARY,
+    payments: [
+      payment({ reversedBy: { id: 'p3', receivedAt: '2026-09-08T10:00:00.000Z' } }),
+      payment({
+        id: 'p3',
+        amount: '-20000',
+        receivedAt: '2026-09-08T10:00:00.000Z',
+        reversalOfId: 'p1',
+        reason: 'Entered against the wrong order',
+      }),
+    ],
+  };
+
+  it('offers it only to somebody allowed to', async () => {
+    granted = [PERMISSIONS.PAYMENT_VIEW];
+    await open(SUMMARY);
+    expect(screen.queryByText('Take it back')).not.toBeInTheDocument();
+
+    granted = [PERMISSIONS.PAYMENT_VIEW, PERMISSIONS.PAYMENT_DELETE];
+    await open(SUMMARY);
+    expect(screen.getByText('Take it back')).toBeInTheDocument();
+  });
+
+  it('will not go ahead without a reason', async () => {
+    granted = [PERMISSIONS.PAYMENT_VIEW, PERMISSIONS.PAYMENT_DELETE];
+    await open(SUMMARY);
+    await act(async () => {
+      fireEvent.click(screen.getByText('Take it back'));
+    });
+
+    // A row saying money was taken back without saying why is deleting it, one
+    // step removed.
+    const confirm = screen.getAllByRole('button', { name: 'Take it back' }).at(-1)!;
+    expect(confirm).toBeDisabled();
+  });
+
+  it('sends the reason with it', async () => {
+    granted = [PERMISSIONS.PAYMENT_VIEW, PERMISSIONS.PAYMENT_DELETE];
+    apiMock.reversePayment.mockResolvedValue({});
+    await open(SUMMARY);
+    await act(async () => {
+      fireEvent.click(screen.getByText('Take it back'));
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Why is it being taken back?'), {
+        target: { value: 'Entered against the wrong order' },
+      });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'Take it back' }).at(-1)!);
+    });
+
+    expect(apiMock.reversePayment).toHaveBeenCalledWith('p1', 'Entered against the wrong order');
+  });
+
+  it('shows the correction as its own row, with why', async () => {
+    granted = [PERMISSIONS.PAYMENT_VIEW];
+    await open(withReversal);
+    expect(screen.getByText('Taken back')).toBeInTheDocument();
+    expect(screen.getByText(/Entered against the wrong order/)).toBeInTheDocument();
+  });
+
+  it('says on the original that it was taken back', async () => {
+    granted = [PERMISSIONS.PAYMENT_VIEW];
+    await open(withReversal);
+    expect(screen.getByText(/Taken back on/)).toBeInTheDocument();
+  });
+
+  it('does not offer to bank cash that has been taken back', async () => {
+    granted = [PERMISSIONS.PAYMENT_VIEW, PERMISSIONS.CASH_DEPOSIT];
+    await open(withReversal);
+    expect(screen.queryByText('Bank it')).not.toBeInTheDocument();
   });
 });

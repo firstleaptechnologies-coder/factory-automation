@@ -6,11 +6,13 @@ import { PaymentsScreen } from './PaymentsScreen';
 const mockPaymentSummary = jest.fn();
 const mockRecordPayment = jest.fn();
 const mockRecordDeposit = jest.fn();
+const mockReversePayment = jest.fn();
 jest.mock('../api/client', () => ({
   api: {
     paymentSummary: (...args: unknown[]) => mockPaymentSummary(...args),
     recordPayment: (...args: unknown[]) => mockRecordPayment(...args),
     recordDeposit: (...args: unknown[]) => mockRecordDeposit(...args),
+    reversePayment: (...args: unknown[]) => mockReversePayment(...args),
   },
 }));
 
@@ -67,6 +69,7 @@ beforeEach(() => {
   mockPermissions = [PERMISSIONS.PAYMENT_RECORD, PERMISSIONS.CASH_DEPOSIT];
   mockRecordPayment.mockResolvedValue({});
   mockRecordDeposit.mockResolvedValue({});
+  mockReversePayment.mockResolvedValue({});
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -252,5 +255,86 @@ describe('banking cash', () => {
     await fireEvent.press(screen.getByText('Bank it'));
     await fireEvent.press(await screen.findByText('Record deposit'));
     await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+  });
+});
+
+
+/**
+ * Taking a receipt back.
+ *
+ * Nothing is deleted, so the screen has to show both halves: the receipt that
+ * was entered, and the row that took it back, with the reason on it.
+ */
+describe('taking a receipt back', () => {
+  const withReversal = {
+    ...SUMMARY,
+    payments: [
+      { ...SUMMARY.payments[0], reversedBy: { id: 'p3', receivedAt: '2026-09-05T10:00:00Z' } },
+      {
+        id: 'p3',
+        amount: '-12000',
+        mode: 'CASH',
+        receivedAt: '2026-09-05T10:00:00Z',
+        receivedBy: { name: 'Nakul' },
+        reference: null,
+        deposits: [],
+        reversalOfId: 'p1',
+        reason: 'Entered against the wrong order',
+      },
+    ],
+  };
+
+  it('offers it only to somebody allowed to', async () => {
+    await mount();
+    expect(screen.queryByText('Take it back')).toBeNull();
+
+    mockPermissions = [PERMISSIONS.PAYMENT_RECORD, PERMISSIONS.PAYMENT_DELETE];
+    await mount();
+    expect(screen.getAllByText('Take it back').length).toBeGreaterThan(0);
+  });
+
+  it('asks why, and refuses to go ahead without an answer', async () => {
+    mockPermissions = [PERMISSIONS.PAYMENT_DELETE];
+    const prompts: { onPress?: (text?: string) => void }[] = [];
+    jest.spyOn(Alert, 'prompt').mockImplementation(((_t: string, _m: string, buttons: unknown) => {
+      (buttons as { onPress?: (text?: string) => void }[]).forEach((b) => prompts.push(b));
+    }) as never);
+
+    await mount();
+    await fireEvent.press(screen.getAllByText('Take it back')[0]);
+    await prompts[1].onPress?.('   ');
+
+    expect(mockReversePayment).not.toHaveBeenCalled();
+  });
+
+  it('sends the reason with it', async () => {
+    mockPermissions = [PERMISSIONS.PAYMENT_DELETE];
+    const prompts: { onPress?: (text?: string) => void }[] = [];
+    jest.spyOn(Alert, 'prompt').mockImplementation(((_t: string, _m: string, buttons: unknown) => {
+      (buttons as { onPress?: (text?: string) => void }[]).forEach((b) => prompts.push(b));
+    }) as never);
+
+    await mount();
+    await fireEvent.press(screen.getAllByText('Take it back')[0]);
+    await prompts[1].onPress?.('Entered against the wrong order');
+
+    expect(mockReversePayment).toHaveBeenCalledWith('p1', 'Entered against the wrong order');
+  });
+
+  it('shows the correction as its own row, with why', async () => {
+    await mount(withReversal);
+    expect(screen.getByText('Taken back')).toBeTruthy();
+    expect(screen.getByText(/Entered against the wrong order/)).toBeTruthy();
+  });
+
+  it('says on the original that it was taken back', async () => {
+    await mount(withReversal);
+    expect(screen.getByText(/Taken back on/)).toBeTruthy();
+  });
+
+  it('does not offer to bank cash that has been taken back', async () => {
+    mockPermissions = [PERMISSIONS.CASH_DEPOSIT, PERMISSIONS.PAYMENT_DELETE];
+    await mount(withReversal);
+    expect(screen.queryByText('Bank it')).toBeNull();
   });
 });

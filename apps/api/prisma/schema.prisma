@@ -123,6 +123,75 @@ model JobRun {
   @@index([startedAt])
 }
 
+/// One row per call into the API that changed something, or failed.
+///
+/// Kept apart from the audit trail on purpose. The trail is a shop's own
+/// business record and lives in their database; this is ours — how the product
+/// is behaving, which calls are slow, what is failing and for whom. It spans
+/// tenants because that is the only way to see a pattern, and it is written to
+/// the platform database for the same reason: a dedicated tenant's database
+/// would hide it.
+///
+/// Successful reads are not recorded. They are most of the traffic and say the
+/// least, and a log nobody can afford to keep is a log nobody keeps.
+model ServerLog {
+  id String @id @default(cuid())
+  /// Whose workspace it was. No FK: the row outlives the tenant.
+  tenantId   String?
+  tenantSlug String?
+  /// Dotted name of what was called: `OrdersController.changeStatus`.
+  action     String
+  method     String
+  path       String
+  status     Int
+  /// ok — it worked. refused — the caller was told no. failed — we broke.
+  outcome    String
+  durationMs Int
+  userId     String?
+  actorLabel String?
+  /// Which client it came from, when it said: `web`, `app`.
+  client     String?
+  error      String?
+  /// The same short code the caller was shown, so a phone call finds this row.
+  reference  String?
+  at         DateTime @default(now())
+
+  @@index([at])
+  @@index([outcome, at])
+  @@index([action, at])
+  @@index([tenantId, at])
+  @@index([reference])
+}
+
+/// What the app and the browser saw.
+///
+/// A crash on the shop floor is otherwise something somebody has to describe
+/// over the phone. The clients queue these and send them in batches, so a
+/// device that is offline in a workshop still reports what happened once it is
+/// back on the network.
+model ClientLog {
+  id         String   @id @default(cuid())
+  tenantId   String?
+  userId     String?
+  /// `app` or `web`.
+  client     String
+  /// `ios`, `android`, or the browser's own name.
+  platform   String?
+  appVersion String?
+  /// info | warn | error
+  level      String
+  message    String
+  /// Whatever the client thought was worth sending with it. Never a token.
+  context    Json?
+  /// When it happened on the device, which is not when it arrived.
+  at         DateTime
+  receivedAt DateTime @default(now())
+
+  @@index([at])
+  @@index([level, at])
+  @@index([tenantId, at])
+}
+
 /// A named set of permissions inside one tenant.
 ///
 /// Roles are per-tenant rather than a fixed enum because every shop divides
@@ -833,6 +902,18 @@ model Payment {
   receivedBy   User?    @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
   createdAt    DateTime @default(now())
 
+  /// The receipt this one takes back, when it is a correction rather than money.
+  ///
+  /// A receipt is never edited and never deleted. A mistake is corrected by
+  /// recording its opposite, which leaves both rows standing: what was entered,
+  /// what took it back, who did it and why. That is what makes it impossible
+  /// for an order to be made to look settled by money that was never collected.
+  reversalOfId String?  @unique
+  reversalOf   Payment? @relation("PaymentReversal", fields: [reversalOfId], references: [id])
+  reversedBy   Payment? @relation("PaymentReversal")
+  /// Why it was taken back. Required to reverse one.
+  reason       String?
+
   /// Only meaningful for CASH: where that cash went afterwards.
   deposits CashDeposit[]
 
@@ -862,6 +943,13 @@ model CashDeposit {
   depositedById String?
   depositedBy   User?    @relation("CashDepositedBy", fields: [depositedById], references: [id])
   createdAt     DateTime @default(now())
+
+  /// The deposit this one takes back. Reversing a receipt whose cash had
+  /// already been banked has to take the banking back with it, or the shop's
+  /// cash position is short by money that never left the drawer.
+  reversalOfId String?      @unique
+  reversalOf   CashDeposit? @relation("DepositReversal", fields: [reversalOfId], references: [id])
+  reversedBy   CashDeposit? @relation("DepositReversal")
 
   @@index([paymentId])
   @@index([depositedAt])

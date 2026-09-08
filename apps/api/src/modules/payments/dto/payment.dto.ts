@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  MinLength,
 } from 'class-validator';
 import { PaymentMode } from '@prisma/client';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
@@ -42,6 +43,16 @@ export class RecordDepositDto {
   @IsOptional() @IsString() note?: string;
   /** Omit to record a deposit that is not tied to one order's cash. */
   @IsOptional() @IsString() paymentId?: string;
+}
+
+/**
+ * Taking a receipt back.
+ *
+ * The reason is not optional. A row that says money was taken back without
+ * saying why is the same problem as deleting it, one step removed.
+ */
+export class ReversePaymentDto {
+  @IsString() @MinLength(3) reason!: string;
 }
 
 export class CashPositionQueryDto {

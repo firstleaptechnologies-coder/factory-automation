@@ -173,9 +173,11 @@ describe('money', () => {
     ]);
   });
 
-  it('guards deleting a receipt more tightly than taking one', () => {
+  it('guards taking a receipt back more tightly than taking one', () => {
     // Not even the default Manager role carries this one.
-    expect(find('PaymentsController', 'remove').permissions).toEqual(['payment.delete']);
+    // The key still says delete; nothing is deleted any more. Taking a receipt
+    // back is a new row that reverses it, and this is who may do that.
+    expect(find('PaymentsController', 'reverse').permissions).toEqual(['payment.delete']);
   });
 
   it('guards reading and writing payouts apart', () => {
@@ -210,7 +212,7 @@ describe('what the roles a shop starts with can reach', () => {
   };
 
   it('lets the owner do everything with money', () => {
-    for (const handler of ['summary', 'record', 'deposit', 'remove', 'cashPosition']) {
+    for (const handler of ['summary', 'record', 'deposit', 'reverse', 'cashPosition']) {
       expect(may('OWNER', 'PaymentsController', handler)).toBe(true);
     }
   });
@@ -238,7 +240,7 @@ describe('what the roles a shop starts with can reach', () => {
     expect(may('MANAGER', 'PaymentsController', 'deposit')).toBe(true);
     expect(may('MANAGER', 'PaymentsController', 'cashPosition')).toBe(true);
     // The one thing the seeded Manager is deliberately not given.
-    expect(may('MANAGER', 'PaymentsController', 'remove')).toBe(false);
+    expect(may('MANAGER', 'PaymentsController', 'reverse')).toBe(false);
   });
 
   it('keeps payouts to whoever the shop trusts with them', () => {
