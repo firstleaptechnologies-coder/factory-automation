@@ -108,6 +108,15 @@ describe('transport', () => {
   it('builds the estimate document URL off the same base', () => {
     expect(build().estimateDocumentUrl('e1')).toBe('https://api.test/estimates/e1/document');
   });
+
+  it('builds the three document URLs off the same base', () => {
+    // All three are fetched as text and turned into a PDF on the device, so
+    // they have to be absolute rather than relative to whatever screen asked.
+    const api = build();
+    expect(api.invoiceDocumentUrl('i1')).toBe('https://api.test/invoices/i1/document');
+    expect(api.challanDocumentUrl('d1')).toBe('https://api.test/challans/d1/document');
+    expect(api.creditNoteDocumentUrl('c1')).toBe('https://api.test/credit-notes/c1/document');
+  });
 });
 
 describe('errors', () => {
@@ -344,6 +353,31 @@ describe('endpoints', () => {
       'GET',
       '/stock/waste',
     ],
+
+    ['invoices', (a) => a.invoices(), 'GET', '/invoices'],
+    ['invoice', (a) => a.invoice('i1'), 'GET', '/invoices/i1'],
+    ['orderInvoice', (a) => a.orderInvoice('o1'), 'GET', '/orders/o1/invoice'],
+    ['raiseInvoice', (a) => a.raiseInvoice('o1'), 'POST', '/orders/o1/invoice'],
+    ['cancelInvoice', (a) => a.cancelInvoice('i1', 'wrong client'), 'POST', '/invoices/i1/cancel'],
+    ['challans', (a) => a.challans(), 'GET', '/challans'],
+    ['challan', (a) => a.challan('d1'), 'GET', '/challans/d1'],
+    ['issueChallan', (a) => a.issueChallan('o1'), 'POST', '/orders/o1/challan'],
+    ['cancelChallan', (a) => a.cancelChallan('d1', 'van sent back'), 'POST', '/challans/d1/cancel'],
+    ['creditNotes', (a) => a.creditNotes(), 'GET', '/credit-notes'],
+    ['creditNote', (a) => a.creditNote('c1'), 'GET', '/credit-notes/c1'],
+    [
+      'creditInvoice',
+      (a) => a.creditInvoice('i1', { taxable: 100, reason: 'RETURN', note: 'two panels back' }),
+      'POST',
+      '/invoices/i1/credit-notes',
+    ],
+    [
+      'cancelCreditNote',
+      (a) => a.cancelCreditNote('c1', 'raised twice'),
+      'POST',
+      '/credit-notes/c1/cancel',
+    ],
+    ['orderReceivable', (a) => a.orderReceivable('o1'), 'GET', '/orders/o1/receivable'],
 
     ['letterTemplates', (a) => a.letterTemplates(), 'GET', '/letters/templates'],
     [

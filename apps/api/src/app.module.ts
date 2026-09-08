@@ -40,6 +40,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { LettersModule } from './modules/letters/letters.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
+import { DocumentsModule } from './modules/documents/documents.module';
 import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
@@ -83,6 +84,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     LettersModule,
     VendorsModule,
     PurchasesModule,
+    DocumentsModule,
     EstimatesModule,
     PlatformModule,
   ],

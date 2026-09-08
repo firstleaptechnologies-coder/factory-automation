@@ -901,6 +901,8 @@ model Order {
   ledgerEntries LedgerEntry[]
   expenses      Expense[]
   stockMoves    StockMove[]
+  invoice       Invoice?
+  challans      Challan[]
   /// Set when this order came from a lead.
   fromLead      Lead?                @relation("LeadConversion")
 
@@ -1930,6 +1932,237 @@ enum StockMoveKind {
   ADJUSTMENT
   /// Sent back to the vendor.
   RETURN
+}
+
+// ---------------------------------------------------------------------------
+// Documents: invoices, challans and credit notes
+// ---------------------------------------------------------------------------
+//
+// None of these post to the ledger, and that is deliberate. An invoice is a
+// claim, not a movement of money; the payment against it is the movement, and
+// that already posts. Posting both would count the same rupees twice, and the
+// cash position — the figure this shop actually asks about — would be wrong by
+// everything it had billed and not yet been paid.
+
+/// Where a document stands.
+///
+/// A number, once used, is used. An invoice is cancelled rather than deleted
+/// and its number is never reissued: a gap in the series is the first thing an
+/// assessing officer asks about.
+enum DocumentStatus {
+  ISSUED
+  CANCELLED
+}
+
+/// A tax invoice, raised from an order.
+///
+/// One per order. Progressive billing would mean deciding which lines belong
+/// to which invoice, and this shop bills a job when it goes out — so a
+/// correction is a credit note rather than a second invoice, which is what the
+/// GST rules expect anyway.
+///
+/// Everything on it is snapshotted. An invoice printed next year has to be the
+/// document that was issued, not a fresh render of whatever the client's
+/// address and the shop's rates happen to be by then.
+model Invoice {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  /// INV-2627-0001, gapless within the financial year.
+  code     String
+
+  orderId String  @unique
+  order   Order   @relation(fields: [orderId], references: [id])
+  status  DocumentStatus @default(ISSUED)
+
+  issuedOn DateTime  @db.Date
+  /// When it is due, from the terms agreed. Nothing chases it yet.
+  dueOn    DateTime? @db.Date
+
+  /// The client, as they were when it was raised.
+  clientName    String
+  clientGstin   String?
+  clientAddress String?
+  clientState   String?
+  /// The shop, as it was when it was raised.
+  firmName      String
+  firmGstin     String?
+  firmState     String?
+
+  /// True when the two states differ: IGST rather than CGST + SGST. Decided
+  /// once, here, so a reprint cannot change which pair is on the paper.
+  interState Boolean @default(false)
+
+  /// The money, snapshotted from the order.
+  subtotal Decimal @db.Decimal(14, 2)
+  discount Decimal @db.Decimal(14, 2) @default(0)
+  taxable  Decimal @db.Decimal(14, 2)
+  cgst     Decimal @db.Decimal(14, 2) @default(0)
+  sgst     Decimal @db.Decimal(14, 2) @default(0)
+  igst     Decimal @db.Decimal(14, 2) @default(0)
+  total    Decimal @db.Decimal(14, 2)
+  /// The total in words, as it has to appear on the paper.
+  totalInWords String
+
+  terms String?
+  note  String?
+
+  /// Why it was cancelled. Required to cancel one.
+  cancelReason String?
+  cancelledAt  DateTime?
+
+  issuedById String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  items       InvoiceItem[]
+  creditNotes CreditNote[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, issuedOn])
+  @@index([tenantId, status])
+  @@index([tenantId])
+}
+
+/// One line of an invoice, as it was printed.
+model InvoiceItem {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  /// Free text, snapshotted: the material and size as they were described.
+  description String
+  /// The HSN code, which a tax invoice has to carry.
+  hsn         String?
+  quantity    Decimal @db.Decimal(14, 3)
+  unit        String  @default("nos")
+  rate        Decimal @db.Decimal(14, 2)
+  amount      Decimal @db.Decimal(14, 2)
+  gstRatePct  Decimal @db.Decimal(5, 2) @default(0)
+  taxAmount   Decimal @db.Decimal(14, 2) @default(0)
+
+  sortOrder Int @default(0)
+
+  @@index([tenantId, invoiceId])
+  @@index([tenantId])
+}
+
+/// A delivery challan: what went out of the door.
+///
+/// No prices on it. A challan travels with the goods and is read by whoever
+/// receives them; what the job cost is between the shop and whoever ordered it.
+model Challan {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  /// DC-2627-0001.
+  code     String
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+  status  DocumentStatus @default(ISSUED)
+
+  issuedOn DateTime @db.Date
+  /// Where it went, which is not always the client's billing address.
+  shipTo   String?
+  /// Who carried it, and on what.
+  transport String?
+  vehicle   String?
+
+  note         String?
+  cancelReason String?
+  cancelledAt  DateTime?
+
+  issuedById String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  items ChallanItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, orderId])
+  @@index([tenantId])
+}
+
+/// One line of a challan: what it was and how many, and nothing about money.
+model ChallanItem {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
+  id        String  @id @default(cuid())
+  challanId String
+  challan   Challan @relation(fields: [challanId], references: [id], onDelete: Cascade)
+
+  description String
+  quantity    Decimal @db.Decimal(14, 3)
+  unit        String  @default("nos")
+  sortOrder   Int     @default(0)
+
+  @@index([tenantId, challanId])
+  @@index([tenantId])
+}
+
+/// Why a credit note was raised.
+///
+/// Named rather than free text because the reason changes what an accountant
+/// does with it, and because "why is this client being charged less" is a
+/// question the owner should be able to answer from a list.
+enum CreditReason {
+  /// Goods came back.
+  RETURN
+  /// The rate or the quantity on the invoice was wrong.
+  CORRECTION
+  /// Agreed after the fact — a discount, a settlement.
+  ALLOWANCE
+  /// The work was not done, or not to standard.
+  CANCELLED_WORK
+}
+
+/// A credit note against an invoice.
+///
+/// It reduces what the client owes; it is not a payment and never counts as
+/// one. Whatever is credited appears on the order as its own line, beside what
+/// was actually collected — an order that was billed ₹50,000, credited ₹5,000
+/// and paid ₹45,000 is settled, and the paper says exactly that rather than
+/// showing ₹50,000 received.
+model CreditNote {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  /// CN-2627-0001.
+  code     String
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  status    DocumentStatus @default(ISSUED)
+
+  issuedOn DateTime     @db.Date
+  reason   CreditReason
+  /// In the shop's own words, and required. A figure that reduced what somebody
+  /// owed with no sentence beside it is the thing the books must never carry.
+  note     String
+
+  /// The money. The GST is reversed in the same proportion the invoice charged
+  /// it, so a credit note against an IGST invoice reverses IGST.
+  taxable Decimal @db.Decimal(14, 2)
+  cgst    Decimal @db.Decimal(14, 2) @default(0)
+  sgst    Decimal @db.Decimal(14, 2) @default(0)
+  igst    Decimal @db.Decimal(14, 2) @default(0)
+  total   Decimal @db.Decimal(14, 2)
+  totalInWords String
+
+  cancelReason String?
+  cancelledAt  DateTime?
+
+  issuedById String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, issuedOn])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------

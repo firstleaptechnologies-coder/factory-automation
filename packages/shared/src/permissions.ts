@@ -108,6 +108,20 @@ export const PERMISSIONS = {
   STOCK_VIEW: 'stock.view',
   STOCK_MOVE: 'stock.move',
 
+  // The paper the shop gives people. Raising a bill is the sales desk's job;
+  // voiding one and crediting one are the accountant's, and are held apart
+  // because they are the two acts that make a claim worth less than it says.
+  INVOICE_VIEW: 'invoice.view',
+  INVOICE_ISSUE: 'invoice.issue',
+  INVOICE_CANCEL: 'invoice.cancel',
+  /**
+   * Reducing what a client owes.
+   *
+   * The tightest key in the product: it is the one act that makes money owed
+   * disappear without a rupee moving, and it never counts as a payment.
+   */
+  CREDIT_NOTE_ISSUE: 'credit_note.issue',
+
   // Shop configuration
   CONFIG_VIEW: 'config.view',
   CONFIG_MANAGE: 'config.manage',
@@ -205,6 +219,15 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
     ],
   },
   {
+    label: 'Invoices and credit notes',
+    permissions: [
+      PERMISSIONS.INVOICE_VIEW,
+      PERMISSIONS.INVOICE_ISSUE,
+      PERMISSIONS.INVOICE_CANCEL,
+      PERMISSIONS.CREDIT_NOTE_ISSUE,
+    ],
+  },
+  {
     label: 'Expenses',
     permissions: [
       PERMISSIONS.EXPENSE_VIEW,
@@ -290,6 +313,10 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.PAYMENT_VIEW]: 'View payments',
   [PERMISSIONS.PAYMENT_RECORD]: 'Record payments',
   [PERMISSIONS.PAYMENT_DELETE]: 'Take a receipt back',
+  [PERMISSIONS.INVOICE_VIEW]: 'See invoices, challans and credit notes',
+  [PERMISSIONS.INVOICE_ISSUE]: 'Raise an invoice or a challan',
+  [PERMISSIONS.INVOICE_CANCEL]: 'Cancel a document',
+  [PERMISSIONS.CREDIT_NOTE_ISSUE]: 'Credit an invoice',
   [PERMISSIONS.EXPENSE_VIEW]: 'View expenses',
   [PERMISSIONS.EXPENSE_MANAGE]: 'Record and edit expenses',
   [PERMISSIONS.EXPENSE_CONFIG]: 'Edit the expense dropdowns',
@@ -364,6 +391,9 @@ export const DEFAULT_ROLES: {
       PERMISSIONS.CLIENT_VIEW, PERMISSIONS.CLIENT_MANAGE,
       PERMISSIONS.PAYMENT_VIEW, PERMISSIONS.PAYMENT_RECORD,
       PERMISSIONS.PRICING_EDIT, PERMISSIONS.CONFIG_VIEW,
+      // They bill the job they sold, and read the paper on it. Voiding an
+      // invoice and crediting one are deliberately not here.
+      PERMISSIONS.INVOICE_VIEW, PERMISSIONS.INVOICE_ISSUE,
     ],
   },
   {

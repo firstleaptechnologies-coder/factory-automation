@@ -442,6 +442,25 @@ export function OrderDetailScreen({ route, navigation }: { route: any; navigatio
         </Card>
       ) : null}
 
+      {can(PERMISSIONS.INVOICE_VIEW) && Number(data.grandTotal) > 0 ? (
+        <Card
+          tone="dark"
+          style={{ marginTop: spacing.md }}
+          onPress={() =>
+            navigation.navigate('OrderInvoice', { orderId, orderCode: data.code })
+          }>
+          <View style={styles.moneyFootFlush}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="label" tone="muted">Invoice and challans</Text>
+              <Text variant="tiny" tone="faint">
+                The bill for this job, and the paper that went out with the goods.
+              </Text>
+            </View>
+            <Icon name="chevronRight" size={14} color={palette.textFaint} />
+          </View>
+        </Card>
+      ) : null}
+
       {can(PERMISSIONS.DISBURSEMENT_VIEW) && Number(data.grandTotal) > 0 ? (
         <Card
           tone="dark"

@@ -483,23 +483,63 @@ blocks anything, and the second wants a commercial answer first — see G11.
   fails on the next one that is neither shown nor deliberately excluded with a
   written reason.
 
-### Phase 7 · Documents — item 10, and the invoice it needs — **M**
+### Phase 7 · Documents — item 10, and the invoice it needs — **M** · *complete, 9 September 2026*
 
-**Credit notes cannot be built first.** A credit note is issued against an
-invoice, and this product has no invoice document — it has estimates, orders,
-GST maths and a `DocumentSequence` counter, which is most of the way there and
-not the thing itself.
+**Credit notes could not be built first.** A credit note is issued against an
+invoice, and the product had no invoice document — it had estimates, orders, GST
+maths and a `DocumentSequence` counter, which is most of the way there and not
+the thing itself. So the invoice came first and the credit note hangs off it.
 
-- **Tax invoice**: financial-year-aware, gapless numbering; the firm's own
-  particulars from `FirmProfile`; CGST/SGST/IGST split already implemented in
-  `pricing.ts`; issued from an order. *Decided 8 September: raised from this
-  system, on demand — somebody asks for it and it downloads.*
-- **Delivery challan** for dispatch.
-- **Credit note** against an invoice, with a reason, the GST reversal, its
-  effect on receivables and its posting to the ledger. Debit note if they raise
-  them.
-- E-invoice (IRN) and e-way bill behind an entitlement — needed only above the
-  turnover threshold, but the invoice model should not have to change when it is.
+- **Nothing here posts to the ledger**, and that is the decision the module
+  turns on. An invoice is a claim, not a movement of money; the payment against
+  it is the movement, and that already posts. Posting both would count the same
+  rupees twice and leave the cash position — the figure this shop actually asks
+  about — wrong by everything it had billed and not been paid.
+- **Tax invoice**, financial-year dated and gapless within the year (`INV-2627-0001`),
+  raised from an order and **one per order**. Progressive billing would mean
+  deciding which lines belong to which invoice; this shop bills a job when it
+  goes out, so a correction is a credit note — which is what the GST rules
+  expect anyway. Everything on it is snapshotted at the moment of issue: the
+  client's particulars, the shop's, the rates, and whether the supply crossed a
+  state line. A reprint next year is the paper that went out, not a fresh render
+  of what things have become since.
+- **A number, once used, is used.** An invoice is cancelled, never deleted, and
+  its number is never reissued — a gap in the series is the first thing an
+  assessing officer asks about. Cancelling requires a reason, and the printed
+  document is stamped across its face with it. An invoice with a live credit
+  note against it cannot be cancelled at all.
+- **Delivery challan** (`DC-2627-0001`), with **no money on it anywhere** — not
+  on the screen and not on the paper. It travels with the goods and is read by
+  whoever takes delivery; what the job cost is between the shop and whoever
+  ordered it. More than one per order, unlike an invoice: a job often leaves in
+  two vans on two days. It carries a receiver's signature line, because that
+  signature is the only proof the goods arrived.
+- **Credit note** (`CN-2627-0001`) against an invoice, with a named reason and a
+  sentence in the shop's own words. The GST is reversed in the proportion the
+  invoice charged it — a credit against an IGST invoice reverses IGST — and the
+  total credited can never exceed what was billed, or a bill would turn into
+  money owed to the client, which is a different document. The paper says
+  "Credit Note" in the largest type on it, names the invoice it credits, and
+  states on its face that it is not a receipt.
+- **The receivable is three figures — charged, credited, received — and stays
+  three** on both clients. Credited money is never counted as received: an order
+  billed ₹1,18,000, credited ₹11,800 and paid ₹1,06,200 is settled, and every
+  screen says exactly that rather than showing ₹1,18,000 collected. Nothing
+  folds one into another anywhere.
+- **The defect running it caught.** The first invoice raised against a real
+  order billed a ₹1,18,000 job at **₹0**. Five of the shop's six orders are
+  quoted as one lump figure for the whole job — that figure lives on the order,
+  and its lines carry the material and the size and no money at all — so an
+  invoice that added its lines up billed nothing. The invoice now restates the
+  order's own money rather than recomputing it, which also keeps the two
+  documents reconcilable; and a lump-sum job prints as one line carrying what
+  was agreed, described by the work it was made of, at the rate that was
+  actually charged rather than the slab that applies today.
+
+*Left for later: e-invoice (IRN) and e-way bill behind an entitlement — needed
+only above the turnover threshold, and the invoice model does not have to change
+when they arrive. Debit notes, until the shop raises one. Chasing an overdue
+invoice: `dueOn` is recorded and nothing reads it yet.*
 
 ### Phase 8 · Reports and exports — item 4 — **M**
 

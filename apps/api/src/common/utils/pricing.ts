@@ -158,6 +158,21 @@ export function splitGstComponents(
     Boolean(buyerStateCode) &&
     sellerStateCode !== buyerStateCode;
 
+  return gstComponents(taxAmount, interState);
+}
+
+/**
+ * The same split, when the decision has already been made.
+ *
+ * An invoice stores whether the supply crossed a state line, because a reprint
+ * after the client moves must not change which pair is on the paper that was
+ * issued. It has the answer, not the codes — so it needs this rather than
+ * being made to reconstruct two state codes it no longer has.
+ */
+export function gstComponents(
+  taxAmount: number,
+  interState: boolean,
+): { cgst: number; sgst: number; igst: number } {
   if (interState) return { cgst: 0, sgst: 0, igst: round2(taxAmount) };
 
   const half = round2(taxAmount / 2);

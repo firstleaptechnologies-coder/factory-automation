@@ -347,6 +347,20 @@ function OrderDetail({ orderId }: { orderId: string }) {
             </Card>
           ) : null}
 
+          {can(PERMISSIONS.INVOICE_VIEW) ? (
+            <Card size="sm" onClick={() => router.push(`/orders/${orderId}/invoice`)}>
+              <div className="row-between">
+                <div>
+                  <div className="t-label muted">Invoice and challans</div>
+                  <div className="t-tiny faint">
+                    The bill for this job, and the paper that went out with the goods.
+                  </div>
+                </div>
+                <Icon name="chevronRight" size={14} color="var(--text-faint)" />
+              </div>
+            </Card>
+          ) : null}
+
           {can(PERMISSIONS.DISBURSEMENT_VIEW) ? (
             <Card size="sm" onClick={() => router.push(`/orders/${orderId}/disbursements`)}>
               <div className="row-between">

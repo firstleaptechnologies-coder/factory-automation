@@ -44,6 +44,9 @@ import { TransactionsScreen } from '../screens/TransactionsScreen';
 import { DisbursementsScreen } from '../screens/DisbursementsScreen';
 import { DisbursementLedgerScreen } from '../screens/DisbursementLedgerScreen';
 import { ExpensesScreen } from '../screens/ExpensesScreen';
+import { InvoicesScreen } from '../screens/InvoicesScreen';
+import { InvoiceDetailScreen } from '../screens/InvoiceDetailScreen';
+import { OrderInvoiceScreen } from '../screens/OrderInvoiceScreen';
 import { EmployeesScreen } from '../screens/EmployeesScreen';
 import { EmployeeFormScreen } from '../screens/EmployeeFormScreen';
 import { EmployeeDetailScreen } from '../screens/EmployeeDetailScreen';
@@ -158,6 +161,9 @@ export function RootNavigator() {
             <Stack.Screen name="Transactions" component={TransactionsScreen} />
             <Stack.Screen name="Disbursements" component={DisbursementsScreen} />
             <Stack.Screen name="DisbursementLedger" component={DisbursementLedgerScreen} />
+            <Stack.Screen name="Invoices" component={InvoicesScreen} />
+            <Stack.Screen name="InvoiceDetail" component={InvoiceDetailScreen} />
+            <Stack.Screen name="OrderInvoice" component={OrderInvoiceScreen} />
             <Stack.Screen name="Expenses" component={ExpensesScreen} />
             <Stack.Screen name="ExpenseForm" component={ExpenseFormScreen} />
             <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} />

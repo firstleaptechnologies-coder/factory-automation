@@ -30,6 +30,8 @@ flowchart LR
     order_detail --> order_payments
     order_payouts["Payouts on this order"]
     order_detail --> order_payouts
+    order_invoice["Invoice and challans"]
+    order_detail --> order_invoice
     order_photos["Photos"]
     order_detail --> order_photos
     leads["Leads"]
@@ -65,6 +67,9 @@ flowchart LR
     direction TB
     transactions["Transactions"]
     payouts["Payout ledger"]
+    invoices["Invoices"]
+    invoice_detail["One invoice"]
+    invoices --> invoice_detail
     expenses["Expenses"]
     expense_form["Record an expense"]
     expenses --> expense_form
@@ -154,6 +159,7 @@ flowchart LR
 |   ↳ One order | `/orders/[id]` | `OrderDetail` | — |
 |     ↳ Payments | `/orders/[id]/payments` | `Payments` | — |
 |     ↳ Payouts on this order | `/orders/[id]/disbursements` | `Disbursements` | — |
+|     ↳ Invoice and challans | `/orders/[id]/invoice` | `OrderInvoice` | — |
 |     ↳ Photos | — | `OrderPhotos` | — |
 | Leads | `/leads` | `Leads` | `lead.view` |
 |   ↳ Board | `/leads/board` | `LeadBoard` | — |
@@ -186,6 +192,8 @@ flowchart LR
 | --- | --- | --- | --- |
 | Transactions | `/transactions` | `Transactions` | `payment.cash_position` |
 | Payout ledger | `/disbursements` | `DisbursementLedger` | `disbursement.view` |
+| Invoices | `/invoices` | `Invoices` | `invoice.view` |
+|   ↳ One invoice | `/invoices/[id]` | `InvoiceDetail` | — |
 | Expenses | `/expenses` | `Expenses` | `expense.view` |
 |   ↳ Record an expense | `/expenses/new` | `ExpenseForm` | — |
 |   ↳ One expense | `/expenses/[id]` | `ExpenseDetail` | — |

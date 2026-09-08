@@ -118,6 +118,13 @@ export const NAV_GROUPS: NavGroup[] = [
                 web: '/orders/[id]/disbursements',
                 app: 'Disbursements',
               },
+              {
+                key: 'order-invoice',
+                label: 'Invoice and challans',
+                icon: 'receipt',
+                web: '/orders/[id]/invoice',
+                app: 'OrderInvoice',
+              },
               { key: 'order-photos', label: 'Photos', icon: 'camera', app: 'OrderPhotos' },
             ],
           },
@@ -258,6 +265,24 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: PERMISSIONS.DISBURSEMENT_VIEW,
         web: '/disbursements',
         app: 'DisbursementLedger',
+      },
+      {
+        key: 'invoices',
+        module: MODULES.FINANCE,
+        label: 'Invoices',
+        icon: 'receipt',
+        permission: PERMISSIONS.INVOICE_VIEW,
+        web: '/invoices',
+        app: 'Invoices',
+        children: [
+          {
+            key: 'invoice-detail',
+            label: 'One invoice',
+            icon: 'receipt',
+            web: '/invoices/[id]',
+            app: 'InvoiceDetail',
+          },
+        ],
       },
       {
         key: 'expenses',

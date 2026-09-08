@@ -33,6 +33,7 @@ import { RolesController } from './roles/roles.controller';
 import { LettersController } from './letters/letters.controller';
 import { VendorsController } from './vendors/vendors.controller';
 import { PurchasesController } from './purchases/purchases.controller';
+import { DocumentsController } from './documents/documents.controller';
 
 /**
  * The API's own wiring, read off the decorators.
@@ -69,6 +70,7 @@ const CONTROLLERS = [
   LettersController,
   VendorsController,
   PurchasesController,
+  DocumentsController,
 ];
 
 const METHOD_NAME: Record<number, string> = {

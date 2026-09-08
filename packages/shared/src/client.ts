@@ -68,6 +68,11 @@ import type {
   StockMove,
   StockMoveKind,
   Vendor,
+  Invoice,
+  Challan,
+  CreditNote,
+  CreditReason,
+  Receivable,
   VendorInput,
   WasteReport,
   WorkspaceRole,
@@ -1133,6 +1138,108 @@ export class ApiClient {
   /** What became of the material that left the rack. */
   wasteReport(query: { from: string; to: string; materialId?: string }) {
     return this.get<WasteReport>('/stock/waste', query);
+  }
+
+  // -- the paper: invoices, challans and credit notes -------------------------
+
+  invoices(query?: { orderId?: string; from?: string; to?: string; search?: string }) {
+    return this.get<Invoice[]>('/invoices', query);
+  }
+
+  invoice(id: string) {
+    return this.get<Invoice>(`/invoices/${id}`);
+  }
+
+  /** The invoice for one order, or null when it has not been raised. */
+  orderInvoice(orderId: string) {
+    return this.get<Invoice | null>(`/orders/${orderId}/invoice`);
+  }
+
+  /** One per order. A correction is a credit note, never a second invoice. */
+  raiseInvoice(
+    orderId: string,
+    body?: { issuedOn?: string; dueOn?: string; terms?: string; note?: string },
+  ) {
+    return this.post<Invoice>(`/orders/${orderId}/invoice`, body ?? {});
+  }
+
+  /** Voids one, keeping its number. The reason is the only record of why. */
+  cancelInvoice(id: string, reason: string) {
+    return this.post<Invoice>(`/invoices/${id}/cancel`, { reason });
+  }
+
+  invoiceDocumentUrl(id: string): string {
+    return `${this.baseUrl}/invoices/${id}/document`;
+  }
+
+  challans(query?: { orderId?: string }) {
+    return this.get<Challan[]>('/challans', query);
+  }
+
+  challan(id: string) {
+    return this.get<Challan>(`/challans/${id}`);
+  }
+
+  /** More than one is allowed: a job often leaves in two vans on two days. */
+  issueChallan(
+    orderId: string,
+    body?: {
+      issuedOn?: string;
+      shipTo?: string;
+      transport?: string;
+      vehicle?: string;
+      note?: string;
+    },
+  ) {
+    return this.post<Challan>(`/orders/${orderId}/challan`, body ?? {});
+  }
+
+  cancelChallan(id: string, reason: string) {
+    return this.post<Challan>(`/challans/${id}/cancel`, { reason });
+  }
+
+  challanDocumentUrl(id: string): string {
+    return `${this.baseUrl}/challans/${id}/document`;
+  }
+
+  creditNotes(query?: { invoiceId?: string }) {
+    return this.get<CreditNote[]>('/credit-notes', query);
+  }
+
+  creditNote(id: string) {
+    return this.get<CreditNote>(`/credit-notes/${id}`);
+  }
+
+  /**
+   * Credits part or all of an invoice.
+   *
+   * The taxable value is what is passed; the GST comes off in the proportion
+   * the invoice charged it. Never a payment, and never counted as one.
+   */
+  creditInvoice(
+    invoiceId: string,
+    body: { taxable: number; reason: CreditReason; note: string; issuedOn?: string },
+  ) {
+    return this.post<CreditNote>(`/invoices/${invoiceId}/credit-notes`, body);
+  }
+
+  cancelCreditNote(id: string, reason: string) {
+    return this.post<CreditNote>(`/credit-notes/${id}/cancel`, { reason });
+  }
+
+  creditNoteDocumentUrl(id: string): string {
+    return `${this.baseUrl}/credit-notes/${id}/document`;
+  }
+
+  /**
+   * What an order was charged, credited and paid.
+   *
+   * Three figures, and they stay three. Nothing here folds what was credited
+   * into what was received, so an order can never look paid by money nobody
+   * collected.
+   */
+  orderReceivable(orderId: string) {
+    return this.get<Receivable | null>(`/orders/${orderId}/receivable`);
   }
 
   // -- letters ---------------------------------------------------------------

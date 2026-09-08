@@ -1518,3 +1518,164 @@ export interface VendorInput {
   paymentTermDays?: number;
   isActive?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// The paper: invoices, challans and credit notes
+// ---------------------------------------------------------------------------
+//
+// None of it posts to the ledger. An invoice is a claim, not a movement of
+// money; the payment against it is the movement, and that already posts.
+
+/**
+ * Where a document stands.
+ *
+ * A number, once used, is used: a document is cancelled rather than deleted
+ * and its number is never reissued.
+ */
+export type DocumentStatus = 'ISSUED' | 'CANCELLED';
+
+export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
+  ISSUED: 'Issued',
+  CANCELLED: 'Cancelled',
+};
+
+/** Why a credit note was raised. */
+export type CreditReason = 'RETURN' | 'CORRECTION' | 'ALLOWANCE' | 'CANCELLED_WORK';
+
+export const CREDIT_REASON_LABELS: Record<CreditReason, string> = {
+  RETURN: 'Goods returned',
+  CORRECTION: 'Correction to the invoice',
+  ALLOWANCE: 'Allowance agreed',
+  CANCELLED_WORK: 'Work not carried out',
+};
+
+/** One line of an invoice, as it was printed. */
+export interface InvoiceItem {
+  id: string;
+  description: string;
+  hsn?: string | null;
+  quantity: string | number;
+  unit: string;
+  rate: string | number;
+  amount: string | number;
+  gstRatePct: string | number;
+  taxAmount: string | number;
+  sortOrder: number;
+}
+
+/**
+ * A tax invoice, raised from an order.
+ *
+ * Everything on it is snapshotted at the moment of issue: the client's
+ * particulars, the shop's, the rates and the tax pair. A reprint next year has
+ * to be the document that went out, not a fresh render of what things have
+ * become since.
+ */
+export interface Invoice {
+  id: string;
+  code: string;
+  status: DocumentStatus;
+  orderId: string;
+  order?: { id: string; code: string };
+  issuedOn: string;
+  dueOn?: string | null;
+  clientName: string;
+  clientGstin?: string | null;
+  clientAddress?: string | null;
+  clientState?: string | null;
+  firmName: string;
+  firmGstin?: string | null;
+  firmState?: string | null;
+  /** True when the supply crossed a state line: IGST rather than CGST + SGST. */
+  interState: boolean;
+  subtotal: string | number;
+  discount: string | number;
+  taxable: string | number;
+  cgst: string | number;
+  sgst: string | number;
+  igst: string | number;
+  total: string | number;
+  totalInWords: string;
+  terms?: string | null;
+  note?: string | null;
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
+  items?: InvoiceItem[];
+  creditNotes?: CreditNote[];
+  createdAt: string;
+}
+
+/** One line of a challan: what it was and how many, and nothing about money. */
+export interface ChallanItem {
+  id: string;
+  description: string;
+  quantity: string | number;
+  unit: string;
+  sortOrder: number;
+}
+
+/**
+ * A delivery challan: what went out of the door.
+ *
+ * No prices on it anywhere, on the screen or on the paper. It travels with the
+ * goods and is read by whoever receives them.
+ */
+export interface Challan {
+  id: string;
+  code: string;
+  status: DocumentStatus;
+  orderId: string;
+  order?: { id: string; code: string };
+  issuedOn: string;
+  shipTo?: string | null;
+  transport?: string | null;
+  vehicle?: string | null;
+  note?: string | null;
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
+  items?: ChallanItem[];
+  createdAt: string;
+}
+
+/**
+ * A credit note against an invoice.
+ *
+ * It reduces what a client owes and is never a payment. What it credits is
+ * shown beside what was collected, never folded into it.
+ */
+export interface CreditNote {
+  id: string;
+  code: string;
+  status: DocumentStatus;
+  invoiceId: string;
+  invoice?: { id: string; code: string; clientName: string; orderId?: string };
+  issuedOn: string;
+  reason: CreditReason;
+  note: string;
+  taxable: string | number;
+  cgst: string | number;
+  sgst: string | number;
+  igst: string | number;
+  total: string | number;
+  totalInWords: string;
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
+  createdAt: string;
+}
+
+/**
+ * What one order was charged, credited and paid.
+ *
+ * Three figures rather than one, and they stay three on every screen that
+ * shows them. Credited money is never counted as received: an order billed
+ * ₹50,000, credited ₹5,000 and paid ₹45,000 is settled, and this says exactly
+ * that rather than showing ₹50,000 collected.
+ */
+export interface Receivable {
+  invoice: { id: string; code: string };
+  charged: number;
+  credited: number;
+  received: number;
+  due: number;
+  settled: boolean;
+}

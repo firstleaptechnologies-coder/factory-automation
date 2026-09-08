@@ -3,7 +3,17 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { tenantId } from '../tenancy/tenant-context';
 
-type Sequenced = 'order' | 'client' | 'lead' | 'estimate' | 'employee' | 'vendor' | 'purchase';
+type Sequenced =
+  | 'order'
+  | 'client'
+  | 'lead'
+  | 'estimate'
+  | 'employee'
+  | 'vendor'
+  | 'purchase'
+  | 'invoice'
+  | 'challan'
+  | 'creditNote';
 
 const PREFIX: Record<Sequenced, string> = {
   order: 'ORD',
@@ -13,6 +23,9 @@ const PREFIX: Record<Sequenced, string> = {
   employee: 'EMP',
   vendor: 'VEN',
   purchase: 'PO',
+  invoice: 'INV',
+  challan: 'DC',
+  creditNote: 'CN',
 };
 
 /**
@@ -34,6 +47,17 @@ const BY_FINANCIAL_YEAR: Record<Sequenced, boolean> = {
   /// A purchase order is the shop's own paperwork, so it is dated like the
   /// rest of it.
   purchase: true,
+  /*
+   * The tax documents, and the ones the law cares about most.
+   *
+   * A GST invoice series runs by financial year and must be gapless within it
+   * — a missing number is the first thing an assessing officer asks about. The
+   * counter row is what makes that true under concurrency; nothing here
+   * computes "the highest so far, plus one".
+   */
+  invoice: true,
+  challan: true,
+  creditNote: true,
 };
 
 type Client = PrismaService | Prisma.TransactionClient;
