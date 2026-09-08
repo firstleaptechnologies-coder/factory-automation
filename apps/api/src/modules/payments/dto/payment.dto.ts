@@ -66,11 +66,15 @@ export class CashPositionQueryDto {
  * Payouts have a ledger of their own and are deliberately not here: they sit
  * beside orders rather than inside them, and mixing them into the takings
  * would be exactly the netting-off the books must not do.
+ *
+ * Spending is here, because it is not attached to any one order and a shop
+ * asking what happened to its money means this list.
  */
 export const TRANSACTION_KINDS = [
   'PAYMENT_CASH',
   'PAYMENT_ONLINE',
   'BANK_DEPOSIT',
+  'EXPENSE',
 ] as const;
 
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];

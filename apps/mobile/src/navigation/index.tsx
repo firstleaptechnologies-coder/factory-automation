@@ -43,6 +43,11 @@ import { PaymentsScreen } from '../screens/PaymentsScreen';
 import { TransactionsScreen } from '../screens/TransactionsScreen';
 import { DisbursementsScreen } from '../screens/DisbursementsScreen';
 import { DisbursementLedgerScreen } from '../screens/DisbursementLedgerScreen';
+import { ExpensesScreen } from '../screens/ExpensesScreen';
+import { ExpenseFormScreen } from '../screens/ExpenseFormScreen';
+import { ExpenseDetailScreen } from '../screens/ExpenseDetailScreen';
+import { ExpenseAnalyticsScreen } from '../screens/ExpenseAnalyticsScreen';
+import { AdminExpenseOptionsScreen } from '../screens/admin/AdminExpenseOptionsScreen';
 import { TenantsScreen } from '../screens/platform/TenantsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -133,6 +138,11 @@ export function RootNavigator() {
             <Stack.Screen name="Transactions" component={TransactionsScreen} />
             <Stack.Screen name="Disbursements" component={DisbursementsScreen} />
             <Stack.Screen name="DisbursementLedger" component={DisbursementLedgerScreen} />
+            <Stack.Screen name="Expenses" component={ExpensesScreen} />
+            <Stack.Screen name="ExpenseForm" component={ExpenseFormScreen} />
+            <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} />
+            <Stack.Screen name="ExpenseAnalytics" component={ExpenseAnalyticsScreen} />
+            <Stack.Screen name="AdminExpenseOptions" component={AdminExpenseOptionsScreen} />
             <Stack.Screen name="FirmProfile" component={FirmProfileScreen} />
             <Stack.Screen name="Estimates" component={EstimatesScreen} />
             <Stack.Screen name="EstimateEdit" component={EstimateEditScreen} />

@@ -38,6 +38,12 @@ export class HistoryController {
     return this.history.forEntity('Client', id);
   }
 
+  @Get('expenses/:id')
+  @RequirePermissions(PERMISSIONS.EXPENSE_VIEW)
+  expense(@Param('id') id: string) {
+    return this.history.forEntity('Expense', id);
+  }
+
   /** The money on one order: what was taken, corrected, or reversed. */
   @Get('payments/:orderId')
   @RequirePermissions(PERMISSIONS.PAYMENT_VIEW)

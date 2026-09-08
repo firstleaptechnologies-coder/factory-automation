@@ -28,6 +28,7 @@ export type IconName =
   | 'filter'
   | 'box'
   | 'clipboard'
+  | 'receipt'
   | 'trend'
   | 'phone'
   | 'pin'
@@ -128,6 +129,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <rect x={5} y={4.5} width={14} height={16} rx={2.5} />
       <path d="M9 4.5V3.5A1.5 1.5 0 0 1 10.5 2h3A1.5 1.5 0 0 1 15 3.5v1" />
       <path d="M9 11h6M9 15h4" />
+    </>
+  ),
+  // A till slip with a torn bottom edge — a bill, which is what an expense
+  // arrives as.
+  receipt: (
+    <>
+      <path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21V3Z" />
+      <path d="M9.5 8h5M9.5 12h5" />
     </>
   ),
   trend: <path d="M3 17.5 9.5 11l4 4L21 7.5M15 7.5h6v6" />,

@@ -35,11 +35,12 @@ export default function TransactionsPage() {
   );
 }
 
-/** The colour a movement reads as: money in, money moved. */
+/** The colour a movement reads as: money in, money moved, money spent. */
 const TONE: Record<TransactionKind, string> = {
   PAYMENT_CASH: 'var(--success)',
   PAYMENT_ONLINE: 'var(--info)',
   BANK_DEPOSIT: 'var(--text-muted)',
+  EXPENSE: 'var(--warning)',
 };
 
 /**
@@ -277,6 +278,7 @@ function Transactions() {
                 label: TRANSACTION_LABELS.BANK_DEPOSIT,
                 color: TONE.BANK_DEPOSIT,
               },
+              { id: 'EXPENSE', label: TRANSACTION_LABELS.EXPENSE, color: TONE.EXPENSE },
             ],
           },
         ]}

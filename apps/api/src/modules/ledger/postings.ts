@@ -111,3 +111,66 @@ export function disbursementPosting(payout: {
     recordedById: payout.recordedById ?? null,
   };
 }
+
+/**
+ * Money the shop spent on itself.
+ *
+ * Which account it left is the shop's own answer, not ours: a payment type is
+ * a label it invented, so the option row it came from says whether that label
+ * means the drawer or the bank. The account is passed in already decided,
+ * because guessing it here would quietly mis-state cash in hand.
+ */
+export function expensePosting(
+  expense: {
+    id: string;
+    date: Date;
+    amount: number;
+    description: string;
+    spentType: string;
+    toName: string;
+    vendor: string;
+    vendorGstin?: string | null;
+    taxAmount?: number | string | null;
+    note?: string | null;
+    orderId?: string | null;
+    createdById?: string | null;
+  },
+  account: LedgerAccount,
+): Posting {
+  return {
+    sourceType: 'Expense',
+    sourceId: expense.id,
+    at: expense.date,
+    direction: LedgerDirection.OUT,
+    account,
+    amount: expense.amount,
+    voucher: 'PAYMENT',
+    orderId: expense.orderId ?? null,
+    // The recipient, not the bucket the money was attributed to: a ledger
+    // reads better with the name of whoever was handed it.
+    party: expense.toName,
+    accountHead: expense.spentType,
+    taxAmount: expense.taxAmount == null ? null : Number(expense.taxAmount),
+    gstin: expense.vendorGstin ?? null,
+    reference: null,
+    note: expense.note ?? expense.description,
+    recordedById: expense.createdById ?? null,
+  };
+}
+
+/**
+ * Which account a payment type comes out of.
+ *
+ * The option row decides, because the shop named these types. The guess below
+ * is only for a label with no option behind it — one typed straight onto an
+ * expense, or an option made before this column existed. It is a guess, and a
+ * wrong one leaves a cash expense sitting in the drawer that isn't there, so
+ * the config screen asks for the account whenever a payment type is added.
+ */
+export function accountForPaymentType(
+  label: string,
+  option?: { account?: LedgerAccount | null } | null,
+): LedgerAccount {
+  if (option?.account) return option.account;
+  return /cash/i.test(label) ? LedgerAccount.CASH : LedgerAccount.BANK;
+}

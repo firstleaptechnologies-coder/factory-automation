@@ -24,9 +24,11 @@ export const MODULES = {
   /** Clients, their sites and their billing details. */
   CLIENTS: 'clients',
 
+  /** What the shop spends on itself, and the ledger it posts to. */
+  EXPENSES: 'expenses',
+
   // Not built yet. Named here so the plans they belong to can be sold, and so
   // nothing has to be renamed when they arrive.
-  EXPENSES: 'expenses',
   PURCHASING: 'purchasing',
   HR: 'hr',
   REPORTS: 'reports',
@@ -60,7 +62,7 @@ export const MODULE_CATALOGUE: Module[] = [
   { key: MODULES.LEADS, label: 'Leads', blurb: 'Enquiries, and the pipeline they move through' },
   { key: MODULES.QUOTES, label: 'Quotes', blurb: 'Priced quotations, before there is an order' },
   { key: MODULES.FINANCE, label: 'Finances', blurb: 'Payments, the cash position and the payout ledger' },
-  { key: MODULES.EXPENSES, label: 'Expenses', blurb: 'What the shop spends, and on what', comingSoon: true },
+  { key: MODULES.EXPENSES, label: 'Expenses', blurb: 'What the shop spends, and on what' },
   { key: MODULES.PURCHASING, label: 'Purchasing', blurb: 'Vendors, purchase orders and stock', comingSoon: true },
   { key: MODULES.HR, label: 'People', blurb: 'Employees, attendance and salary', comingSoon: true },
   { key: MODULES.REPORTS, label: 'Reports', blurb: 'Exports for the shop and for its accountant', comingSoon: true },

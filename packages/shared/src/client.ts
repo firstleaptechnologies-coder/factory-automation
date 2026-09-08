@@ -51,6 +51,13 @@ import type {
   ReleaseAsset,
   ReleaseStatus,
   VersionGate,
+  Expense,
+  ExpenseAnalytics,
+  ExpenseFormOptions,
+  ExpenseInput,
+  ExpenseOption,
+  ExpenseOptionField,
+  ExpensePage,
 } from './types';
 
 /** The editable fields of a client. Shared by create and update. */
@@ -470,7 +477,7 @@ export class ApiClient {
    * back is the same, and both clients render it the same way.
    */
   history(
-    kind: 'orders' | 'leads' | 'quotes' | 'clients' | 'payments',
+    kind: 'orders' | 'leads' | 'quotes' | 'clients' | 'payments' | 'expenses',
     id: string,
   ) {
     return this.get<HistoryEntry[]>(`/history/${kind}/${id}`);
@@ -687,6 +694,111 @@ export class ApiClient {
   /** Cancels rather than deletes — the accountant may still need to see it. */
   cancelDisbursement(id: string) {
     return this.del<Disbursement>(`/disbursements/${id}`);
+  }
+
+  // -- expenses --------------------------------------------------------------
+
+  /**
+   * What the shop spends on itself.
+   *
+   * Separate from payouts, which belong to an order. An expense belongs to the
+   * business, posts to the same ledger as everything else, and appears on the
+   * Transactions screen beside the money coming in.
+   */
+  expenses(query?: {
+    from?: string;
+    to?: string;
+    spentType?: string;
+    doneBy?: string;
+    paymentType?: string;
+    vendor?: string;
+    orderId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.get<ExpensePage>('/expenses', query);
+  }
+
+  expense(id: string) {
+    return this.get<Expense>(`/expenses/${id}`);
+  }
+
+  createExpense(body: ExpenseInput) {
+    return this.post<Expense>('/expenses', body);
+  }
+
+  /** The whole expense: a partial body is refused rather than clearing fields. */
+  updateExpense(id: string, body: ExpenseInput) {
+    return this.patch<Expense>(`/expenses/${id}`, body);
+  }
+
+  /** Removes the ledger row with it, so the two cannot disagree. */
+  deleteExpense(id: string) {
+    return this.del<{ id: string }>(`/expenses/${id}`);
+  }
+
+  /**
+   * The bill, photographed at the counter.
+   *
+   * Files must already be optimised by the caller — see `optimizeImage` in the
+   * web app. The server re-optimises regardless; sending a 12 MP original over
+   * a shop wifi is the thing worth avoiding.
+   */
+  attachExpenseBill(id: string, file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    return this.upload<Expense>(`/expenses/${id}/bill`, form);
+  }
+
+  /** React Native variant: RN streams `{uri, type, name}` from disk. */
+  attachExpenseBillNative(id: string, file: { uri: string; type: string; name: string }) {
+    const form = new FormData();
+    form.append('file', file as unknown as Blob);
+    return this.upload<Expense>(`/expenses/${id}/bill`, form);
+  }
+
+  /** Unpins the bill. The file itself is left alone. */
+  removeExpenseBill(id: string) {
+    return this.del<Expense>(`/expenses/${id}/bill`);
+  }
+
+  expenseAnalytics(query?: { from?: string; to?: string }) {
+    return this.get<ExpenseAnalytics>('/expenses/analytics', query);
+  }
+
+  /** The active labels for each list on the form. */
+  expenseOptions() {
+    return this.get<ExpenseFormOptions>('/expenses/options');
+  }
+
+  /** Every option including the retired ones — the config screen. */
+  allExpenseOptions(field?: ExpenseOptionField) {
+    return this.get<ExpenseOption[]>('/expenses/options/all', field ? { field } : undefined);
+  }
+
+  createExpenseOption(body: {
+    field: ExpenseOptionField;
+    label: string;
+    account?: 'CASH' | 'BANK';
+  }) {
+    return this.post<ExpenseOption>('/expenses/options', body);
+  }
+
+  updateExpenseOption(
+    id: string,
+    body: Partial<{ label: string; account: 'CASH' | 'BANK'; isActive: boolean; sortOrder: number }>,
+  ) {
+    return this.patch<ExpenseOption>(`/expenses/options/${id}`, body);
+  }
+
+  /** Retires it. Expenses hold the label, so old rows are unaffected. */
+  deleteExpenseOption(id: string) {
+    return this.del<ExpenseOption>(`/expenses/options/${id}`);
+  }
+
+  reorderExpenseOptions(field: ExpenseOptionField, orderedIds: string[]) {
+    return this.patch<ExpenseOption[]>('/expenses/options/order', { field, orderedIds });
   }
 
   // -- the firm, and the documents it prints ---------------------------------

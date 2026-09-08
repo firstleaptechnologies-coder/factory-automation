@@ -175,8 +175,14 @@ export interface PaymentSummary {
  *
  * Payouts are deliberately not among these: they have a ledger of their own,
  * and folding them in here would be the netting-off the books must not do.
+ * Spending is, because it belongs to no one order.
  */
-export const TRANSACTION_KINDS = ['PAYMENT_CASH', 'PAYMENT_ONLINE', 'BANK_DEPOSIT'] as const;
+export const TRANSACTION_KINDS = [
+  'PAYMENT_CASH',
+  'PAYMENT_ONLINE',
+  'BANK_DEPOSIT',
+  'EXPENSE',
+] as const;
 
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
 
@@ -202,6 +208,7 @@ export const TRANSACTION_LABELS: Record<TransactionKind, string> = {
   PAYMENT_CASH: 'Cash in',
   PAYMENT_ONLINE: 'Online in',
   BANK_DEPOSIT: 'Banked',
+  EXPENSE: 'Spent',
 };
 
 export interface CashPosition {
@@ -830,4 +837,115 @@ export interface VersionGate {
   recommendedVersion?: string | null;
   message?: string | null;
   updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Expenses
+// ---------------------------------------------------------------------------
+
+/** Which dropdown on the expense form an option feeds. */
+export const EXPENSE_OPTION_FIELDS = [
+  'PAYMENT_TYPE',
+  'DONE_BY',
+  'VENDOR',
+  'SPENT_TYPE',
+  'TO_NAME',
+] as const;
+
+export type ExpenseOptionField = (typeof EXPENSE_OPTION_FIELDS)[number];
+
+/** What each list is called on the form and on the config screen. */
+export const EXPENSE_FIELD_LABELS: Record<ExpenseOptionField, string> = {
+  PAYMENT_TYPE: 'Paid by',
+  DONE_BY: 'Spent by',
+  VENDOR: 'Attributed to',
+  SPENT_TYPE: 'Category',
+  TO_NAME: 'Paid to',
+};
+
+/** A shorter word for the same list, where a form label has to fit. */
+export const EXPENSE_FIELD_HINTS: Record<ExpenseOptionField, string> = {
+  PAYMENT_TYPE: 'Cash, UPI, cheque — whichever the shop uses',
+  DONE_BY: 'Whoever in the shop handed the money over',
+  VENDOR: 'Whose money it was, when that is not the shop',
+  SPENT_TYPE: 'What kind of spending this is',
+  TO_NAME: 'Who received it',
+};
+
+export interface ExpenseOption {
+  id: string;
+  field: ExpenseOptionField;
+  label: string;
+  /** PAYMENT_TYPE only: CASH means it comes out of the drawer. */
+  account?: 'CASH' | 'BANK' | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+/** The active labels for each list, ready for the form. */
+export type ExpenseFormOptions = Record<ExpenseOptionField, string[]>;
+
+export interface Expense {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  paymentType: string;
+  doneBy: string;
+  toName: string;
+  vendor: string;
+  spentType: string;
+  note?: string | null;
+  vendorGstin?: string | null;
+  taxableValue?: number | null;
+  taxAmount?: number | null;
+  itcEligible: boolean;
+  billFileId?: string | null;
+  bill?: { id: string; fileName: string; mimeType: string; byteSize: number } | null;
+  orderId?: string | null;
+  order?: { id: string; code: string; client: { name: string } } | null;
+  createdBy?: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExpensePage extends Paginated<Expense> {
+  /** The whole filtered set, not the page on screen. */
+  total: number;
+}
+
+export interface ExpenseSlice {
+  label: string;
+  amount: number;
+  count: number;
+}
+
+export interface ExpenseAnalytics {
+  total: number;
+  count: number;
+  monthly: { month: string; amount: number }[];
+  bySpentType: ExpenseSlice[];
+  byDoneBy: ExpenseSlice[];
+  byPaymentType: ExpenseSlice[];
+  byVendor: ExpenseSlice[];
+  byToName: ExpenseSlice[];
+}
+
+/** What a form sends when recording or correcting an expense. */
+export interface ExpenseInput {
+  date: string;
+  description: string;
+  amount: number;
+  paymentType: string;
+  doneBy: string;
+  toName: string;
+  vendor: string;
+  spentType: string;
+  note?: string;
+  vendorGstin?: string;
+  taxableValue?: number;
+  taxAmount?: number;
+  itcEligible?: boolean;
+  billFileId?: string;
+  orderId?: string;
 }

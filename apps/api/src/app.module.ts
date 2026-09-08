@@ -32,6 +32,7 @@ import { LeadsModule } from './modules/leads/leads.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { EstimatesModule } from './modules/estimates/estimates.module';
 import { DisbursementsModule } from './modules/disbursements/disbursements.module';
+import { ExpensesModule } from './modules/expenses/expenses.module';
 import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
@@ -67,6 +68,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     LeadsModule,
     PaymentsModule,
     DisbursementsModule,
+    ExpensesModule,
     EstimatesModule,
     PlatformModule,
   ],

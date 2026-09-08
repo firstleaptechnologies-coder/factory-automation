@@ -70,6 +70,13 @@ export const PERMISSIONS = {
   DISBURSEMENT_VIEW: 'disbursement.view',
   DISBURSEMENT_MANAGE: 'disbursement.manage',
 
+  // Expenses — what the shop spends on itself. Separate from payments because
+  // the person who records the diesel is rarely the person who takes the money
+  // in, and configuring the dropdowns is a third thing again.
+  EXPENSE_VIEW: 'expense.view',
+  EXPENSE_MANAGE: 'expense.manage',
+  EXPENSE_CONFIG: 'expense.config',
+
   // Shop configuration
   CONFIG_VIEW: 'config.view',
   CONFIG_MANAGE: 'config.manage',
@@ -167,6 +174,14 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
     ],
   },
   {
+    label: 'Expenses',
+    permissions: [
+      PERMISSIONS.EXPENSE_VIEW,
+      PERMISSIONS.EXPENSE_MANAGE,
+      PERMISSIONS.EXPENSE_CONFIG,
+    ],
+  },
+  {
     label: 'Configuration',
     permissions: [
       PERMISSIONS.CONFIG_VIEW,
@@ -207,6 +222,9 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.PAYMENT_VIEW]: 'View payments',
   [PERMISSIONS.PAYMENT_RECORD]: 'Record payments',
   [PERMISSIONS.PAYMENT_DELETE]: 'Take a receipt back',
+  [PERMISSIONS.EXPENSE_VIEW]: 'View expenses',
+  [PERMISSIONS.EXPENSE_MANAGE]: 'Record and edit expenses',
+  [PERMISSIONS.EXPENSE_CONFIG]: 'Edit the expense dropdowns',
   [PERMISSIONS.PLATFORM_RELEASE_VIEW]: 'See app releases',
   [PERMISSIONS.PLATFORM_RELEASE_MANAGE]: 'Publish app releases',
   [PERMISSIONS.PLATFORM_TENANT_CREATE]: 'Provision workspaces',

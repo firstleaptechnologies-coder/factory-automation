@@ -31,6 +31,7 @@ const TONE: Record<TransactionKind, string> = {
   PAYMENT_CASH: palette.success,
   PAYMENT_ONLINE: palette.info,
   BANK_DEPOSIT: palette.textMuted,
+  EXPENSE: palette.warning,
 };
 
 const KINDS = [
@@ -38,6 +39,7 @@ const KINDS = [
   { id: 'PAYMENT_CASH', label: TRANSACTION_LABELS.PAYMENT_CASH, color: TONE.PAYMENT_CASH },
   { id: 'PAYMENT_ONLINE', label: TRANSACTION_LABELS.PAYMENT_ONLINE, color: TONE.PAYMENT_ONLINE },
   { id: 'BANK_DEPOSIT', label: TRANSACTION_LABELS.BANK_DEPOSIT, color: TONE.BANK_DEPOSIT },
+  { id: 'EXPENSE', label: TRANSACTION_LABELS.EXPENSE, color: TONE.EXPENSE },
 ];
 
 /**

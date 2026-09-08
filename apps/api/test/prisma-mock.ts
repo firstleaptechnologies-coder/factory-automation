@@ -47,6 +47,8 @@ const MODELS = [
   'platformUser',
   'auditLog',
   'ledgerEntry',
+  'expense',
+  'expenseOption',
   'notification',
   'notificationTemplate',
   'jobLease',

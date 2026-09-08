@@ -572,3 +572,24 @@ button.primary:disabled {
   flex-wrap: wrap;
   margin-top: var(--s-lg);
 }
+
+/*
+ * A share of a total, drawn as a length.
+ *
+ * The question a breakdown answers is nearly always "which is the big one",
+ * and a length is easier to compare across rows than an angle is across a pie.
+ * The fill takes the runtime accent, which is configured per tenant.
+ */
+.bar-track {
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--surface-inset);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+}

@@ -65,6 +65,15 @@ flowchart LR
     direction TB
     transactions["Transactions"]
     payouts["Payout ledger"]
+    expenses["Expenses"]
+    expense_form["Record an expense"]
+    expenses --> expense_form
+    expense_detail["One expense"]
+    expenses --> expense_detail
+    expense_analytics["Where the money went"]
+    expenses --> expense_analytics
+    expense_options["Expense dropdowns"]
+    expenses --> expense_options
   end
   Home --> cat_finances
   subgraph cat_vendors["Vendor management"]
@@ -138,6 +147,11 @@ flowchart LR
 | --- | --- | --- | --- |
 | Transactions | `/transactions` | `Transactions` | `payment.cash_position` |
 | Payout ledger | `/disbursements` | `DisbursementLedger` | `disbursement.view` |
+| Expenses | `/expenses` | `Expenses` | `expense.view` |
+|   ↳ Record an expense | `/expenses/new` | `ExpenseForm` | — |
+|   ↳ One expense | `/expenses/[id]` | `ExpenseDetail` | — |
+|   ↳ Where the money went | `/expenses/analytics` | `ExpenseAnalytics` | — |
+|   ↳ Expense dropdowns | `/admin/expense-options` | `AdminExpenseOptions` | `expense.config` |
 
 ### Vendor management
 

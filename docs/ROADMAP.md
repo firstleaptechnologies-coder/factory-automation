@@ -323,15 +323,31 @@ blocks anything, and the second wants a commercial answer first — see G11.
   - Left for a later change: **reversing a settled payout**, the mirror of
     payment reversal. Until it exists a mistaken payout can be corrected only
     by someone with database access.
-- **Expenses**, ported from momentum-arena's shape: `Expense` +
-  `ExpenseEditHistory` + `ExpenseOption` (tenant-editable dropdowns for
-  category, paid-by, mode — the reason their expense screen never needs a
-  developer). Add, for this product:
-  - a bill photo through the existing `StoredFile`,
+- **Expenses — done, 8 September.** Ported from momentum-arena's shape:
+  `Expense` + `ExpenseOption`, the tenant-editable dropdowns for category,
+  paid-by, spent-by, recipient and attribution that are the reason their
+  expense screen never needs a developer. Expenses store the **label** rather
+  than an option id, so retiring "Diesel" changes what can be picked next and
+  never what was recorded last March. Added for this product:
   - **GST fields** — vendor GSTIN, taxable value, ITC eligible — because an
-    expense that cannot be claimed is a different number to the accountant,
-  - an optional **link to an order**, so job costing is possible later,
-  - a cash expense reducing cash in hand *in the same ledger* as everything else.
+    expense whose tax cannot be claimed is a different number to the accountant.
+    They live behind a fold: a form that demands a GSTIN every time is a form
+    people stop filling in.
+  - an optional **link to an order**, for job costing later. It never reduces
+    what the order collected.
+  - a cash expense **reducing cash in hand in the same ledger** as everything
+    else, and appearing on Transactions as a fourth kind. Which payment types
+    are cash is the shop's answer, not ours: each PAYMENT_TYPE option names
+    the account it comes out of, and the config screen asks for it.
+  - **Deviation from momentum, on purpose:** no `ExpenseEditHistory` table.
+    This product already has an audit trail with field-level before/after, a
+    reason note and one timeline component both clients render — a second,
+    parallel history would have put expenses' story somewhere different from
+    every other screen's. `GET /history/expenses/:id` reads the same trail.
+  - the **bill photographed at the counter**, through the existing
+    `StoredFile`. Optimised as a *size* image rather than a reference one: a
+    bill is read, not looked at, and the harder compression that suits a photo
+    of a finished panel turns a printed rate into a smudge.
 
 ### Phase 5 · People — items 8 and 12 — **L**
 

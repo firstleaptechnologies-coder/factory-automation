@@ -432,6 +432,7 @@ model User {
   estimates         Estimate[]           @relation("EstimateCreatedBy")
   notifications     Notification[]       @relation("NotificationFor")
   ledgerEntries     LedgerEntry[]
+  expenses          Expense[]            @relation("ExpenseCreatedBy")
 
   @@unique([tenantId, code])
   @@unique([tenantId, email])
@@ -772,6 +773,7 @@ model StoredFile {
   attachments    OrderAttachment[]
   firmLetterhead FirmProfile[]     @relation("FirmLetterhead")
   firmLogo       FirmProfile[]     @relation("FirmLogo")
+  expenseBills   Expense[]         @relation("ExpenseBill")
 
   @@index([checksum])
   @@index([createdAt])
@@ -880,6 +882,7 @@ model Order {
   payments      Payment[]
   disbursements Disbursement[]
   ledgerEntries LedgerEntry[]
+  expenses      Expense[]
   /// Set when this order came from a lead.
   fromLead      Lead?                @relation("LeadConversion")
 
@@ -1279,6 +1282,116 @@ model LedgerEntry {
   @@index([tenantId, at])
   @@index([tenantId, direction, at])
   @@index([tenantId, orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Expenses
+// ---------------------------------------------------------------------------
+
+/// Which dropdown an option feeds.
+///
+/// The set is fixed because each one is a column on Expense; what goes *in*
+/// each is the shop's to decide, which is the point of the whole model.
+enum ExpenseOptionField {
+  PAYMENT_TYPE
+  DONE_BY
+  VENDOR
+  SPENT_TYPE
+  TO_NAME
+}
+
+/// A choice on the expense form, editable by the shop rather than by us.
+///
+/// This is the reason an expense screen never needs a developer: a shop that
+/// starts buying from a new supplier, or hires someone who will be paying for
+/// things, adds the name itself. Every list on the form comes from here.
+model ExpenseOption {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String             @id @default(cuid())
+  field    ExpenseOptionField
+  /// Stored as it is displayed, and stored on the expense in the same form —
+  /// see Expense.paymentType for why.
+  label    String
+
+  /// PAYMENT_TYPE only: which account this way of paying comes out of.
+  ///
+  /// Cash and a bank transfer are the same expense and a different drawer, and
+  /// nothing but the shop can say which of its own payment types is which.
+  account LedgerAccount?
+
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, field, label])
+  @@index([tenantId, field, isActive])
+  @@index([tenantId])
+}
+
+/// Money the shop spent.
+///
+/// Everything the business pays for that is not a payout against a particular
+/// order: rent, diesel, a router bit, tea. It posts to the ledger like every
+/// other movement of money, so cash spent leaves the drawer and the shop's own
+/// figure for what is in it stays true.
+model Expense {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+
+  /// The day the money was spent, which is not the day somebody typed it in.
+  date        DateTime @db.Date
+  description String
+  amount      Decimal  @db.Decimal(14, 2)
+
+  /// The five dropdowns, stored as labels rather than as ids.
+  ///
+  /// Renaming an option — or retiring it — must not change what an expense
+  /// from last March says it was, and an export a CA reads should not be a
+  /// page of identifiers. Filtering matches on the label.
+  paymentType String
+  doneBy      String
+  toName      String
+  vendor      String
+  spentType   String
+  note        String?
+
+  /// What the accountant needs, and the form should not insist on.
+  ///
+  /// An expense whose tax cannot be claimed is a different number to them, so
+  /// the GSTIN and the split are recorded when they are known and left alone
+  /// when they are not.
+  vendorGstin  String?
+  taxableValue Decimal? @db.Decimal(14, 2)
+  taxAmount    Decimal? @db.Decimal(14, 2)
+  itcEligible  Boolean  @default(false)
+
+  /// The bill, photographed at the counter.
+  billFileId String?
+  bill       StoredFile? @relation("ExpenseBill", fields: [billFileId], references: [id], onDelete: SetNull)
+
+  /// Optional, for job costing later: what this was spent on.
+  ///
+  /// It never reduces what the order collected — an order quoted at ₹X is
+  /// worth ₹X. This says which job the cost belongs to, nothing more.
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?    @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, date])
+  @@index([tenantId, spentType])
+  @@index([tenantId, vendor])
+  @@index([tenantId, doneBy])
+  @@index([tenantId, paymentType])
+  @@index([tenantId, orderId])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------

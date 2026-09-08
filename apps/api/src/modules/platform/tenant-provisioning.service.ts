@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   CustomFieldType,
+  ExpenseOptionField,
+  LedgerAccount,
   PrismaClient,
   StatusCategory,
   UserRole,
@@ -32,6 +34,7 @@ export class TenantProvisioningService {
     await this.seedRoles(db, tenantId);
     await this.seedGstSlabs(db, tenantId);
     await this.seedDisbursementCategories(db, tenantId);
+    await this.seedExpenseOptions(db, tenantId);
     await this.seedMaterials(db, tenantId);
     await this.seedSizes(db, tenantId);
     await this.seedOrderWorkflow(db, tenantId);
@@ -119,6 +122,55 @@ export class TenantProvisioningService {
     await db.appSetting.create({
       data: { tenantId, key: 'disbursementLabel', value: 'ISC' },
     });
+  }
+
+  /**
+   * A first set of expense dropdowns, meant to be edited.
+   *
+   * Every one of these is a guess about a shop we have not met: the point of
+   * the model is that they change them. What matters here is that a new
+   * workspace can record an expense on day one instead of staring at five
+   * empty lists — and that the ways of paying arrive knowing which of them
+   * comes out of the drawer, because that is what keeps cash in hand honest.
+   */
+  private async seedExpenseOptions(db: PrismaClient, tenantId: string) {
+    const options: {
+      field: ExpenseOptionField;
+      label: string;
+      account?: LedgerAccount;
+    }[] = [
+      { field: ExpenseOptionField.PAYMENT_TYPE, label: 'Cash', account: LedgerAccount.CASH },
+      { field: ExpenseOptionField.PAYMENT_TYPE, label: 'UPI', account: LedgerAccount.BANK },
+      { field: ExpenseOptionField.PAYMENT_TYPE, label: 'Bank transfer', account: LedgerAccount.BANK },
+      { field: ExpenseOptionField.PAYMENT_TYPE, label: 'Cheque', account: LedgerAccount.BANK },
+      { field: ExpenseOptionField.PAYMENT_TYPE, label: 'Card', account: LedgerAccount.BANK },
+
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Raw material' },
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Tooling' },
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Machine maintenance' },
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Electricity' },
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Rent' },
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Transport' },
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Labour' },
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Consumables' },
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Office' },
+      { field: ExpenseOptionField.SPENT_TYPE, label: 'Miscellaneous' },
+
+      { field: ExpenseOptionField.VENDOR, label: 'Shop' },
+      { field: ExpenseOptionField.TO_NAME, label: 'Shop' },
+    ];
+
+    for (const [index, option] of options.entries()) {
+      await db.expenseOption.create({
+        data: {
+          tenantId,
+          field: option.field,
+          label: option.label,
+          account: option.account ?? null,
+          sortOrder: index * 10,
+        },
+      });
+    }
   }
 
   private async seedMaterials(db: PrismaClient, tenantId: string) {

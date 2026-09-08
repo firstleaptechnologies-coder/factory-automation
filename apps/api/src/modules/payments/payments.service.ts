@@ -25,7 +25,7 @@ import { tenantId } from '../../common/tenancy/tenant-context';
 /** One movement of money, whatever kind it was. */
 export interface TransactionRow {
   id: string;
-  kind: 'PAYMENT_CASH' | 'PAYMENT_ONLINE' | 'BANK_DEPOSIT';
+  kind: TransactionKind;
   direction: 'IN' | 'OUT' | 'TRANSFER';
   at: Date;
   amount: number;
@@ -540,6 +540,7 @@ const KIND_ROWS: Record<TransactionKind, Prisma.LedgerEntryWhereInput> = {
   PAYMENT_CASH: { sourceType: 'Payment', account: LedgerAccount.CASH },
   PAYMENT_ONLINE: { sourceType: 'Payment', account: LedgerAccount.BANK },
   BANK_DEPOSIT: { sourceType: 'CashDeposit' },
+  EXPENSE: { sourceType: 'Expense' },
 };
 
 /**
@@ -581,6 +582,7 @@ export function transactionFilter(
 /** What kind of movement a ledger row is, on this screen's terms. */
 export function kindOf(row: { sourceType: string; account: LedgerAccount }): TransactionKind {
   if (row.sourceType === 'CashDeposit') return 'BANK_DEPOSIT';
+  if (row.sourceType === 'Expense') return 'EXPENSE';
   return row.account === LedgerAccount.CASH ? 'PAYMENT_CASH' : 'PAYMENT_ONLINE';
 }
 
