@@ -103,31 +103,29 @@ BSP takes weeks, so the application is worth starting well before the code.
 
 ---
 
-## Calls I made for you — say if any is wrong
+## ~~Calls I made for you~~ — all three overruled, 9 September 2026
 
-Not blocking anything: each was decided so Phase 4 could ship, and each is
-cheap to change now and expensive later.
+You said fix all three, and all three are fixed:
 
-- **Expenses have no `ExpenseEditHistory` table**, though momentum's do and my
-  own roadmap said they would. This product already has an audit trail with
-  field-level before and after, a reason note, and one timeline component both
-  clients render. A second, parallel history would have put an expense's story
-  somewhere different from every other screen's. `GET /history/expenses/:id`
-  reads the same trail. *Say so and I will add the dedicated table.*
-- **An expense can be deleted, and its ledger row goes with it** in the same
-  transaction — where a payment or a payout can only be corrected by a further
-  record. The reasoning: an expense is the shop's own note of its own spending
-  and a duplicate typed at the counter is a mistake, not an event that happened
-  to somebody else. The audit trail keeps the deleted row in full, so nothing
-  is concealed. *Say so and I will make it append-only like the rest.*
-- **A settled payout can no longer be cancelled.** It used to be possible, and
-  it left the payout off the screen while the ledger went on counting the money
-  as spent. Correcting one properly — the mirror of taking a receipt back — is
-  not built yet, so today a mistaken settled payout needs somebody with
-  database access. *Tell me to build the reversal and I will.*
-- **The expenses module is off by default.** It is a module like the others, so
-  every workspace that should have it needs it switched on — the platform
-  console does that. I turned it on for `decorbucket` in development.
+- **`ExpenseEditHistory` exists**, as momentum has it: one row per create, edit
+  and reversal, with a JSON list of `{ field, from, to }` and the name of who
+  did it copied onto the row so the log still reads after their account is
+  gone. It earns its place rather than duplicating the audit trail: the edit
+  form now asks **why** the change is being made, and that sentence sits beside
+  the fields it explains on the expense's own screen. The audit trail is still
+  there, underneath, on the same page.
+- **Expenses are append-only, like the rest of the money.** There is no delete
+  route at all. `POST /expenses/:id/reverse` records the opposite row — the
+  negative amount, the negative tax, the reason — and both stand. Reversing one
+  twice is refused, and so is reversing a correction.
+- **A settled payout can be taken back**, the mirror of taking a receipt back:
+  `POST /disbursements/:id/reverse`. A payout that was only ever planned is
+  still cancelled instead, because an intention is not a movement of money.
+
+**Still true and worth knowing:** the expenses module is off by default. It is
+a module like the others, so every workspace that should have it needs it
+switched on from the platform console. I turned it on for `decorbucket` in
+development.
 
 ---
 

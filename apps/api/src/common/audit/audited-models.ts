@@ -13,6 +13,8 @@ export const NOT_AUDITED: Record<string, string> = {
   OrderStatusHistory:
     'already a history, written as the move happens and shown beside this one',
   LeadStatusHistory: 'already a history',
+  ExpenseEditHistory:
+    'already a history, written as the edit happens and shown on the expense',
   DocumentSequence:
     'a counter — every order punched would write a row saying a number went up by one',
   StoredFile:

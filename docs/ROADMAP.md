@@ -320,9 +320,10 @@ blocks anything, and the second wants a commercial answer first — see G11.
   cash handed to a fitter leaves the drawer (shown on its own line, and never
   netted off the order it came from), and a settled payout can no longer be
   cancelled — the money has gone, so what came back is a new record.
-  - Left for a later change: **reversing a settled payout**, the mirror of
-    payment reversal. Until it exists a mistaken payout can be corrected only
-    by someone with database access.
+  - **Reversing a settled payout** is the mirror of payment reversal:
+    `POST /disbursements/:id/reverse` records the opposite row. One that was
+    only ever planned is cancelled instead — an intention is not a movement of
+    money, so there is nothing to take back.
 - **Expenses — done, 8 September.** Ported from momentum-arena's shape:
   `Expense` + `ExpenseOption`, the tenant-editable dropdowns for category,
   paid-by, spent-by, recipient and attribution that are the reason their
@@ -339,11 +340,16 @@ blocks anything, and the second wants a commercial answer first — see G11.
     else, and appearing on Transactions as a fourth kind. Which payment types
     are cash is the shop's answer, not ours: each PAYMENT_TYPE option names
     the account it comes out of, and the config screen asks for it.
-  - **Deviation from momentum, on purpose:** no `ExpenseEditHistory` table.
-    This product already has an audit trail with field-level before/after, a
-    reason note and one timeline component both clients render — a second,
-    parallel history would have put expenses' story somewhere different from
-    every other screen's. `GET /history/expenses/:id` reads the same trail.
+  - **`ExpenseEditHistory`**, as momentum has it: one row per create, edit and
+    reversal, carrying `{ field, from, to }` and the name of whoever did it,
+    copied onto the row so the log reads after their account is gone. What
+    makes it more than a second audit trail is that the edit form asks *why* —
+    and that sentence belongs beside the fields it explains rather than in a
+    general log. The audit trail is still written underneath, and shown on the
+    same screen.
+  - **Append-only, like the rest of the money.** There is no delete. An expense
+    is taken back by recording its opposite — negative amount, negative tax,
+    the reason — and both rows stand.
   - the **bill photographed at the counter**, through the existing
     `StoredFile`. Optimised as a *size* image rather than a reference one: a
     bill is read, not looked at, and the harder compression that suits a photo

@@ -67,6 +67,8 @@ function OrderDisbursements({ orderId }: { orderId: string }) {
   const [settleRef, setSettleRef] = useState('');
 
   const [busy, setBusy] = useState(false);
+  const [taking, setTaking] = useState<Disbursement | null>(null);
+  const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const canManage = can(PERMISSIONS.DISBURSEMENT_MANAGE);
@@ -180,19 +182,58 @@ function OrderDisbursements({ orderId }: { orderId: string }) {
                       }}
                     />
                   ) : null}
-                  <Chip
-                    label="Cancel"
-                    onClick={async () => {
-                      await api.cancelDisbursement(row.id);
-                      ledger.reload();
-                    }}
-                  />
+                  {row.status === 'PAID' ? (
+                    row.reversalOfId || row.reversedBy ? null : (
+                      <Chip label="Take it back" onClick={() => setTaking(row)} />
+                    )
+                  ) : (
+                    <Chip
+                      label="Cancel"
+                      onClick={async () => {
+                        await api.cancelDisbursement(row.id);
+                        ledger.reload();
+                      }}
+                    />
+                  )}
                 </div>
               ) : null}
             </Card>
           ))}
         </div>
       )}
+
+      <Sheet
+        open={Boolean(taking)}
+        title="Take this payout back?"
+        subtitle="It stays on the record with a correction beside it. Say why."
+        onClose={() => setTaking(null)}>
+        <Field
+          label="Why"
+          placeholder="Paid the wrong fitter"
+          value={reason}
+          onChange={setReason}
+          autoFocus
+        />
+        <Button
+          title="Take it back"
+          block
+          variant="danger"
+          loading={busy}
+          disabled={reason.trim().length < 4}
+          onClick={async () => {
+            if (!taking) return;
+            setBusy(true);
+            try {
+              await api.reverseDisbursement(taking.id, reason.trim());
+              setTaking(null);
+              setReason('');
+              ledger.reload();
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      </Sheet>
 
       <Sheet
         open={sheet}

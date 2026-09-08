@@ -12,6 +12,7 @@ import {
   IsString,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
@@ -48,6 +49,20 @@ export class ExpenseDto {
   @IsOptional() @IsString() billFileId?: string;
   /** For job costing. It never reduces what the order collected. */
   @IsOptional() @IsString() orderId?: string;
+
+  /**
+   * Why this is being corrected.
+   *
+   * Kept apart from `note`, which is about the spending itself. This is about
+   * the edit — "the bill was for two sheets, not three" — and it is the reason
+   * an expense keeps a history of its own rather than only an audit row.
+   */
+  @IsOptional() @IsString() @MaxLength(500) editNote?: string;
+}
+
+export class ReverseExpenseDto {
+  /** Required, and kept. A correction nobody explained is a figure that moved. */
+  @IsString() @MinLength(4) @MaxLength(500) reason!: string;
 }
 
 export class ExpenseQueryDto extends PaginationDto {

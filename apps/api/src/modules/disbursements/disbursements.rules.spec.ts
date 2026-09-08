@@ -18,7 +18,14 @@ function build() {
     ...data,
   }));
   db.order.findFirst = jest.fn(async () => ({ id: 'o1', code: 'ORD-1' }));
-  return { service: new DisbursementsService(db as never, ledgerMock() as never), db };
+  // Prisma hands a created row back, and the reversal posts the row it made.
+  db.disbursement.create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+    id: 'd2',
+    category: null,
+    ...data,
+  }));
+  const ledger = ledgerMock();
+  return { service: new DisbursementsService(db as never, ledger as never), db, ledger };
 }
 
 describe('label', () => {
@@ -315,5 +322,94 @@ describe('ledger totals', () => {
     expect(db.disbursement.count.mock.calls[0][0].where).toEqual(
       db.disbursement.findMany.mock.calls[0][0].where,
     );
+  });
+});
+
+describe('taking a settled payout back', () => {
+  const PAID = {
+    id: 'd1',
+    orderId: 'o1',
+    categoryId: 'c1',
+    payeeName: 'Ramesh',
+    payeeContact: null,
+    amount: 4500,
+    status: DisbursementStatus.PAID,
+    paidMode: 'CASH',
+    paidAt: new Date('2026-09-02'),
+    reference: null,
+    reversalOfId: null,
+    reversedBy: null,
+  };
+
+  it('records the opposite row rather than editing the first', async () => {
+    const { service, db } = build();
+    db.disbursement.findFirst = jest.fn(async () => PAID);
+    await inTenant(() => service.reverse('d1', 'Paid the wrong fitter', 'u1'));
+    expect(db.disbursement.create.mock.calls[0][0].data).toMatchObject({
+      amount: -4500,
+      reversalOfId: 'd1',
+      reason: 'Paid the wrong fitter',
+      recordedById: 'u1',
+    });
+  });
+
+  it('marks the correction paid, not planned', async () => {
+    const { service, db } = build();
+    db.disbursement.findFirst = jest.fn(async () => PAID);
+    await inTenant(() => service.reverse('d1', 'Paid the wrong fitter'));
+    // A planned one would sit in the "still owed" column claiming the shop
+    // owes somebody a negative amount.
+    expect(db.disbursement.create.mock.calls[0][0].data.status).toBe(DisbursementStatus.PAID);
+  });
+
+  it('posts it, so the money comes back to the drawer it left', async () => {
+    const { service, db, ledger } = build();
+    db.disbursement.findFirst = jest.fn(async () => PAID);
+    await inTenant(() => service.reverse('d1', 'Paid the wrong fitter'));
+    expect(ledger.post.mock.calls[0][0]).toMatchObject({ amount: -4500, direction: 'OUT' });
+  });
+
+  it('refuses one that was only ever planned', async () => {
+    const { service, db } = build();
+    db.disbursement.findFirst = jest.fn(async () => ({
+      ...PAID,
+      status: DisbursementStatus.PLANNED,
+    }));
+    // An intention is not a movement of money; there is nothing to take back.
+    await expect(
+      inTenant(() => service.reverse('d1', 'Changed our mind')),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('will not take the same payout back twice', async () => {
+    const { service, db } = build();
+    db.disbursement.findFirst = jest.fn(async () => ({ ...PAID, reversedBy: { id: 'd2' } }));
+    await expect(
+      inTenant(() => service.reverse('d1', 'Paid the wrong fitter')),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('will not reverse a correction, because that is paying it again', async () => {
+    const { service, db } = build();
+    db.disbursement.findFirst = jest.fn(async () => ({ ...PAID, reversalOfId: 'd0' }));
+    await expect(
+      inTenant(() => service.reverse('d1', 'Paid the wrong fitter')),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('insists on a reason', async () => {
+    const { service, db } = build();
+    db.disbursement.findFirst = jest.fn(async () => PAID);
+    await expect(inTenant(() => service.reverse('d1', '  '))).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('refuses one that is not there', async () => {
+    const { service, db } = build();
+    db.disbursement.findFirst = jest.fn(async () => null);
+    await expect(
+      inTenant(() => service.reverse('ghost', 'Paid the wrong fitter')),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

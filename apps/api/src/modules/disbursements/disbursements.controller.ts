@@ -6,6 +6,7 @@ import {
   CreateDisbursementDto,
   DisbursementQueryDto,
   LabelDto,
+  ReverseDisbursementDto,
   SettleDisbursementDto,
   UpdateDisbursementDto,
 } from './dto/disbursement.dto';
@@ -79,6 +80,22 @@ export class DisbursementsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.disbursements.settle(id, dto, user?.id);
+  }
+
+  /**
+   * Takes a settled payout back.
+   *
+   * A planned one is cancelled with DELETE instead: an intention is not a
+   * movement of money, and there is nothing to take back.
+   */
+  @RequirePermissions(PERMISSIONS.DISBURSEMENT_MANAGE)
+  @Post(':id/reverse')
+  reverse(
+    @Param('id') id: string,
+    @Body() dto: ReverseDisbursementDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.disbursements.reverse(id, dto.reason, user?.id);
   }
 
   @RequirePermissions(PERMISSIONS.DISBURSEMENT_MANAGE)

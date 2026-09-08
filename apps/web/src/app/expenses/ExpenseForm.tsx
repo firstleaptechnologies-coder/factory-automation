@@ -49,6 +49,8 @@ export function ExpenseForm({ id }: { id?: string }) {
     TO_NAME: null,
   });
   const [note, setNote] = useState('');
+  /** Why this is being corrected — about the edit, not the spending. */
+  const [editNote, setEditNote] = useState('');
 
   // The tax half stays folded away: most expenses at a counter have no bill
   // worth claiming, and a form that asks for a GSTIN every time is a form
@@ -103,6 +105,7 @@ export function ExpenseForm({ id }: { id?: string }) {
         spentType: choice.SPENT_TYPE!,
         toName: choice.TO_NAME!,
         note: note.trim() || undefined,
+        editNote: id ? editNote.trim() || undefined : undefined,
         vendorGstin: vendorGstin.trim() || undefined,
         taxableValue: taxableValue ? Number(taxableValue) : undefined,
         taxAmount: taxAmount ? Number(taxAmount) : undefined,
@@ -165,6 +168,15 @@ export function ExpenseForm({ id }: { id?: string }) {
           onChange={setNote}
           multiline
         />
+
+        {id ? (
+          <Field
+            label="Why the change"
+            placeholder="The bill was for two sheets, not three"
+            value={editNote}
+            onChange={setEditNote}
+          />
+        ) : null}
       </Card>
 
       <Card style={{ marginTop: 'var(--s-lg)' }}>

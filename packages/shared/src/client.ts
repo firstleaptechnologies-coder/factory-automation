@@ -53,6 +53,7 @@ import type {
   VersionGate,
   Expense,
   ExpenseAnalytics,
+  ExpenseEdit,
   ExpenseFormOptions,
   ExpenseInput,
   ExpenseOption,
@@ -691,7 +692,17 @@ export class ApiClient {
     return this.patch<Disbursement>(`/disbursements/${id}`, body);
   }
 
-  /** Cancels rather than deletes — the accountant may still need to see it. */
+  /**
+   * Takes a settled payout back.
+   *
+   * The mirror of taking a receipt back: the money has gone, so the correction
+   * is the opposite row rather than the removal of the first one.
+   */
+  reverseDisbursement(id: string, reason: string) {
+    return this.post<Disbursement>(`/disbursements/${id}/reverse`, { reason });
+  }
+
+  /** Cancels one that was only ever planned. A paid one is taken back. */
   cancelDisbursement(id: string) {
     return this.del<Disbursement>(`/disbursements/${id}`);
   }
@@ -733,9 +744,19 @@ export class ApiClient {
     return this.patch<Expense>(`/expenses/${id}`, body);
   }
 
-  /** Removes the ledger row with it, so the two cannot disagree. */
-  deleteExpense(id: string) {
-    return this.del<{ id: string }>(`/expenses/${id}`);
+  /**
+   * Takes an expense back. There is no delete.
+   *
+   * The opposite row is recorded and both stand, exactly as taking a receipt
+   * back does: money that moved is never quietly unmoved.
+   */
+  reverseExpense(id: string, reason: string) {
+    return this.post<Expense>(`/expenses/${id}/reverse`, { reason });
+  }
+
+  /** What changed on one expense, and why — newest first. */
+  expenseEdits(id: string) {
+    return this.get<ExpenseEdit[]>(`/expenses/${id}/edits`);
   }
 
   /**

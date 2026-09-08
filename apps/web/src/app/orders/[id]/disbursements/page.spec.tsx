@@ -9,6 +9,7 @@ const apiMock = {
   createDisbursement: jest.fn(),
   settleDisbursement: jest.fn(),
   cancelDisbursement: jest.fn(),
+  reverseDisbursement: jest.fn(),
 };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
@@ -82,6 +83,7 @@ beforeEach(() => {
   apiMock.createDisbursement.mockResolvedValue({});
   apiMock.settleDisbursement.mockResolvedValue({});
   apiMock.cancelDisbursement.mockResolvedValue({});
+  apiMock.reverseDisbursement.mockResolvedValue({});
 });
 
 it('says it is loading rather than showing an empty ledger', async () => {
@@ -180,11 +182,39 @@ describe('each payout', () => {
     expect(screen.queryByText('Add Payouts')).not.toBeInTheDocument();
   });
 
-  it('cancels one, and re-reads the ledger', async () => {
+  it('cancels a planned one, and re-reads the ledger', async () => {
     await mount();
     fireEvent.click(screen.getAllByText('Cancel')[0]);
     await waitFor(() => expect(apiMock.cancelDisbursement).toHaveBeenCalledWith('d1'));
     await waitFor(() => expect(apiMock.orderDisbursements).toHaveBeenCalledTimes(2));
+  });
+
+  it('offers no cancel on one that has been paid', async () => {
+    await mount();
+    // An intention can be dropped; money that has gone is taken back instead,
+    // which leaves both rows standing.
+    expect(screen.getAllByText('Cancel')).toHaveLength(1);
+    expect(screen.getByText('Take it back')).toBeInTheDocument();
+  });
+
+  it('insists on a reason before taking a settled payout back', async () => {
+    await mount();
+    fireEvent.click(screen.getByText('Take it back'));
+    // [0] is the chip that opened the sheet; [1] is the confirm inside it.
+    expect(screen.getAllByRole('button', { name: 'Take it back' })[1]).toBeDisabled();
+    expect(apiMock.reverseDisbursement).not.toHaveBeenCalled();
+  });
+
+  it('records the correction once a reason is given', async () => {
+    await mount();
+    fireEvent.click(screen.getByText('Take it back'));
+    fireEvent.change(await screen.findByLabelText('Why'), {
+      target: { value: 'Paid the wrong fitter' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Take it back' })[1]);
+    await waitFor(() =>
+      expect(apiMock.reverseDisbursement).toHaveBeenCalledWith('d2', 'Paid the wrong fitter'),
+    );
   });
 });
 

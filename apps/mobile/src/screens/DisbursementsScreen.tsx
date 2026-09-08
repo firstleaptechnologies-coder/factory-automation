@@ -60,6 +60,8 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
   const [settling, setSettling] = useState<Disbursement | null>(null);
   const [settleMode, setSettleMode] = useState<PaymentMode>('CASH');
   const [settleRef, setSettleRef] = useState('');
+  const [taking, setTaking] = useState<Disbursement | null>(null);
+  const [reason, setReason] = useState('');
 
   const canManage = can(PERMISSIONS.DISBURSEMENT_MANAGE);
 
@@ -111,6 +113,29 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
     } catch (e) {
       haptic('notificationError');
       Alert.alert('Could not settle', e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Takes a settled payout back.
+   *
+   * The mirror of taking a receipt back: the money has gone, so the correction
+   * is the opposite row rather than the removal of the first one.
+   */
+  const takeBack = async () => {
+    if (!taking) return;
+    setBusy(true);
+    try {
+      await api.reverseDisbursement(taking.id, reason.trim());
+      haptic('notificationSuccess');
+      setTaking(null);
+      setReason('');
+      ledger.reload();
+    } catch (e) {
+      haptic('notificationError');
+      Alert.alert('Could not take it back', e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setBusy(false);
     }
@@ -226,12 +251,39 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
                 ) : (
                   <View />
                 )}
-                <Chip label="Cancel" onPress={() => cancel(row)} />
+                {row.status === 'PAID' ? (
+                  row.reversalOfId || row.reversedBy ? null : (
+                    <Chip label="Take it back" onPress={() => setTaking(row)} />
+                  )
+                ) : (
+                  <Chip label="Cancel" onPress={() => cancel(row)} />
+                )}
               </View>
             ) : null}
           </Card>
         ))
       )}
+
+      <Sheet
+        visible={Boolean(taking)}
+        title="Take this payout back?"
+        subtitle="It stays on the record with a correction beside it. Say why."
+        onClose={() => setTaking(null)}>
+        <Field
+          label="Why"
+          placeholder="Paid the wrong fitter"
+          value={reason}
+          onChangeText={setReason}
+          autoFocus
+        />
+        <Button
+          title="Take it back"
+          variant="danger"
+          loading={busy}
+          disabled={reason.trim().length < 4}
+          onPress={takeBack}
+        />
+      </Sheet>
 
       <Sheet
         visible={sheet}

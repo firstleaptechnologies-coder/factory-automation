@@ -12,6 +12,7 @@ const disbursements = {
   settle: jest.fn(async (..._a: unknown[]) => 'settled'),
   update: jest.fn(async (..._a: unknown[]) => 'updated'),
   remove: jest.fn(async (..._a: unknown[]) => 'removed'),
+  reverse: jest.fn(async (..._a: unknown[]) => 'taken back'),
 };
 
 const controller = new DisbursementsController(disbursements as never);
@@ -69,4 +70,11 @@ it('edits and removes a payout by its own id', async () => {
   await controller.remove('d1');
   expect(disbursements.update).toHaveBeenCalledWith('d1', { amount: 5000 });
   expect(disbursements.remove).toHaveBeenCalledWith('d1');
+});
+
+it('takes a settled payout back, with who did it from the session', async () => {
+  await controller.reverse('d1', { reason: 'Paid the wrong fitter' } as never, {
+    id: 'u9',
+  } as never);
+  expect(disbursements.reverse).toHaveBeenCalledWith('d1', 'Paid the wrong fitter', 'u9');
 });

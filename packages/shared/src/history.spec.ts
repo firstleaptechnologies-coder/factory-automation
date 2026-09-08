@@ -1,9 +1,12 @@
 import {
+  describeEdit,
   describeHistory,
+  editDetail,
   entityLabel,
   fieldLabel,
   historyValue,
   shownChanges,
+  type ExpenseEditEntry,
   type HistoryEntry,
 } from './history';
 
@@ -119,5 +122,53 @@ describe('what is worth showing', () => {
     expect(describeHistory(entry({ changes: [{ field: 'updatedAt', from: 1, to: 2 }] }))).toBe(
       'Order edited',
     );
+  });
+});
+
+describe('an expense’s own story', () => {
+  const edit = (over: Partial<ExpenseEditEntry> = {}): ExpenseEditEntry => ({
+    id: 'h1',
+    editType: 'UPDATED',
+    changes: [],
+    createdAt: '2026-09-09T10:00:00Z',
+    ...over,
+  });
+
+  it('names what happened in one word each', () => {
+    expect(describeEdit(edit({ editType: 'CREATED' }))).toBe('Recorded');
+    expect(describeEdit(edit({ editType: 'REVERSED' }))).toBe('Taken back');
+  });
+
+  it('names the field when one thing changed, and counts when several did', () => {
+    expect(
+      describeEdit(edit({ changes: [{ field: 'amount', from: 4500, to: 5200 }] })),
+    ).toBe('Amount changed');
+    expect(
+      describeEdit(
+        edit({
+          changes: [
+            { field: 'amount', from: 4500, to: 5200 },
+            { field: 'spentType', from: 'Tooling', to: 'Consumables' },
+          ],
+        }),
+      ),
+    ).toBe('2 things changed');
+  });
+
+  it('says an edit happened even when the change list is missing', () => {
+    // A row written before a field was tracked still has to read as something.
+    expect(describeEdit(edit())).toBe('Edited');
+  });
+
+  it('reads each change as what it went from and to', () => {
+    expect(
+      editDetail(edit({ changes: [{ field: 'spentType', from: 'Tooling', to: 'Rent' }] })),
+    ).toEqual(['Category: Tooling → Rent']);
+  });
+
+  it('uses the shop’s word for an expense column, not the column name', () => {
+    expect(fieldLabel('doneBy')).toBe('Spent by');
+    expect(fieldLabel('toName')).toBe('Paid to');
+    expect(fieldLabel('vendorGstin')).toBe('Vendor GSTIN');
   });
 });

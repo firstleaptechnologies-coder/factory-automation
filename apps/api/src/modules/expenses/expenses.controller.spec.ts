@@ -11,7 +11,8 @@ const expenses = {
   get: jest.fn(async (..._a: unknown[]) => 'one'),
   create: jest.fn(async (..._a: unknown[]) => 'created'),
   update: jest.fn(async (..._a: unknown[]) => 'updated'),
-  remove: jest.fn(async (..._a: unknown[]) => 'removed'),
+  reverse: jest.fn(async (..._a: unknown[]) => 'taken back'),
+  editHistory: jest.fn(async (..._a: unknown[]) => 'edits'),
   analytics: jest.fn(async (..._a: unknown[]) => 'analytics'),
   attachBill: jest.fn(async (..._a: unknown[]) => 'attached'),
   removeBill: jest.fn(async (..._a: unknown[]) => 'unpinned'),
@@ -59,13 +60,23 @@ it('edits, retires and reorders options by id', async () => {
   });
 });
 
-it('reads, edits and removes one expense by its own id', async () => {
+it('reads and edits one expense by its own id', async () => {
   await controller.get('e1');
-  await controller.update('e1', { amount: 900 } as never);
-  await controller.remove('e1');
+  await controller.update('e1', { amount: 900 } as never, { id: 'u9' } as never);
   expect(expenses.get).toHaveBeenCalledWith('e1');
-  expect(expenses.update).toHaveBeenCalledWith('e1', { amount: 900 });
-  expect(expenses.remove).toHaveBeenCalledWith('e1');
+  expect(expenses.update).toHaveBeenCalledWith('e1', { amount: 900 }, 'u9');
+});
+
+it('takes an expense back rather than deleting it', async () => {
+  // There is no delete: money that moved is never quietly unmoved.
+  expect('remove' in controller).toBe(false);
+  await controller.reverse('e1', { reason: 'Never happened' } as never, { id: 'u9' } as never);
+  expect(expenses.reverse).toHaveBeenCalledWith('e1', 'Never happened', 'u9');
+});
+
+it('reads the story one expense kept', async () => {
+  await controller.editHistory('e1');
+  expect(expenses.editHistory).toHaveBeenCalledWith('e1');
 });
 
 it('passes the dates through to the analytics', async () => {

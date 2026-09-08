@@ -1,18 +1,19 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import { PERMISSIONS } from '@decor/shared';
 import { ExpenseDetailScreen } from './ExpenseDetailScreen';
 
 const mockExpense = jest.fn();
 const mockHistory = jest.fn();
-const mockDelete = jest.fn();
+const mockReverse = jest.fn();
+const mockEdits = jest.fn();
 const mockAttachBill = jest.fn();
 const mockRemoveBill = jest.fn();
 jest.mock('../api/client', () => ({
   api: {
     expense: (...a: unknown[]) => mockExpense(...a),
     history: (...a: unknown[]) => mockHistory(...a),
-    deleteExpense: (...a: unknown[]) => mockDelete(...a),
+    reverseExpense: (...a: unknown[]) => mockReverse(...a),
+    expenseEdits: (...a: unknown[]) => mockEdits(...a),
     attachExpenseBillNative: (...a: unknown[]) => mockAttachBill(...a),
     removeExpenseBill: (...a: unknown[]) => mockRemoveBill(...a),
     fileUrl: (id: string) => `http://api.test/files/${id}`,
@@ -58,7 +59,8 @@ beforeEach(() => {
   mockPermissions = [PERMISSIONS.EXPENSE_VIEW, PERMISSIONS.EXPENSE_MANAGE];
   mockExpense.mockResolvedValue(EXPENSE);
   mockHistory.mockResolvedValue([]);
-  mockDelete.mockResolvedValue({ id: 'e1' });
+  mockReverse.mockResolvedValue({ id: 'e2' });
+  mockEdits.mockResolvedValue([]);
   mockAttachBill.mockResolvedValue({ id: 'e1' });
   mockRemoveBill.mockResolvedValue({ id: 'e1' });
   mockCamera.mockResolvedValue({
@@ -98,37 +100,78 @@ it('reads the trail from the same history everything else uses', async () => {
   expect(mockHistory).toHaveBeenCalledWith('expenses', 'e1');
 });
 
-it('offers editing and deleting only to somebody who may', async () => {
+it('offers editing and correcting only to somebody who may', async () => {
   mockPermissions = [PERMISSIONS.EXPENSE_VIEW];
   await mount();
-  expect(screen.queryByText('Delete')).toBeNull();
+  expect(screen.queryByText('Take it back')).toBeNull();
+  expect(screen.queryByText('Edit')).toBeNull();
 });
 
-it('asks before deleting, and says the history keeps a record', async () => {
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-  await mount();
-  await fireEvent.press(await screen.findByText('Delete'));
-  expect(alert).toHaveBeenCalledWith(
-    'Delete this expense?',
-    expect.stringContaining('ledger entry'),
-    expect.any(Array),
-  );
-  expect(mockDelete).not.toHaveBeenCalled();
-  alert.mockRestore();
+describe('taking it back', () => {
+  it('offers no delete at all', async () => {
+    await mount();
+    // Money that moved is never quietly unmoved.
+    expect(screen.queryByText('Delete')).toBeNull();
+    expect(await screen.findByText('Take it back')).toBeTruthy();
+  });
+
+  it('insists on a reason before it will', async () => {
+    await mount();
+    await fireEvent.press(await screen.findByText('Take it back'));
+    const confirm = screen.getAllByText('Take it back')[1];
+    await fireEvent.press(confirm);
+    expect(mockReverse).not.toHaveBeenCalled();
+  });
+
+  it('records the correction once a reason is given', async () => {
+    await mount();
+    await fireEvent.press(await screen.findByText('Take it back'));
+    await fireEvent.changeText(
+      screen.getByPlaceholderText('The bill was for two sheets, not three'),
+      'Bill was for two sheets',
+    );
+    await fireEvent.press(screen.getAllByText('Take it back')[1]);
+    await waitFor(() =>
+      expect(mockReverse).toHaveBeenCalledWith('e1', 'Bill was for two sheets'),
+    );
+  });
+
+  it('says so on an expense that has been taken back, and offers no edit', async () => {
+    await mount({ ...EXPENSE, reversedBy: { id: 'e2' } });
+    expect(await screen.findByText('This was taken back')).toBeTruthy();
+    expect(screen.queryByText('Edit')).toBeNull();
+  });
+
+  it('says so on the correction itself, with the reason', async () => {
+    await mount({ ...EXPENSE, reversalOfId: 'e0', reason: 'Bill was for two sheets' });
+    expect(await screen.findByText('This is a correction')).toBeTruthy();
+    expect(screen.getByText('“Bill was for two sheets”')).toBeTruthy();
+  });
 });
 
-it('deletes once that is confirmed', async () => {
-  const alert = jest
-    .spyOn(Alert, 'alert')
-    .mockImplementation((_title, _message, buttons) => {
-      const confirm = (buttons ?? []).find((button) => button.style === 'destructive');
-      void confirm?.onPress?.();
-    });
-  await mount();
-  await fireEvent.press(await screen.findByText('Delete'));
-  await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('e1'));
-  expect(navigation.goBack).toHaveBeenCalled();
-  alert.mockRestore();
+describe('the story it keeps', () => {
+  it('reads what changed and why somebody changed it', async () => {
+    mockEdits.mockResolvedValue([
+      {
+        id: 'h1',
+        editType: 'UPDATED',
+        changes: [{ field: 'amount', from: 4500, to: 5200 }],
+        note: 'Bill was for two sheets',
+        userName: 'Nakul',
+        createdAt: '2026-09-09T10:00:00Z',
+      },
+    ]);
+    await mount();
+    expect(await screen.findByText('Amount changed')).toBeTruthy();
+    // The sentence somebody typed belongs beside the fields it explains.
+    expect(screen.getByText('“Bill was for two sheets”')).toBeTruthy();
+  });
+
+  it('still shows the audit trail beside it', async () => {
+    await mount();
+    expect(await screen.findByText('Audit trail')).toBeTruthy();
+    expect(mockHistory).toHaveBeenCalledWith('expenses', 'e1');
+  });
 });
 
 describe('the bill', () => {

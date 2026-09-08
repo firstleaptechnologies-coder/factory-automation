@@ -46,6 +46,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   Payment: 'Payment',
   CashDeposit: 'Deposit',
   Disbursement: 'Payout',
+  Expense: 'Expense',
+  ExpenseOption: 'Expense option',
   Lead: 'Enquiry',
   Estimate: 'Quote',
   EstimateItem: 'Quote line',
@@ -82,6 +84,7 @@ export const FIELD_LABELS: Record<string, string> = {
   code: 'Code',
   description: 'Description',
   discountPct: 'Discount',
+  doneBy: 'Spent by',
   dueDate: 'Due date',
   estimatedValue: 'Estimated value',
   expectedCloseDate: 'Expected close',
@@ -90,12 +93,14 @@ export const FIELD_LABELS: Record<string, string> = {
   grandTotal: 'Grand total',
   heightMm: 'Height',
   isActive: 'Active',
+  itcEligible: 'Input credit claimable',
   lineTotal: 'Line total',
   materialId: 'Material',
   mode: 'Paid by',
   name: 'Name',
   notes: 'Notes',
   paidAt: 'Paid on',
+  paymentType: 'Paid by',
   phone: 'Phone',
   priority: 'Priority',
   pricingMode: 'Priced by',
@@ -106,12 +111,17 @@ export const FIELD_LABELS: Record<string, string> = {
   reference: 'Reference',
   shippingAddress: 'Shipping address',
   sortOrder: 'Order',
+  spentType: 'Category',
   statusId: 'Stage',
   subtotal: 'Subtotal',
+  taxableValue: 'Taxable value',
   taxAmount: 'Tax',
+  toName: 'Paid to',
   taxTreatment: 'GST treatment',
   thicknessMm: 'Thickness',
   total: 'Total',
+  vendor: 'Attributed to',
+  vendorGstin: 'Vendor GSTIN',
   widthMm: 'Width',
 };
 
@@ -172,4 +182,43 @@ export function describeHistory(entry: HistoryEntry): string {
   if (changes.length === 0) return `${entityLabel(entry.entity)} edited`;
   if (changes.length === 1) return `${fieldLabel(changes[0].field)} changed`;
   return `${changes.length} things changed on the ${what}`;
+}
+
+// ---------------------------------------------------------------------------
+// An expense's own story
+// ---------------------------------------------------------------------------
+
+/**
+ * One line of it, in the same words both clients use.
+ *
+ * The audit trail records every write in the database; this is the record an
+ * expense keeps for itself, because a correction is made for a reason somebody
+ * types at the time and that sentence belongs beside the fields it explains.
+ */
+export interface ExpenseEditEntry {
+  id: string;
+  editType: 'CREATED' | 'UPDATED' | 'REVERSED';
+  changes: HistoryChange[];
+  note?: string | null;
+  userName?: string | null;
+  createdAt: string;
+}
+
+/** What one entry says happened, in a sentence. */
+export function describeEdit(entry: ExpenseEditEntry): string {
+  if (entry.editType === 'CREATED') return 'Recorded';
+  if (entry.editType === 'REVERSED') return 'Taken back';
+
+  const changes = entry.changes ?? [];
+  if (changes.length === 0) return 'Edited';
+  if (changes.length === 1) return `${fieldLabel(changes[0].field)} changed`;
+  return `${changes.length} things changed`;
+}
+
+/** The detail under that sentence: what each field went from and to. */
+export function editDetail(entry: ExpenseEditEntry): string[] {
+  return (entry.changes ?? []).map(
+    (change) =>
+      `${fieldLabel(change.field)}: ${historyValue(change.from)} → ${historyValue(change.to)}`,
+  );
 }

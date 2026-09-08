@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
@@ -31,6 +32,11 @@ export class SettleDisbursementDto {
   @IsOptional() @IsDateString() paidAt?: string;
   @IsOptional() @IsString() reference?: string;
   @IsOptional() @IsString() note?: string;
+}
+
+export class ReverseDisbursementDto {
+  /** Required, and kept. A correction nobody explained is a figure that moved. */
+  @IsString() @MinLength(4) @MaxLength(500) reason: string;
 }
 
 export class UpdateDisbursementDto {

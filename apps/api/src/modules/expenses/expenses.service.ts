@@ -200,19 +200,34 @@ export class ExpensesService {
       include: INCLUDE,
     });
 
+    await this.record(created.id, 'CREATED', [], dto.note, userId);
     await this.postSpend(created);
     return created;
   }
 
-  async update(id: string, dto: ExpenseDto) {
+  async update(id: string, dto: ExpenseDto, userId?: string) {
     const existing = await this.prisma.expense.findFirst({ where: { id } });
     if (!existing) throw new NotFoundException('Expense not found');
+    if (existing.reversalOfId) {
+      throw new BadRequestException(
+        'That row is a correction of another expense. Edit the one it corrects.',
+      );
+    }
+
+    const proposed = await this.rowFrom(dto);
+    const changes = diffExpense(existing, proposed);
 
     const updated = await this.prisma.expense.update({
       where: { id },
-      data: await this.rowFrom(dto),
+      data: proposed,
       include: INCLUDE,
     });
+
+    // Nothing written when nothing moved: a log of edits that changed no field
+    // is a log nobody reads twice.
+    if (changes.length) {
+      await this.record(id, 'UPDATED', changes, dto.editNote, userId);
+    }
 
     // Posted again rather than left alone: the ledger row is keyed on this
     // expense, so a corrected amount corrects the books in the same breath.
@@ -221,26 +236,75 @@ export class ExpensesService {
   }
 
   /**
-   * Removed, and its ledger row with it.
+   * Taken back, not deleted.
    *
-   * An expense is the shop's own note of its own spending, and a duplicate row
-   * typed at the counter is a mistake rather than an event — unlike a receipt
-   * from a client or a payout to a fitter, which are things that happened to
-   * somebody else and are corrected by a further record. Nothing is concealed
-   * by this: the audit trail keeps the deleted row in full, with who deleted
-   * it, and the books stay in step because both go together.
+   * The opposite row is recorded and both stand: what was entered, what took
+   * it back, who did it and why. An expense is money that moved, and the one
+   * thing the books must never allow is a figure quietly becoming a different
+   * figure — so this works exactly as taking a receipt back does, and for the
+   * same reason.
    */
-  async remove(id: string) {
-    const row = await this.prisma.expense.findFirst({ where: { id } });
-    if (!row) throw new NotFoundException('Expense not found');
+  async reverse(id: string, reason: string, userId?: string) {
+    const expense = await this.prisma.expense.findFirst({
+      where: { id },
+      include: { reversedBy: { select: { id: true } } },
+    });
+    if (!expense) throw new NotFoundException('Expense not found');
 
-    await this.prisma.$transaction([
-      this.prisma.ledgerEntry.deleteMany({
-        where: { sourceType: 'Expense', sourceId: id },
-      }),
-      this.prisma.expense.delete({ where: { id } }),
-    ]);
-    return { id };
+    if (expense.reversedBy) {
+      throw new BadRequestException('That expense has already been taken back');
+    }
+    if (expense.reversalOfId) {
+      // Reversing a reversal is spending the money again; record it as an
+      // expense, so the list says what actually happened.
+      throw new BadRequestException(
+        'That row is itself a correction. Record the expense again rather than reversing it.',
+      );
+    }
+    if (!reason?.trim()) {
+      throw new BadRequestException('Say why this expense is being taken back');
+    }
+
+    const amount = Number(expense.amount);
+    const taken = await this.prisma.expense.create({
+      data: {
+        tenantId: tenantId(),
+        date: expense.date,
+        description: expense.description,
+        amount: -amount,
+        paymentType: expense.paymentType,
+        doneBy: expense.doneBy,
+        toName: expense.toName,
+        vendor: expense.vendor,
+        spentType: expense.spentType,
+        note: `Takes back ₹${amount.toFixed(2)} recorded on ${expense.date
+          .toISOString()
+          .slice(0, 10)}`,
+        // The tax comes back with it, or the accountant claims credit on a
+        // bill the shop has just said it never paid.
+        vendorGstin: expense.vendorGstin,
+        taxableValue: expense.taxableValue == null ? null : -Number(expense.taxableValue),
+        taxAmount: expense.taxAmount == null ? null : -Number(expense.taxAmount),
+        itcEligible: expense.itcEligible,
+        orderId: expense.orderId,
+        reason: reason.trim(),
+        reversalOfId: expense.id,
+        createdById: userId,
+      },
+      include: INCLUDE,
+    });
+
+    await this.record(expense.id, 'REVERSED', [], reason.trim(), userId);
+    await this.postSpend(taken);
+    return taken;
+  }
+
+  /** What changed on one expense, and why — newest first. */
+  editHistory(id: string) {
+    return this.prisma.expenseEditHistory.findMany({
+      where: { expenseId: id },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   /**
@@ -338,6 +402,40 @@ export class ExpensesService {
       billFileId: dto.billFileId ?? null,
       orderId: dto.orderId ?? null,
     };
+  }
+
+  /**
+   * One line in the expense's own story.
+   *
+   * The user's name is copied onto the row rather than only referenced: the
+   * moment somebody most wants to read who corrected an expense is often after
+   * that person has left and their account has gone.
+   */
+  private async record(
+    expenseId: string,
+    editType: 'CREATED' | 'UPDATED' | 'REVERSED',
+    changes: FieldChange[],
+    note?: string | null,
+    userId?: string,
+  ) {
+    const user = userId
+      ? await this.prisma.user.findFirst({
+          where: { id: userId },
+          select: { name: true },
+        })
+      : null;
+
+    await this.prisma.expenseEditHistory.create({
+      data: {
+        tenantId: tenantId(),
+        expenseId,
+        editType,
+        changes: changes as unknown as Prisma.InputJsonValue,
+        note: note?.trim() || null,
+        userId: userId ?? null,
+        userName: user?.name ?? null,
+      },
+    });
   }
 
   /** Which drawer this expense came out of, and the posting for it. */
@@ -476,4 +574,71 @@ function duplicateOrThrow(error: unknown, label: string): unknown {
     return new BadRequestException(`"${label}" is already on that list`);
   }
   return error;
+}
+
+/** What one edit changed. */
+export interface FieldChange {
+  field: string;
+  from: string | number | boolean | null;
+  to: string | number | boolean | null;
+}
+
+/**
+ * The columns worth saying changed.
+ *
+ * A list rather than every key on the row: `updatedAt` moves on every edit and
+ * saying so in the history is noise, and the relations are not the expense.
+ */
+export const TRACKED_FIELDS = [
+  'date',
+  'description',
+  'amount',
+  'paymentType',
+  'doneBy',
+  'toName',
+  'vendor',
+  'spentType',
+  'note',
+  'vendorGstin',
+  'taxableValue',
+  'taxAmount',
+  'itcEligible',
+  'orderId',
+] as const;
+
+/** A value as the history should read it, whatever Prisma handed back. */
+function comparable(value: unknown): string | number | boolean | null {
+  if (value == null) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === 'boolean') return value;
+  // A Decimal and the number that replaces it must compare equal, or every
+  // save would claim the amount changed.
+  if (typeof value === 'number') return value;
+  if (typeof value === 'object' && 'toString' in value) {
+    const text = String(value);
+    return Number.isNaN(Number(text)) ? text : Number(text);
+  }
+  return String(value);
+}
+
+/**
+ * What one save actually changed.
+ *
+ * Pure and exported: what counts as a change is a rule worth reading on its
+ * own, and getting it wrong in either direction — a history full of edits that
+ * changed nothing, or one silently missing a corrected amount — is the kind of
+ * thing only a test catches.
+ */
+export function diffExpense(
+  previous: Record<string, unknown>,
+  next: Record<string, unknown>,
+): FieldChange[] {
+  const changes: FieldChange[] = [];
+  for (const field of TRACKED_FIELDS) {
+    if (!(field in next)) continue;
+    const from = comparable(previous[field]);
+    const to = comparable(next[field]);
+    if (from !== to) changes.push({ field, from, to });
+  }
+  return changes;
 }

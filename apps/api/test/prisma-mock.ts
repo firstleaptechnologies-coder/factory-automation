@@ -49,6 +49,7 @@ const MODELS = [
   'ledgerEntry',
   'expense',
   'expenseOption',
+  'expenseEditHistory',
   'notification',
   'notificationTemplate',
   'jobLease',

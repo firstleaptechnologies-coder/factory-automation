@@ -433,6 +433,7 @@ model User {
   notifications     Notification[]       @relation("NotificationFor")
   ledgerEntries     LedgerEntry[]
   expenses          Expense[]            @relation("ExpenseCreatedBy")
+  expenseEdits      ExpenseEditHistory[] @relation("ExpenseEditBy")
 
   @@unique([tenantId, code])
   @@unique([tenantId, email])
@@ -1181,6 +1182,17 @@ model Disbursement {
   reference String?
   note      String?
 
+  /// A payout that has been paid is money that has gone. It is never edited
+  /// away and never cancelled: a mistake is corrected by recording its
+  /// opposite, so both rows stand and the ledger, this screen and the shop's
+  /// own bank statement can all be reconciled against each other. Cancelling
+  /// is left for a payout that was only ever planned.
+  reversalOfId String?       @unique
+  reversalOf   Disbursement? @relation("DisbursementReversal", fields: [reversalOfId], references: [id])
+  reversedBy   Disbursement? @relation("DisbursementReversal")
+  /// Why it was taken back. Required to reverse one.
+  reason       String?
+
   recordedById String?
   recordedBy   User?    @relation("DisbursementRecordedBy", fields: [recordedById], references: [id])
   createdAt    DateTime @default(now())
@@ -1380,6 +1392,19 @@ model Expense {
   orderId String?
   order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
+  /// An expense is never deleted. A duplicate typed at the counter, or one
+  /// that turned out never to have happened, is corrected by recording its
+  /// opposite — which leaves both rows standing: what was entered, what took
+  /// it back, who did it and why. The books and this screen then agree without
+  /// either of them having to forget something.
+  reversalOfId String?  @unique
+  reversalOf   Expense? @relation("ExpenseReversal", fields: [reversalOfId], references: [id])
+  reversedBy   Expense? @relation("ExpenseReversal")
+  /// Why it was taken back. Required to reverse one.
+  reason       String?
+
+  editHistory ExpenseEditHistory[]
+
   createdById String?
   createdBy   User?    @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
@@ -1391,6 +1416,45 @@ model Expense {
   @@index([tenantId, doneBy])
   @@index([tenantId, paymentType])
   @@index([tenantId, orderId])
+  @@index([tenantId])
+}
+
+/// What changed on an expense, and why somebody changed it.
+///
+/// The audit trail records every write in this database already. This sits
+/// beside it because an expense is corrected for a reason a person types at
+/// the time — "the bill was for two sheets, not three" — and that sentence
+/// belongs on the screen the correction was made on, next to the fields it
+/// explains, rather than in a general log somebody has to go looking through.
+///
+/// `changes` is a JSON array of `{ field, from, to }` rather than a column per
+/// field, because the expense has many mutable columns and adding one should
+/// not need a migration here as well.
+model ExpenseEditHistory {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId  String
+  id        String  @id @default(cuid())
+  expenseId String
+  expense   Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  /// CREATED | UPDATED | REVERSED — what happened, in one word.
+  editType String
+  changes  Json
+  /// Why. Typed by whoever made the change, and the reason this model exists.
+  note     String?
+
+  /// Who did it, and their name at the time.
+  ///
+  /// The name is copied rather than only referenced so the log still reads
+  /// after that person's account is gone — which is the moment somebody is
+  /// most likely to be reading it.
+  userId   String?
+  user     User?   @relation("ExpenseEditBy", fields: [userId], references: [id], onDelete: SetNull)
+  userName String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, expenseId, createdAt])
   @@index([tenantId])
 }
 

@@ -8,6 +8,7 @@ const mockCategories = jest.fn();
 const mockCreate = jest.fn();
 const mockSettle = jest.fn();
 const mockCancel = jest.fn();
+const mockReverse = jest.fn();
 jest.mock('../api/client', () => ({
   api: {
     orderDisbursements: (...a: unknown[]) => mockOrderDisbursements(...a),
@@ -15,6 +16,7 @@ jest.mock('../api/client', () => ({
     createDisbursement: (...a: unknown[]) => mockCreate(...a),
     settleDisbursement: (...a: unknown[]) => mockSettle(...a),
     cancelDisbursement: (...a: unknown[]) => mockCancel(...a),
+    reverseDisbursement: (...a: unknown[]) => mockReverse(...a),
   },
 }));
 
@@ -279,13 +281,14 @@ describe('settling a payout', () => {
   });
 });
 
-describe('cancelling a payout', () => {
+describe('cancelling a payout that was only planned', () => {
   it('asks first, naming the payee and the amount', async () => {
     await mount();
+    // The planned one is Iqbal's; a paid payout is taken back instead.
     await fireEvent.press(screen.getAllByText('Cancel')[0]);
     expect(Alert.alert).toHaveBeenCalledWith(
       'Cancel this payout?',
-      'Ramesh · ₹2,500',
+      'Iqbal · ₹1,800',
       expect.anything(),
     );
     expect(mockCancel).not.toHaveBeenCalled();
@@ -300,6 +303,44 @@ describe('cancelling a payout', () => {
     }[];
     const confirm = buttons.find((b) => b.text !== 'Cancel' && b.onPress);
     await confirm!.onPress!();
-    await waitFor(() => expect(mockCancel).toHaveBeenCalledWith('d1'));
+    await waitFor(() => expect(mockCancel).toHaveBeenCalledWith('d2'));
+  });
+
+  it('offers no cancel on one that has been paid', async () => {
+    await mount();
+    // An intention can be dropped; money that has gone is taken back instead,
+    // which leaves both rows standing.
+    expect(screen.getAllByText('Cancel')).toHaveLength(1);
+    expect(screen.getByText('Take it back')).toBeTruthy();
+  });
+});
+
+describe('taking a settled payout back', () => {
+  it('insists on a reason', async () => {
+    await mount();
+    await fireEvent.press(screen.getByText('Take it back'));
+    await fireEvent.press(screen.getAllByText('Take it back')[1]);
+    expect(mockReverse).not.toHaveBeenCalled();
+  });
+
+  it('records the correction once a reason is given', async () => {
+    await mount();
+    await fireEvent.press(screen.getByText('Take it back'));
+    await fireEvent.changeText(
+      screen.getByPlaceholderText('Paid the wrong fitter'),
+      'Paid the wrong fitter',
+    );
+    await fireEvent.press(screen.getAllByText('Take it back')[1]);
+    await waitFor(() =>
+      expect(mockReverse).toHaveBeenCalledWith('d1', 'Paid the wrong fitter'),
+    );
+  });
+
+  it('offers nothing on a row that is already a correction', async () => {
+    await mount({
+      ...LEDGER,
+      disbursements: [{ ...LEDGER.disbursements[0], reversalOfId: 'd0' }],
+    });
+    expect(screen.queryByText('Take it back')).toBeNull();
   });
 });

@@ -615,6 +615,11 @@ export interface Disbursement {
   paidMode?: PaymentMode | null;
   reference?: string | null;
   note?: string | null;
+  /** Set on the row that takes another back, and on the one taken back. */
+  reversalOfId?: string | null;
+  reversedBy?: { id: string } | null;
+  /** Why it was taken back. */
+  reason?: string | null;
   recordedBy?: { id: string; name: string } | null;
   createdAt: string;
   order?: { id: string; code: string; client: { name: string } };
@@ -902,6 +907,11 @@ export interface Expense {
   itcEligible: boolean;
   billFileId?: string | null;
   bill?: { id: string; fileName: string; mimeType: string; byteSize: number } | null;
+  /** Set on the row that takes another back, and on the one taken back. */
+  reversalOfId?: string | null;
+  reversedBy?: { id: string } | null;
+  /** Why it was taken back. */
+  reason?: string | null;
   orderId?: string | null;
   order?: { id: string; code: string; client: { name: string } } | null;
   createdBy?: { id: string; name: string } | null;
@@ -948,4 +958,23 @@ export interface ExpenseInput {
   itcEligible?: boolean;
   billFileId?: string;
   orderId?: string;
+  /**
+   * Why this is being corrected — about the edit, not the spending.
+   *
+   * Kept apart from `note`, and shown on the expense's own history so the
+   * sentence sits beside the fields it explains.
+   */
+  editNote?: string;
+}
+
+/** One line in an expense's own story. */
+export interface ExpenseEdit {
+  id: string;
+  expenseId: string;
+  editType: 'CREATED' | 'UPDATED' | 'REVERSED';
+  changes: { field: string; from: string | number | boolean | null; to: string | number | boolean | null }[];
+  note?: string | null;
+  userId?: string | null;
+  userName?: string | null;
+  createdAt: string;
 }

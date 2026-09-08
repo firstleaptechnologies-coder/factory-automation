@@ -174,6 +174,75 @@ export class DisbursementsService {
     return settled;
   }
 
+  /**
+   * Takes a settled payout back.
+   *
+   * The mirror of taking a receipt back, and for the same reason: the money
+   * has gone, so the correction is the opposite row rather than the removal of
+   * the first one. Both stand — what was paid, what took it back, who did it
+   * and why — and the ledger, this screen and the shop's bank statement can be
+   * reconciled against each other afterwards.
+   *
+   * A payout that was only planned is cancelled instead: an intention is not a
+   * movement of money, and there is nothing to take back.
+   */
+  async reverse(id: string, reason: string, userId?: string) {
+    const payout = await this.prisma.disbursement.findFirst({
+      where: { id },
+      include: { ...INCLUDE, reversedBy: { select: { id: true } } },
+    });
+    if (!payout) throw new NotFoundException('Payout not found');
+
+    if (payout.status !== DisbursementStatus.PAID) {
+      throw new BadRequestException(
+        'That payout has not been paid yet — cancel it rather than taking it back',
+      );
+    }
+    if (payout.reversedBy) {
+      throw new BadRequestException('That payout has already been taken back');
+    }
+    if (payout.reversalOfId) {
+      throw new BadRequestException(
+        'That row is itself a correction. Record the payout again rather than reversing it.',
+      );
+    }
+    if (!reason?.trim()) {
+      throw new BadRequestException('Say why this payout is being taken back');
+    }
+
+    const amount = Number(payout.amount);
+    const taken = await this.prisma.disbursement.create({
+      data: {
+        tenantId: tenantId(),
+        orderId: payout.orderId,
+        categoryId: payout.categoryId,
+        payeeName: payout.payeeName,
+        payeeContact: payout.payeeContact,
+        amount: -amount,
+        // Paid, like the row it takes back: a correction to money that moved
+        // is itself money moving, and a planned one would sit in the "still
+        // owed" column claiming the shop owes somebody a negative amount.
+        status: DisbursementStatus.PAID,
+        paidMode: payout.paidMode,
+        paidAt: new Date(),
+        reference: payout.reference,
+        note: `Takes back ₹${amount.toFixed(2)} paid on ${
+          payout.paidAt ? payout.paidAt.toISOString().slice(0, 10) : 'an earlier date'
+        }`,
+        reason: reason.trim(),
+        reversalOfId: payout.id,
+        recordedById: userId,
+      },
+      include: INCLUDE,
+    });
+
+    await this.books.post(
+      disbursementPosting({ ...taken, amount: Number(taken.amount) }),
+    );
+
+    return taken;
+  }
+
   async update(id: string, dto: UpdateDisbursementDto) {
     const row = await this.prisma.disbursement.findFirst({ where: { id } });
     if (!row) throw new NotFoundException('Payout not found');
@@ -193,7 +262,7 @@ export class DisbursementsService {
      */
     if (row.status === DisbursementStatus.PAID) {
       throw new BadRequestException(
-        'That payout has already been paid — record the money coming back rather than cancelling it',
+        'That payout has already been paid — take it back rather than cancelling it',
       );
     }
 

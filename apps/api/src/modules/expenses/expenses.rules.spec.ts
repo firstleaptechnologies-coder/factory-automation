@@ -1,5 +1,12 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { ExpensesService, dateOnly, expenseFilter, groupBy, monthlySeries } from './expenses.service';
+import {
+  ExpensesService,
+  dateOnly,
+  diffExpense,
+  expenseFilter,
+  groupBy,
+  monthlySeries,
+} from './expenses.service';
 import { accountForPaymentType, expensePosting } from '../ledger/postings';
 import { inTenant, prismaMock, ledgerMock } from '../../../test/prisma-mock';
 
@@ -51,6 +58,26 @@ function build() {
 }
 
 const dto = (over: Record<string, unknown> = {}) => ({ ...SPEND, ...over }) as never;
+
+/** The same expense as the database hands it back, for comparing against. */
+const SPEND_ROW = {
+  id: 'e1',
+  date: new Date('2026-09-08T00:00:00.000Z'),
+  description: 'Router bits',
+  amount: 4500,
+  paymentType: 'Cash',
+  doneBy: 'Nakul',
+  toName: 'Sharma Tools',
+  vendor: 'Self',
+  spentType: 'Tooling',
+  note: null,
+  vendorGstin: null,
+  taxableValue: null,
+  taxAmount: null,
+  itcEligible: false,
+  orderId: null,
+  reversalOfId: null,
+};
 
 describe('recording what was spent', () => {
   it('posts it to the ledger, so spending is on the same screen as taking', async () => {
@@ -104,21 +131,170 @@ describe('recording what was spent', () => {
   });
 });
 
-describe('removing one', () => {
-  it('takes the ledger row with it, so the two cannot disagree', async () => {
+describe('taking one back', () => {
+  const SPENT = {
+    id: 'e1',
+    date: new Date('2026-09-08'),
+    description: 'Router bits',
+    amount: 4500,
+    paymentType: 'Cash',
+    doneBy: 'Nakul',
+    toName: 'Sharma Tools',
+    vendor: 'Self',
+    spentType: 'Tooling',
+    vendorGstin: '09AAACH7409R1ZZ',
+    taxableValue: 3814,
+    taxAmount: 686,
+    itcEligible: true,
+    orderId: null,
+    reversalOfId: null,
+    reversedBy: null,
+  };
+
+  it('records the opposite row rather than removing the first', async () => {
     const { service, db } = build();
-    db.expense.findFirst = jest.fn(async () => ({ id: 'e1' }));
-    await service.remove('e1');
-    expect(db.ledgerEntry.deleteMany).toHaveBeenCalledWith({
-      where: { sourceType: 'Expense', sourceId: 'e1' },
+    db.expense.findFirst = jest.fn(async () => SPENT);
+    await inTenant(() => service.reverse('e1', 'Bill was for two sheets, not three', 'u1'));
+
+    // Both rows stand: what was entered, what took it back, who and why.
+    expect(db.expense.delete).not.toHaveBeenCalled();
+    expect(db.expense.create.mock.calls[0][0].data).toMatchObject({
+      amount: -4500,
+      reversalOfId: 'e1',
+      reason: 'Bill was for two sheets, not three',
+      createdById: 'u1',
     });
-    expect(db.expense.delete).toHaveBeenCalledWith({ where: { id: 'e1' } });
+  });
+
+  it('brings the tax back with it', async () => {
+    const { service, db } = build();
+    db.expense.findFirst = jest.fn(async () => SPENT);
+    await inTenant(() => service.reverse('e1', 'Never happened'));
+    // Otherwise the accountant claims credit on a bill the shop has just said
+    // it never paid.
+    expect(db.expense.create.mock.calls[0][0].data).toMatchObject({
+      taxableValue: -3814,
+      taxAmount: -686,
+    });
+  });
+
+  it('posts the correction, so the drawer follows it', async () => {
+    const { service, db, ledger } = build();
+    db.expense.findFirst = jest.fn(async () => SPENT);
+    await inTenant(() => service.reverse('e1', 'Never happened'));
+    expect(ledger.post).toHaveBeenCalled();
+  });
+
+  it('will not take the same expense back twice', async () => {
+    const { service, db } = build();
+    db.expense.findFirst = jest.fn(async () => ({ ...SPENT, reversedBy: { id: 'e2' } }));
+    await expect(
+      inTenant(() => service.reverse('e1', 'Never happened')),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('will not reverse a correction, because that is spending it again', async () => {
+    const { service, db } = build();
+    db.expense.findFirst = jest.fn(async () => ({ ...SPENT, reversalOfId: 'e0' }));
+    await expect(
+      inTenant(() => service.reverse('e1', 'Never happened')),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('insists on a reason, because a figure that moved is owed an explanation', async () => {
+    const { service, db } = build();
+    db.expense.findFirst = jest.fn(async () => SPENT);
+    await expect(inTenant(() => service.reverse('e1', '  '))).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('refuses one that is not there', async () => {
     const { service, db } = build();
     db.expense.findFirst = jest.fn(async () => null);
-    await expect(service.remove('ghost')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      inTenant(() => service.reverse('ghost', 'Never happened')),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('the story an expense keeps', () => {
+  it('opens with the row being created', async () => {
+    const { service, db } = build();
+    await inTenant(() => service.create(dto(), 'u1'));
+    expect(db.expenseEditHistory.create.mock.calls[0][0].data).toMatchObject({
+      expenseId: 'e1',
+      editType: 'CREATED',
+      changes: [],
+    });
+  });
+
+  it('copies the name of whoever did it, not only their id', async () => {
+    const { service, db } = build();
+    db.user.findFirst = jest.fn(async () => ({ name: 'Nakul' }));
+    await inTenant(() => service.create(dto(), 'u1'));
+    // The moment somebody most wants to read who corrected an expense is often
+    // after that person has left and their account has gone.
+    expect(db.expenseEditHistory.create.mock.calls[0][0].data).toMatchObject({
+      userId: 'u1',
+      userName: 'Nakul',
+    });
+  });
+
+  it('says what changed, and keeps the reason typed at the time', async () => {
+    const { service, db } = build();
+    db.expense.findFirst = jest.fn(async () => ({ ...SPEND_ROW, amount: 4500 }));
+    await inTenant(() =>
+      service.update('e1', dto({ amount: 5200, editNote: 'Two sheets, not three' })),
+    );
+    const written = db.expenseEditHistory.create.mock.calls[0][0].data;
+    expect(written.editType).toBe('UPDATED');
+    expect(written.note).toBe('Two sheets, not three');
+    expect(written.changes).toEqual([{ field: 'amount', from: 4500, to: 5200 }]);
+  });
+
+  it('writes nothing when a save changed nothing', async () => {
+    const { service, db } = build();
+    db.expense.findFirst = jest.fn(async () => SPEND_ROW);
+    await inTenant(() => service.update('e1', dto()));
+    // A log of edits that changed no field is a log nobody reads twice.
+    expect(db.expenseEditHistory.create).not.toHaveBeenCalled();
+  });
+
+  it('will not edit a correction, only the row it corrects', async () => {
+    const { service, db } = build();
+    db.expense.findFirst = jest.fn(async () => ({ ...SPEND_ROW, reversalOfId: 'e0' }));
+    await expect(inTenant(() => service.update('e1', dto()))).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+});
+
+describe('what counts as a change', () => {
+  it('sees a corrected amount however Prisma handed the old one back', () => {
+    // A Decimal and the number replacing it must compare equal, or every save
+    // would claim the amount changed.
+    expect(diffExpense({ amount: { toString: () => '4500' } }, { amount: 4500 })).toEqual([]);
+    expect(diffExpense({ amount: { toString: () => '4500' } }, { amount: 5200 })).toEqual([
+      { field: 'amount', from: 4500, to: 5200 },
+    ]);
+  });
+
+  it('reads a date as the day it means', () => {
+    expect(
+      diffExpense({ date: new Date('2026-09-08') }, { date: new Date('2026-09-09') }),
+    ).toEqual([{ field: 'date', from: '2026-09-08', to: '2026-09-09' }]);
+  });
+
+  it('treats a cleared field as a change to nothing', () => {
+    expect(diffExpense({ note: 'Short delivery' }, { note: null })).toEqual([
+      { field: 'note', from: 'Short delivery', to: null },
+    ]);
+  });
+
+  it('says nothing about the columns nobody edited', () => {
+    // `updatedAt` moves on every save; saying so in the history is noise.
+    expect(diffExpense({ updatedAt: new Date('2026-01-01') }, {})).toEqual([]);
   });
 });
 

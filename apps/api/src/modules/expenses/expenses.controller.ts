@@ -20,6 +20,7 @@ import {
   ExpenseOptionDto,
   ExpenseQueryDto,
   ReorderExpenseOptionsDto,
+  ReverseExpenseDto,
   UpdateExpenseOptionDto,
 } from './dto/expense.dto';
 import { IncomingFile } from '../files/files.service';
@@ -108,14 +109,31 @@ export class ExpensesController {
    */
   @RequirePermissions(PERMISSIONS.EXPENSE_MANAGE)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: ExpenseDto) {
-    return this.expenses.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: ExpenseDto, @CurrentUser() user?: AuthUser) {
+    return this.expenses.update(id, dto, user?.id);
   }
 
+  /**
+   * Takes an expense back. There is no delete.
+   *
+   * The opposite row is recorded and both stand, exactly as taking a receipt
+   * back does: money that moved is never quietly unmoved.
+   */
   @RequirePermissions(PERMISSIONS.EXPENSE_MANAGE)
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.expenses.remove(id);
+  @Post(':id/reverse')
+  reverse(
+    @Param('id') id: string,
+    @Body() dto: ReverseExpenseDto,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.expenses.reverse(id, dto.reason, user?.id);
+  }
+
+  /** What changed on this expense, and why. */
+  @RequirePermissions(PERMISSIONS.EXPENSE_VIEW)
+  @Get(':id/edits')
+  editHistory(@Param('id') id: string) {
+    return this.expenses.editHistory(id);
   }
 
   /** The bill, photographed at the counter. One per expense. */

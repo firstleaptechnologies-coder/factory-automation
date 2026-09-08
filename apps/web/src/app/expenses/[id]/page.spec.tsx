@@ -6,10 +6,11 @@ import ExpensePage from './page';
 const apiMock = {
   expense: jest.fn(),
   history: jest.fn(),
-  deleteExpense: jest.fn(),
   expenseOptions: jest.fn(),
   attachExpenseBill: jest.fn(),
   removeExpenseBill: jest.fn(),
+  reverseExpense: jest.fn(),
+  expenseEdits: jest.fn(),
   fileUrl: jest.fn((id: string) => `http://api.test/files/${id}`),
 };
 jest.mock('@/lib/api', () => ({
@@ -68,7 +69,8 @@ beforeEach(() => {
   permissions = [PERMISSIONS.EXPENSE_VIEW, PERMISSIONS.EXPENSE_MANAGE];
   apiMock.expense.mockResolvedValue(EXPENSE);
   apiMock.history.mockResolvedValue([]);
-  apiMock.deleteExpense.mockResolvedValue({ id: 'e1' });
+  apiMock.reverseExpense.mockResolvedValue({ id: 'e2' });
+  apiMock.expenseEdits.mockResolvedValue([]);
   apiMock.attachExpenseBill.mockResolvedValue({ id: 'e1' });
   apiMock.removeExpenseBill.mockResolvedValue({ id: 'e1' });
   apiMock.expenseOptions.mockResolvedValue({
@@ -115,25 +117,77 @@ it('reads the trail from the same history everything else uses', async () => {
   await waitFor(() => expect(apiMock.history).toHaveBeenCalledWith('expenses', 'e1'));
 });
 
-it('offers editing and deleting only to somebody who may', async () => {
+it('offers editing and correcting only to somebody who may', async () => {
   permissions = [PERMISSIONS.EXPENSE_VIEW];
   await mount();
-  await waitFor(() => expect(screen.queryByText('Delete')).toBeNull());
+  await waitFor(() => expect(screen.queryByText('Take it back')).toBeNull());
+  expect(screen.queryByText('Edit')).toBeNull();
 });
 
-it('asks before deleting, and says the history keeps a record', async () => {
-  await mount();
-  fireEvent.click(await screen.findByText('Delete'));
-  expect(await screen.findByText(/ledger entry/)).toBeInTheDocument();
-  expect(apiMock.deleteExpense).not.toHaveBeenCalled();
+describe('taking it back', () => {
+  it('offers no delete at all', async () => {
+    await mount();
+    // Money that moved is never quietly unmoved.
+    expect(screen.queryByText('Delete')).toBeNull();
+    expect(await screen.findByText('Take it back')).toBeInTheDocument();
+  });
+
+  it('insists on a reason before it will', async () => {
+    await mount();
+    fireEvent.click(await screen.findByText('Take it back'));
+    const confirm = screen.getAllByRole('button', { name: 'Take it back' })[1];
+    expect(confirm).toBeDisabled();
+    expect(apiMock.reverseExpense).not.toHaveBeenCalled();
+  });
+
+  it('records the correction once a reason is given', async () => {
+    await mount();
+    fireEvent.click(await screen.findByText('Take it back'));
+    fireEvent.change(await screen.findByLabelText('Why'), {
+      target: { value: 'Bill was for two sheets' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Take it back' })[1]);
+    await waitFor(() =>
+      expect(apiMock.reverseExpense).toHaveBeenCalledWith('e1', 'Bill was for two sheets'),
+    );
+  });
+
+  it('says so on an expense that has been taken back, and offers no edit', async () => {
+    await mount({ ...EXPENSE, reversedBy: { id: 'e2' } });
+    expect(await screen.findByText('This was taken back')).toBeInTheDocument();
+    expect(screen.queryByText('Edit')).toBeNull();
+  });
+
+  it('says so on the correction itself, with the reason', async () => {
+    await mount({ ...EXPENSE, reversalOfId: 'e0', reason: 'Bill was for two sheets' });
+    expect(await screen.findByText('This is a correction')).toBeInTheDocument();
+    expect(screen.getByText('“Bill was for two sheets”')).toBeInTheDocument();
+  });
 });
 
-it('deletes once that is confirmed', async () => {
-  await mount();
-  fireEvent.click(await screen.findByText('Delete'));
-  fireEvent.click(await screen.findByText('Delete it'));
-  await waitFor(() => expect(apiMock.deleteExpense).toHaveBeenCalledWith('e1'));
-  expect(push).toHaveBeenCalledWith('/expenses');
+describe('the story it keeps', () => {
+  it('reads what changed and why somebody changed it', async () => {
+    apiMock.expenseEdits.mockResolvedValue([
+      {
+        id: 'h1',
+        editType: 'UPDATED',
+        changes: [{ field: 'amount', from: 4500, to: 5200 }],
+        note: 'Bill was for two sheets',
+        userName: 'Nakul',
+        createdAt: '2026-09-09T10:00:00Z',
+      },
+    ]);
+    await mount();
+    expect(await screen.findByText('Amount changed')).toBeInTheDocument();
+    // The sentence somebody typed belongs beside the fields it explains.
+    expect(screen.getByText('“Bill was for two sheets”')).toBeInTheDocument();
+  });
+
+  it('still shows the audit trail beside it', async () => {
+    await mount();
+    expect(await screen.findByText('Audit trail')).toBeInTheDocument();
+    await waitFor(() => expect(apiMock.history).toHaveBeenCalledWith('expenses', 'e1'));
+  });
 });
 
 it('edits on the same address rather than a page of its own', async () => {

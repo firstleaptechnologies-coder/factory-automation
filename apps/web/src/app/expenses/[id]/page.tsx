@@ -2,15 +2,15 @@
 
 import { Suspense, use, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { Expense, HistoryEntry } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Expense, ExpenseEdit, HistoryEntry } from '@decor/shared';
+import { PERMISSIONS, describeEdit, editDetail } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { optimizeImage } from '@/lib/optimize-image';
 import { useAuth } from '@/lib/auth';
 import { Shell } from '@/components/Shell';
 import { HistoryTimeline } from '@/components/HistoryTimeline';
-import { Button, Card, Loader, PageHead, Pill, Sheet } from '@/ui';
+import { Button, Card, Field, Loader, PageHead, Pill, Sheet } from '@/ui';
 import { formatDateShort, formatInr } from '@/lib/format';
 import { ExpenseForm } from '../ExpenseForm';
 
@@ -43,7 +43,9 @@ function Detail({ id }: { id: string }) {
   const { can } = useAuth();
   const expense = useApi<Expense>(() => api.expense(id), [id]);
   const history = useApi<HistoryEntry[]>(() => api.history('expenses', id), [id]);
+  const edits = useApi<ExpenseEdit[]>(() => api.expenseEdits(id), [id]);
   const [confirming, setConfirming] = useState(false);
+  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -53,11 +55,24 @@ function Detail({ id }: { id: string }) {
   const row = expense.data;
   if (!row) return null;
 
-  const remove = async () => {
+  const taken = Boolean(row.reversedBy);
+  const correction = Boolean(row.reversalOfId);
+
+  /**
+   * Takes the expense back rather than deleting it.
+   *
+   * The opposite row is recorded and both stand — what was entered, what took
+   * it back, who did it and why — exactly as taking a receipt back does.
+   */
+  const takeBack = async () => {
     setBusy(true);
     try {
-      await api.deleteExpense(id);
-      router.push('/expenses');
+      await api.reverseExpense(id, reason.trim());
+      setConfirming(false);
+      setReason('');
+      expense.reload();
+      edits.reload();
+      history.reload();
     } finally {
       setBusy(false);
     }
@@ -85,7 +100,7 @@ function Detail({ id }: { id: string }) {
         title={row.description}
         subtitle={`${row.spentType} · ${formatDateShort(row.date)}`}
         action={
-          canManage ? (
+          canManage && !taken && !correction ? (
             <div className="row">
               <Button
                 title="Edit"
@@ -93,7 +108,11 @@ function Detail({ id }: { id: string }) {
                 icon="edit"
                 onClick={() => router.push(`/expenses/${id}?edit=1`)}
               />
-              <Button title="Delete" variant="danger" onClick={() => setConfirming(true)} />
+              <Button
+                title="Take it back"
+                variant="danger"
+                onClick={() => setConfirming(true)}
+              />
             </div>
           ) : null
         }
@@ -108,6 +127,24 @@ function Detail({ id }: { id: string }) {
           {row.paymentType} · paid to {row.toName}
         </div>
       </Card>
+
+      {taken ? (
+        <Card size="sm" style={{ marginTop: 'var(--s-lg)' }}>
+          <div className="t-label">This was taken back</div>
+          <div className="t-tiny muted">
+            It stays on the record; a correction cancels the amount.
+          </div>
+        </Card>
+      ) : null}
+
+      {correction ? (
+        <Card size="sm" style={{ marginTop: 'var(--s-lg)' }}>
+          <div className="t-label">This is a correction</div>
+          <div className="t-tiny muted">
+            {row.reason ? `“${row.reason}”` : 'It takes an earlier expense back.'}
+          </div>
+        </Card>
+      ) : null}
 
       <div className="grid-2" style={{ marginTop: 'var(--s-lg)' }}>
         <Card size="sm">
@@ -184,7 +221,27 @@ function Detail({ id }: { id: string }) {
         )}
       </Card>
 
-      <h2 className="t-label muted" style={{ marginTop: 'var(--s-xl)' }}>History</h2>
+      <h2 className="t-label muted" style={{ marginTop: 'var(--s-xl)' }}>
+        What happened to it
+      </h2>
+      {(edits.data ?? []).length === 0 ? (
+        <div className="t-small faint">Nothing yet.</div>
+      ) : (
+        (edits.data ?? []).map((edit) => (
+          <Card key={edit.id} size="sm" style={{ marginBottom: 'var(--s-sm)' }}>
+            <div className="t-small bold">{describeEdit(edit)}</div>
+            {editDetail(edit).map((line) => (
+              <div key={line} className="t-tiny muted">{line}</div>
+            ))}
+            {edit.note ? <div className="t-tiny faint">“{edit.note}”</div> : null}
+            <div className="t-tiny faint">
+              {edit.userName ?? 'Somebody'} · {formatDateShort(edit.createdAt)}
+            </div>
+          </Card>
+        ))
+      )}
+
+      <h2 className="t-label muted" style={{ marginTop: 'var(--s-xl)' }}>Audit trail</h2>
       <HistoryTimeline
         entries={history.data ?? []}
         empty="Nothing has changed since this was recorded"
@@ -192,10 +249,24 @@ function Detail({ id }: { id: string }) {
 
       <Sheet
         open={confirming}
-        title="Delete this expense?"
-        subtitle="It comes off the books with its ledger entry. The history keeps a record of what was here."
+        title="Take this expense back?"
+        subtitle="It stays on the record with a correction beside it. Say why."
         onClose={() => setConfirming(false)}>
-        <Button title="Delete it" block variant="danger" loading={busy} onClick={remove} />
+        <Field
+          label="Why"
+          placeholder="The bill was for two sheets, not three"
+          value={reason}
+          onChange={setReason}
+          autoFocus
+        />
+        <Button
+          title="Take it back"
+          block
+          variant="danger"
+          loading={busy}
+          disabled={reason.trim().length < 4}
+          onClick={takeBack}
+        />
       </Sheet>
     </>
   );
