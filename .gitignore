@@ -25,3 +25,10 @@ apps/api/test/**/*.js.map
 
 # TypeScript's incremental build cache. Machine-local, and noisy in a diff.
 *.tsbuildinfo
+
+# The key that signs updates for every phone running this app.
+#
+# The certificate beside it is public and is committed — the app has to carry
+# it to check a signature. The private key is not: it belongs in the API's
+# environment and in a password manager, and nowhere else.
+apps/mobile/keys/

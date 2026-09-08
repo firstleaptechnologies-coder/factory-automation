@@ -66,3 +66,18 @@ a reason — `audited-models.spec.ts` fails otherwise.
 Money rows are append-only. A receipt is corrected by recording its opposite,
 never by editing or deleting it; the same will hold for everything that posts
 to the ledger.
+
+## Updates are signed, and the key is not in here
+
+The app carries `apps/mobile/certs/certificate.pem` and refuses any update that
+does not verify against it. The private half signs on the API side, from
+`EXPO_OTA_PRIVATE_KEY`, and lives only in an environment — never in the
+repository, never in a commit.
+
+Two consequences worth remembering before touching this:
+
+- **A release published by an API without the key is unsigned**, and every app
+  built with the certificate will refuse it. Staging and production each need
+  the key, and it must be the same one the binary was built against.
+- **The certificate is baked into the binary**, as are the update URL and the
+  runtime version. Changing any of them is a store release, not an update.

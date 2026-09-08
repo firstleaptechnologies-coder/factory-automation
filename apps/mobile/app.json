@@ -17,6 +17,11 @@
       "checkAutomatically": "ON_LOAD",
       "requestHeaders": {
         "expo-channel-name": "development"
+      },
+      "codeSigningCertificate": "./certs/certificate.pem",
+      "codeSigningMetadata": {
+        "keyid": "main",
+        "alg": "rsa-v1_5-sha256"
       }
     }
   }

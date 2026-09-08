@@ -25,9 +25,23 @@ and Skia 2.11.2 needed no change — their peer ranges are open.
 The other thing the pin cost was the iOS floor: Expo SDK 57's modules need
 **16.4**, and the app was on 15.1.
 
-*Remaining, and it is yours:* the update URL in `apps/mobile/app.json` points at
-`http://localhost:3001` because there is nowhere else yet. It has to change when
-there is a staging or production API — see item 4.
+Updates are **code-signed**: the app carries a certificate
+(`apps/mobile/certs/certificate.pem`, committed, valid to September 2036) and
+refuses any update that does not verify against it. The private half signs on
+the API side and is deliberately not in this repository.
+
+*Two things remaining, and both are yours:*
+
+- [ ] **The signing key belongs in every environment that serves updates.** It
+      is in `apps/api/.env` for development. Copy it into staging and
+      production as `EXPO_OTA_PRIVATE_KEY`, and **keep a copy somewhere safe**
+      — a password manager, not a laptop. Lose it and no phone already carrying
+      the certificate will accept another update: the way back is a store
+      release with a new certificate.
+- [ ] **The update URL** in `apps/mobile/app.json`, `ios/Expo.plist` and the
+      Android manifest points at `http://localhost:3001`, because there is
+      nowhere else yet. It is baked into the binary, so it has to be right
+      *before* the first real build — see item 4.
 
 ## 2. A Firebase project — **blocks push notifications**
 
