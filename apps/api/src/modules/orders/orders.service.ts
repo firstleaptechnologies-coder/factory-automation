@@ -17,6 +17,7 @@ import { CodeGeneratorService } from '../../common/utils/code-generator.service'
 import { paginate } from '../../common/dto/pagination.dto';
 import { FilesService, IncomingFile } from '../files/files.service';
 import { ClientsService } from '../clients/clients.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { DEFAULT_UNIT, LengthUnit, PERMISSIONS, fromMm, toMm } from '@decor/shared';
 import { lineAmount, round2, splitTax } from '../../common/utils/pricing';
 import { deriveStatus } from '../payments/payments.service';
@@ -73,6 +74,7 @@ export class OrdersService {
     private readonly codes: CodeGeneratorService,
     private readonly files: FilesService,
     private readonly clients: ClientsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -644,7 +646,7 @@ export class OrdersService {
   async changeStatus(
     id: string,
     dto: ChangeStatusDto,
-    user?: { id: string; role?: string; permissions?: string[] },
+    user?: { id: string; name?: string; code?: string; role?: string; permissions?: string[] },
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id },
@@ -702,7 +704,7 @@ export class OrdersService {
   private async moveBack(
     order: { id: string; statusId: string; workflowId: string; status: { name: string } },
     dto: ChangeStatusDto,
-    user?: { id: string; role?: string; permissions?: string[] },
+    user?: { id: string; name?: string; code?: string; role?: string; permissions?: string[] },
   ) {
     const target = await this.prisma.workflowStatus.findUnique({
       where: { id: dto.toStatusId },
@@ -742,7 +744,7 @@ export class OrdersService {
   private async applyStatus(
     order: { id: string; statusId: string },
     dto: ChangeStatusDto,
-    user: { id: string } | undefined,
+    user: { id: string; name?: string; code?: string } | undefined,
     reversed: boolean,
   ) {
     await this.prisma.$transaction([
@@ -763,7 +765,29 @@ export class OrdersService {
       }),
     ]);
 
-    return this.findOne(order.id);
+    const fresh = await this.findOne(order.id);
+
+    /*
+     * Tell the people who would want to know.
+     *
+     * After the move rather than inside the transaction: the move is the point
+     * and the notification is the courtesy — one must not be able to undo the
+     * other.
+     */
+    await this.notifications.raise(reversed ? 'order.moved_back' : 'order.moved', {
+      entity: 'Order',
+      entityId: order.id,
+      actorId: user?.id,
+      values: {
+        order: fresh.code,
+        stage: fresh.status?.name,
+        client: fresh.client?.name,
+        who: actorName(user),
+        reason: dto.note,
+      },
+    });
+
+    return fresh;
   }
 
   // -- attachments ----------------------------------------------------------
@@ -864,3 +888,9 @@ function measure(input: MeasurementDto): number {
 }
 
 
+
+
+/** The name to put in "…moved it", when there is one. */
+function actorName(user?: { id: string; name?: string; code?: string }): string | undefined {
+  return user?.name ?? user?.code;
+}

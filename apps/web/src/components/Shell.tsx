@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { NAV_GROUPS, NAV_HOME, type NavGroup, type NavItem } from '@decor/shared';
+import { api } from '@/lib/api';
+import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
 import { Avatar, Icon, IconName, Loader } from '@/ui';
 
@@ -35,6 +37,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
    * anything.
    */
   const [closed, setClosed] = useState<string[]>([]);
+
+  /*
+   * What is waiting, on the bell.
+   *
+   * Asked for once per page rather than polled: the number is a nudge to open
+   * the list, not a live feed, and a request every few seconds from every open
+   * tab is a cost the shop pays for nothing.
+   */
+  const unread = useApi<{ unread: number }>(() => api.unreadNotifications(), []);
 
   useEffect(() => {
     try {
@@ -135,6 +146,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {/* Home sits outside the categories: it is where you land, not
             somewhere you go looking for. */}
         <NavLink item={NAV_HOME} pathname={pathname} />
+
+        <Link href="/notifications" className="nav-link" data-active={pathname === '/notifications'}>
+          <Icon name="bell" size={17} />
+          Notifications
+          {unread.data?.unread ? (
+            <span className="nav-badge" data-testid="unread-badge">
+              {unread.data.unread > 9 ? '9+' : unread.data.unread}
+            </span>
+          ) : null}
+        </Link>
 
         {NAV_GROUPS.map((group) => renderGroup(group))}
 

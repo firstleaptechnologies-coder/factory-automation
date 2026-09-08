@@ -19,6 +19,7 @@ import { HealthModule } from './modules/health/health.module';
 import { HistoryModule } from './modules/history/history.module';
 import { LogsModule } from './modules/logs/logs.module';
 import { OtaModule } from './modules/ota/ota.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { UsersModule } from './modules/users/users.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { ConfigurationModule } from './modules/config/config.module';
@@ -53,6 +54,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     HistoryModule,
     LogsModule,
     OtaModule,
+    NotificationsModule,
     UsersModule,
     ClientsModule,
     ConfigurationModule,

@@ -15,6 +15,7 @@ import { FilesController } from './files/files.controller';
 import { HealthController } from './health/health.controller';
 import { HistoryController } from './history/history.controller';
 import { LogsController } from './logs/logs.controller';
+import { NotificationsController } from './notifications/notifications.controller';
 import { UpdatesController } from './ota/updates.controller';
 import { ReleasesController } from './ota/releases.controller';
 import { LeadsController } from './leads/leads.controller';
@@ -42,6 +43,7 @@ const CONTROLLERS = [
   HealthController,
   HistoryController,
   LogsController,
+  NotificationsController,
   UpdatesController,
   ReleasesController,
   LeadsController,
@@ -155,6 +157,21 @@ it('takes what the clients saw behind a token, and slowly', () => {
   // not be able to fill the table while it is at it.
   expect(find('LogsController', 'record').isPublic).toBe(false);
   expect(guards).toContain('ThrottlerGuard');
+});
+
+describe('notifications', () => {
+  it('lets anybody read their own, and nobody read another’s', () => {
+    // The service scopes every query to the caller, so there is nothing here
+    // for a permission to protect.
+    expect(find('NotificationsController', 'mine').permissions).toEqual([]);
+    expect(find('NotificationsController', 'unread').permissions).toEqual([]);
+  });
+
+  it('keeps the wording behind the configuration permissions', () => {
+    // What the shop says to itself is a shop-wide setting, not a personal one.
+    expect(find('NotificationsController', 'settings').permissions).toEqual(['config.view']);
+    expect(find('NotificationsController', 'saveSetting').permissions).toEqual(['config.manage']);
+  });
 });
 
 describe('releases', () => {
@@ -394,7 +411,13 @@ describe('everything that changes something', () => {
    * gating it would mean a crash going unreported by whoever hit it. Listed
    * here rather than left out quietly, so the rule below stays sharp.
    */
-  const OPEN_WRITES = new Set(['LogsController.record']);
+  const OPEN_WRITES = new Set([
+    'LogsController.record',
+    // Marking your own notification read is not an action on the shop's data;
+    // there is no way to reach anybody else's.
+    'NotificationsController.read',
+    'NotificationsController.readAll',
+  ]);
 
   const mutating = routes.filter(
     (route) =>
@@ -404,7 +427,7 @@ describe('everything that changes something', () => {
   );
 
   it('leaves almost nothing ungated', () => {
-    expect(OPEN_WRITES.size).toBeLessThan(3);
+    expect(OPEN_WRITES.size).toBeLessThan(5);
   });
 
   it('is not a short list', () => {

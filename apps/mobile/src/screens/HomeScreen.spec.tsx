@@ -5,11 +5,13 @@ import { HomeScreen } from './HomeScreen';
 const mockOrders = jest.fn();
 const mockLeads = jest.fn();
 const mockDefaultWorkflow = jest.fn();
+const mockUnread = jest.fn();
 jest.mock('../api/client', () => ({
   api: {
     orders: (...a: unknown[]) => mockOrders(...a),
     leads: (...a: unknown[]) => mockLeads(...a),
     defaultWorkflow: (...a: unknown[]) => mockDefaultWorkflow(...a),
+    unreadNotifications: (...a: unknown[]) => mockUnread(...a),
   },
 }));
 
@@ -81,6 +83,7 @@ async function mount(orders = [ORDER], leads: unknown[] = [LEAD], flow: unknown 
 }
 
 beforeEach(() => {
+  mockUnread.mockResolvedValue({ unread: 0 });
   jest.clearAllMocks();
   mockUser = { name: 'Nakul', code: 'ADMIN', role: 'ADMIN', permissions: [] };
   mockGranted = [
@@ -294,4 +297,27 @@ it('puts punching last, where a thumb lands', async () => {
 it('offers no board of its own — each list is the way to its board', async () => {
   await mount();
   expect(screen.queryByText('Board')).toBeNull();
+});
+
+
+describe('the bell', () => {
+  it('carries a count of what is waiting', async () => {
+    mockUnread.mockResolvedValue({ unread: 3 });
+    await mount();
+    // "Three things happened" is a different decision from "something
+    // happened".
+    expect(await screen.findByTestId('unread-badge')).toBeTruthy();
+    expect(screen.getByTestId('unread-badge')).toHaveTextContent('3');
+  });
+
+  it('stops counting past nine, which is enough to make the point', async () => {
+    mockUnread.mockResolvedValue({ unread: 42 });
+    await mount();
+    expect(await screen.findByTestId('unread-badge')).toHaveTextContent('9+');
+  });
+
+  it('shows nothing when there is nothing', async () => {
+    await mount();
+    expect(screen.queryByTestId('unread-badge')).toBeNull();
+  });
 });

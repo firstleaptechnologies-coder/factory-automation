@@ -89,7 +89,7 @@ flowchart LR
 | Screen | Web | App route | Permission |
 | --- | --- | --- | --- |
 | Home | `/` | `Home` | — |
-|   ↳ Notifications | — | `Notifications` | — |
+|   ↳ Notifications | `/notifications` | `Notifications` | — |
 |   ↳ Search | — | `Search` | — |
 
 ## Categories

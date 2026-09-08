@@ -1,13 +1,13 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PaymentMode } from '@prisma/client';
 import { PaymentsService } from './payments.service';
-import { inTenant, prismaMock } from '../../../test/prisma-mock';
+import { inTenant, prismaMock, notificationsMock } from '../../../test/prisma-mock';
 
 function serviceWithOrder(order: unknown) {
   const db = prismaMock();
   (db as never as Record<string, Record<string, jest.Mock>>).order.findUnique =
     jest.fn(async () => order);
-  return { service: new PaymentsService(db), db } as {
+  return { service: new PaymentsService(db, notificationsMock() as never), db } as {
     service: PaymentsService;
     db: Record<string, Record<string, jest.Mock>>;
   };
@@ -113,7 +113,7 @@ describe('banking cash later', () => {
   function serviceWithPayment(payment: unknown) {
     const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
     db.payment.findUnique = jest.fn(async () => payment);
-    return { service: new PaymentsService(db as never), db };
+    return { service: new PaymentsService(db as never, notificationsMock() as never), db };
   }
 
   it('refuses to deposit against an online payment', async () => {
@@ -161,7 +161,7 @@ describe('banking cash later', () => {
 
   it('allows an unattached deposit, for cash that cannot be traced to one receipt', async () => {
     const db = prismaMock();
-    const service = new PaymentsService(db);
+    const service = new PaymentsService(db, notificationsMock() as never);
     await expect(
       inTenant(() => service.deposit({ amount: 2500 } as never)),
     ).resolves.toBeDefined();
@@ -202,7 +202,7 @@ describe('reversing a payment', () => {
       id: 'p2',
       ...data,
     }));
-    return { service: new PaymentsService(db as never), db };
+    return { service: new PaymentsService(db as never, notificationsMock() as never), db };
   }
 
   const reverse = (service: PaymentsService, reason = 'Entered twice') =>
@@ -278,7 +278,7 @@ describe('reversing a payment', () => {
   it('says so when the receipt is not there', async () => {
     const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
     db.payment.findUnique = jest.fn(async () => null);
-    const service = new PaymentsService(db as never);
+    const service = new PaymentsService(db as never, notificationsMock() as never);
     await expect(inTenant(() => service.reverse('nope', 'x', 'u1'))).rejects.toThrow(
       NotFoundException,
     );

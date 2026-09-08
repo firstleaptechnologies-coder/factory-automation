@@ -17,6 +17,8 @@ export const NOT_AUDITED: Record<string, string> = {
     'a counter — every order punched would write a row saying a number went up by one',
   StoredFile:
     'holds the file bytes; a diff of it would copy every uploaded photo into the log',
+  Notification:
+    'already a record of something that happened; auditing it would log the log',
 };
 
 export const AUDITED_MODELS: Set<string> = new Set(

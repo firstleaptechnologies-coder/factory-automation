@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { AttachmentKind, PricingMode, TaxTreatment, UserRole } from '@prisma/client';
 import { OrdersService } from './orders.service';
 import { PERMISSIONS } from '@decor/shared';
-import { inTenant, prismaMock } from '../../../test/prisma-mock';
+import { inTenant, prismaMock, notificationsMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;
 
@@ -28,11 +28,20 @@ function build() {
   db.order.create = jest.fn(async () => ({ id: 'o1', items: [] }));
   db.order.findUnique = jest.fn(async () => ({ id: 'o1', items: [] }));
 
+  const notifications = notificationsMock();
+
   return {
-    service: new OrdersService(db as never, codes as never, files as never, clients as never),
+    service: new OrdersService(
+      db as never,
+      codes as never,
+      files as never,
+      clients as never,
+      notifications as never,
+    ),
     db,
     codes,
     files,
+    notifications,
   };
 }
 
@@ -623,6 +632,30 @@ describe('changeStatus', () => {
   function withOrder(db: Db, over: Record<string, unknown> = {}) {
     db.order.findUnique = jest.fn(async () => ({ ...order, ...over }));
   }
+
+  it('tells the people who would want to know', async () => {
+    const { service, db, notifications } = build();
+    withOrder(db);
+    db.workflowTransition.findUnique = jest.fn(async () => ({
+      id: 't1',
+      fromStatusId: 's1',
+      toStatusId: 's2',
+      requiresNote: false,
+      allowedRoles: [],
+    }));
+
+    await inTenant(() =>
+      service.changeStatus('o1', { toStatusId: 's2' } as never, { id: 'u1', name: 'Rajat' }),
+    );
+
+    expect(notifications.raise.mock.calls[0][0]).toBe('order.moved');
+    expect(notifications.raise.mock.calls[0][1]).toMatchObject({
+      entity: 'Order',
+      entityId: 'o1',
+      // They do not need telling about what they just did themselves.
+      actorId: 'u1',
+    });
+  });
 
   it('is a no-op when the order is already there', async () => {
     const { service, db } = build();

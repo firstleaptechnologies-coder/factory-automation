@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PaymentMode, PaymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { round2 } from '../../common/utils/pricing';
 import {
   CashPositionQueryDto,
@@ -27,7 +28,10 @@ export interface TransactionRow {
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   /**
    * Record money against an order and re-derive its payment status.
@@ -39,7 +43,8 @@ export class PaymentsService {
   async record(orderId: string, dto: RecordPaymentDto, userId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { payments: true },
+      // The client comes along for what the notification will say.
+      include: { payments: true, client: { select: { name: true } } },
     });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
@@ -66,7 +71,7 @@ export class PaymentsService {
       throw new BadRequestException('Deposited amount cannot exceed the cash received');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const recorded = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
         data: {
           tenantId: tenantId(),
@@ -98,6 +103,20 @@ export class PaymentsService {
 
       return payment;
     });
+
+    await this.notifications.raise('payment.recorded', {
+      entity: 'Order',
+      entityId: orderId,
+      actorId: userId,
+      values: {
+        amount: formatAmount(dto.amount),
+        order: order.code,
+        client: order.client?.name,
+        who: undefined,
+      },
+    });
+
+    return recorded;
   }
 
   /** Cash walked to the bank. Attach it to a payment when it is traceable. */
@@ -462,7 +481,7 @@ export class PaymentsService {
 
     const amount = Number(payment.amount);
 
-    return this.prisma.$transaction(async (tx) => {
+    const taken = await this.prisma.$transaction(async (tx) => {
       const reversal = await tx.payment.create({
         data: {
           tenantId: tenantId(),
@@ -507,6 +526,20 @@ export class PaymentsService {
 
       return reversal;
     });
+
+    await this.notifications.raise('payment.reversed', {
+      entity: 'Order',
+      entityId: payment.orderId,
+      actorId: userId,
+      values: {
+        amount: formatAmount(amount),
+        order: payment.order.code,
+        who: undefined,
+        reason: reason.trim(),
+      },
+    });
+
+    return taken;
   }
 }
 

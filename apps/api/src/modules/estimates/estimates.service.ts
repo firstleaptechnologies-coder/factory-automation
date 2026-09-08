@@ -7,6 +7,7 @@ import {
   TaxTreatment,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CodeGeneratorService } from '../../common/utils/code-generator.service';
 import { tenantId } from '../../common/tenancy/tenant-context';
 import { OrdersService } from '../orders/orders.service';
@@ -63,6 +64,7 @@ export class EstimatesService {
     private readonly prisma: PrismaService,
     private readonly codes: CodeGeneratorService,
     private readonly orders: OrdersService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // -- the firm's own letterhead details ------------------------------------
@@ -259,6 +261,26 @@ export class EstimatesService {
       if (status === EstimateStatus.SENT && before.status !== EstimateStatus.SENT) {
         await this.markLeadQuoted(estimate.leadId, estimate.code, userId);
       }
+    }
+
+    /*
+     * A client's answer, which is the one thing on a quote nobody wants to
+     * hear about a week late.
+     */
+    if (status !== before.status && (status === EstimateStatus.ACCEPTED || status === EstimateStatus.DECLINED)) {
+      await this.notifications.raise(
+        status === EstimateStatus.ACCEPTED ? 'quote.accepted' : 'quote.declined',
+        {
+          entity: 'Estimate',
+          entityId: id,
+          actorId: userId,
+          values: {
+            quote: estimate.code,
+            client: estimate.client?.name ?? estimate.clientName,
+            amount: `₹${Number(estimate.grandTotal).toFixed(2)}`,
+          },
+        },
+      );
     }
 
     return estimate;

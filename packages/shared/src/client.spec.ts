@@ -350,6 +350,18 @@ describe('endpoints', () => {
 
     ['tenants', (a) => a.tenants(), 'GET', '/platform/tenants'],
 
+    ['notifications', (a) => a.notifications(), 'GET', '/notifications'],
+    ['unreadNotifications', (a) => a.unreadNotifications(), 'GET', '/notifications/unread'],
+    ['readNotification', (a) => a.readNotification('n1'), 'POST', '/notifications/n1/read'],
+    ['readAllNotifications', (a) => a.readAllNotifications(), 'POST', '/notifications/read-all'],
+    ['notificationSettings', (a) => a.notificationSettings(), 'GET', '/notifications/settings/all'],
+    [
+      'saveNotificationSetting',
+      (a) => a.saveNotificationSetting('order.moved', { enabled: false }),
+      'PUT',
+      '/notifications/settings/order.moved',
+    ],
+
     ['releases', (a) => a.releases(), 'GET', '/platform/releases'],
     ['release', (a) => a.release('r1'), 'GET', '/platform/releases/r1'],
     [

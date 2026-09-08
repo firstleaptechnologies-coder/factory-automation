@@ -45,6 +45,8 @@ const MODELS = [
   'tenant',
   'platformUser',
   'auditLog',
+  'notification',
+  'notificationTemplate',
   'jobLease',
   'jobRun',
   'serverLog',
@@ -103,4 +105,15 @@ export function inTenant<T>(fn: () => T): T {
     { tenantId: 'tenant-test', slug: 'test-shop', isolation: TenantIsolation.SHARED },
     fn,
   );
+}
+
+/**
+ * A stand-in for the notifications service.
+ *
+ * Every service that tells somebody something takes it, and no test about
+ * pricing or status rules cares what it did — so they take this and the two
+ * specs that *are* about notifications assert on it directly.
+ */
+export function notificationsMock(): { raise: jest.Mock } {
+  return { raise: jest.fn(async () => 1) };
 }

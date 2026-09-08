@@ -1,5 +1,5 @@
 import { PaymentsService } from './payments.service';
-import { prismaMock } from '../../../test/prisma-mock';
+import { prismaMock, notificationsMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;
 
@@ -46,7 +46,7 @@ function build(payments = PAYMENTS, deposits = DEPOSITS) {
   db.cashDeposit.findMany = jest.fn(async () => deposits);
   db.payment.count = jest.fn(async () => payments.length);
   db.cashDeposit.count = jest.fn(async () => deposits.length);
-  return { service: new PaymentsService(db as never), db };
+  return { service: new PaymentsService(db as never, notificationsMock() as never), db };
 }
 
 const query = (over: Record<string, unknown> = {}) =>

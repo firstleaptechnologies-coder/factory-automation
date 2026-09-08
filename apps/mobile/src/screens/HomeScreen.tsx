@@ -42,6 +42,9 @@ export function HomeScreen({ navigation }: { navigation: any }) {
   const isAdmin = user?.role === 'ADMIN';
   const [unit] = useDisplayUnit();
 
+  /* Refetched whenever the screen regains focus, like everything else. */
+  const unread = useApi<{ unread: number }>(() => api.unreadNotifications(), []);
+
   const orders = useApi<Paginated<Order> & { unit: string }>(
     () => api.orders({ unit, limit: 6 }),
     [unit],
@@ -105,12 +108,23 @@ export function HomeScreen({ navigation }: { navigation: any }) {
         <View style={styles.topActions}>
           {/* Search and the settings dial both live in the bar now; the bell is
               the only thing up here that is about this moment. */}
-          <RoundButton
-            icon="bell"
-            testID="open-notifications"
-            accessibilityLabel="Notifications"
-            onPress={() => navigation.navigate('Notifications')}
-          />
+          <View>
+            <RoundButton
+              icon="bell"
+              testID="open-notifications"
+              accessibilityLabel="Notifications"
+              onPress={() => navigation.navigate('Notifications')}
+            />
+            {/* A count rather than a plain dot: "three things happened" is a
+                different decision from "something happened". */}
+            {unread.data?.unread ? (
+              <View testID="unread-badge" style={styles.badge} pointerEvents="none">
+                <Text variant="micro" tone="onAccent" bold>
+                  {unread.data.unread > 9 ? '9+' : unread.data.unread}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       </Animated.View>
 
@@ -288,6 +302,18 @@ export function HomeScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',

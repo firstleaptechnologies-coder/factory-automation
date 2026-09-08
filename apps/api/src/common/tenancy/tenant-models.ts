@@ -12,7 +12,8 @@ export const TENANT_SCOPED_MODELS = new Set([
   'OrderStatusHistory', 'Payment', 'CashDeposit', 'LeadSource',
   'CustomFieldDefinition', 'Lead', 'LeadStatusHistory', 'AppSetting',
   'DocumentSequence', 'AuditLog', 'Disbursement', 'DisbursementCategory',
-  'Estimate', 'EstimateItem', 'FirmProfile',
+  'Estimate', 'EstimateItem', 'FirmProfile', 'Notification',
+  'NotificationTemplate',
 ]);
 
 

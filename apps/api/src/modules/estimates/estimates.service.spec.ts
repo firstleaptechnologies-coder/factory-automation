@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EstimateStatus, PricingMode, TaxTreatment } from '@prisma/client';
 import { EstimatesService } from './estimates.service';
-import { inTenant, prismaMock } from '../../../test/prisma-mock';
+import { inTenant, prismaMock, notificationsMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;
 
@@ -17,7 +17,7 @@ function build() {
     stateCode: '27',
     termsAndConditions: 'Firm terms',
   }));
-  return { service: new EstimatesService(db as never, codes as never, orders as never), db, orders, codes };
+  return { service: new EstimatesService(db as never, codes as never, orders as never, notificationsMock() as never), db, orders, codes };
 }
 
 const line = (over: Record<string, unknown> = {}) => ({

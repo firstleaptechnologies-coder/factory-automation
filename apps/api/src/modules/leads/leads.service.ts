@@ -12,6 +12,7 @@ import {
   WorkflowKind,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CodeGeneratorService } from '../../common/utils/code-generator.service';
 import { paginate } from '../../common/dto/pagination.dto';
 import { OrdersService } from '../orders/orders.service';
@@ -59,6 +60,7 @@ export class LeadsService {
     private readonly codes: CodeGeneratorService,
     private readonly customFields: CustomFieldsService,
     private readonly orders: OrdersService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // -- sources --------------------------------------------------------------
@@ -324,7 +326,7 @@ export class LeadsService {
   private async applyStatus(
     lead: { id: string; statusId: string },
     dto: ChangeLeadStatusDto,
-    user: { id: string } | undefined,
+    user: { id: string; name?: string; code?: string } | undefined,
     reversed: boolean,
   ) {
     await this.prisma.$transaction([
@@ -342,7 +344,21 @@ export class LeadsService {
       }),
     ]);
 
-    return this.findOne(lead.id);
+    const fresh = await this.findOne(lead.id);
+
+    // After the move: the move is the point, the notification is the courtesy.
+    await this.notifications.raise('lead.moved', {
+      entity: 'Lead',
+      entityId: lead.id,
+      actorId: user?.id,
+      values: {
+        lead: fresh.code ?? fresh.title,
+        stage: fresh.status?.name,
+        who: user?.name ?? user?.code,
+      },
+    });
+
+    return fresh;
   }
 
   /**

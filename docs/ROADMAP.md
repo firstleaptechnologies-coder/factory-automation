@@ -246,11 +246,27 @@ out as one release rather than two.
 *What is left for the app itself:* adopting `expo-updates`, which needs the
 React Native decision in [WAITING-ON-YOU.md](WAITING-ON-YOU.md).
 
-**Push (item 2)** — the transport needs a Firebase project, so it is being built
-from the inside out: `Notification` rows are the source of truth and the app's
-notification screen reads them; FCM only wakes the phone. Native setup —
-`@react-native-firebase/{app,messaging}`, an APNs key, the platform files, the
-Android 13 runtime permission and notification channels — waits on the account.
+**Push (item 2)** — built from the inside out, because the row is the source of
+truth and FCM is only the transport that wakes the phone. Shipped:
+
+- A code-owned registry of triggers (`order.moved`, `order.moved_back`,
+  `payment.recorded`, `payment.reversed`, `quote.accepted`, `quote.declined`,
+  `lead.moved`) whose **wording each shop owns** — a row overrides the default
+  or switches the trigger off entirely.
+- `Notification` rows, one per person, so read state is theirs alone.
+  Recipients are chosen by permission rather than by role name: somebody who
+  cannot see payments is not told one was taken, and nobody is told about their
+  own doing.
+- The words are rendered when it happens and kept: editing a template later
+  must not rewrite what people were already told.
+- Raising one never throws. A shop must not be unable to move an order because
+  telling somebody about it failed.
+- Both clients: the app's notification screen — a shell until now — and a web
+  page, with a counted bell on each.
+
+*What is left:* the native setup — `@react-native-firebase/{app,messaging}`, an
+APNs key, the platform files, the Android 13 runtime permission and notification
+channels — which waits on the Firebase account.
 
 **Also in this release, because it is native:** crash reporting in the app.
 

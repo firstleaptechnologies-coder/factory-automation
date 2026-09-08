@@ -417,6 +417,7 @@ model User {
   cashDeposited     CashDeposit[]        @relation("CashDepositedBy")
   disbursements     Disbursement[]       @relation("DisbursementRecordedBy")
   estimates         Estimate[]           @relation("EstimateCreatedBy")
+  notifications     Notification[]       @relation("NotificationFor")
 
   @@unique([tenantId, code])
   @@unique([tenantId, email])
@@ -1324,6 +1325,65 @@ model LeadStatusHistory {
 
 /// Runtime configuration the admin can change without a deploy: default
 /// display unit, image optimisation targets, storage backend preference.
+/// Something that happened, that somebody should know about.
+///
+/// The row is the source of truth, not the push. A phone that was off, a person
+/// who was on leave, an app that was never installed — the notification is
+/// still here when they open the product, which is what makes it worth
+/// building before the transport that wakes the phone exists.
+model Notification {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+
+  /// Who it is for. One row per person, so read state is theirs alone.
+  userId String
+  user   User   @relation("NotificationFor", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The registry key it was raised under: `order.moved`, `payment.recorded`.
+  /// A string rather than an enum, so a new trigger is a release rather than a
+  /// migration.
+  kind String
+
+  /// Rendered when it happened, and kept. Editing a template later must not
+  /// rewrite what people were already told.
+  title String
+  body  String
+
+  /// What it is about, so tapping it can open the thing itself.
+  entity   String?
+  entityId String?
+
+  /// Who caused it, for "Rajat moved it" rather than "it moved".
+  actorId String?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, userId, readAt])
+}
+
+/// A shop's own wording for one kind of notification.
+///
+/// The triggers are the product's; what they say is the shop's. A row here
+/// overrides the default for one key — and can switch it off entirely, because
+/// a notification nobody wants is worse than none.
+model NotificationTemplate {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String  @id @default(cuid())
+  key      String
+  title    String?
+  body     String?
+  enabled  Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+}
+
 model AppSetting {
   id        String   @id @default(cuid())
   /// Owning tenant. No FK: a dedicated database holds no Tenant row.

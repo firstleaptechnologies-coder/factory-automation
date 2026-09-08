@@ -19,7 +19,12 @@ jest.mock('next/link', () => ({
   ),
 }));
 
+const unread = jest.fn();
+jest.mock('@/lib/api', () => ({ api: { unreadNotifications: () => unread() } }));
+
 const signOut = jest.fn();
+
+beforeEach(() => unread.mockResolvedValue({ unread: 0 }));
 let auth: Record<string, unknown>;
 jest.mock('@/lib/auth', () => ({ useAuth: () => auth }));
 
@@ -267,5 +272,32 @@ describe('the categories', () => {
     mount(all());
     expect(screen.getByText('Payout ledger')).toBeInTheDocument();
     getItem.mockRestore();
+  });
+});
+
+
+describe('the bell', () => {
+  it('is in the sidebar, above the categories', async () => {
+    mount();
+    expect(await screen.findByText('Notifications')).toBeInTheDocument();
+  });
+
+  it('carries a count of what is waiting', async () => {
+    unread.mockResolvedValue({ unread: 4 });
+    mount();
+    // "Four things happened" is a different decision from "something happened".
+    expect(await screen.findByTestId('unread-badge')).toHaveTextContent('4');
+  });
+
+  it('stops counting past nine', async () => {
+    unread.mockResolvedValue({ unread: 30 });
+    mount();
+    expect(await screen.findByTestId('unread-badge')).toHaveTextContent('9+');
+  });
+
+  it('shows nothing when there is nothing', async () => {
+    mount();
+    await screen.findByText('Notifications');
+    expect(screen.queryByTestId('unread-badge')).not.toBeInTheDocument();
   });
 });

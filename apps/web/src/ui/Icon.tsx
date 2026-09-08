@@ -32,10 +32,12 @@ export type IconName =
   | 'phone'
   | 'pin'
   | 'trash'
+  | 'bell'
   | 'edit';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   arrowUpRight: <path d="M7 17 17 7M9 7h8v8" />,
+  bell: <path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9ZM10 18.5a2 2 0 0 0 4 0" />,
   plus: <path d="M12 5v14M5 12h14" />,
   scan: (
     <>

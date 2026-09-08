@@ -3,7 +3,7 @@ import { StatusCategory, UserRole, WorkflowKind } from '@prisma/client';
 import { LeadsService } from './leads.service';
 import { CustomFieldsService } from './custom-fields.service';
 import { PERMISSIONS } from '@decor/shared';
-import { inTenant, prismaMock } from '../../../test/prisma-mock';
+import { inTenant, prismaMock, notificationsMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;
 
@@ -26,7 +26,7 @@ function build() {
   }));
 
   return {
-    service: new LeadsService(db as never, codes as never, customFields, orders as never),
+    service: new LeadsService(db as never, codes as never, customFields, orders as never, notificationsMock() as never),
     db,
     orders,
     codes,

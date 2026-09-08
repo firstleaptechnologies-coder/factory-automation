@@ -1,5 +1,6 @@
 import type { LengthUnit } from './units';
 import type { HistoryEntry } from './history';
+import type { AppNotification, NotificationSetting } from './notifications';
 import type {
   AttachmentKind,
   AuthUser,
@@ -773,6 +774,38 @@ export class ApiClient {
 
   tenants() {
     return this.get<Tenant[]>('/platform/tenants');
+  }
+
+  // -- notifications --------------------------------------------------------
+
+  /** What happened while you were not looking, newest first. */
+  notifications(query?: { unread?: boolean; before?: string }) {
+    return this.get<{ items: AppNotification[]; unread: number }>('/notifications', query);
+  }
+
+  /** Just the number, for the bell. */
+  unreadNotifications() {
+    return this.get<{ unread: number }>('/notifications/unread');
+  }
+
+  readNotification(id: string) {
+    return this.post<{ read: number }>(`/notifications/${id}/read`);
+  }
+
+  readAllNotifications() {
+    return this.post<{ read: number }>('/notifications/read-all');
+  }
+
+  /** Every trigger the product has, with this shop's wording where they set it. */
+  notificationSettings() {
+    return this.get<NotificationSetting[]>('/notifications/settings/all');
+  }
+
+  saveNotificationSetting(
+    key: string,
+    body: { title?: string; body?: string; enabled?: boolean },
+  ) {
+    return this.request<NotificationSetting[]>('PUT', `/notifications/settings/${key}`, body);
   }
 
   // -- releases (the app binary and what it runs) ---------------------------

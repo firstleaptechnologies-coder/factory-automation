@@ -52,7 +52,13 @@ export const NAV_HOME: NavItem = {
   web: '/',
   app: 'Home',
   children: [
-    { key: 'notifications', label: 'Notifications', icon: 'bell', app: 'Notifications' },
+    {
+      key: 'notifications',
+      label: 'Notifications',
+      icon: 'bell',
+      web: '/notifications',
+      app: 'Notifications',
+    },
     { key: 'search', label: 'Search', icon: 'search', app: 'Search' },
   ],
 };
