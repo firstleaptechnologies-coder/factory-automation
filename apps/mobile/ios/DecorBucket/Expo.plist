@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EXUpdatesCheckOnLaunch</key>
+	<string>ALWAYS</string>
+	<key>EXUpdatesCodeSigningCertificate</key>
+	<string>-----BEGIN CERTIFICATE-----
+MIIC2zCCAcOgAwIBAgIJOjxrYdCDh4oOMA0GCSqGSIb3DQEBCwUAMBcxFTATBgNV
+BAMTDERlY29yIEJ1Y2tldDAeFw0yNjA5MDgxNzIwMDZaFw0zNjA5MDgxNzIwMDZa
+MBcxFTATBgNVBAMTDERlY29yIEJ1Y2tldDCCASIwDQYJKoZIhvcNAQEBBQADggEP
+ADCCAQoCggEBANI8RzYd/pE8efC2xMs+vdAtE0+TJRQREwlec826PyQAj+CTje1z
+NvpXTBtY74WTGRVfFvopZmH5EdXd23zG/5ZzPVWHjs+wIMnlB2RSa2pUKruksyGy
+j9IoT5dfY1RYwnQa3Rb5EOQs2oCqS/Aza1Mlj5izpYSSCpl9cGOxGdnwoBIT4eLq
+lbZIM8yGdwyAVJESfAO2tQQS33yvEspplpHD8DNNSBb90h77SVwfTlQZo48RrdNC
+gZ6SGyAVBLR0VrT5xc+jA/N2BT3p4xXf/uJ870k9mrQmZOmeLNwL5/TODPN61tAT
+tAce3e1Hg1A20EXOI1EkrhgQ2zWnzzfFOW0CAwEAAaMqMCgwDgYDVR0PAQH/BAQD
+AgeAMBYGA1UdJQEB/wQMMAoGCCsGAQUFBwMDMA0GCSqGSIb3DQEBCwUAA4IBAQBt
+z0np0i5QFWE0LCEDJYke2/cYyeZB05VoECZyXLbhqqy7b51GqaG5LDs/f7pw+omi
+s7gfc3O4vJW5XqjpOu1VHhkIFela5RsgAxO+XFBMy8/RAInb0uWK+Ei2Bha2Z4fc
+0sZg3AjS1YfBnZq3GE+lvsPBLsHFG4oaPCjJ8KR7bUYAm8SSw5F1djOKt6KpK1M1
+RgnIV46TG80fEJ/+zzlLEGc59voTShidf1t0SpZv5bGa90M20SiLoJZG8ieeCnjd
+ghZjzNdFBYZX39Er8lAmfd+8vGHgEyIPBhFTON0vm+c/8i1J+TeN0aMhV3Zxvl1z
+W/0WyK7WnVKish6eyLNZ
+-----END CERTIFICATE-----
+</string>
+	<key>EXUpdatesCodeSigningMetadata</key>
+	<dict>
+		<key>alg</key>
+		<string>rsa-v1_5-sha256</string>
+		<key>keyid</key>
+		<string>main</string>
+	</dict>
+	<key>EXUpdatesEnabled</key>
+	<true/>
+	<key>EXUpdatesHasEmbeddedUpdate</key>
+	<true/>
+	<key>EXUpdatesLaunchWaitMs</key>
+	<integer>0</integer>
+	<key>EXUpdatesRequestHeaders</key>
+	<dict>
+		<key>expo-channel-name</key>
+		<string>development</string>
+	</dict>
+	<key>EXUpdatesRuntimeVersion</key>
+	<string>1</string>
+	<key>EXUpdatesURL</key>
+	<string>http://localhost:3001/api/updates/manifest</string>
+</dict>
+</plist>
