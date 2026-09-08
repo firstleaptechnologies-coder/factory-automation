@@ -23,6 +23,8 @@ export function IconTile({
   size = 58,
   /** Set when the tile sits on the accent card, where grey text disappears. */
   onAccentGround,
+  fluid,
+  labelSize,
 }: {
   icon: IconName;
   label?: string;
@@ -30,6 +32,15 @@ export function IconTile({
   tone?: 'dark' | 'accent';
   size?: number;
   onAccentGround?: boolean;
+  /** Share the row evenly instead of taking a fixed width. */
+  fluid?: boolean;
+  /**
+   * One size for the whole row, worked out by the caller from its longest
+   * label. Left off, each tile shrinks its own label to fit — which is right
+   * for a tile standing alone and wrong for a row, where five labels at five
+   * sizes read as a mistake.
+   */
+  labelSize?: number;
 }) {
   const scale = useSharedValue(1);
   const [pressed, setPressed] = React.useState(false);
@@ -46,7 +57,7 @@ export function IconTile({
   );
 
   return (
-    <View style={styles.tileWrap}>
+    <View style={[styles.tileWrap, fluid ? styles.tileFluid : null]}>
       <AnimatedPressable
         onPress={() => {
           haptic('impactLight');
@@ -70,11 +81,21 @@ export function IconTile({
         )}
       </AnimatedPressable>
       {label ? (
+        /*
+         * The label shrinks rather than clipping.
+         *
+         * A tile is a fifth of the card, and a single long word cannot wrap —
+         * "Transactions" came out as "Transactio…", which reads as a bug. A
+         * couple of points smaller on the one long label is invisible; a
+         * truncated word is not.
+         */
         <Text
           variant="tiny"
           tone={onAccentGround ? 'onAccent' : 'muted'}
-          style={styles.tileLabel}
-          numberOfLines={1}>
+          style={[styles.tileLabel, labelSize ? { fontSize: labelSize } : null]}
+          numberOfLines={1}
+          adjustsFontSizeToFit={!labelSize}
+          minimumFontScale={0.75}>
           {label}
         </Text>
       ) : null}
@@ -213,7 +234,7 @@ export function ScreenHeader({
   return (
     <View style={styles.header}>
       {onBack ? (
-        <RoundButton icon="back" onPress={onBack} />
+        <RoundButton icon="back" onPress={onBack} accessibilityLabel="Back" />
       ) : (
         <View style={{ width: 46 }} />
       )}
@@ -234,11 +255,20 @@ export function RoundButton({
   onPress,
   tone = 'dark',
   size = 46,
+  testID,
+  accessibilityLabel,
 }: {
   icon: IconName;
   onPress: () => void;
   tone?: 'dark' | 'accent';
   size?: number;
+  /** These pads carry an icon and no label, so tests need a handle. */
+  testID?: string;
+  /**
+   * What the pad does, spoken. An icon alone announces as an unlabelled
+   * button, which tells somebody using a screen reader nothing at all.
+   */
+  accessibilityLabel?: string;
 }) {
   const [pressed, setPressed] = React.useState(false);
   const body = (
@@ -249,6 +279,9 @@ export function RoundButton({
 
   return (
     <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       onPress={() => {
         haptic('impactLight');
         onPress();
@@ -273,6 +306,8 @@ export function Divider({ style }: { style?: ViewStyle }) {
 
 const styles = StyleSheet.create({
   tileWrap: { alignItems: 'center', width: 74 },
+  /* Five across a phone: the fixed width overflows, so share what there is. */
+  tileFluid: { width: undefined, flex: 1 },
   tileLabel: { marginTop: spacing.sm, textAlign: 'center' },
   pill: {
     paddingHorizontal: spacing.md,
@@ -300,3 +335,35 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1, alignItems: 'center' },
   divider: { height: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginVertical: spacing.md },
 });
+
+/**
+ * The end of a paged list: a spinner while the next page is in flight, or a
+ * quiet line confirming there is nothing further. Without the second half a
+ * list that has genuinely ended looks like one that failed to load more.
+ */
+export function ListFooter({
+  loading,
+  hasMore,
+  shown,
+  total,
+  noun = 'items',
+}: {
+  loading: boolean;
+  hasMore: boolean;
+  shown: number;
+  total: number;
+  noun?: string;
+}) {
+  if (shown === 0) return null;
+  return (
+    <View style={{ paddingVertical: spacing.lg, alignItems: 'center' }}>
+      {loading ? (
+        <ActivityIndicator color={palette.accent} />
+      ) : (
+        <Text variant="tiny" tone="faint">
+          {hasMore ? `${shown} of ${total} ${noun}` : `All ${total} ${noun}`}
+        </Text>
+      )}
+    </View>
+  );
+}

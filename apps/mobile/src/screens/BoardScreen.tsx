@@ -1,17 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import type { Order, OrderBoard } from '@decor/shared';
 import { UNIT_LABEL } from '@decor/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { StageBoard } from '../components/StageBoard';
-import { Loader, Pill, Screen, ScreenHeader, Text, RoundButton, haptic } from '../ui';
+import { Loader, Pill, Screen, ScreenHeader, Text, RoundButton, ask, haptic } from '../ui';
 import { palette, spacing } from '../theme';
 
 /** Orders on the board the admin configured. Drag a card sideways to move it. */
 export function BoardScreen({ navigation }: { navigation: any }) {
   const board = useApi<OrderBoard>(() => api.orderBoard(), []);
-  const [note, setNote] = useState('');
 
   const move = async (order: Order, toStatusId: string) => {
     try {
@@ -24,35 +23,63 @@ export function BoardScreen({ navigation }: { navigation: any }) {
       // A refusal that needs a note is worth offering to fix rather than
       // just reporting — the person already decided to make the move.
       if (/requires a note/i.test(message)) {
-        Alert.prompt?.(
-          'A note is required',
-          message,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Move',
-              onPress: async (text?: string) => {
-                if (!text?.trim()) return;
-                try {
-                  await api.changeOrderStatus(order.id, { toStatusId, note: text.trim() });
-                  haptic('notificationSuccess');
-                  board.refresh();
-                } catch (inner) {
-                  Alert.alert(
-                    'Still could not move',
-                    inner instanceof Error ? inner.message : 'Unknown error',
-                  );
-                }
-              },
+        ask('A note is required', message, [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Move',
+            onPress: async (text?: string) => {
+              if (!text?.trim()) return;
+              try {
+                await api.changeOrderStatus(order.id, { toStatusId, note: text.trim() });
+                haptic('notificationSuccess');
+                board.refresh();
+              } catch (inner) {
+                Alert.alert(
+                  'Still could not move',
+                  inner instanceof Error ? inner.message : 'Unknown error',
+                );
+              }
             },
-          ],
-          'plain-text',
-        ) ?? Alert.alert('A note is required', message);
+          },
+        ]);
+      } else if (/move back/i.test(message)) {
+        /*
+         * The server has already decided this one: it says "move back" only
+         * where the arrow exists the other way round and the person is allowed
+         * to take it. Anyone else gets a refusal, which falls through below.
+         * So all that is left here is the question.
+         */
+        askToGoBack(order, toStatusId, message);
       } else {
         Alert.alert('Cannot move there', message);
       }
       board.refresh();
     }
+  };
+
+  /** The question, then the move again with the acknowledgement on it. */
+  const askToGoBack = (order: Order, toStatusId: string, message: string) => {
+    const send = async (note?: string) => {
+      try {
+        await api.changeOrderStatus(order.id, {
+          toStatusId,
+          note: note?.trim() || undefined,
+          reverse: true,
+        });
+        haptic('notificationSuccess');
+      } catch (inner) {
+        Alert.alert(
+          'Could not move it back',
+          inner instanceof Error ? inner.message : 'Unknown error',
+        );
+      }
+      board.refresh();
+    };
+
+    ask(`Send ${order.code} back?`, `${message} Why is it going back?`, [
+      { text: 'Leave it', style: 'cancel' },
+      { text: 'Move it back', onPress: send },
+    ]);
   };
 
   if (!board.data) return <Loader label="Loading the board" />;
@@ -75,8 +102,15 @@ export function BoardScreen({ navigation }: { navigation: any }) {
         columns={board.data.columns.map((column) => ({
           status: column.status,
           items: column.orders,
+          total: column.total,
         }))}
         onMove={move}
+        onSeeAll={(status) =>
+          navigation.navigate('Main', {
+            screen: 'Orders',
+            params: { statusId: status.id },
+          })
+        }
         emptyLabel="No orders"
         renderCard={(order) => (
           <View>

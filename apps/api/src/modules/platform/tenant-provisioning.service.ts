@@ -31,12 +31,45 @@ export class TenantProvisioningService {
   ): Promise<void> {
     await this.seedRoles(db, tenantId);
     await this.seedGstSlabs(db, tenantId);
+    await this.seedDisbursementCategories(db, tenantId);
     await this.seedMaterials(db, tenantId);
     await this.seedSizes(db, tenantId);
     await this.seedOrderWorkflow(db, tenantId);
     await this.seedLeadPipeline(db, tenantId);
     await this.seedOwner(db, tenantId, owner);
     this.logger.log(`Seeded workspace ${tenantId}`);
+  }
+
+  /**
+   * Bring a workspace's stock roles up to date with this release.
+   *
+   * A tenant is seeded once, so a permission added in a later release would
+   * otherwise never reach a workspace that already exists — its owner would be
+   * locked out of the new screen with no way to grant themselves access. Only
+   * `isSystem` roles are touched; anything the tenant built themselves is
+   * theirs to maintain.
+   */
+  async syncSystemRoles(db: PrismaClient, tenantId: string): Promise<number> {
+    let changed = 0;
+    for (const role of DEFAULT_ROLES) {
+      const existing = await db.role.findFirst({
+        where: { tenantId, code: role.code, isSystem: true },
+      });
+      if (!existing) continue;
+
+      const missing = role.permissions.filter(
+        (permission) => !existing.permissions.includes(permission),
+      );
+      if (!missing.length) continue;
+
+      await db.role.update({
+        where: { id: existing.id },
+        data: { permissions: [...existing.permissions, ...missing] },
+      });
+      this.logger.log(`${role.code} in ${tenantId} gained ${missing.join(', ')}`);
+      changed += missing.length;
+    }
+    return changed;
   }
 
   private async seedRoles(db: PrismaClient, tenantId: string) {
@@ -66,6 +99,26 @@ export class TenantProvisioningService {
     for (const slab of slabs) {
       await db.gstSlab.create({ data: { tenantId, ...slab } });
     }
+  }
+
+  /**
+   * Buckets for money paid out of an order after the client has paid — a
+   * fitter, a transporter, a polisher. Every tenant renames the ledger itself
+   * (the `disbursementLabel` setting, "ISC" by default) and edits these.
+   */
+  private async seedDisbursementCategories(db: PrismaClient, tenantId: string) {
+    const categories = [
+      { code: 'INSTALL', name: 'Installation', sortOrder: 0 },
+      { code: 'TRANSPORT', name: 'Transport', sortOrder: 1 },
+      { code: 'LABOUR', name: 'Site labour', sortOrder: 2 },
+      { code: 'MISC', name: 'Miscellaneous', sortOrder: 3 },
+    ];
+    for (const category of categories) {
+      await db.disbursementCategory.create({ data: { tenantId, ...category } });
+    }
+    await db.appSetting.create({
+      data: { tenantId, key: 'disbursementLabel', value: 'ISC' },
+    });
   }
 
   private async seedMaterials(db: PrismaClient, tenantId: string) {
@@ -123,11 +176,16 @@ export class TenantProvisioningService {
   private async seedOrderWorkflow(db: PrismaClient, tenantId: string) {
     const stages = [
       { code: 'LEAD', name: 'Lead', color: '#8B949E', category: StatusCategory.OPEN, isInitial: true, isEntryPoint: true, x: 40, y: 200 },
-      { code: 'ORDER_FINAL', name: 'Order confirmed', color: '#FF6B1A', category: StatusCategory.OPEN, isEntryPoint: true, x: 260, y: 200 },
-      { code: 'DESIGN', name: 'Design', color: '#8957E5', category: StatusCategory.IN_PROGRESS, x: 480, y: 200 },
-      { code: 'DESIGN_APPROVAL', name: 'Design approval', color: '#B392F0', category: StatusCategory.IN_PROGRESS, x: 700, y: 200 },
-      { code: 'PRODUCTION', name: 'Production', color: '#D29922', category: StatusCategory.IN_PROGRESS, x: 920, y: 200 },
-      { code: 'QC_SANDING', name: 'QC & Sanding', color: '#E3B341', category: StatusCategory.IN_PROGRESS, x: 1140, y: 200 },
+      /*
+       * `home` puts a stage on the home screen's summary, in that order. A new
+       * shop starts watching the five stages work actually sits in; the screen
+       * behind Admin → Status flow → Main card changes them.
+       */
+      { code: 'ORDER_FINAL', name: 'Order confirmed', color: '#FF6B1A', category: StatusCategory.OPEN, isEntryPoint: true, x: 260, y: 200, home: 0 },
+      { code: 'DESIGN', name: 'Design', color: '#8957E5', category: StatusCategory.IN_PROGRESS, x: 480, y: 200, home: 1 },
+      { code: 'DESIGN_APPROVAL', name: 'Design approval', color: '#B392F0', category: StatusCategory.IN_PROGRESS, x: 700, y: 200, home: 2 },
+      { code: 'PRODUCTION', name: 'Production', color: '#D29922', category: StatusCategory.IN_PROGRESS, x: 920, y: 200, home: 3 },
+      { code: 'QC_SANDING', name: 'QC & Sanding', color: '#E3B341', category: StatusCategory.IN_PROGRESS, x: 1140, y: 200, home: 4 },
       { code: 'PAYMENT', name: 'Payment', color: '#58A6FF', category: StatusCategory.IN_PROGRESS, x: 1360, y: 200 },
       { code: 'READY_DISPATCH', name: 'Ready to dispatch', color: '#3FB950', category: StatusCategory.IN_PROGRESS, x: 1580, y: 200 },
       { code: 'DELIVERED', name: 'Delivered', color: '#2EA043', category: StatusCategory.DONE, isTerminal: true, x: 1800, y: 200 },
@@ -271,6 +329,7 @@ export class TenantProvisioningService {
           sortOrder: index,
           canvasX: stage.x,
           canvasY: stage.y,
+          homeCardOrder: stage.home ?? null,
         },
       });
       ids.set(stage.code, saved.id);

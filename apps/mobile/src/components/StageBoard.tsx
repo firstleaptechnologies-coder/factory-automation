@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Dimensions, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   interpolate,
@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { WorkflowStatus } from '@decor/shared';
 import { motion, palette, radius, spacing } from '../theme';
-import { Text, Icon, Pill, EmptyState, haptic } from '../ui';
+import { Text, Icon, EmptyState, haptic } from '../ui';
 
 const COLUMN_WIDTH = Math.min(Dimensions.get('window').width * 0.78, 320);
 /** How far a card must travel before the drag counts as a stage change. */
@@ -36,11 +36,15 @@ export function StageBoard<T extends BoardItem>({
   columns,
   renderCard,
   onMove,
+  onSeeAll,
   emptyLabel = 'Nothing here',
 }: {
-  columns: { status: WorkflowStatus; items: T[]; subtitle?: string }[];
+  /** `items` is what fits on the board; `total` is what the stage really holds. */
+  columns: { status: WorkflowStatus; items: T[]; subtitle?: string; total?: number }[];
   renderCard: (item: T) => React.ReactNode;
   onMove: (item: T, toStatusId: string) => Promise<void>;
+  /** Opens the paged list for one stage, when the column is showing a slice. */
+  onSeeAll?: (status: WorkflowStatus) => void;
   emptyLabel?: string;
 }) {
   return (
@@ -60,7 +64,9 @@ export function StageBoard<T extends BoardItem>({
               ) : null}
             </View>
             <View style={styles.count}>
-              <Text variant="tiny" tone="muted" bold>{column.items.length}</Text>
+              <Text variant="tiny" tone="muted" bold>
+                {column.total ?? column.items.length}
+              </Text>
             </View>
           </View>
 
@@ -79,6 +85,29 @@ export function StageBoard<T extends BoardItem>({
                 </DraggableCard>
               ))
             )}
+
+            {/* A capped column has to say so, or the board quietly lies about
+                how much work is in a stage. */}
+            {typeof column.total === 'number' && column.total > column.items.length ? (
+              onSeeAll ? (
+                <Pressable
+                  onPress={() => onSeeAll(column.status)}
+                  style={styles.more}
+                  hitSlop={6}>
+                  <Text variant="tiny" tone="accent" bold>
+                    {column.total - column.items.length} more — see all
+                  </Text>
+                </Pressable>
+              ) : (
+                // Nothing to open, so it states the fact rather than pretending
+                // to be a button.
+                <View style={styles.more}>
+                  <Text variant="tiny" tone="faint">
+                    {column.total - column.items.length} more not shown
+                  </Text>
+                </View>
+              )
+            ) : null}
           </ScrollView>
         </View>
       ))}
@@ -102,15 +131,25 @@ function DraggableCard<T extends BoardItem>({
   const offset = useSharedValue(0);
   const lifted = useSharedValue(0);
   const [pending, setPending] = useState(false);
+  /*
+   * The same flag as a ref.
+   *
+   * `.enabled(!pending)` only takes effect after React has re-rendered, and the
+   * state value inside `commit` is whatever the closure captured — so a second
+   * gesture that lands before that render still saw `false` and the card walked
+   * two stages along the flow on one swipe. A ref is written immediately, so
+   * the re-entry is refused in the same tick.
+   */
+  const inFlight = useRef(false);
 
   const commit = async (statusId: string) => {
-    // `pending` lives on the JS thread and the gesture runs on the UI thread,
-    // so the flag can lag by a frame. Checking it here closes that window.
-    if (pending) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
     try {
       await onMove(item, statusId);
     } finally {
+      inFlight.current = false;
       setPending(false);
       offset.value = withSpring(0, motion.spring);
     }
@@ -121,6 +160,9 @@ function DraggableCard<T extends BoardItem>({
   };
 
   const pan = Gesture.Pan()
+    // Names the gesture so a test can drive it; Gesture Handler has no other
+    // way to address one.
+    .withTestId(`stage-card-${item.id}`)
     // A card that is already moving must not accept another drag. Without this
     // a single swipe can commit several stages in a row: the move is async, the
     // board re-renders underneath it, and the gesture stays live the whole time
@@ -169,7 +211,8 @@ function DraggableCard<T extends BoardItem>({
   return (
     <View style={styles.cardSlot}>
       {previousStatus ? (
-        <Animated.View style={[styles.hint, styles.hintLeft, leftHint]}>
+        <Animated.View
+          style={[styles.hint, styles.hintLeft, accentFill, leftHint]}>
           <Icon name="chevronLeft" size={14} color={palette.textOnAccent} />
           <Text variant="micro" tone="onAccent" bold numberOfLines={1}>
             {previousStatus.name}
@@ -177,7 +220,8 @@ function DraggableCard<T extends BoardItem>({
         </Animated.View>
       ) : null}
       {nextStatus ? (
-        <Animated.View style={[styles.hint, styles.hintRight, rightHint]}>
+        <Animated.View
+          style={[styles.hint, styles.hintRight, accentFill, rightHint]}>
           <Text variant="micro" tone="onAccent" bold numberOfLines={1}>
             {nextStatus.name}
           </Text>
@@ -194,6 +238,12 @@ function DraggableCard<T extends BoardItem>({
   );
 }
 
+/**
+ * Applied inline wherever the accent is painted. A StyleSheet freezes the
+ * colour at import time, and the accent is configurable per tenant at runtime.
+ */
+const accentFill = { backgroundColor: palette.accent };
+
 const styles = StyleSheet.create({
   // Padding on both sides: the screen itself is unpadded so the columns can
   // run to the edge when scrolled, but the first one must not sit flush.
@@ -209,6 +259,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.28)',
+  },
+  more: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
   },
   count: {
     minWidth: 26,
@@ -232,7 +286,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: palette.accent,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radius.pill,

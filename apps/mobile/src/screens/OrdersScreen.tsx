@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import type { Material, Order, Paginated, Workflow } from '@decor/shared';
-import { LENGTH_UNITS, UNIT_LABEL } from '@decor/shared';
+import type { Material, Order, Workflow } from '@decor/shared';
+import { LENGTH_UNITS, PERMISSIONS, UNIT_LABEL } from '@decor/shared';
 import { api } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../hooks/useApi';
+import { usePaginated } from '../hooks/usePaginated';
+import { FilterSheet } from '../components/FilterSheet';
 import { useDisplayUnit } from '../hooks/useUnit';
 import {
   Card,
@@ -12,82 +15,146 @@ import {
   EmptyState,
   Field,
   Icon,
+  ListFooter,
   Loader,
   Pill,
   RoundButton,
   Screen,
   ScreenHeader,
-  Sheet,
   Text,
 } from '../ui';
 import { palette, spacing } from '../theme';
 import { relativeTime } from '../lib/format';
 
-export function OrdersScreen({ navigation }: { navigation: any }) {
+export function OrdersScreen({ route, navigation }: { route?: any; navigation: any }) {
+  const { can } = useAuth();
   const [unit, setUnit] = useDisplayUnit();
   const [search, setSearch] = useState('');
-  const [statusId, setStatusId] = useState<string | null>(null);
+  // The board hands a stage over when a column overflows, so the list opens
+  // already filtered to it.
+  const [statusId, setStatusId] = useState<string | null>(
+    (route?.params as { statusId?: string } | undefined)?.statusId ?? null,
+  );
   const [materialId, setMaterialId] = useState<string | null>(null);
   const [filterSheet, setFilterSheet] = useState(false);
 
   const workflow = useApi<Workflow>(() => api.defaultWorkflow(), []);
   const materials = useApi<Material[]>(() => api.materials(), []);
-  const orders = useApi<Paginated<Order> & { unit: string }>(
-    () =>
+  const orders = usePaginated<Order>(
+    (page) =>
       api.orders({
         unit,
         search: search || undefined,
         statusId: statusId ?? undefined,
         materialId: materialId ?? undefined,
-        limit: 60,
+        page,
+        limit: 25,
       }),
     [unit, search, statusId, materialId],
   );
 
   const activeFilters = [statusId, materialId].filter(Boolean).length;
 
+  /*
+   * Built once per data change. Rebuilding the option arrays on every render
+   * handed the wheel a fresh list each time the order list re-fetched, and a
+   * wheel whose options changed under it lost track of what was selected.
+   */
+  const filterDimensions = useMemo(
+    () => [
+      {
+        key: 'statusId',
+        label: 'Stage',
+        options: [
+          { id: null, label: 'Any stage' },
+          ...(workflow.data?.statuses ?? []).map((status) => ({
+            id: status.id,
+            label: status.name,
+            color: status.color,
+          })),
+        ],
+      },
+      {
+        key: 'materialId',
+        label: 'Material',
+        options: [
+          { id: null, label: 'Any material' },
+          ...(materials.data ?? []).map((material) => ({
+            id: material.id,
+            label: material.name,
+            color: material.color,
+          })),
+        ],
+      },
+    ],
+    [workflow.data, materials.data],
+  );
+
   return (
-    <Screen refreshing={orders.refreshing} onRefresh={orders.refresh}>
-      <ScreenHeader
-        title="Orders"
-        subtitle={`${orders.data?.meta.total ?? 0} total`}
-        right={<RoundButton icon="filter" onPress={() => setFilterSheet(true)} />}
-      />
-
-      <Field
-        placeholder="Order no, client or location"
-        value={search}
-        onChangeText={setSearch}
-        icon="search"
-      />
-
-      <View style={styles.unitRow}>
-        <Text variant="label" tone="faint">Sizes in</Text>
-        {LENGTH_UNITS.map((u) => (
-          <Chip key={u} label={UNIT_LABEL[u]} selected={unit === u} onPress={() => setUnit(u)} />
-        ))}
-        {activeFilters > 0 ? (
-          <Chip
-            label={`${activeFilters} filter${activeFilters > 1 ? 's' : ''} ×`}
-            selected
-            onPress={() => {
-              setStatusId(null);
-              setMaterialId(null);
-            }}
+    <Screen
+      refreshing={orders.refreshing}
+      onRefresh={orders.refresh}
+      onEndReached={orders.loadMore}
+      /*
+        Everything you work the list with stays put: the search, the way to the
+        board, the units and which filters are on. Having to scroll back to the
+        top to change any of them is what makes a long list tiring.
+      */
+      sticky={
+        <>
+          <ScreenHeader
+            title="Orders"
+            subtitle={`${orders.total} total`}
+            right={<RoundButton icon="filter" testID="filter-button" onPress={() => setFilterSheet(true)} />}
           />
-        ) : null}
-      </View>
 
-      {orders.loading && !orders.data ? (
+          {/*
+            The board is a way of looking at this list rather than a place of
+            its own, so it is reached from here — and punching starts from the
+            list you are already looking at.
+          */}
+          <View style={styles.actions}>
+            <Chip icon="layers" label="Board" onPress={() => navigation.navigate('Board')} />
+            {can(PERMISSIONS.ORDER_PUNCH) ? (
+              <Chip icon="plus" label="Punch order" onPress={() => navigation.navigate('PunchTab')} />
+            ) : null}
+          </View>
+
+          <Field
+            placeholder="Order no, client or location"
+            value={search}
+            onChangeText={setSearch}
+            icon="search"
+          />
+
+          <View style={styles.unitRow}>
+            <Text variant="label" tone="faint">Sizes in</Text>
+            {LENGTH_UNITS.map((u) => (
+              <Chip key={u} label={UNIT_LABEL[u]} selected={unit === u} onPress={() => setUnit(u)} />
+            ))}
+            {activeFilters > 0 ? (
+              <Chip
+                label={`${activeFilters} filter${activeFilters > 1 ? 's' : ''} ×`}
+                selected
+                onPress={() => {
+                  setStatusId(null);
+                  setMaterialId(null);
+                }}
+              />
+            ) : null}
+          </View>
+        </>
+      }>
+      {orders.loading ? (
         <Loader />
-      ) : orders.data?.data.length === 0 ? (
+      ) : orders.items.length === 0 ? (
         <EmptyState
           icon="clipboard"
           title="No orders match"
           message="Try clearing the search or filters."
         />
       ) : (
-        orders.data?.data.map((order, index) => (
+        orders.items.map((order, index) => (
           <Animated.View
             key={order.id}
             entering={FadeInDown.delay(Math.min(index, 8) * 40).duration(320)}
@@ -140,38 +207,31 @@ export function OrdersScreen({ navigation }: { navigation: any }) {
         ))
       )}
 
-      <Sheet visible={filterSheet} title="Filter orders" onClose={() => setFilterSheet(false)}>
-        <Text variant="label" tone="muted" style={styles.sheetLabel}>Status</Text>
-        <View style={styles.chipWrap}>
-          {workflow.data?.statuses.map((status) => (
-            <Chip
-              key={status.id}
-              label={status.name}
-              accent={status.color}
-              selected={statusId === status.id}
-              onPress={() => setStatusId(statusId === status.id ? null : status.id)}
-            />
-          ))}
-        </View>
+      <ListFooter
+        loading={orders.loadingMore}
+        hasMore={orders.hasMore}
+        shown={orders.items.length}
+        total={orders.total}
+        noun="orders"
+      />
 
-        <Text variant="label" tone="muted" style={styles.sheetLabel}>Material</Text>
-        <View style={styles.chipWrap}>
-          {materials.data?.map((m) => (
-            <Chip
-              key={m.id}
-              label={m.name}
-              accent={m.color}
-              selected={materialId === m.id}
-              onPress={() => setMaterialId(materialId === m.id ? null : m.id)}
-            />
-          ))}
-        </View>
-      </Sheet>
+      <FilterSheet
+        visible={filterSheet}
+        onClose={() => setFilterSheet(false)}
+        title="Filter orders"
+        dimensions={filterDimensions}
+        value={{ statusId, materialId }}
+        onApply={(next) => {
+          setStatusId(next.statusId ?? null);
+          setMaterialId(next.materialId ?? null);
+        }}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  actions: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   unitRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -12,7 +12,9 @@
  * few things that should pull the eye.
  */
 
-export const palette = {
+import { inkOn } from '@decor/shared';
+
+export const palette: Record<string, string> = {
   /** The single ground colour. Every panel is this, or a shade of it. */
   bg: '#25292E',
   surface: '#282D32',
@@ -98,10 +100,21 @@ export const weight = {
  * Shadow geometry. Depth is the offset and blur of the two lights; a bigger
  * depth reads as a panel standing further off the ground.
  */
+/**
+ * Shadow geometry. Depth is the offset, blur and strength of the two lights;
+ * a bigger depth reads as a panel standing further off the ground.
+ *
+ * The blur is deliberately three to four times the offset. When blur only just
+ * exceeds the offset the shadow keeps a hard edge and reads as a second copy of
+ * the control sitting behind it — a visible dark pill behind every button —
+ * rather than as light falling off a raised surface. Small controls also get a
+ * weaker shadow, because a chip usually sits on a card that is already raised
+ * and the two otherwise compound into a smudge.
+ */
 export const depth = {
-  sm: { offset: 3, blur: 6 },
-  md: { offset: 6, blur: 12 },
-  lg: { offset: 9, blur: 18 },
+  sm: { offset: 2, blur: 8, dark: 0.34, light: 0.045 },
+  md: { offset: 5, blur: 16, dark: 0.46, light: 0.055 },
+  lg: { offset: 8, blur: 24, dark: 0.55, light: 0.06 },
 } as const;
 
 export const shadow = {
@@ -130,13 +143,99 @@ export const motion = {
   springSoft: { damping: 22, stiffness: 120, mass: 1 },
 } as const;
 
-/** Pick legible text for an arbitrary configured status colour. */
+/**
+ * Legible text for an arbitrary configured colour.
+ *
+ * Measured rather than estimated: this used to weigh the channels by perceived
+ * brightness and flip at a threshold, which reads a saturated yellow and a
+ * saturated blue as the same lightness and gives them the same ink. Those are
+ * exactly the colours a decor shop reaches for.
+ */
 export function readableOn(background: string): string {
-  const hex = background.replace('#', '');
-  if (hex.length !== 6) return palette.text;
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.6 ? '#1A1D20' : palette.white;
+  return normaliseHex(background) ? inkOn(background) : palette.text;
+}
+
+
+// ---------------------------------------------------------------------------
+// Runtime theming
+// ---------------------------------------------------------------------------
+
+/**
+ * Repaint the app in a tenant's own accent.
+ *
+ * Only the accent moves. On a soft-UI theme the greys are structural — they are
+ * what makes a surface look pressed out of the ground — so letting a client
+ * choose those would not be branding, it would be breaking the illusion. One
+ * colour in, the whole ramp derived from it.
+ *
+ * The exported objects are mutated in place rather than replaced, because every
+ * StyleSheet in the app has already captured references to them. Callers must
+ * force a re-render afterwards; ThemeProvider does that by remounting the tree.
+ */
+export function applyAccent(hex: string): void {
+  const accent = normaliseHex(hex);
+  if (!accent) return;
+
+  palette.accent = accent;
+  palette.accentBright = shift(accent, 0.18);
+  palette.accentDeep = shift(accent, -0.12);
+  palette.accentGlow = withAlpha(accent, 0.45);
+  /*
+   * The ink on the accent follows the accent.
+   *
+   * It was white, which was right for our orange and wrong the moment a shop
+   * chose a pale one: the punch button's label disappeared into its own
+   * background. Whether the label is white or charcoal is not a decision
+   * anybody should have to make — it falls out of the colour.
+   */
+  palette.textOnAccent = inkOn(accent);
+
+  gradients.accent = [palette.accentBright, palette.accent, palette.accentDeep];
+  gradients.accentSoft = [shift(accent, 0.08), shift(accent, -0.07)];
+}
+
+export const DEFAULT_ACCENT = '#FF6B1A';
+
+/** Accepts #rgb and #rrggbb; anything else is refused rather than guessed at. */
+function normaliseHex(input: string): string | null {
+  const value = String(input ?? '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value.toUpperCase();
+  if (/^#[0-9a-f]{3}$/i.test(value)) {
+    const [, r, g, b] = value.toUpperCase();
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return null;
+}
+
+function channels(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+/** Lighten (positive) or darken (negative) towards white or black. */
+function shift(hex: string, amount: number): string {
+  const target = amount >= 0 ? 255 : 0;
+  const weight = Math.abs(amount);
+  const moved = channels(hex).map((channel) =>
+    Math.round(channel + (target - channel) * weight),
+  );
+  return `#${moved.map((c) => c.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+}
+
+function withAlpha(hex: string, alpha: number): string {
+  const [r, g, b] = channels(hex);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/**
+ * Whether white or near-black is readable on the current accent.
+ *
+ * A tenant may well pick a pale brand yellow, and white text on it is
+ * unreadable — so the label colour follows the accent rather than being fixed.
+ */
+export function readableOnAccent(): string {
+  return readableOn(palette.accent);
 }

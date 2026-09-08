@@ -1,9 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   AttachmentKind,
   PricingMode,
   Prisma,
   RateUnit,
+  TaxTreatment,
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -11,8 +17,10 @@ import { CodeGeneratorService } from '../../common/utils/code-generator.service'
 import { paginate } from '../../common/dto/pagination.dto';
 import { FilesService, IncomingFile } from '../files/files.service';
 import { ClientsService } from '../clients/clients.service';
-import { DEFAULT_UNIT, LengthUnit, fromMm, toMm } from '@decor/shared';
-import { lineAmount, round2 } from '../../common/utils/pricing';
+import { DEFAULT_UNIT, LengthUnit, PERMISSIONS, fromMm, toMm } from '@decor/shared';
+import { lineAmount, round2, splitTax } from '../../common/utils/pricing';
+import { deriveStatus } from '../payments/payments.service';
+import { totalsFor } from './order-totals';
 
 /** Thickness is spoken in millimetres regardless of the sheet's display unit. */
 const THICKNESS_UNIT: LengthUnit = 'MM';
@@ -117,7 +125,11 @@ export class OrdersService {
       throw new BadRequestException(`${initial.name} is not a stage an order may start at`);
     }
 
-    const items = await Promise.all(dto.items.map((item) => this.resolveItem(item)));
+    const treatment = dto.taxTreatment ?? TaxTreatment.EXCLUSIVE;
+    const pricing = dto.pricingMode ?? PricingMode.ITEMISED;
+    const items = await Promise.all(
+      dto.items.map((item) => this.resolveItem(item, treatment, pricing)),
+    );
     const lumpSumSlab =
       (dto.pricingMode ?? PricingMode.ITEMISED) === PricingMode.LUMP_SUM
         ? await this.prisma.gstSlab.findFirst({
@@ -133,6 +145,7 @@ export class OrdersService {
       dto.discount,
       dto.total,
       lumpSumSlab ? Number(lumpSumSlab.ratePct) : 0,
+      treatment,
     );
     const code = await this.codes.next('order');
 
@@ -160,6 +173,9 @@ export class OrdersService {
           notes: dto.notes,
           createdById: userId,
           pricingMode: money.pricingMode,
+          taxTreatment: treatment,
+          quotedAmount: money.quotedAmount,
+          taxDiscount: money.taxDiscount,
           subtotal: money.subtotal,
           discount: money.discount,
           total: money.total,
@@ -167,7 +183,8 @@ export class OrdersService {
           taxAmount: money.taxAmount,
           grandTotal: money.grandTotal,
           items: {
-            create: items.map((item, index) => ({
+            // The rolled-up figures are the order's, not the line's.
+            create: items.map(({ quotedAmount, concession, ...item }, index) => ({
               tenantId: tenantId(),
               lineNo: index + 1,
               ...item,
@@ -233,7 +250,11 @@ export class OrdersService {
    * way the numbers are copied onto the item in millimetres rather than left as
    * a reference, so editing the preset next month cannot rewrite this order.
    */
-  private async resolveItem(item: PunchItemDto) {
+  private async resolveItem(
+    item: PunchItemDto,
+    treatment: TaxTreatment,
+    pricing: PricingMode = PricingMode.ITEMISED,
+  ) {
     const preset = item.sizePresetId
       ? await this.prisma.sizePreset.findUnique({ where: { id: item.sizePresetId } })
       : null;
@@ -250,7 +271,14 @@ export class OrdersService {
         'Each item needs a length and width — pick a size preset or enter both',
       );
     }
-    if (lengthMm <= 0 || widthMm <= 0) {
+    /*
+     * A size of zero is meaningless where the size sets the price, and is the
+     * ordinary state of affairs where it does not: a quotation is written
+     * before anything is measured, and the order it becomes carries one agreed
+     * figure with the real lines specified on the floor later. Refusing it
+     * outright meant an accepted quote could not become an order at all.
+     */
+    if ((lengthMm <= 0 || widthMm <= 0) && pricing !== PricingMode.LUMP_SUM) {
       throw new BadRequestException('Sizes must be greater than zero');
     }
 
@@ -264,7 +292,7 @@ export class OrdersService {
     const quantity = item.quantity ?? 1;
     const rateUnit = item.rateUnit ?? RateUnit.PER_SQFT;
     const rate = item.rate ?? null;
-    const amount = lineAmount({ rate, rateUnit, lengthMm, widthMm, quantity });
+    const quoted = lineAmount({ rate, rateUnit, lengthMm, widthMm, quantity });
 
     // GST sits on what is sold, not on the board it was cut from — so the slab
     // is a property of the line. Falling back to the tenant's default keeps
@@ -274,6 +302,12 @@ export class OrdersService {
       : await this.prisma.gstSlab.findFirst({ where: { isDefault: true, isActive: true } });
 
     const gstRatePct = slab ? Number(slab.ratePct) : 0;
+
+    // `amount` is always the taxable value. Under INCLUSIVE and ABSORBED the
+    // rate was quoted with the tax already inside it, so the tax comes out of
+    // the line rather than being added to it — every total downstream then
+    // works the same way regardless of how the job was quoted.
+    const split = splitTax(quoted, gstRatePct, treatment);
 
     return {
       sizePresetId: item.sizePresetId,
@@ -288,10 +322,13 @@ export class OrdersService {
       rateUnit,
       // Priced now and stored: a rate edited next month must not restate what
       // this order was worth today. The same reasoning applies to the tax rate.
-      amount,
+      amount: split.net,
       gstSlabId: slab?.id ?? null,
       gstRatePct,
-      taxAmount: round2((amount * gstRatePct) / 100),
+      taxAmount: split.tax,
+      /** Not stored on the line — rolled up onto the order. */
+      quotedAmount: quoted,
+      concession: split.concession,
     };
   }
 
@@ -422,39 +459,179 @@ export class OrdersService {
     });
     if (!existing) throw new NotFoundException(`Order ${id} not found`);
 
-    const pricingMode = dto.pricingMode ?? existing.pricingMode;
-    const money =
-      dto.pricingMode !== undefined || dto.discount !== undefined || dto.total !== undefined
-        ? totalsFor(
-            pricingMode,
-            existing.items.map((item) => ({
-              amount: Number(item.amount),
-              taxAmount: Number(item.taxAmount),
-            })),
-            dto.discount ?? Number(existing.discount),
-            dto.total ?? Number(existing.total),
-          )
-        : null;
+    const touchesMoney =
+      dto.pricingMode !== undefined ||
+      dto.discount !== undefined ||
+      dto.total !== undefined ||
+      dto.taxTreatment !== undefined ||
+      dto.gstSlabId !== undefined;
 
-    return this.prisma.order.update({
+    await this.prisma.order.update({
       where: { id },
       data: {
         location: dto.location,
         priority: dto.priority,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         notes: dto.notes,
-        ...(money
-          ? {
-              pricingMode: money.pricingMode,
-              subtotal: money.subtotal,
-              discount: money.discount,
-              total: money.total,
-              taxAmount: money.taxAmount,
-              grandTotal: money.grandTotal,
-            }
-          : {}),
       },
-      include: ORDER_INCLUDE,
+    });
+
+    if (touchesMoney) {
+      await this.reprice(id, {
+        pricingMode: dto.pricingMode,
+        taxTreatment: dto.taxTreatment,
+        gstSlabId: dto.gstSlabId,
+        discount: dto.discount,
+        total: dto.total,
+      });
+    }
+
+    return this.findOne(id);
+  }
+
+  /**
+   * Recompute an order's money after the terms change.
+   *
+   * The lines are re-priced from the rate that was quoted, never from the
+   * amount stored on them: that amount is a taxable value under whichever
+   * treatment was in force when it was written, so re-splitting it under a new
+   * treatment would take tax out of a figure the tax had already been taken out
+   * of. The rate is the only thing that survives a change of terms unchanged.
+   */
+  async reprice(
+    id: string,
+    dto: {
+      pricingMode?: PricingMode;
+      taxTreatment?: TaxTreatment;
+      gstSlabId?: string;
+      discount?: number;
+      total?: number;
+    },
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!order) throw new NotFoundException(`Order ${id} not found`);
+
+    const pricingMode = dto.pricingMode ?? order.pricingMode;
+    const treatment = dto.taxTreatment ?? order.taxTreatment;
+
+    if (pricingMode === PricingMode.LUMP_SUM) {
+      const slab = dto.gstSlabId
+        ? await this.prisma.gstSlab.findFirst({ where: { id: dto.gstSlabId } })
+        : order.gstSlabId
+          ? await this.prisma.gstSlab.findFirst({ where: { id: order.gstSlabId } })
+          : await this.prisma.gstSlab.findFirst({ where: { isDefault: true, isActive: true } });
+
+      /*
+       * `||`, not `??`. An order punched before `quotedAmount` existed carries
+       * the column's default of 0, and `??` only falls through on null — so a
+       * zero was taken as the quoted figure and repricing wiped the order to
+       * nothing. Fall back to the taxable total whenever there is no quote on
+       * record.
+       */
+      const quoted =
+        dto.total ?? (Number(order.quotedAmount) || Number(order.total) || 0);
+      const money = totalsFor(
+        pricingMode,
+        [],
+        0,
+        quoted,
+        slab ? Number(slab.ratePct) : 0,
+        treatment,
+      );
+
+      await this.prisma.order.update({
+        where: { id },
+        data: {
+          pricingMode,
+          taxTreatment: treatment,
+          gstSlabId: slab?.id ?? null,
+          quotedAmount: money.quotedAmount,
+          taxDiscount: money.taxDiscount,
+          subtotal: money.subtotal,
+          discount: money.discount,
+          total: money.total,
+          taxAmount: money.taxAmount,
+          grandTotal: money.grandTotal,
+        },
+      });
+      await this.resettlePaymentStatus(id, money.grandTotal);
+      return this.findOne(id);
+    }
+
+    const priced = order.items.map((item) => {
+      const quoted = lineAmount({
+        rate: item.rate === null ? null : Number(item.rate),
+        rateUnit: item.rateUnit,
+        lengthMm: Number(item.lengthMm),
+        widthMm: Number(item.widthMm),
+        quantity: item.quantity,
+      });
+      const split = splitTax(quoted, Number(item.gstRatePct), treatment);
+      return { item, quoted, split };
+    });
+
+    const money = totalsFor(
+      pricingMode,
+      priced.map(({ quoted, split }) => ({
+        amount: split.net,
+        taxAmount: split.tax,
+        quotedAmount: quoted,
+        concession: split.concession,
+      })),
+      dto.discount ?? Number(order.discount),
+      dto.total ?? Number(order.total),
+      0,
+      treatment,
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const { item, split } of priced) {
+        await tx.orderItem.update({
+          where: { id: item.id },
+          data: { amount: split.net, taxAmount: split.tax },
+        });
+      }
+
+      await tx.order.update({
+        where: { id },
+        data: {
+          pricingMode,
+          taxTreatment: treatment,
+          quotedAmount: money.quotedAmount,
+          taxDiscount: money.taxDiscount,
+          subtotal: money.subtotal,
+          discount: money.discount,
+          total: money.total,
+          taxAmount: money.taxAmount,
+          grandTotal: money.grandTotal,
+        },
+      });
+    });
+
+    await this.resettlePaymentStatus(id, money.grandTotal);
+    return this.findOne(id);
+  }
+
+  /**
+   * Re-derive whether an order is settled after its value changed.
+   *
+   * Dropping the GST off a ₹47,200 order makes ₹40,000 the whole of it, and a
+   * client who had paid ₹40,000 is now paid in full. Leaving the status where
+   * it was would have them chased for money they do not owe.
+   */
+  private async resettlePaymentStatus(orderId: string, grandTotal: number) {
+    const received = await this.prisma.payment.aggregate({
+      where: { orderId },
+      _sum: { amount: true },
+    });
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: deriveStatus(grandTotal, Number(received._sum.amount ?? 0)),
+      },
     });
   }
 
@@ -464,7 +641,11 @@ export class OrdersService {
    * The move is only allowed if an edge exists on the canvas, so the graph is
    * genuinely the source of truth rather than documentation of it.
    */
-  async changeStatus(id: string, dto: ChangeStatusDto, user?: { id: string; role?: string }) {
+  async changeStatus(
+    id: string,
+    dto: ChangeStatusDto,
+    user?: { id: string; role?: string; permissions?: string[] },
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: { status: true },
@@ -485,12 +666,7 @@ export class OrdersService {
     });
 
     if (!transition) {
-      const target = await this.prisma.workflowStatus.findUnique({
-        where: { id: dto.toStatusId },
-      });
-      throw new BadRequestException(
-        `The flow does not allow moving from ${order.status.name} to ${target?.name ?? 'that status'}`,
-      );
+      return this.moveBack(order, dto, user);
     }
 
     if (
@@ -510,24 +686,84 @@ export class OrdersService {
       );
     }
 
+    return this.applyStatus(order, dto, user, false);
+  }
+
+  /**
+   * Sending an order back the way it came.
+   *
+   * Not a hole in the flow: the move must exist on the canvas in the other
+   * direction, so an order can only retrace a step it actually took. What
+   * makes it safe is that it is separately permitted and separately
+   * acknowledged — the client has to say `reverse`, which is the machine half
+   * of the question the screen asks the person. It is recorded as a reversal
+   * so the history reads as what happened.
+   */
+  private async moveBack(
+    order: { id: string; statusId: string; workflowId: string; status: { name: string } },
+    dto: ChangeStatusDto,
+    user?: { id: string; role?: string; permissions?: string[] },
+  ) {
+    const target = await this.prisma.workflowStatus.findUnique({
+      where: { id: dto.toStatusId },
+    });
+
+    const backwards = await this.prisma.workflowTransition.findUnique({
+      where: {
+        workflowId_fromStatusId_toStatusId: {
+          workflowId: order.workflowId,
+          fromStatusId: dto.toStatusId,
+          toStatusId: order.statusId,
+        },
+      },
+    });
+
+    if (!backwards) {
+      throw new BadRequestException(
+        `The flow does not allow moving from ${order.status.name} to ${target?.name ?? 'that status'}`,
+      );
+    }
+
+    if (!user?.permissions?.includes(PERMISSIONS.ORDER_MOVE_BACK)) {
+      throw new ForbiddenException(
+        `Going back from ${order.status.name} to ${target?.name ?? 'that status'} is not a move the flow draws. Only somebody allowed to send orders back can do it.`,
+      );
+    }
+
+    if (!dto.reverse) {
+      throw new BadRequestException(
+        `${order.status.name} → ${target?.name ?? 'that status'} is a move back, not part of the usual journey. Confirm it before it is made.`,
+      );
+    }
+
+    return this.applyStatus(order, dto, user, true);
+  }
+
+  private async applyStatus(
+    order: { id: string; statusId: string },
+    dto: ChangeStatusDto,
+    user: { id: string } | undefined,
+    reversed: boolean,
+  ) {
     await this.prisma.$transaction([
       this.prisma.order.update({
-        where: { id },
+        where: { id: order.id },
         data: { statusId: dto.toStatusId },
       }),
       this.prisma.orderStatusHistory.create({
         data: {
           tenantId: tenantId(),
-          orderId: id,
+          orderId: order.id,
           fromStatusId: order.statusId,
           toStatusId: dto.toStatusId,
           note: dto.note,
+          reversed,
           changedById: user?.id,
         },
       }),
     ]);
 
-    return this.findOne(id);
+    return this.findOne(order.id);
   }
 
   // -- attachments ----------------------------------------------------------
@@ -591,75 +827,40 @@ export class OrdersService {
 
     if (!workflow) throw new NotFoundException('No workflow configured');
 
-    const orders = await this.prisma.order.findMany({
-      where: { workflowId: workflow.id },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-      include: ORDER_INCLUDE,
-    });
+    // Each column is fetched with its own cap, rather than one capped query
+    // sliced afterwards: a single busy stage would eat a shared budget and the
+    // quieter columns would come back empty. The count is the truth about what
+    // is really in the stage; the overflow is read on the orders list, which
+    // pages.
+    const columns = await Promise.all(
+      workflow.statuses.map(async (status) => {
+        const [orders, total] = await Promise.all([
+          this.prisma.order.findMany({
+            where: { workflowId: workflow.id, statusId: status.id },
+            orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+            include: ORDER_INCLUDE,
+            take: BOARD_COLUMN_LIMIT,
+          }),
+          this.prisma.order.count({
+            where: { workflowId: workflow.id, statusId: status.id },
+          }),
+        ]);
+        return { status, orders, total };
+      }),
+    );
 
     return {
       workflow: { id: workflow.id, code: workflow.code, name: workflow.name },
-      columns: workflow.statuses.map((status) => ({
-        status,
-        orders: orders.filter((order) => order.statusId === status.id),
-      })),
+      columns,
     };
   }
 }
+
+/** How many cards one board column carries before it says "and N more". */
+const BOARD_COLUMN_LIMIT = 20;
 
 function measure(input: MeasurementDto): number {
   return toMm(input.value, input.unit);
 }
 
 
-/**
- * The order's money, from however it was quoted.
- *
- * ITEMISED adds the priced lines and subtracts a discount. LUMP_SUM keeps the
- * figure that was actually given to the client and leaves the lines unpriced —
- * back-calculating a rate from it would invent a number nobody agreed to, and
- * that number would drift the moment a size was corrected.
- */
-function totalsFor(
-  pricingMode: PricingMode,
-  items: { amount: number; taxAmount?: number }[],
-  discount = 0,
-  quotedTotal = 0,
-  lumpSumTaxPct = 0,
-): {
-  pricingMode: PricingMode;
-  subtotal: number;
-  discount: number;
-  total: number;
-  taxAmount: number;
-  grandTotal: number;
-} {
-  if (pricingMode === PricingMode.LUMP_SUM) {
-    const total = round2(quotedTotal);
-    // One slab covers the whole quoted figure, because a lump sum has no lines
-    // to tax individually.
-    const taxAmount = round2((total * lumpSumTaxPct) / 100);
-    return {
-      pricingMode,
-      subtotal: total,
-      discount: 0,
-      total,
-      taxAmount,
-      grandTotal: round2(total + taxAmount),
-    };
-  }
-
-  const subtotal = round2(items.reduce((sum, item) => sum + item.amount, 0));
-  const applied = Math.min(round2(discount), subtotal);
-  const total = round2(subtotal - applied);
-  const taxAmount = round2(items.reduce((sum, item) => sum + (item.taxAmount ?? 0), 0));
-
-  return {
-    pricingMode,
-    subtotal,
-    discount: applied,
-    total,
-    taxAmount,
-    grandTotal: round2(total + taxAmount),
-  };
-}

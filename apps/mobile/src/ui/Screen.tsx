@@ -25,6 +25,8 @@ export function Screen({
   style,
   /** Extra bottom room so content clears the floating tab bar. */
   tabBarPadding = true,
+  onEndReached,
+  sticky,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
@@ -33,6 +35,17 @@ export function Screen({
   onRefresh?: () => void;
   style?: ViewStyle;
   tabBarPadding?: boolean;
+  /** Fired once per approach to the bottom, for paged lists. */
+  onEndReached?: () => void;
+  /**
+   * What stays at the top while the rest scrolls under it.
+   *
+   * A list you are searching or filtering is a list you are working on: having
+   * to scroll back up to change the search, or to see which filters are on, is
+   * the thing that makes a long list tiring. The bar carries its own top inset,
+   * because once pinned it sits where the notch is.
+   */
+  sticky?: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -62,8 +75,26 @@ export function Screen({
       />
       {scroll ? (
         <ScrollView
-          contentContainerStyle={{ paddingTop: insets.top + spacing.sm }}
+          testID="screen-scroll"
+          // The sticky bar carries the top inset when there is one, so the
+          // content below it starts flush against it.
+          contentContainerStyle={{ paddingTop: sticky ? 0 : insets.top + spacing.sm }}
+          stickyHeaderIndices={sticky ? [0] : undefined}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={64}
+          onScroll={
+            onEndReached
+              ? (event) => {
+                  const { contentOffset, contentSize, layoutMeasurement } =
+                    event.nativeEvent;
+                  const distanceToBottom =
+                    contentSize.height - contentOffset.y - layoutMeasurement.height;
+                  // Fetch a screen's worth early so the next page is usually
+                  // there before the list runs out under the thumb.
+                  if (distanceToBottom < layoutMeasurement.height * 0.6) onEndReached();
+                }
+              : undefined
+          }
           refreshControl={
             onRefresh ? (
               <RefreshControl
@@ -74,6 +105,17 @@ export function Screen({
               />
             ) : undefined
           }>
+          {sticky ? (
+            <View
+              testID="sticky-bar"
+              style={[
+                styles.sticky,
+                padded && styles.padded,
+                { paddingTop: insets.top + spacing.sm },
+              ]}>
+              {sticky}
+            </View>
+          ) : null}
           {content}
         </ScrollView>
       ) : (
@@ -87,4 +129,10 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: palette.bg },
   fill: { flex: 1 },
   padded: { paddingHorizontal: spacing.lg },
+  /*
+   * The ground is painted behind the scroller and does not move, so a bar
+   * pinned to the top of the viewport always sits over the same band of it —
+   * which is why a flat colour matches rather than showing a seam.
+   */
+  sticky: { backgroundColor: gradients.screen[0], paddingBottom: spacing.sm },
 });

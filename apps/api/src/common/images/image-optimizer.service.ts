@@ -94,10 +94,23 @@ export class ImageOptimizerService {
     const qualitySteps = [target.quality, 75, 60, 45];
     const edgeSteps = [target.maxEdge, Math.round(target.maxEdge * 0.75), Math.round(target.maxEdge * 0.5)];
 
+    /*
+     * Measure the picture the way it will be seen.
+     *
+     * A phone writes a portrait photo as landscape pixels plus an EXIF
+     * rotation. Fitting against the stored dimensions hands `resize` a
+     * transposed box, and the rotated image is squeezed to fit inside it — a
+     * 200×400 photo came out 100×200, half the resolution, on exactly the size
+     * images somebody needs to read a number off.
+     */
+    const turned = (metadata.orientation ?? 1) >= 5;
+    const sourceWidth = turned ? metadata.height! : metadata.width!;
+    const sourceHeight = turned ? metadata.width! : metadata.height!;
+
     let last!: { data: Buffer; info: OutputInfo };
 
     for (const maxEdge of edgeSteps) {
-      const { width, height } = fitWithin(metadata.width!, metadata.height!, maxEdge);
+      const { width, height } = fitWithin(sourceWidth, sourceHeight, maxEdge);
 
       for (const quality of qualitySteps) {
         const attempt = await sharp(input)

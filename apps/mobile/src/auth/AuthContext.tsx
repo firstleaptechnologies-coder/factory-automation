@@ -7,28 +7,38 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type {AuthUser} from '@decor/shared';
-import {api, setUnauthorizedHandler} from '../api/client';
+import type { AuthUser } from '@decor/shared';
+import { api, setUnauthorizedHandler } from '../api/client';
 
 const TOKEN_KEY = 'decor.token';
 const USER_KEY = 'decor.user';
+const WORKSPACE_KEY = 'decor.workspace';
 
 interface AuthState {
   user: AuthUser | null;
+  /** Remembered between sessions so the shop types it once, not daily. */
+  workspace: string | null;
   loading: boolean;
-  signIn: (identifier: string, password: string) => Promise<void>;
+  signIn: (workspace: string, identifier: string, password: string) => Promise<void>;
+  signInAsPlatform: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Forget the workspace too, for a device moving between businesses. */
+  forgetWorkspace: () => Promise<void>;
+  can: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-export function AuthProvider({children}: {children: React.ReactNode}) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [workspace, setWorkspace] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const signOut = useCallback(async () => {
     api.setToken(null);
     setUser(null);
+    // The workspace deliberately survives sign-out: the next person at this
+    // device is almost always from the same shop.
     await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
   }, []);
 
@@ -38,19 +48,19 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
     });
   }, [signOut]);
 
-  // Restore the shift's session so an operator is not re-typing a password
-  // every time the tablet sleeps.
   useEffect(() => {
     (async () => {
       try {
-        const [[, token], [, cached]] = await AsyncStorage.multiGet([
+        const [[, token], [, cached], [, savedWorkspace]] = await AsyncStorage.multiGet([
           TOKEN_KEY,
           USER_KEY,
+          WORKSPACE_KEY,
         ]);
+        if (savedWorkspace) setWorkspace(savedWorkspace);
+
         if (token) {
           api.setToken(token);
           if (cached) setUser(JSON.parse(cached) as AuthUser);
-          // Confirm the token is still good; a stale one signs us out quietly.
           const fresh = await api.me();
           setUser(fresh);
           await AsyncStorage.setItem(USER_KEY, JSON.stringify(fresh));
@@ -63,18 +73,65 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
     })();
   }, [signOut]);
 
-  const signIn = useCallback(async (identifier: string, password: string) => {
-    const result = await api.login(identifier, password);
-    setUser(result.user);
-    await AsyncStorage.multiSet([
-      [TOKEN_KEY, result.accessToken],
-      [USER_KEY, JSON.stringify(result.user)],
-    ]);
-  }, []);
+  const persist = useCallback(
+    async (token: string, nextUser: AuthUser, slug?: string) => {
+      setUser(nextUser);
+      const entries: [string, string][] = [
+        [TOKEN_KEY, token],
+        [USER_KEY, JSON.stringify(nextUser)],
+      ];
+      if (slug) {
+        setWorkspace(slug);
+        entries.push([WORKSPACE_KEY, slug]);
+      }
+      await AsyncStorage.multiSet(entries);
+    },
+    [],
+  );
+
+  const signIn = useCallback(
+    async (slug: string, identifier: string, password: string) => {
+      const result = await api.login(slug, identifier, password);
+      await persist(result.accessToken, result.user, result.workspace?.slug ?? slug);
+    },
+    [persist],
+  );
+
+  const signInAsPlatform = useCallback(
+    async (email: string, password: string) => {
+      const result = await api.platformLogin(email, password);
+      await persist(result.accessToken, result.user);
+    },
+    [persist],
+  );
+
+  const forgetWorkspace = useCallback(async () => {
+    setWorkspace(null);
+    await AsyncStorage.removeItem(WORKSPACE_KEY);
+    await signOut();
+  }, [signOut]);
+
+  /**
+   * Screens ask what the person may do, never what they are called. A tenant
+   * can rename or recombine roles freely; the permission keys do not move.
+   */
+  const can = useCallback(
+    (permission: string) => Boolean(user?.permissions?.includes(permission)),
+    [user],
+  );
 
   const value = useMemo(
-    () => ({user, loading, signIn, signOut}),
-    [user, loading, signIn, signOut],
+    () => ({
+      user,
+      workspace,
+      loading,
+      signIn,
+      signInAsPlatform,
+      signOut,
+      forgetWorkspace,
+      can,
+    }),
+    [user, workspace, loading, signIn, signInAsPlatform, signOut, forgetWorkspace, can],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

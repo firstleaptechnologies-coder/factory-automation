@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -7,15 +8,36 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { StatusCategory, UserRole } from '@prisma/client';
+import { HOME_CARD_LIMIT } from '@decor/shared';
 
 export class CreateWorkflowDto {
   @IsString() @MinLength(1) code: string;
   @IsString() @MinLength(1) name: string;
   @IsOptional() @IsString() description?: string;
+}
+
+/**
+ * What can be changed about a flow itself, rather than its stages.
+ */
+export class UpdateWorkflowDto {
+  @IsOptional() @IsString() @MinLength(1) name?: string;
+  @IsOptional() @IsString() description?: string;
+  /**
+   * Days an enquiry may sit untouched before it goes quiet. Zero or null turns
+   * it off — nothing is ever archived by age.
+   */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(3650) leadExpiryDays?: number | null;
+  /**
+   * The stage an enquiry moves to when a quote is sent. Null means sending one
+   * records itself against the enquiry but moves nothing.
+   */
+  @IsOptional() @IsString() quoteStatusId?: string | null;
 }
 
 export class StatusDto {
@@ -76,4 +98,18 @@ export class SaveGraphDto {
   @ValidateNested({ each: true })
   @Type(() => TransitionDto)
   transitions: TransitionDto[];
+}
+
+/**
+ * Which stages the home screen counts, in the order they appear there.
+ *
+ * Five, because the card is read at a glance from across a workshop — a longer
+ * list stops being a summary. Which five is the shop's own decision, so it is
+ * stored rather than derived from the flow.
+ */
+export class HomeCardDto {
+  @IsArray()
+  @ArrayMaxSize(HOME_CARD_LIMIT)
+  @IsString({ each: true })
+  statusIds: string[];
 }

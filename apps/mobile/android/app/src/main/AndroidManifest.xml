@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Only read when someone taps "from contacts"; the list stays on the
+         device and just the chosen contact becomes a client. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
       android:name=".MainApplication"

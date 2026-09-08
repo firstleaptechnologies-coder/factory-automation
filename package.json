@@ -24,6 +24,11 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "ios": "npm run ios --prefix apps/mobile",
     "android": "npm run android --prefix apps/mobile",
-    "build:shared": "npm run build --workspace @decor/shared"
+    "build:shared": "npm run build --workspace @decor/shared",
+    "test": "npm run test --workspaces --if-present",
+    "lint:mobile": "npm run lint --prefix apps/mobile",
+    "typecheck:mobile": "npm run typecheck --prefix apps/mobile",
+    "test:mobile": "npm run test --prefix apps/mobile",
+    "verify": "npm run build:shared && npm run db:generate && npm run typecheck --workspaces --if-present && npm test --workspaces --if-present && npm run lint:mobile && npm run typecheck:mobile && npm run test:mobile"
   }
 }

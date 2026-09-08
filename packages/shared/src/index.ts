@@ -3,3 +3,6 @@ export * from './permissions';
 export * from './image-policy';
 export * from './types';
 export * from './client';
+export * from './color';
+export * from './navigation';
+export * from './navigation-doc';

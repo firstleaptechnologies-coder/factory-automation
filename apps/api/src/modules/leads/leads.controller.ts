@@ -12,7 +12,9 @@ import {
   UpdateCustomFieldDto,
   UpdateLeadDto,
 } from './dto/lead.dto';
+import { PERMISSIONS } from '@decor/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('leads')
@@ -60,6 +62,9 @@ export class LeadsController {
     return this.leads.update(id, dto);
   }
 
+  // As with orders: which people may move an enquiry along is the shop's own
+  // decision, so it is a permission rather than a hard-coded role.
+  @RequirePermissions(PERMISSIONS.LEAD_MOVE_STATUS)
   @Post(':id/status')
   changeStatus(
     @Param('id') id: string,

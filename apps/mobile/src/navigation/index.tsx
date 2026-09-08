@@ -15,6 +15,8 @@ import { OrdersScreen } from '../screens/OrdersScreen';
 import { OrderDetailScreen } from '../screens/OrderDetailScreen';
 import { OrderPhotosScreen } from '../screens/OrderPhotosScreen';
 import { LeadsScreen } from '../screens/LeadsScreen';
+import { LeadBoardScreen } from '../screens/LeadBoardScreen';
+import { ArchivedLeadsScreen } from '../screens/ArchivedLeadsScreen';
 import { LeadDetailScreen } from '../screens/LeadDetailScreen';
 import { LeadCreateScreen } from '../screens/LeadCreateScreen';
 import { LeadConvertScreen } from '../screens/LeadConvertScreen';
@@ -23,11 +25,24 @@ import { ClientsScreen } from '../screens/ClientsScreen';
 import { ClientDetailScreen } from '../screens/ClientDetailScreen';
 import { SearchScreen } from '../screens/SearchScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { AdminHomeScreen } from '../screens/admin/AdminHomeScreen';
 import { AdminMaterialsScreen } from '../screens/admin/AdminMaterialsScreen';
 import { AdminSizesScreen } from '../screens/admin/AdminSizesScreen';
 import { AdminFlowScreen } from '../screens/admin/AdminFlowScreen';
+import { FlowCanvasScreen } from '../screens/admin/FlowCanvasScreen';
+import { MainCardScreen } from '../screens/admin/MainCardScreen';
+import { FirmProfileScreen } from '../screens/admin/FirmProfileScreen';
+import { EstimatesScreen } from '../screens/EstimatesScreen';
+import { EstimateEditScreen } from '../screens/EstimateEditScreen';
+import { EstimateDetailScreen } from '../screens/EstimateDetailScreen';
+import { ClientFirmScreen } from '../screens/ClientFirmScreen';
 import { AdminLeadFieldsScreen } from '../screens/admin/AdminLeadFieldsScreen';
+import { PaymentsScreen } from '../screens/PaymentsScreen';
+import { TransactionsScreen } from '../screens/TransactionsScreen';
+import { DisbursementsScreen } from '../screens/DisbursementsScreen';
+import { DisbursementLedgerScreen } from '../screens/DisbursementLedgerScreen';
+import { TenantsScreen } from '../screens/platform/TenantsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -53,16 +68,23 @@ function MainTabs() {
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: palette.bg } }}>
       <Tabs.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
       <Tabs.Screen name="Orders" component={OrdersScreen} options={{ title: 'Orders' }} />
-      {/* The centre action. It is a route so it can hold state while you fill it. */}
-      <Tabs.Screen name="PunchTab" component={PunchScreen} options={{ title: 'Punch' }} />
-      <Tabs.Screen name="Leads" component={LeadsScreen} options={{ title: 'Leads' }} />
       <Tabs.Screen name="Search" component={SearchScreen} options={{ title: 'Search' }} />
+      <Tabs.Screen name="Leads" component={LeadsScreen} options={{ title: 'Leads' }} />
+      {/*
+        Punching is reached from the home card rather than the bar, but it stays
+        a tab route: that is what lets a half-filled punch survive a trip to an
+        order and back. The bar simply does not draw it.
+      */}
+      <Tabs.Screen name="PunchTab" component={PunchScreen} options={{ title: 'Punch' }} />
     </Tabs.Navigator>
   );
 }
 
 export function RootNavigator() {
   const { user, loading } = useAuth();
+  // A platform admin belongs to no workspace, so they get the control plane
+  // rather than a shop's screens.
+  const isPlatform = Boolean(user?.isPlatform);
 
   if (loading) {
     return (
@@ -80,7 +102,9 @@ export function RootNavigator() {
           contentStyle: { backgroundColor: palette.bg },
           animation: 'slide_from_right',
         }}>
-        {user ? (
+        {user && isPlatform ? (
+          <Stack.Screen name="Tenants" component={TenantsScreen} />
+        ) : user ? (
           <>
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
@@ -89,14 +113,28 @@ export function RootNavigator() {
             <Stack.Screen name="LeadCreate" component={LeadCreateScreen} />
             <Stack.Screen name="LeadConvert" component={LeadConvertScreen} />
             <Stack.Screen name="Board" component={BoardScreen} />
+            <Stack.Screen name="LeadBoard" component={LeadBoardScreen} />
+            <Stack.Screen name="ArchivedLeads" component={ArchivedLeadsScreen} />
             <Stack.Screen name="Clients" component={ClientsScreen} />
             <Stack.Screen name="ClientDetail" component={ClientDetailScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Admin" component={AdminHomeScreen} />
             <Stack.Screen name="AdminMaterials" component={AdminMaterialsScreen} />
             <Stack.Screen name="AdminSizes" component={AdminSizesScreen} />
             <Stack.Screen name="AdminFlow" component={AdminFlowScreen} />
+            <Stack.Screen name="FlowCanvas" component={FlowCanvasScreen} />
+            <Stack.Screen name="MainCard" component={MainCardScreen} />
             <Stack.Screen name="AdminLeadFields" component={AdminLeadFieldsScreen} />
+            <Stack.Screen name="Payments" component={PaymentsScreen} />
+            <Stack.Screen name="Transactions" component={TransactionsScreen} />
+            <Stack.Screen name="Disbursements" component={DisbursementsScreen} />
+            <Stack.Screen name="DisbursementLedger" component={DisbursementLedgerScreen} />
+            <Stack.Screen name="FirmProfile" component={FirmProfileScreen} />
+            <Stack.Screen name="Estimates" component={EstimatesScreen} />
+            <Stack.Screen name="EstimateEdit" component={EstimateEditScreen} />
+            <Stack.Screen name="EstimateDetail" component={EstimateDetailScreen} />
+            <Stack.Screen name="ClientFirm" component={ClientFirmScreen} />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />

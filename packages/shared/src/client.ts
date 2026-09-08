@@ -22,7 +22,46 @@ import type {
   Workflow,
   WorkflowStatus,
   WorkflowTransition,
+  CashDeposit,
+  Estimate,
+  EstimateInput,
+  EstimateStatus,
+  FirmProfile,
+  Disbursement,
+  DisbursementCategory,
+  DisbursementLedger,
+  DisbursementStatus,
+  DisbursementSummary,
+  CashInHandRow,
+  CashPosition,
+  Transaction,
+  TransactionKind,
+  GstSlab,
+  Payment,
+  PaymentMode,
+  PaymentSummary,
+  PricingMode,
+  TaxTreatment,
+  Tenant,
+  TenantIsolation,
+  TenantStatus,
 } from './types';
+
+/** The editable fields of a client. Shared by create and update. */
+export interface ClientDetails {
+  name?: string;
+  phone?: string;
+  altPhone?: string;
+  email?: string;
+  gstin?: string;
+  company?: string;
+  stateCode?: string;
+  stateName?: string;
+  address?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
+  notes?: string;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -63,6 +102,29 @@ export class ApiClient {
   /** Absolute URL for an attachment, for <img src>. */
   fileUrl(fileId: string): string {
     return `${this.baseUrl}/files/${fileId}`;
+  }
+
+  /**
+   * A response that is not JSON — a rendered document, above all.
+   *
+   * Kept beside the JSON path rather than bolted onto it so `handle` can stay
+   * strict about parsing; a document that came back as an error page would
+   * otherwise be handed on as if it were the document.
+   */
+  async fetchText(path: string): Promise<string> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+    });
+    if (response.status === 401) this.options.onUnauthorized?.();
+    const text = await response.text();
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        extractMessage(safeParse(text)) ?? `Request failed (${response.status})`,
+        text,
+      );
+    }
+    return text;
   }
 
   private async request<T>(
@@ -133,10 +195,40 @@ export class ApiClient {
 
   // -- auth -----------------------------------------------------------------
 
-  async login(identifier: string, password: string): Promise<LoginResponse> {
-    const result = await this.post<LoginResponse>('/auth/login', { identifier, password });
+  /**
+   * Sign in to one workspace.
+   *
+   * The workspace comes first because every tenant keeps its own separate set
+   * of people — an employee code means nothing until you know which business
+   * it belongs to.
+   */
+  async login(
+    workspace: string,
+    identifier: string,
+    password: string,
+  ): Promise<LoginResponse> {
+    const result = await this.post<LoginResponse>('/auth/login', {
+      workspace,
+      identifier,
+      password,
+    });
     this.token = result.accessToken;
     return result;
+  }
+
+  /** Sign in to the platform itself, above every workspace. */
+  async platformLogin(email: string, password: string): Promise<LoginResponse> {
+    const result = await this.post<LoginResponse>('/auth/platform/login', {
+      email,
+      password,
+    });
+    this.token = result.accessToken;
+    return result;
+  }
+
+  /** Check a workspace exists before asking for a password. */
+  workspaceExists(workspace: string) {
+    return this.post<{ slug: string; exists: boolean }>('/auth/workspace', { workspace });
   }
 
   me() {
@@ -158,8 +250,13 @@ export class ApiClient {
     return this.get<Client>(`/clients/${id}`);
   }
 
-  createClient(body: { name: string; phone?: string; email?: string; company?: string; address?: string }) {
+  createClient(body: ClientDetails & { name: string }) {
     return this.post<Client>('/clients', body);
+  }
+
+  /** Everything on a client's firm record. All of it optional but the name. */
+  updateClient(id: string, body: ClientDetails) {
+    return this.patch<Client>(`/clients/${id}`, body);
   }
 
   addClientLocation(clientId: string, body: { name: string; address?: string }) {
@@ -214,8 +311,9 @@ export class ApiClient {
     return this.get<Workflow[]>('/workflows');
   }
 
-  defaultWorkflow() {
-    return this.get<Workflow>('/workflows/default');
+  /** The flow orders run on. Pass `LEAD` for the enquiry pipeline instead. */
+  defaultWorkflow(kind?: 'ORDER' | 'LEAD') {
+    return this.get<Workflow>('/workflows/default', kind ? { kind } : undefined);
   }
 
   workflow(id: string) {
@@ -249,9 +347,67 @@ export class ApiClient {
     return this.post<Workflow>(`/workflows/${workflowId}/graph`, body);
   }
 
+  /**
+   * Which stages the home screen counts, in the order they appear there.
+   *
+   * Sent as the whole list because the order is the point — the position of
+   * each stage on the card is its place in this array.
+   */
+  /**
+   * Change the flow itself — its name, or how long an enquiry may sit untouched
+   * before it goes quiet and moves to the archive.
+   */
+  updateWorkflow(
+    workflowId: string,
+    body: {
+      name?: string;
+      description?: string;
+      leadExpiryDays?: number | null;
+      quoteStatusId?: string | null;
+    },
+  ) {
+    return this.patch<Workflow>(`/workflows/${workflowId}`, body);
+  }
+
+  setHomeCardStatuses(workflowId: string, statusIds: string[]) {
+    return this.patch<Workflow>(`/workflows/${workflowId}/home-card`, { statusIds });
+  }
+
+  /**
+   * Re-state an order's money terms — the GST treatment above all.
+   *
+   * Re-prices every line from the rate it was quoted at, so switching a vendor
+   * to "GST absorbed" after the fact gives the same numbers as punching it that
+   * way would have. Can change whether the order counts as settled.
+   */
+  repriceOrder(
+    orderId: string,
+    body: {
+      pricingMode?: PricingMode;
+      taxTreatment?: TaxTreatment;
+      gstSlabId?: string;
+      discount?: number;
+      total?: number;
+    },
+  ) {
+    return this.patch<Order>(`/orders/${orderId}/terms`, body);
+  }
+
   allowedNext(statusId: string) {
     return this.get<(WorkflowTransition & { toStatus: WorkflowStatus })[]>(
       `/workflows/statuses/${statusId}/next`,
+    );
+  }
+
+  /**
+   * Where this status came from — the moves back.
+   *
+   * A separate call rather than a flag on `allowedNext`, so a screen that has
+   * not been taught about going back cannot show one among the ordinary moves.
+   */
+  allowedBack(statusId: string) {
+    return this.get<{ transitionId: string; toStatus: WorkflowStatus }[]>(
+      `/workflows/statuses/${statusId}/back`,
     );
   }
 
@@ -287,7 +443,10 @@ export class ApiClient {
     return this.patch<Order>(`/orders/${id}`, body);
   }
 
-  changeOrderStatus(id: string, body: { toStatusId: string; note?: string }) {
+  changeOrderStatus(
+    id: string,
+    body: { toStatusId: string; note?: string; reverse?: boolean },
+  ) {
     return this.post<Order>(`/orders/${id}/status`, body);
   }
 
@@ -331,6 +490,274 @@ export class ApiClient {
     return this.del<unknown>(`/orders/attachments/${attachmentId}`);
   }
 
+  // -- money ----------------------------------------------------------------
+
+  gstSlabs(includeInactive = false) {
+    return this.get<GstSlab[]>('/config/gst-slabs', { includeInactive });
+  }
+
+  createGstSlab(body: { name: string; ratePct: number; isDefault?: boolean }) {
+    return this.post<GstSlab>('/config/gst-slabs', body);
+  }
+
+  updateGstSlab(id: string, body: Partial<GstSlab> & { ratePct?: number }) {
+    return this.patch<GstSlab>(`/config/gst-slabs/${id}`, body);
+  }
+
+  paymentSummary(orderId: string) {
+    return this.get<PaymentSummary>(`/orders/${orderId}/payments`);
+  }
+
+  recordPayment(
+    orderId: string,
+    body: {
+      amount: number;
+      mode: PaymentMode;
+      reference?: string;
+      note?: string;
+      receivedAt?: string;
+      /** Cash banked at the same time as it was received. */
+      depositedAmount?: number;
+      bankReference?: string;
+    },
+  ) {
+    return this.post<Payment>(`/orders/${orderId}/payments`, body);
+  }
+
+  deletePayment(paymentId: string) {
+    return this.del<unknown>(`/payments/${paymentId}`);
+  }
+
+  recordDeposit(body: {
+    amount: number;
+    paymentId?: string;
+    depositedAt?: string;
+    bankReference?: string;
+    note?: string;
+  }) {
+    return this.post<CashDeposit>('/payments/deposits', body);
+  }
+
+  /**
+   * Every movement of money except a payout, filterable and paged.
+   *
+   * Payouts have their own ledger — `disbursements` — on purpose.
+   */
+  transactions(query?: {
+    kind?: TransactionKind;
+    from?: string;
+    to?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.get<Paginated<Transaction>>('/payments/transactions', query);
+  }
+
+  cashPosition(query?: { from?: string; to?: string }) {
+    return this.get<CashPosition>('/payments/cash-position', query);
+  }
+
+  cashInHand() {
+    return this.get<CashInHandRow[]>('/payments/cash-in-hand');
+  }
+
+  // -- disbursements --------------------------------------------------------
+  //
+  // Money paid out of an order after the client's money has arrived. Kept
+  // beside the order, never netted off it: the order is still worth what it
+  // was quoted at, and its payment status still reflects what was collected.
+
+  /** What this tenant calls these charges. "ISC" unless they renamed it. */
+  disbursementLabel() {
+    return this.get<{ label: string }>('/disbursements/label');
+  }
+
+  setDisbursementLabel(label: string) {
+    return this.patch<{ label: string }>('/disbursements/label', { label });
+  }
+
+  disbursementCategories(includeInactive = false) {
+    return this.get<DisbursementCategory[]>(
+      '/disbursements/categories',
+      includeInactive ? { includeInactive: 'true' } : undefined,
+    );
+  }
+
+  createDisbursementCategory(body: { code: string; name: string; sortOrder?: number }) {
+    return this.post<DisbursementCategory>('/disbursements/categories', body);
+  }
+
+  deactivateDisbursementCategory(id: string) {
+    return this.del<DisbursementCategory>(`/disbursements/categories/${id}`);
+  }
+
+  disbursementLedger(query?: {
+    status?: DisbursementStatus;
+    categoryId?: string;
+    search?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.get<DisbursementLedger>('/disbursements', query);
+  }
+
+  orderDisbursements(orderId: string) {
+    return this.get<DisbursementSummary>(`/disbursements/order/${orderId}`);
+  }
+
+  createDisbursement(
+    orderId: string,
+    body: {
+      payeeName: string;
+      amount: number;
+      categoryId?: string;
+      payeeContact?: string;
+      note?: string;
+      /** Pass PAID with a mode to log one that has already gone out. */
+      status?: DisbursementStatus;
+      paidMode?: PaymentMode;
+      paidAt?: string;
+      reference?: string;
+    },
+  ) {
+    return this.post<Disbursement>(`/disbursements/order/${orderId}`, body);
+  }
+
+  settleDisbursement(
+    id: string,
+    body: { paidMode: PaymentMode; paidAt?: string; reference?: string; note?: string },
+  ) {
+    return this.post<Disbursement>(`/disbursements/${id}/settle`, body);
+  }
+
+  updateDisbursement(id: string, body: Partial<{ payeeName: string; payeeContact: string; amount: number; categoryId: string; note: string }>) {
+    return this.patch<Disbursement>(`/disbursements/${id}`, body);
+  }
+
+  /** Cancels rather than deletes — the accountant may still need to see it. */
+  cancelDisbursement(id: string) {
+    return this.del<Disbursement>(`/disbursements/${id}`);
+  }
+
+  // -- the firm, and the documents it prints ---------------------------------
+
+  /** The shop's own details, as they appear on anything it prints. */
+  firmProfile() {
+    return this.get<FirmProfile>('/firm');
+  }
+
+  /**
+   * Just the colours. Readable by every signed-in user, unlike the full firm
+   * profile, so a production hand who cannot see bank details still gets their
+   * shop's branding.
+   */
+  firmTheme() {
+    return this.get<{ accent: string }>('/firm/theme');
+  }
+
+  saveFirmProfile(body: Partial<FirmProfile>) {
+    return this.patch<FirmProfile>('/firm', pickFirmFields(body));
+  }
+
+  /** The caller builds the FormData, because a file means something different
+   *  in a browser and on a phone. */
+  uploadLetterhead(form: FormData, kind: 'letterhead' | 'logo' = 'letterhead') {
+    return this.upload<FirmProfile>(`/firm/letterhead?kind=${kind}`, form);
+  }
+
+  clearLetterhead(kind: 'letterhead' | 'logo' = 'letterhead') {
+    return this.del<FirmProfile>(`/firm/letterhead?kind=${kind}`);
+  }
+
+  estimates(query?: {
+    status?: EstimateStatus;
+    clientId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.get<Paginated<Estimate>>('/estimates', query);
+  }
+
+  estimate(id: string) {
+    return this.get<Estimate>(`/estimates/${id}`);
+  }
+
+  createEstimate(body: EstimateInput) {
+    return this.post<Estimate>('/estimates', body);
+  }
+
+  updateEstimate(id: string, body: EstimateInput & { status?: EstimateStatus }) {
+    return this.patch<Estimate>(`/estimates/${id}`, body);
+  }
+
+  setEstimateStatus(id: string, status: EstimateStatus) {
+    return this.post<Estimate>(`/estimates/${id}/status`, { status });
+  }
+
+  /**
+   * Turn an accepted quotation into an order. The estimate is kept as the
+   * record of what was agreed, and the money carries across unchanged.
+   */
+  convertEstimate(
+    id: string,
+    body: { location: string; workflowId?: string; startStatusId?: string; notes?: string },
+  ) {
+    return this.post<Order>(`/estimates/${id}/convert`, body);
+  }
+
+  deleteEstimate(id: string) {
+    return this.del<unknown>(`/estimates/${id}`);
+  }
+
+  /**
+   * The printable document as HTML, letterhead inlined.
+   *
+   * HTML rather than a PDF so the app can convert it on the device and hand it
+   * straight to WhatsApp, while the web prints the very same markup — one
+   * layout, one set of totals.
+   */
+  estimateDocumentUrl(id: string): string {
+    return `${this.baseUrl}/estimates/${id}/document`;
+  }
+
+  // -- platform -------------------------------------------------------------
+
+  tenants() {
+    return this.get<Tenant[]>('/platform/tenants');
+  }
+
+  tenant(id: string) {
+    return this.get<Tenant>(`/platform/tenants/${id}`);
+  }
+
+  createTenant(body: {
+    slug: string;
+    name: string;
+    isolation?: TenantIsolation;
+    databaseUrl?: string;
+    plan?: string;
+    contactName?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    ownerName: string;
+    ownerCode: string;
+    ownerPassword: string;
+    ownerEmail?: string;
+  }) {
+    return this.post<Tenant & { signIn: { workspace: string; code: string } }>(
+      '/platform/tenants',
+      body,
+    );
+  }
+
+  updateTenant(id: string, body: { name?: string; status?: TenantStatus; plan?: string }) {
+    return this.patch<Tenant>(`/platform/tenants/${id}`, body);
+  }
+
   // -- leads ----------------------------------------------------------------
 
   leads(query?: {
@@ -339,6 +766,8 @@ export class ApiClient {
     sourceId?: string;
     search?: string;
     converted?: boolean;
+    /** The enquiries that have gone quiet, rather than the ones that have not. */
+    archived?: boolean;
     page?: number;
     limit?: number;
   }) {
@@ -361,7 +790,10 @@ export class ApiClient {
     return this.patch<Lead>(`/leads/${id}`, body);
   }
 
-  changeLeadStatus(id: string, body: { toStatusId: string; note?: string }) {
+  changeLeadStatus(
+    id: string,
+    body: { toStatusId: string; note?: string; reverse?: boolean },
+  ) {
     return this.post<Lead>(`/leads/${id}/status`, body);
   }
 
@@ -404,6 +836,46 @@ export class ApiClient {
   deactivateLeadField(id: string) {
     return this.del<unknown>(`/leads/fields/${id}`);
   }
+}
+
+/**
+ * The fields the firm profile actually accepts.
+ *
+ * Both apps load the whole profile row into their form state and hand it
+ * straight back on save, so the server-managed columns — id, tenantId, the two
+ * file ids, updatedAt — travelled with it and the API rejected the lot with
+ * "property id should not exist". Narrowing here rather than in each screen
+ * means a new caller cannot reintroduce it, and a new editable field is one
+ * entry in this list.
+ */
+const FIRM_FIELDS = [
+  'name',
+  'gstin',
+  'stateCode',
+  'stateName',
+  'phone',
+  'email',
+  'address',
+  'website',
+  'bankName',
+  'bankAccountName',
+  'bankAccountNumber',
+  'bankIfsc',
+  'bankBranch',
+  'termsAndConditions',
+  'signatoryName',
+  'accentColor',
+  'themeAccent',
+] as const satisfies readonly (keyof FirmProfile)[];
+
+export function pickFirmFields(body: Partial<FirmProfile>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of FIRM_FIELDS) {
+    const value = body[field];
+    // `null` is how the API says "no value"; sending it back fails @IsString.
+    if (value !== undefined && value !== null) out[field] = value;
+  }
+  return out;
 }
 
 function safeParse(text: string): unknown {

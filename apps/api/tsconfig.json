@@ -7,5 +7,7 @@
     "strictPropertyInitialization": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  // Specs are type-checked by `npm run typecheck` (and by jest); the build
+  // neither needs them nor should ship them.
+  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
 }

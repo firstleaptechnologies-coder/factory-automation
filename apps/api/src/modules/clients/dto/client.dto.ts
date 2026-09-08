@@ -12,6 +12,11 @@ export class CreateClientDto {
   @IsOptional() @IsString() gstin?: string;
   @IsOptional() @IsString() company?: string;
   @IsOptional() @IsString() address?: string;
+  @IsOptional() @IsString() altPhone?: string;
+  @IsOptional() @IsString() stateCode?: string;
+  @IsOptional() @IsString() stateName?: string;
+  @IsOptional() @IsString() billingAddress?: string;
+  @IsOptional() @IsString() shippingAddress?: string;
   @IsOptional() @IsString() notes?: string;
 }
 
@@ -22,6 +27,11 @@ export class UpdateClientDto {
   @IsOptional() @IsString() gstin?: string;
   @IsOptional() @IsString() company?: string;
   @IsOptional() @IsString() address?: string;
+  @IsOptional() @IsString() altPhone?: string;
+  @IsOptional() @IsString() stateCode?: string;
+  @IsOptional() @IsString() stateName?: string;
+  @IsOptional() @IsString() billingAddress?: string;
+  @IsOptional() @IsString() shippingAddress?: string;
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }

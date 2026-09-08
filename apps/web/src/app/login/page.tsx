@@ -1,58 +1,186 @@
 'use client';
 
-import {useState} from 'react';
-import {useAuth} from '@/lib/auth';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { landingFor } from '@/lib/nav';
+import { Button, Field, Icon } from '@/ui';
 
+type Mode = 'workspace' | 'credentials' | 'platform';
+
+/**
+ * Signing in, workspace first.
+ *
+ * An employee code means nothing until you know which business it belongs to —
+ * two shops on the platform can both have an "ADMIN". The workspace is checked
+ * before a password is asked for, so a typo in the slug is caught while it is
+ * still obvious what went wrong, and it is remembered afterwards because the
+ * same browser almost always belongs to the same shop.
+ */
 export default function LoginPage() {
-  const {signIn} = useAuth();
+  const { workspace, signIn, signInAsPlatform, forgetWorkspace, user } = useAuth();
+
+  const [mode, setMode] = useState<Mode>('workspace');
+  const [slug, setSlug] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  useEffect(() => {
+    if (workspace) {
+      setSlug(workspace);
+      setMode('credentials');
+    }
+  }, [workspace]);
+
+  useEffect(() => {
+    const destination = landingFor(user);
+    if (destination) window.location.href = destination;
+  }, [user]);
+
+  const checkWorkspace = async () => {
     setBusy(true);
     setError(null);
     try {
-      await signIn(identifier.trim(), password);
+      const result = await api.workspaceExists(slug.trim().toLowerCase());
+      if (!result.exists) {
+        setError(`No workspace called "${slug.trim()}"`);
+        return;
+      }
+      setSlug(result.slug);
+      setMode('credentials');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Login failed');
+      setError(e instanceof Error ? e.message : 'Could not reach the server');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (mode === 'platform') {
+        await signInAsPlatform(identifier.trim(), password);
+      } else {
+        await signIn(slug.trim().toLowerCase(), identifier.trim(), password);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not sign in');
+    } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="center-screen">
-      <form className="card" style={{width: 360}} onSubmit={submit}>
-        <h1 className="page-title">Decor Bucket</h1>
-        <p className="page-sub">Manufacturing ERP</p>
-
-        <div className="field">
-          <label htmlFor="identifier">Employee code, phone or email</label>
-          <input
-            id="identifier"
-            value={identifier}
-            onChange={e => setIdentifier(e.target.value)}
-            autoFocus
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-          />
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 'var(--s-lg)',
+      }}>
+      <div style={{ width: 'min(400px, 100%)' }} className="enter">
+        <div style={{ textAlign: 'center', marginBottom: 'var(--s-xxl)' }}>
+          <span
+            className="brand-mark"
+            style={{ width: 76, height: 76, borderRadius: 30, margin: '0 auto' }}>
+            <Icon name="scan" size={34} color="#fff" strokeWidth={2.1} />
+          </span>
+          <h1 className="t-h1" style={{ margin: 'var(--s-lg) 0 2px' }}>
+            Decor Bucket
+          </h1>
+          <p className="t-small muted" style={{ margin: 0 }}>
+            Order punching for the floor
+          </p>
         </div>
 
-        {error ? <p className="error">{error}</p> : null}
+        {mode === 'workspace' ? (
+          <>
+            <Field
+              label="Workspace"
+              placeholder="your-shop"
+              icon="box"
+              value={slug}
+              onChange={setSlug}
+              hint="The short name your provider gave you."
+              error={error}
+              autoFocus
+              onEnter={checkWorkspace}
+            />
+            <Button
+              title="Continue"
+              size="lg"
+              block
+              loading={busy}
+              disabled={!slug.trim()}
+              onClick={checkWorkspace}
+            />
+          </>
+        ) : (
+          <>
+            {mode === 'credentials' ? (
+              <div className="wrap" style={{ marginBottom: 'var(--s-lg)' }}>
+                <span className="chip" data-selected style={{ cursor: 'default' }}>
+                  <Icon name="box" size={14} />
+                  {slug}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    forgetWorkspace();
+                    setMode('workspace');
+                    setPassword('');
+                    setError(null);
+                  }}>
+                  change
+                </button>
+              </div>
+            ) : null}
 
-        <button className="primary" style={{width: '100%'}} disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
+            <Field
+              label={mode === 'platform' ? 'Email' : 'Employee code'}
+              placeholder={mode === 'platform' ? 'you@example.com' : 'e.g. ADMIN'}
+              icon="user"
+              value={identifier}
+              onChange={setIdentifier}
+              autoFocus
+            />
+            <Field
+              label="Password"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              error={error}
+              onEnter={submit}
+            />
+            <Button
+              title="Sign in"
+              size="lg"
+              block
+              loading={busy}
+              disabled={!identifier.trim() || !password}
+              onClick={submit}
+            />
+          </>
+        )}
+
+        <div style={{ textAlign: 'center', marginTop: 'var(--s-xl)' }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              setError(null);
+              setIdentifier('');
+              setPassword('');
+              setMode(mode === 'platform' ? (workspace ? 'credentials' : 'workspace') : 'platform');
+            }}>
+            {mode === 'platform' ? 'Back to workspace sign in' : 'Platform administration'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

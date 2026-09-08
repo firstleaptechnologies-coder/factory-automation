@@ -59,6 +59,8 @@ export class UpdateLeadDto {
 export class ChangeLeadStatusDto {
   @IsString() toStatusId: string;
   @IsOptional() @IsString() note?: string;
+  /** "Yes, I know this goes back." See ChangeStatusDto on orders. */
+  @IsOptional() @IsBoolean() reverse?: boolean;
 }
 
 /**
@@ -89,6 +91,8 @@ export class LeadQueryDto {
   @IsOptional() @IsString() sourceId?: string;
   @IsOptional() @IsString() search?: string;
   @IsOptional() @IsBoolean() @Type(() => Boolean) converted?: boolean;
+  /** The enquiries that have gone quiet, rather than the ones that have not. */
+  @IsOptional() @IsBoolean() @Type(() => Boolean) archived?: boolean;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) limit = 50;
 

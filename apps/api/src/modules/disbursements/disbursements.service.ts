@@ -1,0 +1,284 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { DisbursementStatus, Prisma } from '@prisma/client';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { tenantId } from '../../common/tenancy/tenant-context';
+import { paginate } from '../../common/dto/pagination.dto';
+import { round2 } from '../../common/utils/pricing';
+import {
+  CategoryDto,
+  CreateDisbursementDto,
+  DisbursementQueryDto,
+  SettleDisbursementDto,
+  UpdateDisbursementDto,
+} from './dto/disbursement.dto';
+
+/** Falls back to this when a tenant has not named these charges. */
+const DEFAULT_LABEL = 'ISC';
+const LABEL_KEY = 'disbursementLabel';
+
+const INCLUDE = {
+  category: true,
+  recordedBy: { select: { id: true, name: true } },
+} as const;
+
+/**
+ * Payouts made out of an order once the client's money has arrived.
+ *
+ * These sit beside the order rather than inside it. An order quoted at ₹X is
+ * worth ₹X and is settled when ₹X is collected; what the shop then owes a
+ * fitter or a transporter is a separate obligation. Netting the two would
+ * understate revenue and leave the books disagreeing with the GST already
+ * charged on that order — so nothing here touches the order's total or its
+ * payment status.
+ */
+@Injectable()
+export class DisbursementsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** What this tenant calls these charges. */
+  async label(): Promise<string> {
+    const setting = await this.prisma.appSetting.findFirst({ where: { key: LABEL_KEY } });
+    return typeof setting?.value === 'string' ? setting.value : DEFAULT_LABEL;
+  }
+
+  async setLabel(label: string): Promise<{ label: string }> {
+    await this.prisma.appSetting.upsert({
+      where: { tenantId_key: { tenantId: tenantId(), key: LABEL_KEY } },
+      update: { value: label },
+      create: { tenantId: tenantId(), key: LABEL_KEY, value: label },
+    });
+    return { label };
+  }
+
+  // -- categories -----------------------------------------------------------
+
+  listCategories(includeInactive = false) {
+    return this.prisma.disbursementCategory.findMany({
+      where: includeInactive ? {} : { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  createCategory(dto: CategoryDto) {
+    return this.prisma.disbursementCategory.create({
+      data: {
+        tenantId: tenantId(),
+        code: dto.code.toUpperCase(),
+        name: dto.name,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+  }
+
+  async deactivateCategory(id: string) {
+    return this.prisma.disbursementCategory.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
+
+  // -- per order ------------------------------------------------------------
+
+  async forOrder(orderId: string) {
+    const order = await this.prisma.order.findFirst({ where: { id: orderId } });
+    if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+
+    const rows = await this.prisma.disbursement.findMany({
+      where: { orderId, status: { not: DisbursementStatus.CANCELLED } },
+      orderBy: { createdAt: 'desc' },
+      include: INCLUDE,
+    });
+
+    const total = sum(rows.map((row) => Number(row.amount)));
+    const paid = sum(
+      rows
+        .filter((row) => row.status === DisbursementStatus.PAID)
+        .map((row) => Number(row.amount)),
+    );
+
+    return {
+      orderId,
+      label: await this.label(),
+      total: round2(total),
+      paid: round2(paid),
+      pending: round2(total - paid),
+      count: rows.length,
+      disbursements: rows,
+    };
+  }
+
+  async create(orderId: string, dto: CreateDisbursementDto, userId?: string) {
+    const order = await this.prisma.order.findFirst({ where: { id: orderId } });
+    if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+
+    const settled = dto.status === DisbursementStatus.PAID;
+    if (settled && !dto.paidMode) {
+      throw new BadRequestException('Say how it was paid — cash or online');
+    }
+
+    return this.prisma.disbursement.create({
+      data: {
+        tenantId: tenantId(),
+        orderId,
+        categoryId: dto.categoryId,
+        payeeName: dto.payeeName,
+        payeeContact: dto.payeeContact,
+        amount: dto.amount,
+        status: dto.status ?? DisbursementStatus.PLANNED,
+        paidMode: dto.paidMode,
+        paidAt: settled ? (dto.paidAt ? new Date(dto.paidAt) : new Date()) : null,
+        reference: dto.reference,
+        note: dto.note,
+        recordedById: userId,
+      },
+      include: INCLUDE,
+    });
+  }
+
+  async settle(id: string, dto: SettleDisbursementDto, userId?: string) {
+    const row = await this.prisma.disbursement.findFirst({ where: { id } });
+    if (!row) throw new NotFoundException('Payout not found');
+    if (row.status === DisbursementStatus.PAID) {
+      throw new BadRequestException('That payout is already settled');
+    }
+
+    return this.prisma.disbursement.update({
+      where: { id },
+      data: {
+        status: DisbursementStatus.PAID,
+        paidMode: dto.paidMode,
+        paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
+        reference: dto.reference,
+        note: dto.note ?? row.note,
+        recordedById: userId ?? row.recordedById,
+      },
+      include: INCLUDE,
+    });
+  }
+
+  async update(id: string, dto: UpdateDisbursementDto) {
+    const row = await this.prisma.disbursement.findFirst({ where: { id } });
+    if (!row) throw new NotFoundException('Payout not found');
+    return this.prisma.disbursement.update({ where: { id }, data: dto, include: INCLUDE });
+  }
+
+  async remove(id: string) {
+    const row = await this.prisma.disbursement.findFirst({ where: { id } });
+    if (!row) throw new NotFoundException('Payout not found');
+    // Cancelled rather than deleted: a settled payout is a record the
+    // accountant may need to see even after it is written off.
+    return this.prisma.disbursement.update({
+      where: { id },
+      data: { status: DisbursementStatus.CANCELLED },
+      include: INCLUDE,
+    });
+  }
+
+  // -- ledger ---------------------------------------------------------------
+
+  /** Every payout across every order — the view the accountant reconciles. */
+  async ledger(query: DisbursementQueryDto) {
+    const where = ledgerFilter(query);
+
+    const [rows, count] = await Promise.all([
+      this.prisma.disbursement.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: query.skip,
+        take: query.limit,
+        include: {
+          ...INCLUDE,
+          order: { select: { id: true, code: true, client: { select: { name: true } } } },
+        },
+      }),
+      this.prisma.disbursement.count({ where }),
+    ]);
+
+    // Totals describe the whole filtered ledger, not the page in hand — an
+    // accountant reading "committed" wants the figure for everything matching,
+    // and a per-page sum would silently change as they scrolled.
+    const totals = await this.totalsFor(where);
+
+    return {
+      label: await this.label(),
+      totals,
+      ...paginate(rows, count, { page: query.page, limit: query.limit }),
+    };
+  }
+
+  private async totalsFor(where: Prisma.DisbursementWhereInput) {
+    const [all, paid] = await Promise.all([
+      this.prisma.disbursement.aggregate({ where, _sum: { amount: true }, _count: true }),
+      this.prisma.disbursement.aggregate({
+        // Intersected, not overridden: spreading a second `status` onto the
+        // filter would replace it, so asking for cancelled rows reported the
+        // paid total of a different set entirely.
+        where: paidWithin(where),
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const total = Number(all._sum.amount ?? 0);
+    const settled = Number(paid._sum.amount ?? 0);
+    return {
+      total: round2(total),
+      paid: round2(settled),
+      pending: round2(total - settled),
+      count: all._count,
+    };
+  }
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+/**
+ * The rows one view of the ledger covers.
+ *
+ * Extracted so the filter can be reasoned about on its own: the rows on screen
+ * and the totals above them are both built from this, and they drifted apart
+ * once already when they were derived separately.
+ */
+export function ledgerFilter(query: {
+  status?: DisbursementStatus;
+  categoryId?: string;
+  search?: string;
+  from?: string;
+  to?: string;
+}): Prisma.DisbursementWhereInput {
+  return {
+    // Cancelled payouts are hidden unless they are what was asked for.
+    status: query.status ?? { not: DisbursementStatus.CANCELLED },
+    ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+    ...(query.search
+      ? {
+          OR: [
+            { payeeName: { contains: query.search, mode: 'insensitive' as const } },
+            { order: { code: { contains: query.search, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {}),
+    ...(query.from || query.to
+      ? {
+          createdAt: {
+            ...(query.from ? { gte: new Date(query.from) } : {}),
+            ...(query.to ? { lte: new Date(query.to) } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * The filter for the paid subset of a view.
+ *
+ * Intersected, never spread: adding a second `status` onto the filter object
+ * replaces the first, which once made "show me cancelled payouts" report the
+ * paid total of a completely different set.
+ */
+export function paidWithin(
+  where: Prisma.DisbursementWhereInput,
+): Prisma.DisbursementWhereInput {
+  return { AND: [where, { status: DisbursementStatus.PAID }] };
+}

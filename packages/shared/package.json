@@ -7,9 +7,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "docs:nav": "tsx scripts/docs-nav.ts"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.5.1",
+    "ts-jest": "^29.4.12",
     "typescript": "^5.7.3"
   }
 }

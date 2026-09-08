@@ -53,6 +53,23 @@ export function ClientDetailScreen({ route, navigation }: { route: any; navigati
         </Card>
       </Animated.View>
 
+      <Card
+        tone="dark"
+        style={{ marginTop: spacing.lg }}
+        onPress={() => navigation.navigate('ClientFirm', { clientId: data.id })}>
+        <View style={styles.firmRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="label" tone="muted">Firm details</Text>
+            <Text variant="tiny" tone="faint" numberOfLines={2}>
+              {data.gstin
+                ? `GSTIN ${data.gstin}${data.stateName ? ` · ${data.stateName}` : ''}`
+                : 'GST number, addresses and a second contact number'}
+            </Text>
+          </View>
+          <Icon name="chevronRight" size={14} color={palette.textFaint} />
+        </View>
+      </Card>
+
       {data.locations?.length ? (
         <>
           <SectionHeader title="Sites" />
@@ -96,6 +113,7 @@ export function ClientDetailScreen({ route, navigation }: { route: any; navigati
 }
 
 const styles = StyleSheet.create({
+  firmRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   hero: { alignItems: 'center', paddingVertical: spacing.xl },
   heroMeta: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.md },
   metaItem: { flexDirection: 'row', alignItems: 'center' },

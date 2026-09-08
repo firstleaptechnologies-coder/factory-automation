@@ -58,7 +58,7 @@ export function KanbanBoard<T extends { id: string }>({
           <div
             key={column.status.id}
             className={`kanban-col${hoverColumn === column.status.id ? ' over' : ''}`}
-            style={{ borderTopColor: column.status.color }}
+            style={{ '--column-accent': column.status.color } as React.CSSProperties}
             onDragOver={(event) => {
               // Without preventDefault the browser refuses the drop entirely.
               event.preventDefault();
@@ -69,7 +69,7 @@ export function KanbanBoard<T extends { id: string }>({
               event.preventDefault();
               void drop(column.status.id);
             }}>
-            <div className="kanban-head">
+            <div className="kanban-head" style={{ borderTopColor: column.status.color }}>
               <strong>{column.status.name}</strong>
               <span className="muted">{column.items.length}</span>
             </div>

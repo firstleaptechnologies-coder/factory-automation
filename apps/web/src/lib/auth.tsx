@@ -8,25 +8,38 @@ import {
   useMemo,
   useState,
 } from 'react';
-import {useRouter} from 'next/navigation';
-import type {AuthUser} from '@decor/shared';
-import {api, clearToken, loadToken, saveToken} from './api';
+import { useRouter } from 'next/navigation';
+import type { AuthUser } from '@decor/shared';
+import { api, clearToken, loadToken, saveToken } from './api';
+
+const WORKSPACE_KEY = 'decor.workspace';
 
 interface AuthState {
   user: AuthUser | null;
+  /** Remembered between sessions so the shop types it once, not daily. */
+  workspace: string | null;
   loading: boolean;
-  signIn: (identifier: string, password: string) => Promise<void>;
+  signIn: (workspace: string, identifier: string, password: string) => Promise<void>;
+  signInAsPlatform: (email: string, password: string) => Promise<void>;
   signOut: () => void;
+  /** Forget the workspace too, for a browser moving between businesses. */
+  forgetWorkspace: () => void;
+  /** Whether the signed-in user's role allows something. */
+  can: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-export function AuthProvider({children}: {children: React.ReactNode}) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [workspace, setWorkspace] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const saved = window.localStorage.getItem(WORKSPACE_KEY);
+    if (saved) setWorkspace(saved);
+
     const token = loadToken();
     if (!token) {
       setLoading(false);
@@ -39,22 +52,58 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
       .finally(() => setLoading(false));
   }, []);
 
-  const signIn = useCallback(async (identifier: string, password: string) => {
-    const result = await api.login(identifier, password);
-    saveToken(result.accessToken);
-    setUser(result.user);
-    router.push('/');
-  }, [router]);
+  const signIn = useCallback(
+    async (slug: string, identifier: string, password: string) => {
+      const result = await api.login(slug, identifier, password);
+      saveToken(result.accessToken);
+      window.localStorage.setItem(WORKSPACE_KEY, slug);
+      setWorkspace(slug);
+      setUser(result.user);
+      router.push('/');
+    },
+    [router],
+  );
+
+  const signInAsPlatform = useCallback(
+    async (email: string, password: string) => {
+      const result = await api.platformLogin(email, password);
+      saveToken(result.accessToken);
+      setUser(result.user);
+      router.push('/platform/tenants');
+    },
+    [router],
+  );
 
   const signOut = useCallback(() => {
     clearToken();
     setUser(null);
+    // The workspace deliberately survives sign-out: the next person at this
+    // desk is almost always from the same shop.
     router.push('/login');
   }, [router]);
 
+  const forgetWorkspace = useCallback(() => {
+    window.localStorage.removeItem(WORKSPACE_KEY);
+    setWorkspace(null);
+  }, []);
+
+  const can = useCallback(
+    (permission: string) => Boolean(user?.permissions?.includes(permission)),
+    [user],
+  );
+
   const value = useMemo(
-    () => ({user, loading, signIn, signOut}),
-    [user, loading, signIn, signOut],
+    () => ({
+      user,
+      workspace,
+      loading,
+      signIn,
+      signInAsPlatform,
+      signOut,
+      forgetWorkspace,
+      can,
+    }),
+    [user, workspace, loading, signIn, signInAsPlatform, signOut, forgetWorkspace, can],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { LayoutChangeEvent, StyleSheet, View, ViewStyle } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { depth, gradients, palette, radius as R } from '../theme';
 
@@ -19,6 +19,38 @@ import { depth, gradients, palette, radius as R } from '../theme';
  * Nothing here has a visible border — on this theme a border flattens the
  * illusion immediately.
  */
+
+/**
+ * The radius a shadow-casting layer may actually use.
+ *
+ * iOS derives a drop shadow from the layer's own shape, and it can only do that
+ * when the layer draws its corners natively. Ask for a radius larger than half
+ * the box — `radius.pill` is 999 — and the corners get drawn with a mask
+ * instead, which the shadow ignores: a pill then casts a rectangle. Clamping to
+ * half the shorter side gives the identical pill and keeps the shadow honest.
+ *
+ * Returns undefined until the view has been measured, so the first paint uses
+ * the requested radius rather than flashing a square.
+ */
+function useShadowRadius(requested: number) {
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setBox((current) =>
+      current && current.width === width && current.height === height
+        ? current
+        : { width, height },
+    );
+  }, []);
+
+  const radius = box
+    ? Math.min(requested, Math.min(box.width, box.height) / 2)
+    : requested;
+
+  return { radius, onLayout };
+}
+
 export function Neumorph({
   children,
   variant = 'raised',
@@ -34,11 +66,14 @@ export function Neumorph({
   style?: ViewStyle;
   contentStyle?: ViewStyle;
 }) {
-  const { offset, blur } = depth[size];
+  const { offset, blur, dark, light } = depth[size];
+  const shadow = useShadowRadius(radius);
 
   if (variant === 'flat') {
     return (
-      <View style={[{ borderRadius: radius, backgroundColor: palette.surface }, style]}>
+      <View
+        onLayout={shadow.onLayout}
+        style={[{ borderRadius: shadow.radius, backgroundColor: palette.surface }, style]}>
         <View style={contentStyle}>{children}</View>
       </View>
     );
@@ -49,8 +84,10 @@ export function Neumorph({
   // bottom edge catches light, which reads as depressed.
   if (variant === 'inset') {
     return (
-      <View style={[styles.insetOuter, { borderRadius: radius }, style]}>
-        <View style={[{ borderRadius: radius, overflow: 'hidden' }, contentStyle]}>
+      <View
+        onLayout={shadow.onLayout}
+        style={[styles.insetOuter, { borderRadius: shadow.radius }, style]}>
+        <View style={[{ borderRadius: shadow.radius, overflow: 'hidden' }, contentStyle]}>
           <LinearGradient
             colors={gradients.inset}
             start={{ x: 0.15, y: 0 }}
@@ -65,12 +102,18 @@ export function Neumorph({
 
   return (
     <View
+      onLayout={shadow.onLayout}
       style={[
         {
-          borderRadius: radius,
+          borderRadius: shadow.radius,
+          // iOS derives a shadow from the layer's own opaque backing, not from
+          // its children. Without a background colour here the layer is empty
+          // and the shadow falls back to the bounding rectangle. The fill is
+          // hidden behind the content either way.
+          backgroundColor: palette.surface,
           shadowColor: '#000000',
           shadowOffset: { width: offset, height: offset },
-          shadowOpacity: 0.55,
+          shadowOpacity: dark,
           shadowRadius: blur,
           elevation: 8,
         },
@@ -78,13 +121,14 @@ export function Neumorph({
       ]}>
       <View
         style={{
-          borderRadius: radius,
+          borderRadius: shadow.radius,
+          backgroundColor: palette.surface,
           shadowColor: '#FFFFFF',
           shadowOffset: { width: -offset, height: -offset },
-          shadowOpacity: 0.06,
+          shadowOpacity: light,
           shadowRadius: blur,
         }}>
-        <View style={[{ borderRadius: radius, overflow: 'hidden' }, contentStyle]}>
+        <View style={[{ borderRadius: shadow.radius, overflow: 'hidden' }, contentStyle]}>
           <LinearGradient
             colors={gradients.raised}
             start={{ x: 0.1, y: 0 }}
@@ -126,20 +170,28 @@ export function AccentSurface({
   contentStyle?: ViewStyle;
   soft?: boolean;
 }) {
+  const shadow = useShadowRadius(radius);
+
   return (
     <View
+      onLayout={shadow.onLayout}
       style={[
         {
-          borderRadius: radius,
+          borderRadius: shadow.radius,
+          // Same reason as Neumorph: the glow has to be cast by a rounded,
+          // opaque layer or it comes out as a rectangular halo.
+          backgroundColor: palette.accent,
           shadowColor: palette.accent,
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: soft ? 0.35 : 0.55,
-          shadowRadius: soft ? 12 : 18,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: soft ? 0.3 : 0.42,
+          // Wide and soft. A tight halo reads as an outline drawn round the
+          // panel rather than as light coming off it.
+          shadowRadius: soft ? 16 : 24,
           elevation: 12,
         },
         style,
       ]}>
-      <View style={[{ borderRadius: radius, overflow: 'hidden' }, contentStyle]}>
+      <View style={[{ borderRadius: shadow.radius, overflow: 'hidden' }, contentStyle]}>
         <LinearGradient
           colors={soft ? gradients.accentSoft : gradients.accent}
           start={{ x: 0.1, y: 0 }}

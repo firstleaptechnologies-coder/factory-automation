@@ -10,3 +10,15 @@ coverage/
 .DS_Store
 apps/api/prisma/*.db
 uploads/
+
+# Stray tsc output next to the sources it was built from.
+#
+# Jest resolves .js ahead of .ts, so one leftover build of a spec helper
+# silently shadows the file everyone is editing — the tests then pass or fail
+# against code nobody can see.
+apps/api/src/**/*.js
+apps/api/src/**/*.d.ts
+apps/api/src/**/*.js.map
+apps/api/test/**/*.js
+apps/api/test/**/*.d.ts
+apps/api/test/**/*.js.map

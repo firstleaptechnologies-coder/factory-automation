@@ -2,78 +2,171 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { NAV_GROUPS, NAV_HOME, type NavGroup, type NavItem } from '@decor/shared';
 import { useAuth } from '@/lib/auth';
+import { Avatar, Icon, IconName, Loader } from '@/ui';
 
-const NAV = [
-  { href: '/punch', label: 'Punch order' },
-  { href: '/leads', label: 'Leads' },
-  { href: '/orders', label: 'Orders' },
-  { href: '/board', label: 'Board' },
-  { href: '/clients', label: 'Clients' },
-];
+const CLOSED_KEY = 'decor.nav.closed';
 
-const ADMIN_NAV = [
-  { href: '/admin/materials', label: 'Materials' },
-  { href: '/admin/sizes', label: 'Sizes' },
-  { href: '/admin/lead-fields', label: 'Lead fields' },
-  { href: '/admin/flow', label: 'Status flow' },
-];
-
+/**
+ * The signed-in frame.
+ *
+ * The menu is grouped by what a screen is *for* and read from the shared
+ * navigation tree, so the sidebar and the app's menu cannot drift apart and a
+ * new screen has an obvious home. Groups collapse because the product is one
+ * module today and will be several: a list that only grows becomes a list
+ * nobody reads.
+ *
+ * Filtered by permission rather than by role name, the same way the API
+ * decides: a tenant can rename or recombine their roles and the menu follows
+ * without anyone editing a list.
+ */
 export function Shell({ children }: { children: React.ReactNode }) {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, can } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
+  /*
+   * What is shut, rather than what is open.
+   *
+   * A group added in a later release is then open by default — the opposite
+   * would hide a whole new module from everybody who had ever collapsed
+   * anything.
+   */
+  const [closed, setClosed] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(CLOSED_KEY);
+      if (saved) setClosed(JSON.parse(saved) as string[]);
+    } catch {
+      // A browser that refuses storage still gets a working menu.
+    }
+  }, []);
+
+  const toggle = (key: string) => {
+    setClosed((current) => {
+      const next = current.includes(key)
+        ? current.filter((one) => one !== key)
+        : [...current, key];
+      try {
+        window.localStorage.setItem(CLOSED_KEY, JSON.stringify(next));
+      } catch {
+        // Not worth failing a click over.
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
-  }, [loading, user, router]);
+    // A platform admin belongs to no workspace, so the shop's screens would be
+    // empty for them.
+    if (!loading && user?.isPlatform && !pathname.startsWith('/platform')) {
+      router.replace('/platform/tenants');
+    }
+  }, [loading, user, pathname, router]);
 
-  if (loading) return <div className="center-screen muted">Loading…</div>;
+  if (loading) return <Loader label="Loading" />;
   if (!user) return null;
 
-  const isAdmin = user.role === 'ADMIN';
+  const visible = (item: NavItem) =>
+    Boolean(item.web) && (!item.permission || can(item.permission));
+
+  /** A group is worth showing when anything inside it is. */
+  const groupHas = (group: NavGroup): boolean =>
+    group.items.some(visible) || (group.groups ?? []).some(groupHas);
+
+  /** Whichever group holds the current page stays open, however it was left. */
+  const holdsCurrent = (group: NavGroup): boolean =>
+    group.items.some((item) => item.web && item.web !== '/' && pathname.startsWith(item.web)) ||
+    (group.groups ?? []).some(holdsCurrent);
+
+  const renderGroup = (group: NavGroup, depth = 0) => {
+    if (!groupHas(group)) return null;
+    const shut = closed.includes(group.key) && !holdsCurrent(group);
+
+    return (
+      <div
+        key={group.key}
+        className="nav-section"
+        data-depth={depth}
+        // The rule lights up for the category holding the current page, so a
+        // glance answers "where am I" without reading a label.
+        data-current={holdsCurrent(group)}>
+        <button
+          type="button"
+          className="nav-group"
+          data-testid={`nav-group-${group.key}`}
+          aria-expanded={!shut}
+          onClick={() => toggle(group.key)}>
+          <Icon name={shut ? 'chevronRight' : 'chevronDown'} size={13} />
+          {group.label}
+        </button>
+
+        {shut ? null : (
+          <>
+            {group.items.filter(visible).map((item) => (
+              <NavLink key={item.key} item={item} pathname={pathname} />
+            ))}
+            {(group.groups ?? []).map((inner) => renderGroup(inner, depth + 1))}
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="layout">
-      <nav className="sidebar">
-        <div className="brand">
-          Decor Bucket
-          <small>Order punching</small>
-        </div>
+    <div className="shell">
+      <nav className="shell-nav">
+        <Link href="/" className="brand">
+          <span className="brand-mark">
+            <Icon name="scan" size={22} color="#fff" strokeWidth={2.1} />
+          </span>
+          <span>
+            <span className="t-h3" style={{ display: 'block', lineHeight: 1.15 }}>
+              Decor Bucket
+            </span>
+            <span className="t-tiny faint">Order punching</span>
+          </span>
+        </Link>
 
-        {NAV.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`nav-link${pathname === item.href ? ' active' : ''}`}>
-            {item.label}
-          </Link>
-        ))}
+        {/* Home sits outside the categories: it is where you land, not
+            somewhere you go looking for. */}
+        <NavLink item={NAV_HOME} pathname={pathname} />
 
-        {isAdmin ? (
-          <>
-            <div className="nav-heading">Admin</div>
-            {ADMIN_NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`nav-link${pathname === item.href ? ' active' : ''}`}>
-                {item.label}
-              </Link>
-            ))}
-          </>
-        ) : null}
+        {NAV_GROUPS.map((group) => renderGroup(group))}
 
-        <div style={{ marginTop: 'auto', paddingTop: 16 }}>
-          <div style={{ padding: '0 10px 8px' }}>
-            <div style={{ fontWeight: 600 }}>{user.name}</div>
-            <div className="muted" style={{ fontSize: 12 }}>{user.role}</div>
+        <div style={{ marginTop: 'auto', paddingTop: 'var(--s-xl)' }}>
+          <div className="row" style={{ padding: '0 var(--s-md) var(--s-md)' }}>
+            <Avatar name={user.name ?? '?'} size={38} />
+            <span style={{ minWidth: 0 }}>
+              <span className="t-small bold truncate" style={{ display: 'block' }}>
+                {user.name}
+              </span>
+              <span className="t-tiny faint">{user.code ?? user.role}</span>
+            </span>
           </div>
-          <button onClick={signOut} style={{ width: '100%' }}>Sign out</button>
+          <button type="button" className="nav-link" onClick={signOut} style={{ width: '100%' }}>
+            <Icon name="back" size={17} />
+            Sign out
+          </button>
         </div>
       </nav>
-      <main className="main">{children}</main>
+      <main className="shell-main">{children}</main>
     </div>
+  );
+}
+
+function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+  const href = item.web as string;
+  // "/" would otherwise light up on every page.
+  const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+  return (
+    <Link href={href} className="nav-link" data-active={active}>
+      <Icon name={item.icon as IconName} size={17} />
+      {item.label}
+    </Link>
   );
 }

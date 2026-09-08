@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Material, PunchItemInput, SizePreset } from '@decor/shared';
 import { DEFAULT_UNIT, LengthUnit, parseLengthToMm } from '@decor/shared';
 import { Shell } from '@/components/Shell';
+import { Select } from '@/ui';
 import { ClientPicker, ClientSelection } from '@/components/ClientPicker';
 import { PhotoField, PendingPhoto } from '@/components/PhotoField';
 import { SizeInput } from '@/components/SizeInput';
@@ -168,6 +169,7 @@ export default function PunchPage() {
 
   return (
     <Shell>
+      <div className="legacy">
       <h1 className="page-title">Punch order</h1>
       <p className="page-sub">Client, site, sizes, material, photos.</p>
 
@@ -194,14 +196,15 @@ export default function PunchPage() {
           </div>
 
           <div className="field-row">
-            <div className="field">
-              <label htmlFor="priority">Priority</label>
-              <select id="priority" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                {['LOW', 'NORMAL', 'HIGH', 'URGENT'].map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="Priority"
+              value={priority}
+              onChange={setPriority}
+              options={['LOW', 'NORMAL', 'HIGH', 'URGENT'].map((p) => ({
+                value: p,
+                label: p,
+              }))}
+            />
             <div className="field">
               <label htmlFor="due">Due date</label>
               <input id="due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
@@ -283,17 +286,15 @@ export default function PunchPage() {
               </div>
 
               <div className="field-row">
-                <div className="field">
-                  <label>Size preset</label>
-                  <select
-                    value={item.sizePresetId}
-                    onChange={(e) => applyPreset(item.key, e.target.value)}>
-                    <option value="">Custom size</option>
-                    {presets.map((preset) => (
-                      <option key={preset.id} value={preset.id}>{preset.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  label="Size preset"
+                  value={item.sizePresetId}
+                  onChange={(value) => applyPreset(item.key, value)}
+                  options={[
+                    { value: '', label: 'Custom size' },
+                    ...presets.map((preset) => ({ value: preset.id, label: preset.name })),
+                  ]}
+                />
 
                 <SizeInput
                   label="Length"
@@ -311,38 +312,36 @@ export default function PunchPage() {
               </div>
 
               <div className="field-row">
-                <div className="field">
-                  <label>Material</label>
-                  <select
-                    value={item.materialId}
-                    onChange={(e) =>
-                      patch(item.key, { materialId: e.target.value, materialThicknessId: '' })
-                    }>
-                    <option value="">Select…</option>
-                    {materials.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  label="Material"
+                  value={item.materialId}
+                  placeholder="Select…"
+                  onChange={(value) =>
+                    patch(item.key, { materialId: value, materialThicknessId: '' })
+                  }
+                  options={materials.map((m) => ({
+                    value: m.id,
+                    label: m.name,
+                    color: m.color,
+                  }))}
+                />
 
-                <div className="field">
-                  <label>Thickness</label>
-                  <select
-                    value={item.materialThicknessId}
-                    disabled={!material}
-                    onChange={(e) =>
-                      patch(item.key, { materialThicknessId: e.target.value, customThickness: '' })
-                    }>
-                    <option value="">
-                      {material ? 'Custom / none' : 'Pick a material first'}
-                    </option>
-                    {material?.thicknesses.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label ?? `${Number(t.valueMm)} mm`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  label="Thickness"
+                  value={item.materialThicknessId}
+                  disabled={!material}
+                  placeholder={material ? 'Custom / none' : 'Pick a material first'}
+                  onChange={(value) =>
+                    patch(item.key, { materialThicknessId: value, customThickness: '' })
+                  }
+                  options={[
+                    { value: '', label: material ? 'Custom / none' : 'Pick a material first' },
+                    ...(material?.thicknesses ?? []).map((t) => ({
+                      value: t.id,
+                      label: t.label ?? `${Number(t.valueMm)} mm`,
+                    })),
+                  ]}
+                />
 
                 {!item.materialThicknessId ? (
                   <SizeInput
@@ -375,7 +374,7 @@ export default function PunchPage() {
           );
         })}
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <div className="button-row">
           <button type="button" onClick={() => setItems((rows) => [...rows, blankItem(unit)])}>
             + Add item
           </button>
@@ -384,6 +383,7 @@ export default function PunchPage() {
           </button>
         </div>
       </div>
+    </div>
     </Shell>
   );
 }

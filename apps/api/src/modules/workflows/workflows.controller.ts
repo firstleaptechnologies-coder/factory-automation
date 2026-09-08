@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { UserRole, WorkflowKind } from '@prisma/client';
 import { WorkflowsService } from './workflows.service';
 import {
   CreateWorkflowDto,
+  HomeCardDto,
   SaveGraphDto,
+  UpdateWorkflowDto,
   StatusDto,
   UpdateStatusDto,
 } from './dto/workflow.dto';
@@ -18,9 +20,12 @@ export class WorkflowsController {
     return this.workflows.list();
   }
 
+  /** The flow orders run on, or the enquiry pipeline when asked for it. */
   @Get('default')
-  getDefault() {
-    return this.workflows.getDefault();
+  getDefault(@Query('kind') kind?: string) {
+    return this.workflows.getDefault(
+      kind === 'LEAD' ? WorkflowKind.LEAD : WorkflowKind.ORDER,
+    );
   }
 
   @Get(':id')
@@ -33,10 +38,23 @@ export class WorkflowsController {
     return this.workflows.allowedNext(statusId);
   }
 
+  /** Where this status came from, for a move that has to go back. */
+  @Get('statuses/:statusId/back')
+  allowedBack(@Param('statusId') statusId: string) {
+    return this.workflows.allowedBack(statusId);
+  }
+
   @Roles(UserRole.ADMIN)
   @Post()
   create(@Body() dto: CreateWorkflowDto) {
     return this.workflows.create(dto);
+  }
+
+  /** The flow itself: its name, and how long an enquiry may sit untouched. */
+  @Roles(UserRole.ADMIN)
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateWorkflowDto) {
+    return this.workflows.update(id, dto);
   }
 
   @Roles(UserRole.ADMIN)
@@ -68,5 +86,12 @@ export class WorkflowsController {
   @Post(':id/graph')
   saveGraph(@Param('id') id: string, @Body() dto: SaveGraphDto) {
     return this.workflows.saveGraph(id, dto);
+  }
+
+  /** Which stages the home screen counts, and in what order they sit there. */
+  @Roles(UserRole.ADMIN)
+  @Patch(':id/home-card')
+  setHomeCard(@Param('id') id: string, @Body() dto: HomeCardDto) {
+    return this.workflows.setHomeCard(id, dto.statusIds);
   }
 }

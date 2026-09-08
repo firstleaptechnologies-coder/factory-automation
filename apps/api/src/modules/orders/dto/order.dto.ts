@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsIn,
@@ -12,7 +13,13 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { AttachmentKind, PricingMode, Priority, RateUnit } from '@prisma/client';
+import {
+  AttachmentKind,
+  PricingMode,
+  Priority,
+  RateUnit,
+  TaxTreatment,
+} from '@prisma/client';
 import { LENGTH_UNITS, LengthUnit } from '@decor/shared';
 import { MeasurementDto } from '../../config/dto/config.dto';
 import { CreateClientDto } from '../../clients/dto/client.dto';
@@ -68,6 +75,11 @@ export class PunchOrderDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) total?: number;
   /** GST slab for a LUMP_SUM order, applied to the whole quoted figure. */
   @IsOptional() @IsString() gstSlabId?: string;
+  /**
+   * How the quoted figure relates to the GST on it. EXCLUSIVE adds the tax on
+   * top; INCLUSIVE and ABSORBED take it out of what was quoted.
+   */
+  @IsOptional() @IsEnum(TaxTreatment) taxTreatment?: TaxTreatment;
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -78,6 +90,8 @@ export class PunchOrderDto {
 export class UpdateOrderDto {
   @IsOptional() @IsString() location?: string;
   @IsOptional() @IsEnum(PricingMode) pricingMode?: PricingMode;
+  @IsOptional() @IsEnum(TaxTreatment) taxTreatment?: TaxTreatment;
+  @IsOptional() @IsString() gstSlabId?: string;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) discount?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) total?: number;
   @IsOptional() @IsEnum(Priority) priority?: Priority;
@@ -85,9 +99,33 @@ export class UpdateOrderDto {
   @IsOptional() @IsString() notes?: string;
 }
 
+/**
+ * Re-stating the money terms of an order that already exists.
+ *
+ * Separate from UpdateOrderDto because it re-prices every line and can change
+ * whether the order is settled — that is not something to slip into a general
+ * edit of the notes field.
+ */
+export class RepriceOrderDto {
+  @IsOptional() @IsEnum(PricingMode) pricingMode?: PricingMode;
+  @IsOptional() @IsEnum(TaxTreatment) taxTreatment?: TaxTreatment;
+  /** Only meaningful for a LUMP_SUM order. */
+  @IsOptional() @IsString() gstSlabId?: string;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) discount?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) total?: number;
+}
+
 export class ChangeStatusDto {
   @IsString() toStatusId: string;
   @IsOptional() @IsString() note?: string;
+  /**
+   * "Yes, I know this goes back."
+   *
+   * A move the flow does not draw is refused unless the caller says this — the
+   * machine half of the question the screen asks, so an older client or a
+   * stray script can never walk an order backwards without meaning to.
+   */
+  @IsOptional() @IsBoolean() reverse?: boolean;
 }
 
 export class AttachmentMetaDto {

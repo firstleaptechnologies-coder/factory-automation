@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import { IMAGE_TARGETS, formatBytes } from '@decor/shared';
@@ -10,6 +10,7 @@ import {
   Chip,
   Field,
   Icon,
+  ImageViewer,
   Screen,
   ScreenHeader,
   Text,
@@ -33,6 +34,8 @@ export function OrderPhotosScreen({ route, navigation }: { route: any; navigatio
   const [description, setDescription] = useState('');
   const [assets, setAssets] = useState<Asset[]>([]);
   const [busy, setBusy] = useState(false);
+  /** Which queued photo is open full screen — checking one before it is sent. */
+  const [viewing, setViewing] = useState<number | null>(null);
 
   const target = IMAGE_TARGETS[kind];
 
@@ -152,7 +155,11 @@ export function OrderPhotosScreen({ route, navigation }: { route: any; navigatio
                 exiting={FadeOut.duration(160)}
                 layout={Layout.springify()}
                 style={styles.thumb}>
-                <Image source={{ uri: asset.uri }} style={styles.thumbImage} />
+                <Pressable
+                  testID={`queued-${index}`}
+                  onPress={() => setViewing(index)}>
+                  <Image source={{ uri: asset.uri }} style={styles.thumbImage} />
+                </Pressable>
                 <Text variant="micro" tone="faint" style={{ marginTop: 4 }}>
                   {asset.fileSize ? formatBytes(asset.fileSize) : ''}
                 </Text>
@@ -166,6 +173,16 @@ export function OrderPhotosScreen({ route, navigation }: { route: any; navigatio
               </Animated.View>
             ))}
           </ScrollView>
+
+          <ImageViewer
+            images={assets.map((asset, index) => ({
+              id: `${asset.uri}-${index}`,
+              uri: asset.uri!,
+              caption: asset.fileSize ? formatBytes(asset.fileSize) : undefined,
+            }))}
+            index={viewing}
+            onClose={() => setViewing(null)}
+          />
         </>
       ) : (
         <Card tone="dark" style={styles.placeholder}>

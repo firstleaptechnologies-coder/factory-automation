@@ -6,14 +6,16 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "prisma db seed",
     "prebuild": "npm run build --prefix ../../packages/shared",
-    "prestart:dev": "npm run build --prefix ../../packages/shared"
+    "prestart:dev": "npm run build --prefix ../../packages/shared",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -27,7 +29,9 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.15",
+    "@nestjs/schedule": "^4.1.2",
     "@nestjs/swagger": "^8.1.0",
+    "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "^6.2.1",
     "@types/multer": "^2.2.0",
     "bcryptjs": "^2.4.3",
@@ -46,9 +50,12 @@
     "@nestjs/schematics": "^10.2.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.10.5",
     "@types/passport-jwt": "^4.0.1",
+    "jest": "^30.5.1",
     "prisma": "^6.2.1",
+    "ts-jest": "^29.4.12",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3"

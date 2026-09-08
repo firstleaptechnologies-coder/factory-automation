@@ -9,6 +9,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { useAuth } from '../auth/AuthContext';
 import { motion, palette, radius, spacing } from '../theme';
 import { AccentSurface, Neumorph } from '../ui/Neumorph';
 import { Icon, IconName } from '../ui/Icon';
@@ -25,26 +26,57 @@ const TAB_ICONS: Record<string, IconName> = {
 };
 
 /**
+ * What sits in the bar, left to right.
+ *
+ * Written out rather than taken from the navigator's own order: the middle slot
+ * is a raised button rather than a tab, and the last is not a tab at all but
+ * the way into everything an admin configures.
+ */
+const ROW = ['Home', 'Orders', 'centre', 'Leads', 'settings'] as const;
+
+/**
  * The floating tab bar.
  *
- * Four tabs with a raised lime action in the middle. That centre button is not
- * a tab — it is the punch action, which is the thing this app exists to do and
- * deserves to be reachable from anywhere with a thumb.
+ * Four tabs with a raised action in the middle. Search sits there because it is
+ * the thing reached most often with a thumb and from anywhere — punching is
+ * still a tap away on the home card, and still its own route, so a half-filled
+ * punch survives going elsewhere and coming back.
  */
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
+  const routeFor = (name: string) => state.routes.find((route) => route.name === name);
+  const search = routeFor('Search');
 
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
       <Neumorph radius={radius.xxl} size="lg" contentStyle={styles.bar}>
-        {state.routes.map((route, index) => {
-          const focused = state.index === index;
-          const { options } = descriptors[route.key];
+        {ROW.map((slot) => {
+          if (slot === 'centre') return <View key="centre" style={styles.centerSlot} />;
 
-          // The punch action sits in the middle of the row.
-          if (route.name === 'PunchTab') {
-            return <View key={route.key} style={styles.centerSlot} />;
+          if (slot === 'settings') {
+            return (
+              <Tab
+                key="settings"
+                testID="tab-settings"
+                icon={isAdmin ? 'tune' : 'settings'}
+                label={isAdmin ? 'More' : 'Settings'}
+                focused={false}
+                onPress={() => {
+                  haptic('impactLight');
+                  // Not a tab: it opens the stack, over whichever tab is showing.
+                  navigation.navigate(isAdmin ? 'Admin' : 'Settings');
+                }}
+              />
+            );
           }
+
+          const route = routeFor(slot);
+          if (!route) return null;
+          const focused = state.routes[state.index]?.key === route.key;
+          const { options } = descriptors[route.key];
 
           return (
             <Tab
@@ -68,10 +100,11 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         })}
       </Neumorph>
 
-      <PunchButton
+      <CentreButton
+        focused={search ? state.routes[state.index]?.key === search.key : false}
         onPress={() => {
           haptic('impactMedium');
-          navigation.navigate('PunchTab');
+          navigation.navigate('Search');
         }}
       />
     </View>
@@ -83,11 +116,13 @@ function Tab({
   label,
   focused,
   onPress,
+  testID,
 }: {
   icon: IconName;
   label: string;
   focused: boolean;
   onPress: () => void;
+  testID?: string;
 }) {
   const lift = useSharedValue(focused ? 1 : 0);
   lift.value = withSpring(focused ? 1 : 0, motion.spring);
@@ -98,7 +133,13 @@ function Tab({
   }));
 
   return (
-    <AnimatedPressable onPress={onPress} style={[styles.tab, animatedStyle]} hitSlop={6}>
+    <AnimatedPressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={[styles.tab, animatedStyle]}
+      hitSlop={6}>
       <Icon name={icon} size={22} color={focused ? palette.accent : palette.textMuted} />
       <Text
         variant="micro"
@@ -110,15 +151,17 @@ function Tab({
   );
 }
 
-/** The raised centre button. It pulses once on mount so it is noticed. */
-function PunchButton({ onPress }: { onPress: () => void }) {
+/** The raised centre button: search, from anywhere. */
+function CentreButton({ focused, onPress }: { focused: boolean; onPress: () => void }) {
   const scale = useSharedValue(1);
   const glow = useSharedValue(0);
 
   React.useEffect(() => {
+    // Settles to a steady glow rather than pulsing for attention — search is
+    // where a thumb goes by habit, not something to be sold.
     glow.value = withSequence(
-      withTiming(1, { duration: 600 }),
-      withTiming(0.55, { duration: 900 }),
+      withTiming(0.8, { duration: 400 }),
+      withTiming(0.55, { duration: 700 }),
     );
   }, [glow]);
 
@@ -130,8 +173,15 @@ function PunchButton({ onPress }: { onPress: () => void }) {
 
   return (
     <View style={styles.centerWrap} pointerEvents="box-none">
-      <Animated.View style={[styles.glow, glowStyle]} pointerEvents="none" />
+      <Animated.View
+        style={[styles.glow, { backgroundColor: palette.accent }, glowStyle]}
+        pointerEvents="none"
+      />
       <AnimatedPressable
+        testID="tab-search"
+        accessibilityRole="button"
+        accessibilityLabel="Search"
+        accessibilityState={{ selected: focused }}
         onPress={onPress}
         onPressIn={() => {
           scale.value = withSpring(0.9, motion.spring);
@@ -141,7 +191,7 @@ function PunchButton({ onPress }: { onPress: () => void }) {
         }}
         style={buttonStyle}>
         <AccentSurface radius={32} contentStyle={styles.center}>
-          <Icon name="scan" size={26} color={palette.white} strokeWidth={2.1} />
+          <Icon name="search" size={26} color={palette.white} strokeWidth={2.1} />
         </AccentSurface>
       </AnimatedPressable>
     </View>
@@ -180,6 +230,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: palette.accent,
+    // Colour applied inline: the accent is configurable at runtime and a
+    // StyleSheet freezes whatever it was at import.
   },
 });

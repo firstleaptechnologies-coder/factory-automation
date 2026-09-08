@@ -13,6 +13,7 @@ export type IconName =
   | 'arrowUpRight'
   | 'arrowDownLeft'
   | 'plus'
+  | 'minus'
   | 'scan'
   | 'home'
   | 'card'
@@ -52,6 +53,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   arrowUpRight: <Path d="M7 17 17 7M9 7h8v8" />,
   arrowDownLeft: <Path d="M17 7 7 17M15 17H7V9" />,
   plus: <Path d="M12 5v14M5 12h14" />,
+  minus: <Path d="M5 12h14" />,
   scan: (
     <>
       <Path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" />

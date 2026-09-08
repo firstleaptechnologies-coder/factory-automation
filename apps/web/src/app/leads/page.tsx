@@ -1,248 +1,200 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import type {
-  CustomFieldDefinition,
-  Lead,
-  LeadBoard,
-  LeadSource,
-  Material,
-} from '@decor/shared';
-import { formatCurrencyInr } from '@/lib/format';
-import { Shell } from '@/components/Shell';
-import { KanbanBoard } from '@/components/KanbanBoard';
-import { CustomFields } from '@/components/CustomFields';
-import { ConvertLeadDialog } from '@/components/ConvertLeadDialog';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { Lead, LeadSource, Workflow } from '@decor/shared';
+import { PERMISSIONS } from '@decor/shared';
 import { api } from '@/lib/api';
+import { useApi } from '@/lib/useApi';
+import { usePaginated } from '@/lib/usePaginated';
+import { useAuth } from '@/lib/auth';
+import { Shell } from '@/components/Shell';
+import { FilterSheet } from '@/components/FilterSheet';
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  ListFooter,
+  Loader,
+  PageHead,
+  Pill,
+} from '@/ui';
+import { formatInr, relativeTime } from '@/lib/format';
 
-/**
- * The lead dashboard: a pipeline board, plus a create form that is generated
- * from whatever fields the admin has defined.
- */
 export default function LeadsPage() {
-  const [board, setBoard] = useState<LeadBoard | null>(null);
-  const [sources, setSources] = useState<LeadSource[]>([]);
-  const [fields, setFields] = useState<CustomFieldDefinition[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [converting, setConverting] = useState<Lead | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [message, setMessage] = useState<{ text: string; tone: 'success' | 'danger' } | null>(null);
-
-  const [form, setForm] = useState({
-    title: '',
-    contactName: '',
-    contactPhone: '',
-    company: '',
-    location: '',
-    sourceId: '',
-    estimatedValue: '',
-  });
-  const [customValues, setCustomValues] = useState<Record<string, unknown>>({});
-
-  const load = useCallback(async () => {
-    const [b, s, f] = await Promise.all([api.leadBoard(), api.leadSources(), api.leadFields()]);
-    setBoard(b);
-    setSources(s);
-    setFields(f);
-  }, []);
-
-  useEffect(() => {
-    load().catch((e) =>
-      setMessage({ text: e instanceof Error ? e.message : 'Could not load', tone: 'danger' }),
-    );
-    api.materials().then(setMaterials).catch(() => undefined);
-  }, [load]);
-
-  const create = async () => {
-    setMessage(null);
-    try {
-      await api.createLead({
-        title: form.title,
-        contactName: form.contactName || undefined,
-        contactPhone: form.contactPhone || undefined,
-        company: form.company || undefined,
-        location: form.location || undefined,
-        sourceId: form.sourceId || undefined,
-        estimatedValue: form.estimatedValue ? Number(form.estimatedValue) : undefined,
-        customFields: customValues,
-      });
-      setForm({
-        title: '', contactName: '', contactPhone: '', company: '',
-        location: '', sourceId: '', estimatedValue: '',
-      });
-      setCustomValues({});
-      setShowForm(false);
-      await load();
-      setMessage({ text: 'Lead created.', tone: 'success' });
-    } catch (e) {
-      setMessage({ text: e instanceof Error ? e.message : 'Could not create', tone: 'danger' });
-    }
-  };
-
-  const move = async (lead: Lead, toStatusId: string) => {
-    setMessage(null);
-    const target = board?.columns.find((c) => c.status.id === toStatusId)?.status;
-    const transitions = await api.allowedNext(lead.status.id);
-    const transition = transitions.find((t) => t.toStatusId === toStatusId);
-
-    let note: string | undefined;
-    if (transition?.requiresNote) {
-      const entered = window.prompt(`Moving ${lead.code} to ${target?.name} needs a note. Why?`);
-      if (!entered?.trim()) {
-        setMessage({ text: 'Move cancelled — a note is required.', tone: 'danger' });
-        return;
-      }
-      note = entered.trim();
-    }
-
-    try {
-      await api.changeLeadStatus(lead.id, { toStatusId, note });
-      await load();
-    } catch (e) {
-      await load();
-      setMessage({ text: e instanceof Error ? e.message : 'Could not move', tone: 'danger' });
-    }
-  };
-
   return (
     <Shell>
+      <Leads />
+    </Shell>
+  );
+}
+
+/**
+ * Enquiries as a list.
+ *
+ * The sidebar opens this rather than the board for the same reason it opens the
+ * order list: looking one up — by name, by phone, by where it came from — is
+ * the common errand, and pushing the pipeline along is the occasional one.
+ */
+function Leads() {
+  const router = useRouter();
+  const { can } = useAuth();
+  const [search, setSearch] = useState('');
+  const [statusId, setStatusId] = useState<string | null>(null);
+  const [sourceId, setSourceId] = useState<string | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const workflow = useApi<Workflow>(() => api.defaultWorkflow('LEAD'), []);
+  const sources = useApi<LeadSource[]>(() => api.leadSources(), []);
+
+  const leads = usePaginated<Lead>(
+    (page) =>
+      api.leads({
+        search: search || undefined,
+        statusId: statusId ?? undefined,
+        sourceId: sourceId ?? undefined,
+        page,
+        limit: 25,
+      }),
+    [search, statusId, sourceId],
+  );
+
+  const active = [statusId, sourceId].filter(Boolean).length;
+
+  return (
+    <>
+      {/* Same as the orders list: what you work the list with stays put. */}
+      <div className="sticky-bar">
+      <PageHead
+        title="Leads"
+        subtitle={`${leads.total} enquir${leads.total === 1 ? 'y' : 'ies'}`}
+        action={
+          <div className="row">
+            <Button title="Board" variant="dark" onClick={() => router.push('/leads/board')} />
+            <Button
+              title="Archived"
+              variant="dark"
+              onClick={() => router.push('/leads/archived')}
+            />
+            {can(PERMISSIONS.LEAD_CREATE) ? (
+              <Button title="New lead" icon="plus" onClick={() => router.push('/leads/board?new=1')} />
+            ) : null}
+          </div>
+        }
+      />
+
       <div className="toolbar">
-        <div>
-          <h1 className="page-title">Leads</h1>
-          <p className="page-sub" style={{ margin: 0 }}>
-            {board?.workflow.name ?? 'Loading…'} — drag to move a lead through the pipeline.
-          </p>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <Field
+            placeholder="Name, phone or what it is for"
+            icon="search"
+            value={search}
+            onChange={setSearch}
+            pasteable={false}
+            style={{ marginBottom: 0 }}
+          />
         </div>
-        <div className="spacer" />
-        <button className="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? 'Close' : '+ New lead'}
-        </button>
+        <Button
+          title={active === 0 ? 'Filter' : `${active} filter${active === 1 ? '' : 's'}`}
+          variant={active === 0 ? 'dark' : 'primary'}
+          icon="filter"
+          onClick={() => setFilterOpen(true)}
+        />
+      </div>
       </div>
 
-      {message ? <div className={`banner ${message.tone}`}>{message.text}</div> : null}
+      <div style={{ height: 'var(--s-lg)' }} />
 
-      {showForm ? (
-        <div className="card" style={{ marginBottom: 14 }}>
-          <h3>New lead</h3>
-          <div className="field-row">
-            <div className="field">
-              <label>Title</label>
-              <input
-                value={form.title}
-                placeholder="What is the enquiry for?"
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-              />
-            </div>
-            <div className="field">
-              <label>Contact name</label>
-              <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>Phone</label>
-              <input value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>Company</label>
-              <input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>Location</label>
-              <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>Source</label>
-              <select value={form.sourceId} onChange={(e) => setForm({ ...form, sourceId: e.target.value })}>
-                <option value="">—</option>
-                {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label>Estimated value (₹)</label>
-              <input
-                value={form.estimatedValue}
-                inputMode="numeric"
-                onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })}
-              />
-            </div>
-          </div>
-
-          {fields.length ? (
-            <>
-              <h3 style={{ marginTop: 12 }}>Details</h3>
-              <CustomFields
-                definitions={fields}
-                values={customValues}
-                onChange={setCustomValues}
-              />
-            </>
-          ) : null}
-
-          <button className="primary" disabled={!form.title.trim()} onClick={create}>
-            Create lead
-          </button>
-        </div>
-      ) : null}
-
-      {!board ? (
-        <p className="muted">Loading…</p>
-      ) : (
-        <KanbanBoard
-          columns={board.columns.map((column) => ({
-            status: column.status,
-            items: column.leads,
-            subtitle: column.value > 0 ? formatCurrencyInr(column.value) : undefined,
-          }))}
-          onMove={move}
-          emptyLabel="No leads"
-          renderCard={(lead) => (
-            <div>
-              <div className="code">{lead.title}</div>
-              <div className="sub">{lead.code}</div>
-              <div className="sub">
-                {lead.contactName ?? lead.client?.name}
-                {lead.contactPhone ? ` · ${lead.contactPhone}` : ''}
-              </div>
-              {lead.location ? <div className="sub">{lead.location}</div> : null}
-              {lead.estimatedValue ? (
-                <div style={{ fontSize: 12, marginTop: 4 }}>
-                  {formatCurrencyInr(Number(lead.estimatedValue))}
-                </div>
-              ) : null}
-              {lead.source ? (
-                <span
-                  className="pill"
-                  style={{ background: lead.source.color ?? 'var(--text-muted)', marginTop: 6 }}>
-                  {lead.source.name}
-                </span>
-              ) : null}
-              {lead.convertedOrder ? (
-                <div className="sub" style={{ color: 'var(--success)', marginTop: 6 }}>
-                  → {lead.convertedOrder.code}
-                </div>
-              ) : (
-                <button
-                  style={{ marginTop: 8, padding: '5px 10px', fontSize: 12 }}
-                  onClick={() => setConverting(lead)}>
-                  Convert to order
-                </button>
-              )}
-            </div>
-          )}
+      {leads.loading ? (
+        <Loader />
+      ) : leads.items.length === 0 ? (
+        <EmptyState
+          icon="trend"
+          title="No enquiries match"
+          message="Try clearing the search or the filters."
         />
+      ) : (
+        <div className="stack-sm">
+          {leads.items.map((lead) => (
+            <Card
+              key={lead.id}
+              size="sm"
+              className="row-card"
+              onClick={() => router.push(`/leads/${lead.id}`)}>
+              <div className="row-between">
+                <div style={{ minWidth: 0 }}>
+                  <div className="t-h3 truncate">{lead.title}</div>
+                  <div className="t-tiny muted truncate">
+                    {lead.code} · {relativeTime(lead.createdAt)} ·{' '}
+                    {lead.contactName ?? lead.client?.name ?? '—'}
+                    {lead.contactPhone ? ` · ${lead.contactPhone}` : ''}
+                  </div>
+                </div>
+                <div className="row">
+                  {lead.convertedOrder ? (
+                    <span className="t-tiny success bold">→ {lead.convertedOrder.code}</span>
+                  ) : lead.estimatedValue ? (
+                    <span className="t-body bold accent">
+                      {formatInr(Number(lead.estimatedValue))}
+                    </span>
+                  ) : null}
+                  {lead.source ? (
+                    <Pill label={lead.source.name} color={lead.source.color ?? 'var(--surface-lit)'} />
+                  ) : null}
+                  <Pill label={lead.status.name} color={lead.status.color} />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {converting ? (
-        <ConvertLeadDialog
-          lead={converting}
-          materials={materials}
-          onClose={() => setConverting(null)}
-          onConverted={async (order) => {
-            setConverting(null);
-            await load();
-            setMessage({ text: `Converted into ${order.code}.`, tone: 'success' });
-          }}
-        />
-      ) : null}
-    </Shell>
+      <FilterSheet
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        title="Filter leads"
+        dimensions={[
+          {
+            key: 'statusId',
+            label: 'Stage',
+            options: [
+              { id: null, label: 'Any stage' },
+              ...(workflow.data?.statuses ?? []).map((status) => ({
+                id: status.id,
+                label: status.name,
+                color: status.color,
+              })),
+            ],
+          },
+          {
+            key: 'sourceId',
+            label: 'Source',
+            options: [
+              { id: null, label: 'Any source' },
+              ...(sources.data ?? []).map((source) => ({
+                id: source.id,
+                label: source.name,
+                color: source.color,
+              })),
+            ],
+          },
+        ]}
+        value={{ statusId, sourceId }}
+        onApply={(next) => {
+          setStatusId(next.statusId ?? null);
+          setSourceId(next.sourceId ?? null);
+        }}
+      />
+
+      <ListFooter
+        loading={leads.loadingMore}
+        hasMore={leads.hasMore}
+        shown={leads.items.length}
+        total={leads.total}
+        noun="enquiries"
+        onMore={leads.loadMore}
+      />
+    </>
   );
 }

@@ -64,6 +64,7 @@ function Key({
 
   return (
     <AnimatedPressable
+      testID={`keypad-${label}`}
       onPress={onPress}
       onLongPress={onLongPress}
       onPressIn={() => {

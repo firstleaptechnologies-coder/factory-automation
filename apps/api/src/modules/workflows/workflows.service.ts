@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, StatusCategory } from '@prisma/client';
+import { Prisma, StatusCategory, WorkflowKind } from '@prisma/client';
+import { HOME_CARD_LIMIT } from '@decor/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   CreateWorkflowDto,
@@ -7,6 +8,7 @@ import {
   StatusDto,
   TransitionDto,
   UpdateStatusDto,
+  UpdateWorkflowDto,
 } from './dto/workflow.dto';
 import { tenantId } from '../../common/tenancy/tenant-context';
 
@@ -40,17 +42,29 @@ export class WorkflowsService {
     return workflow;
   }
 
-  async getDefault() {
+  /**
+   * The flow orders run on.
+   *
+   * Asked for by kind, not by `isDefault` alone: a shop has a default order
+   * flow and a default lead pipeline, and whichever row came back first would
+   * otherwise decide whether the orders list filtered by order stages or by
+   * enquiry stages.
+   */
+  async getDefault(kind: WorkflowKind = WorkflowKind.ORDER) {
     const workflow = await this.prisma.workflow.findFirst({
-      where: { isDefault: true, isActive: true },
+      where: { kind, isDefault: true, isActive: true },
       include: {
-        statuses: { orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] },
+        statuses: {
+          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          // Carried here so the home screen's summary costs no extra call.
+          include: { _count: { select: { ordersAtStatus: true } } },
+        },
         transitions: true,
       },
     });
     if (!workflow) {
       throw new NotFoundException(
-        'No default workflow is configured — an admin must create one before orders can be punched',
+        `No default ${kind.toLowerCase()} workflow is configured — an admin must create one first`,
       );
     }
     return workflow;
@@ -61,6 +75,36 @@ export class WorkflowsService {
     return this.prisma.workflow.create({
       data: { ...dto, tenantId: tenantId(), isDefault: isFirst },
       include: { statuses: true, transitions: true },
+    });
+  }
+
+  /**
+   * Rename a flow, say how long an enquiry may sit before it goes quiet, or
+   * name the stage that means a quote has gone out.
+   */
+  async update(id: string, dto: UpdateWorkflowDto) {
+    const workflow = await this.findOne(id);
+
+    if (dto.quoteStatusId) {
+      const known = workflow.statuses.some((status) => status.id === dto.quoteStatusId);
+      if (!known) {
+        throw new BadRequestException('That stage does not belong to this flow');
+      }
+    }
+
+    return this.prisma.workflow.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        // Zero reads as "never", which is how it is turned off.
+        ...(dto.leadExpiryDays !== undefined
+          ? { leadExpiryDays: dto.leadExpiryDays ? dto.leadExpiryDays : null }
+          : {}),
+        ...(dto.quoteStatusId !== undefined
+          ? { quoteStatusId: dto.quoteStatusId || null }
+          : {}),
+      },
     });
   }
 
@@ -209,6 +253,79 @@ export class WorkflowsService {
         include: { statuses: true, transitions: true },
       });
     });
+  }
+
+  /**
+   * Which stages the home screen counts, and in what order.
+   *
+   * Written as a set rather than one stage at a time: the order is the whole
+   * point, and a half-applied change would leave two stages claiming the same
+   * position on the card.
+   */
+  async setHomeCard(workflowId: string, statusIds: string[]) {
+    const workflow = await this.findOne(workflowId);
+    const known = new Set(workflow.statuses.map((status) => status.id));
+
+    for (const id of statusIds) {
+      if (!known.has(id)) {
+        throw new BadRequestException('A stage does not belong to this workflow');
+      }
+    }
+    if (new Set(statusIds).size !== statusIds.length) {
+      throw new BadRequestException('A stage can only appear once on the card');
+    }
+    if (statusIds.length > HOME_CARD_LIMIT) {
+      throw new BadRequestException(
+        `The home card holds ${HOME_CARD_LIMIT} stages; ${statusIds.length} were chosen`,
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.workflowStatus.updateMany({
+        where: { workflowId, homeCardOrder: { not: null } },
+        data: { homeCardOrder: null },
+      });
+      for (const [position, id] of statusIds.entries()) {
+        await tx.workflowStatus.update({
+          where: { id },
+          data: { homeCardOrder: position },
+        });
+      }
+      return tx.workflow.findUnique({
+        where: { id: workflowId },
+        include: {
+          statuses: {
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+            include: { _count: { select: { ordersAtStatus: true } } },
+          },
+          transitions: true,
+        },
+      });
+    });
+  }
+
+  /**
+   * Where a status can be sent back to.
+   *
+   * The edges of the flow are one-way on purpose. Work does go backwards
+   * though — a piece fails QC, a client changes an approved design — and the
+   * honest way to allow that is to let it walk back along an arrow that exists
+   * rather than to draw a permanent backwards one anybody could take by
+   * accident. So the moves back are exactly the moves in, reversed.
+   */
+  async allowedBack(statusId: string) {
+    const incoming = await this.prisma.workflowTransition.findMany({
+      where: { toStatusId: statusId },
+      include: {
+        fromStatus: {
+          select: { id: true, code: true, name: true, color: true, category: true },
+        },
+      },
+    });
+    return incoming.map((transition) => ({
+      transitionId: transition.id,
+      toStatus: transition.fromStatus,
+    }));
   }
 
   /** Moves available from a status, for the order screen's status dropdown. */

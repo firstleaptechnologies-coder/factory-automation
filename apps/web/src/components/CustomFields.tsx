@@ -1,6 +1,7 @@
 'use client';
 
 import type { CustomFieldDefinition } from '@decor/shared';
+import { Select } from '@/ui';
 
 /**
  * Renders the admin's field definitions as a form.
@@ -36,16 +37,18 @@ export function CustomFields({
             return (
               <div className="field" key={field.id}>
                 {label}
-                <select
-                  id={`cf-${field.key}`}
+                <Select
                   value={value === true ? 'true' : value === false ? 'false' : ''}
-                  onChange={(e) =>
-                    set(field.key, e.target.value === '' ? undefined : e.target.value === 'true')
-                  }>
-                  <option value="">—</option>
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
+                  placeholder="—"
+                  onChange={(next) =>
+                    set(field.key, next === '' ? undefined : next === 'true')
+                  }
+                  options={[
+                    { value: '', label: '—' },
+                    { value: 'true', label: 'Yes' },
+                    { value: 'false', label: 'No' },
+                  ]}
+                />
                 {field.helpText ? <small className="muted">{field.helpText}</small> : null}
               </div>
             );
@@ -54,15 +57,15 @@ export function CustomFields({
             return (
               <div className="field" key={field.id}>
                 {label}
-                <select
-                  id={`cf-${field.key}`}
+                <Select
                   value={(value as string) ?? ''}
-                  onChange={(e) => set(field.key, e.target.value || undefined)}>
-                  <option value="">—</option>
-                  {field.options.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
+                  placeholder="—"
+                  onChange={(next) => set(field.key, next || undefined)}
+                  options={[
+                    { value: '', label: '—' },
+                    ...field.options.map((option) => ({ value: option, label: option })),
+                  ]}
+                />
                 {field.helpText ? <small className="muted">{field.helpText}</small> : null}
               </div>
             );

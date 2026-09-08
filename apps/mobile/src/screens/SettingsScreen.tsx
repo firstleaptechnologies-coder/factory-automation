@@ -14,7 +14,7 @@ import {
   SectionHeader,
   Text,
 } from '../ui';
-import { palette, spacing } from '../theme';
+import { spacing } from '../theme';
 
 export function SettingsScreen({ navigation }: { navigation: any }) {
   const { user, signOut } = useAuth();

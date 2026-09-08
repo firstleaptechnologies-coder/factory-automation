@@ -82,6 +82,47 @@ model PlatformUser {
   updatedAt    DateTime @updatedAt
 }
 
+/// A scheduled job's claim on being the one running it.
+///
+/// The API is one process today and will be several. Two of them waking at
+/// 03:30 and both pruning, both pushing, both closing the day would each be a
+/// bug that only shows up in production, so a job takes this lease before it
+/// does anything. The lease expires on its own, which is what makes a crashed
+/// holder recoverable without anyone clearing a flag by hand.
+model JobLease {
+  /// The job's dotted name — one lease per job, which is what the PK enforces.
+  name       String   @id
+  /// Which process holds it, for the "who is running this" question.
+  holder     String
+  acquiredAt DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([expiresAt])
+}
+
+/// One row per run of a scheduled job.
+///
+/// A cron that quietly stops running is invisible until someone notices the
+/// thing it was supposed to do never happened. This is the record that answers
+/// "did it run last night, and what did it do".
+model JobRun {
+  id   String @id @default(cuid())
+  /// Dotted name from the registry, e.g. "tenant.health".
+  name String
+  /// RUNNING → OK | FAILED | SKIPPED. SKIPPED means another instance held the
+  /// lease, which is a healthy outcome rather than a missed run.
+  outcome    String    @default("RUNNING")
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  durationMs Int?
+  /// What the run found, in the job's own words.
+  detail     Json?
+  error      String?
+
+  @@index([name, startedAt])
+  @@index([startedAt])
+}
+
 /// A named set of permissions inside one tenant.
 ///
 /// Roles are per-tenant rather than a fixed enum because every shop divides
@@ -123,8 +164,9 @@ model GstSlab {
   isActive  Boolean @default(true)
   sortOrder Int     @default(0)
 
-  orderItems OrderItem[]
-  orders     Order[]
+  orderItems    OrderItem[]
+  estimateItems EstimateItem[]
+  orders        Order[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -173,6 +215,8 @@ model User {
   leadStatusChanges LeadStatusHistory[]  @relation("LeadStatusChangedBy")
   paymentsReceived  Payment[]            @relation("PaymentReceivedBy")
   cashDeposited     CashDeposit[]        @relation("CashDepositedBy")
+  disbursements     Disbursement[]       @relation("DisbursementRecordedBy")
+  estimates         Estimate[]           @relation("EstimateCreatedBy")
 
   @@unique([tenantId, code])
   @@unique([tenantId, email])
@@ -189,16 +233,30 @@ model User {
 /// screen, which is why only `name` is required.
 model Client {
   /// Owning tenant. No FK: a dedicated database holds no Tenant row.
-  tenantId String
-  id       String  @id @default(cuid())
-  code     String
-  name     String
-  phone    String?
-  email    String?
-  gstin    String?
-  company  String?
-  address  String?
-  notes    String?
+  tenantId  String
+  id        String  @id @default(cuid())
+  code      String
+  name      String
+  phone     String?
+  /// A second number for the same firm — the site contact, or whoever actually
+  /// answers. Optional; a client punched on the floor often has just the one.
+  altPhone  String?
+  email     String?
+  gstin     String?
+  /// The trading name on their paperwork, which is rarely the person's name.
+  company   String?
+  /// Their state, as the GST code and name ("08-Rajasthan"). It decides whether
+  /// a supply is intra-state (CGST + SGST) or inter-state (IGST), so an invoice
+  /// cannot be made correctly without it.
+  stateCode String?
+  stateName String?
+
+  /// Kept as one free-text block each rather than split into lines: addresses
+  /// here are pasted from WhatsApp far more often than typed field by field.
+  address         String?
+  billingAddress  String?
+  shippingAddress String?
+  notes           String?
 
   isActive    Boolean  @default(true)
   createdById String?
@@ -209,6 +267,7 @@ model Client {
   orders    Order[]
   locations ClientLocation[]
   leads     Lead[]
+  estimates Estimate[]
 
   @@unique([tenantId, code])
   @@index([name])
@@ -330,6 +389,20 @@ model Workflow {
   /// One default per kind.
   isDefault   Boolean      @default(false)
   isActive    Boolean      @default(true)
+
+  /// How long an enquiry may sit untouched before it counts as gone quiet, in
+  /// days. Null means they never do. Only meaningful on a LEAD workflow: an
+  /// order does not go stale, somebody is waiting for it.
+  leadExpiryDays Int?
+
+  /// The stage an enquiry moves to when a quote is sent to the client.
+  ///
+  /// Configured rather than inferred: one shop's pipeline says "Quoted", the
+  /// next says "Estimate sent", and a third quotes twice and cares only about
+  /// the second. Null means sending a quote records itself against the lead
+  /// but moves nothing.
+  quoteStatusId String?
+
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -384,6 +457,11 @@ model WorkflowStatus {
   canvasX Float @default(0)
   canvasY Float @default(0)
 
+  /// Where this stage sits on the home screen's summary, or null when it is not
+  /// on it. A shop watches a handful of stages day to day — which ones differ
+  /// from shop to shop, so they are chosen rather than derived.
+  homeCardOrder Int?
+
   outgoing WorkflowTransition[] @relation("FromStatus")
   incoming WorkflowTransition[] @relation("ToStatus")
 
@@ -396,6 +474,7 @@ model WorkflowStatus {
 
   @@unique([workflowId, code])
   @@index([workflowId, sortOrder])
+  @@index([workflowId, homeCardOrder])
   @@index([parentId])
   @@index([tenantId])
 }
@@ -466,7 +545,9 @@ model StoredFile {
   uploadedBy   User?    @relation(fields: [uploadedById], references: [id])
   createdAt    DateTime @default(now())
 
-  attachments OrderAttachment[]
+  attachments    OrderAttachment[]
+  firmLetterhead FirmProfile[]     @relation("FirmLetterhead")
+  firmLogo       FirmProfile[]     @relation("FirmLogo")
 
   @@index([checksum])
   @@index([createdAt])
@@ -482,6 +563,25 @@ enum Priority {
   NORMAL
   HIGH
   URGENT
+}
+
+/// How the GST on an order relates to the figure the client was given.
+///
+/// The shop quotes in whichever of these three ways the conversation went, and
+/// the books have to end up correct either way — so the treatment is stored on
+/// the order rather than inferred from the numbers afterwards.
+enum TaxTreatment {
+  /// The quoted figure is before tax. GST is added on top and the client pays
+  /// the larger number. This is the ordinary case.
+  EXCLUSIVE
+  /// The quoted figure is what the client pays, GST already inside it. The tax
+  /// is backed out of that figure rather than added to it.
+  INCLUSIVE
+  /// The client asked for the GST to be dropped, and the shop agreed to absorb
+  /// it. They pay the figure they were quoted, so — like INCLUSIVE — that
+  /// figure is what the tax comes out of; what the shop gave up is recorded
+  /// separately as a concession.
+  ABSORBED
 }
 
 model Order {
@@ -518,6 +618,20 @@ model Order {
   /// Taxable value: subtotal less discount, before GST.
   total       Decimal     @default(0) @db.Decimal(14, 2)
 
+  /// How the quoted figure relates to the GST on it. Under EXCLUSIVE the tax is
+  /// added to `total`; under INCLUSIVE and ABSORBED it is taken out of what was
+  /// quoted, so `total` is smaller than the figure the client heard.
+  taxTreatment TaxTreatment @default(EXCLUSIVE)
+  /// What was said to the client, before any of this arithmetic. Kept because
+  /// it is the number they will quote back on the phone, and under INCLUSIVE
+  /// and ABSORBED it appears nowhere else on the order.
+  quotedAmount Decimal      @default(0) @db.Decimal(14, 2)
+  /// Under ABSORBED, the GST the shop gave up rather than charge on top. It is
+  /// not deducted from anything — the client was never billed it — but the
+  /// concession has to be visible or nobody can see what the order really cost
+  /// to win.
+  taxDiscount  Decimal      @default(0) @db.Decimal(14, 2)
+
   /// GST. Under ITEMISED this is the sum of the lines' tax. Under LUMP_SUM one
   /// slab applies to the whole quoted figure, so the slab is held here instead.
   gstSlabId  String?
@@ -540,6 +654,7 @@ model Order {
   attachments   OrderAttachment[]
   statusHistory OrderStatusHistory[]
   payments      Payment[]
+  disbursements Disbursement[]
   /// Set when this order came from a lead.
   fromLead      Lead?                @relation("LeadConversion")
 
@@ -666,6 +781,10 @@ model OrderStatusHistory {
   toStatus     WorkflowStatus  @relation("HistoryTo", fields: [toStatusId], references: [id])
 
   note        String?
+  /// True when this move went back the way the order came — a move the flow
+  /// does not draw, taken deliberately by somebody allowed to. Kept on the row
+  /// so the history reads as what happened rather than as an ordinary step.
+  reversed    Boolean  @default(false)
   changedById String?
   changedBy   User?    @relation(fields: [changedById], references: [id])
   changedAt   DateTime @default(now())
@@ -747,6 +866,81 @@ model CashDeposit {
   @@index([paymentId])
   @@index([depositedAt])
   @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// Disbursements
+// ---------------------------------------------------------------------------
+//
+// Money paid out of an order after the client's money has come in — the fitter,
+// the transporter, the installer, whoever else has to be settled once the job
+// is done. The shop's accountant reconciles these, so they are ordinary
+// payables: the order's own value and payment status are untouched by them.
+//
+// Deliberately not a reduction of the order. An order quoted at X is worth X
+// and is settled when X is collected; what leaves afterwards is a separate
+// obligation. Netting the two would understate revenue and put the books out of
+// step with the GST already charged on that order.
+//
+// Every tenant labels these differently — one says ISC, another says site
+// charges — so the heading is configuration, not a constant.
+
+enum DisbursementStatus {
+  /// Owed, not yet handed over.
+  PLANNED
+  PAID
+  CANCELLED
+}
+
+/// A kind of payout, defined per tenant.
+model DisbursementCategory {
+  id       String @id @default(cuid())
+  tenantId String
+
+  code      String
+  name      String
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  disbursements Disbursement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+}
+
+model Disbursement {
+  id       String @id @default(cuid())
+  tenantId String
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  categoryId String?
+  category   DisbursementCategory? @relation(fields: [categoryId], references: [id])
+
+  /// Who the money goes to.
+  payeeName    String
+  payeeContact String?
+
+  amount Decimal            @db.Decimal(14, 2)
+  status DisbursementStatus @default(PLANNED)
+
+  /// How it was settled, once it has been.
+  paidAt    DateTime?
+  paidMode  PaymentMode?
+  reference String?
+  note      String?
+
+  recordedById String?
+  recordedBy   User?    @relation("DisbursementRecordedBy", fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, status])
 }
 
 // ---------------------------------------------------------------------------
@@ -847,6 +1041,13 @@ model Lead {
   owner   User?   @relation("LeadOwner", fields: [ownerId], references: [id])
 
   estimatedValue Decimal?  @db.Decimal(14, 2)
+  /// What was actually quoted, taken from the estimate that was sent.
+  ///
+  /// Kept beside the guess rather than overwriting it: `estimatedValue` is what
+  /// somebody thought the job was worth when the phone was put down, and the
+  /// difference between the two is worth being able to see. Where this is set
+  /// it is the figure the pipeline is worth.
+  quotedValue    Decimal?  @db.Decimal(14, 2)
   expectedDate   DateTime?
   priority       Priority  @default(NORMAL)
   notes          String?
@@ -866,6 +1067,7 @@ model Lead {
   updatedAt   DateTime @updatedAt
 
   statusHistory LeadStatusHistory[]
+  estimates     Estimate[]
 
   @@unique([tenantId, code])
   @@index([statusId])
@@ -887,6 +1089,8 @@ model LeadStatusHistory {
   toStatus     WorkflowStatus  @relation("LeadHistoryTo", fields: [toStatusId], references: [id])
 
   note        String?
+  /// True when the enquiry went back a stage. See OrderStatusHistory.reversed.
+  reversed    Boolean  @default(false)
   changedById String?
   changedBy   User?    @relation("LeadStatusChangedBy", fields: [changedById], references: [id])
   changedAt   DateTime @default(now())
@@ -942,5 +1146,188 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+  @@index([tenantId])
+}
+
+/// The shop's own details, as they appear on anything it prints.
+///
+/// One row per tenant. Estimates and invoices are rendered from this rather
+/// than from a stored letterhead image alone, so a firm that changes its phone
+/// number does not have to re-upload artwork — but an uploaded letterhead is
+/// honoured where one exists, because most firms already have one they like.
+model FirmProfile {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String @id
+  id       String @unique @default(cuid())
+
+  name      String
+  gstin     String?
+  /// GST state code and name, e.g. "08" / "Rajasthan". Compared against the
+  /// client's to decide CGST+SGST versus IGST.
+  stateCode String?
+  stateName String?
+  phone     String?
+  email     String?
+  address   String?
+  website   String?
+
+  /// Printed under the totals so the client knows where to send the money.
+  bankName          String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankIfsc          String?
+  bankBranch        String?
+
+  /// The numbered block at the foot of an estimate. Free text, because every
+  /// shop's terms are their own.
+  termsAndConditions String?
+  /// Printed above the signature line.
+  signatoryName      String?
+
+  /// An uploaded letterhead, drawn as the page background. When absent the
+  /// document draws its own header from the fields above.
+  letterheadFileId String?
+  letterheadFile   StoredFile? @relation("FirmLetterhead", fields: [letterheadFileId], references: [id])
+  logoFileId       String?
+  logoFile         StoredFile? @relation("FirmLogo", fields: [logoFileId], references: [id])
+
+  /// The accent used on printed documents — estimates, bills. Kept separate
+  /// from the app's accent below, because a letterhead's red and a screen's
+  /// orange are different decisions and a firm may well want both.
+  accentColor String @default("#E4232F")
+
+  /// The app and web accent, so a client's software can carry their own brand
+  /// colour rather than ours. One colour rather than a palette: on a soft-UI
+  /// theme the greys are structural — they are what makes a surface look
+  /// pressed out of the ground — and only the accent is really theirs to pick.
+  themeAccent String @default("#FF6B1A")
+
+  updatedAt DateTime @updatedAt
+}
+
+enum EstimateStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  /// Turned into an order. The estimate stays as the record of what was quoted.
+  CONVERTED
+}
+
+/// A priced quotation given to a client before any order exists.
+///
+/// Deliberately not an Order: most estimates never become one, and the numbers
+/// on an estimate are a proposal that can be revised, while an order's are a
+/// fact that must not move. Converting copies the figures across.
+model Estimate {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  /// Human-readable, from the same atomic counter the order numbers use.
+  code     String
+
+  clientId   String?
+  client     Client? @relation(fields: [clientId], references: [id])
+  /// A name typed on the spot, for a quote given before the client exists.
+  clientName String?
+
+  /// Snapshotted at issue: an estimate printed last month must still show the
+  /// address it was sent to, whatever the client record says today.
+  billingAddress  String?
+  shippingAddress String?
+  clientGstin     String?
+  clientStateCode String?
+
+  status        EstimateStatus @default(DRAFT)
+  issuedOn      DateTime       @default(now())
+  validTill     DateTime?
+  notes         String?
+  /// Overrides the firm's standing terms for this one document.
+  termsOverride String?
+
+  /// How the GST on this estimate relates to the figures quoted, exactly as on
+  /// an order.
+  taxTreatment TaxTreatment @default(EXCLUSIVE)
+
+  /// Money, all snapshotted. `subtotal` is before discount, `total` is the
+  /// taxable value after it, and `grandTotal` is what the client would pay.
+  subtotal    Decimal @default(0) @db.Decimal(14, 2)
+  discount    Decimal @default(0) @db.Decimal(14, 2)
+  total       Decimal @default(0) @db.Decimal(14, 2)
+  /// Split out because an Indian invoice must show them separately. Intra-state
+  /// fills cgst and sgst; inter-state fills igst.
+  cgst        Decimal @default(0) @db.Decimal(14, 2)
+  sgst        Decimal @default(0) @db.Decimal(14, 2)
+  igst        Decimal @default(0) @db.Decimal(14, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2)
+  grandTotal  Decimal @default(0) @db.Decimal(14, 2)
+  /// Discount plus the tax that would have been charged on it — the figure the
+  /// sample estimate prints as "You saved".
+  savedAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  /// Set when this estimate became an order.
+  orderId String? @unique
+
+  /// The enquiry this was quoted for, where there was one.
+  ///
+  /// Optional on purpose: most estimates are for a client who rang up and
+  /// asked for a price, and making every quote wait for an enquiry to be
+  /// raised first would put a step in front of the commonest job in the shop.
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  createdById String?
+  createdBy   User?    @relation("EstimateCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items EstimateItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, clientId])
+  @@index([leadId])
+}
+
+/// One priced line on an estimate.
+///
+/// Free-form rather than tied to a material and a size preset: a quotation is
+/// often written before anything has been measured, and forcing it through the
+/// punch form would make quoting slower than writing it out by hand.
+model EstimateItem {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
+  id         String   @id @default(cuid())
+  estimateId String
+  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  lineNo     Int
+
+  name        String
+  description String?
+  /// HSN for goods, SAC for services. Printed as one column, as on the sample.
+  hsnSac      String?
+
+  quantity    Decimal @default(1) @db.Decimal(12, 3)
+  /// The unit as the shop says it — "Sqf", "Rft", "Nos".
+  unit        String  @default("Sqf")
+  ratePerUnit Decimal @default(0) @db.Decimal(14, 2)
+
+  /// Per-line discount, held as both so the printed document can show the
+  /// percentage that was agreed alongside the money it came to.
+  discountPct    Decimal @default(0) @db.Decimal(5, 2)
+  discountAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  gstSlabId  String?
+  gstSlab    GstSlab? @relation(fields: [gstSlabId], references: [id])
+  gstRatePct Decimal  @default(0) @db.Decimal(5, 2)
+  taxAmount  Decimal  @default(0) @db.Decimal(14, 2)
+
+  /// Taxable value after the line discount.
+  netAmount Decimal @default(0) @db.Decimal(14, 2)
+  /// What this line comes to including its GST — the sample's "Amount".
+  amount    Decimal @default(0) @db.Decimal(14, 2)
+
+  @@unique([estimateId, lineNo])
   @@index([tenantId])
 }

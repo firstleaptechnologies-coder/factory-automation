@@ -1,0 +1,88 @@
+# Every push, on every branch.
+#
+# The two jobs split along the one seam in this repo: the workspaces
+# (api + web + shared) install together from the root lockfile, and the mobile
+# app deliberately does not — it is a bare React Native app kept outside the npm
+# workspaces so its Metro and native tooling see a normal project. It has its own
+# lockfile and its own install.
+#
+# What is gated: TypeScript compiles, and all four suites pass. Three of those
+# specs are the navigation coverage checks, so a screen that nobody put in the
+# shared tree fails CI here rather than being discovered when someone cannot find
+# it.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A second push to the same branch makes the first run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workspaces:
+    name: api · web · shared
+    runs-on: ubuntu-latest
+    env:
+      # Prisma refuses to generate without the variable being present. Nothing
+      # in CI connects to a database — the API's specs are unit tests over
+      # mocked clients — so any well-formed URL will do.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The API and the web app import @decor/shared as a built package, so it
+      # has to exist before either of them typechecks.
+      - name: Build shared
+        run: npm run build:shared
+
+      # The specs import the generated Prisma client's types; without this the
+      # API suite fails to compile rather than fails to pass.
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Typecheck
+        run: npm run typecheck --workspaces --if-present
+
+      - name: Test
+        run: npm test --workspaces --if-present
+
+  mobile:
+    name: mobile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      # No root install: the app resolves @decor/shared from source through
+      # Metro, tsc paths and a Jest moduleNameMapper, so the shared package
+      # needs no build step here either.
+      - run: npm ci
+        working-directory: apps/mobile
+
+      - name: Lint
+        run: npm run lint
+        working-directory: apps/mobile
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: apps/mobile
+
+      - name: Test
+        run: npm test
+        working-directory: apps/mobile

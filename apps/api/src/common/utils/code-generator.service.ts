@@ -3,12 +3,13 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { tenantId } from '../tenancy/tenant-context';
 
-type Sequenced = 'order' | 'client' | 'lead';
+type Sequenced = 'order' | 'client' | 'lead' | 'estimate';
 
 const PREFIX: Record<Sequenced, string> = {
   order: 'ORD',
   client: 'CL',
   lead: 'LD',
+  estimate: 'EST',
 };
 
 type Client = PrismaService | Prisma.TransactionClient;

@@ -124,7 +124,8 @@ export function AdminMaterialsScreen({ navigation }: { navigation: any }) {
 
       <Sheet visible={sheet} title="Add material" onClose={() => setSheet(false)}>
         <Field label="Code" placeholder="MDF" value={code} onChangeText={(v) => setCode(v.toUpperCase())} />
-        <Field label="Name" placeholder="MDF" value={name} onChangeText={setName} />
+        {/* Not "MDF" again — two fields sharing one example reads as a repeat. */}
+        <Field label="Name" placeholder="MDF board" value={name} onChangeText={setName} />
         <Button
           title="Add"
           loading={busy}

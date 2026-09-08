@@ -40,6 +40,7 @@ export default function SizesAdminPage() {
 
   return (
     <Shell>
+      <div className="legacy">
       <h1 className="page-title">Sizes</h1>
       <p className="page-sub">
         Presets offered while punching. Type in any unit — everything is stored in millimetres.
@@ -60,28 +61,30 @@ export default function SizesAdminPage() {
             ))}
           </div>
         </div>
-        <div className="row">
-          <div style={{ width: 150 }}>
+        <div className="field-row">
+          <div className="col" style={{ flexBasis: 150 }}>
             <label>Code</label>
             <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} />
           </div>
-          <div style={{ width: 220 }}>
+          <div className="col" style={{ flexBasis: 220 }}>
             <label>Name</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
-          <div style={{ width: 120 }}>
+          <div className="col" style={{ flexBasis: 120 }}>
             <label>Length ({UNIT_LABEL[unit]})</label>
             <input value={form.length} onChange={(e) => setForm({ ...form, length: e.target.value })} />
           </div>
-          <div style={{ width: 120 }}>
+          <div className="col" style={{ flexBasis: 120 }}>
             <label>Width ({UNIT_LABEL[unit]})</label>
             <input value={form.width} onChange={(e) => setForm({ ...form, width: e.target.value })} />
           </div>
-          <div style={{ width: 130 }}>
+          <div className="col" style={{ flexBasis: 130 }}>
             <label>Thickness (mm)</label>
             <input value={form.thickness} onChange={(e) => setForm({ ...form, thickness: e.target.value })} />
           </div>
-          <button className="primary" disabled={!form.code || !form.name} onClick={create}>Add</button>
+          <button className="primary row-action" disabled={!form.code || !form.name} onClick={create}>
+            Add
+          </button>
         </div>
       </div>
 
@@ -92,7 +95,7 @@ export default function SizesAdminPage() {
           <span className="muted" style={{ fontSize: 12 }}>shown in {UNIT_LABEL[unit]}</span>
         </div>
         {loading ? <p className="muted">Loading…</p> : null}
-        <table>
+        <table className="table">
           <thead>
             <tr><th>Code</th><th>Name</th><th>Length</th><th>Width</th><th>Thickness</th><th>Stored</th></tr>
           </thead>
@@ -112,6 +115,7 @@ export default function SizesAdminPage() {
           </tbody>
         </table>
       </div>
+    </div>
     </Shell>
   );
 }

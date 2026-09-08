@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Client, Paginated } from '@decor/shared';
+import type { Client } from '@decor/shared';
 import { api } from '../api/client';
-import { useApi } from '../hooks/useApi';
+import { usePaginated } from '../hooks/usePaginated';
 import {
   Avatar,
   Card,
   EmptyState,
   Field,
   Icon,
+  ListFooter,
   Loader,
   Screen,
   ScreenHeader,
@@ -19,16 +20,19 @@ import { palette, spacing } from '../theme';
 
 export function ClientsScreen({ navigation }: { navigation: any }) {
   const [search, setSearch] = useState('');
-  const clients = useApi<Paginated<Client>>(
-    () => api.clients({ search: search || undefined, limit: 100 }),
+  const clients = usePaginated<Client>(
+    (page) => api.clients({ search: search || undefined, page, limit: 25 }),
     [search],
   );
 
   return (
-    <Screen refreshing={clients.refreshing} onRefresh={clients.refresh}>
+    <Screen
+      refreshing={clients.refreshing}
+      onRefresh={clients.refresh}
+      onEndReached={clients.loadMore}>
       <ScreenHeader
         title="Clients"
-        subtitle={`${clients.data?.meta.total ?? 0} on file`}
+        subtitle={`${clients.total} on file`}
         onBack={() => navigation.goBack()}
       />
 
@@ -39,16 +43,16 @@ export function ClientsScreen({ navigation }: { navigation: any }) {
         icon="search"
       />
 
-      {clients.loading && !clients.data ? (
+      {clients.loading ? (
         <Loader />
-      ) : clients.data?.data.length === 0 ? (
+      ) : clients.items.length === 0 ? (
         <EmptyState
           icon="users"
           title="No clients yet"
           message="Clients are added automatically as orders are punched."
         />
       ) : (
-        clients.data?.data.map((client, index) => (
+        clients.items.map((client, index) => (
           <Animated.View
             key={client.id}
             entering={FadeInDown.delay(Math.min(index, 10) * 35).duration(300)}>
@@ -73,6 +77,14 @@ export function ClientsScreen({ navigation }: { navigation: any }) {
           </Animated.View>
         ))
       )}
+
+      <ListFooter
+        loading={clients.loadingMore}
+        hasMore={clients.hasMore}
+        shown={clients.items.length}
+        total={clients.total}
+        noun="clients"
+      />
     </Screen>
   );
 }

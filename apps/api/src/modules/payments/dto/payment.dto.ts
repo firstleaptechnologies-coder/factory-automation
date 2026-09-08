@@ -2,12 +2,14 @@ import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
   Min,
 } from 'class-validator';
 import { PaymentMode } from '@prisma/client';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 /**
  * Recording money coming in.
@@ -45,4 +47,28 @@ export class RecordDepositDto {
 export class CashPositionQueryDto {
   @IsOptional() @IsDateString() from?: string;
   @IsOptional() @IsDateString() to?: string;
+}
+
+/**
+ * Every movement of money except a payout, in one list.
+ *
+ * Payouts have a ledger of their own and are deliberately not here: they sit
+ * beside orders rather than inside them, and mixing them into the takings
+ * would be exactly the netting-off the books must not do.
+ */
+export const TRANSACTION_KINDS = [
+  'PAYMENT_CASH',
+  'PAYMENT_ONLINE',
+  'BANK_DEPOSIT',
+] as const;
+
+export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
+
+export class TransactionQueryDto extends PaginationDto {
+  /** One kind, or all of them when omitted. */
+  @IsOptional() @IsIn(TRANSACTION_KINDS) kind?: TransactionKind;
+  @IsOptional() @IsDateString() from?: string;
+  @IsOptional() @IsDateString() to?: string;
+  /** Order code, client name, or a bank/UTR reference. */
+  @IsOptional() @IsString() declare search?: string;
 }

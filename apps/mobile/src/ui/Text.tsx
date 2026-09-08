@@ -45,6 +45,14 @@ export function Text({
       style={[
         styles[variant],
         toneStyles[tone],
+        // The two accent tones are resolved here rather than in the StyleSheet:
+        // a tenant can change the accent at runtime, and StyleSheet.create
+        // freezes whatever the colour was when the module was imported.
+        tone === 'accent'
+          ? { color: palette.accent }
+          : tone === 'onAccent'
+            ? { color: palette.textOnAccent }
+            : null,
         bold ? { fontWeight: weight.bold as TextStyle['fontWeight'] } : null,
         style,
       ]}>
@@ -70,12 +78,17 @@ const styles = StyleSheet.create({
   },
 });
 
+/**
+ * Tones that never move live here. The accent tones are deliberately empty and
+ * applied inline above — see the note there.
+ */
 const toneStyles = StyleSheet.create({
   default: { color: palette.text },
   muted: { color: palette.textMuted },
   faint: { color: palette.textFaint },
-  onAccent: { color: palette.textOnAccent },
-  accent: { color: palette.accent },
+  onAccent: {},
+  /** Overridden inline; see the note on toneStyles. */
+  accent: {},
   danger: { color: palette.danger },
   success: { color: palette.success },
   warning: { color: palette.warning },

@@ -1,0 +1,7 @@
+-- CreateEnum
+CREATE TYPE "TaxTreatment" AS ENUM ('EXCLUSIVE', 'INCLUSIVE', 'ABSORBED');
+
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "quotedAmount" DECIMAL(14,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "taxDiscount" DECIMAL(14,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "taxTreatment" "TaxTreatment" NOT NULL DEFAULT 'EXCLUSIVE';

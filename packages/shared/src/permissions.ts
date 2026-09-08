@@ -13,13 +13,35 @@ export const PERMISSIONS = {
   ORDER_PUNCH: 'order.punch',
   ORDER_EDIT: 'order.edit',
   ORDER_MOVE_STATUS: 'order.move_status',
+  /*
+   * Sending an order back the way it came.
+   *
+   * The flow the admin drew is one-way, and that is the point of it. But work
+   * genuinely goes backwards — a piece fails QC and returns to sanding, a
+   * client changes the design after it was approved — and without this the
+   * only way to record it was to draw a permanent backwards arrow that anyone
+   * could then take by accident. Held separately so it stays rare.
+   */
+  ORDER_MOVE_BACK: 'order.move_back',
   ORDER_ATTACH: 'order.attach',
+  /**
+   * Re-stating an order's terms — above all how its GST is treated. Kept apart
+   * from ordinary pricing because it decides what the shop declares on a
+   * supply, which is the accountant's call rather than the sales desk's.
+   */
+  ORDER_TERMS: 'order.terms',
+
+  // Estimates
+  ESTIMATE_VIEW: 'estimate.view',
+  ESTIMATE_MANAGE: 'estimate.manage',
 
   // Leads
   LEAD_VIEW: 'lead.view',
   LEAD_CREATE: 'lead.create',
   LEAD_EDIT: 'lead.edit',
   LEAD_MOVE_STATUS: 'lead.move_status',
+  /** Sending an enquiry back a stage. See ORDER_MOVE_BACK. */
+  LEAD_MOVE_BACK: 'lead.move_back',
   LEAD_CONVERT: 'lead.convert',
 
   // Clients
@@ -33,6 +55,12 @@ export const PERMISSIONS = {
   CASH_DEPOSIT: 'payment.deposit',
   CASH_POSITION_VIEW: 'payment.cash_position',
   PRICING_EDIT: 'pricing.edit',
+
+  // Disbursements — money paid out of an order to third parties. Gated
+  // separately because a shop may want only its owner and accountant to see
+  // what is owed to whom.
+  DISBURSEMENT_VIEW: 'disbursement.view',
+  DISBURSEMENT_MANAGE: 'disbursement.manage',
 
   // Shop configuration
   CONFIG_VIEW: 'config.view',
@@ -62,13 +90,19 @@ export const TENANT_PERMISSIONS: Permission[] = ALL_PERMISSIONS.filter(
 /** Grouped for the role editor, so the UI does not have to know the taxonomy. */
 export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
   {
+    label: 'Estimates',
+    permissions: [PERMISSIONS.ESTIMATE_VIEW, PERMISSIONS.ESTIMATE_MANAGE],
+  },
+  {
     label: 'Orders',
     permissions: [
       PERMISSIONS.ORDER_VIEW,
       PERMISSIONS.ORDER_PUNCH,
       PERMISSIONS.ORDER_EDIT,
       PERMISSIONS.ORDER_MOVE_STATUS,
+      PERMISSIONS.ORDER_MOVE_BACK,
       PERMISSIONS.ORDER_ATTACH,
+      PERMISSIONS.ORDER_TERMS,
     ],
   },
   {
@@ -78,6 +112,7 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
       PERMISSIONS.LEAD_CREATE,
       PERMISSIONS.LEAD_EDIT,
       PERMISSIONS.LEAD_MOVE_STATUS,
+      PERMISSIONS.LEAD_MOVE_BACK,
       PERMISSIONS.LEAD_CONVERT,
     ],
   },
@@ -94,6 +129,8 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
       PERMISSIONS.CASH_DEPOSIT,
       PERMISSIONS.CASH_POSITION_VIEW,
       PERMISSIONS.PRICING_EDIT,
+      PERMISSIONS.DISBURSEMENT_VIEW,
+      PERMISSIONS.DISBURSEMENT_MANAGE,
     ],
   },
   {
@@ -121,11 +158,16 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.ORDER_PUNCH]: 'Punch orders',
   [PERMISSIONS.ORDER_EDIT]: 'Edit orders',
   [PERMISSIONS.ORDER_MOVE_STATUS]: 'Move order status',
+  [PERMISSIONS.ORDER_MOVE_BACK]: 'Send an order back a stage',
   [PERMISSIONS.ORDER_ATTACH]: 'Attach photos',
+  [PERMISSIONS.ORDER_TERMS]: 'Change GST treatment',
+  [PERMISSIONS.ESTIMATE_VIEW]: 'See estimates',
+  [PERMISSIONS.ESTIMATE_MANAGE]: 'Write and send estimates',
   [PERMISSIONS.LEAD_VIEW]: 'View leads',
   [PERMISSIONS.LEAD_CREATE]: 'Create leads',
   [PERMISSIONS.LEAD_EDIT]: 'Edit leads',
   [PERMISSIONS.LEAD_MOVE_STATUS]: 'Move lead stage',
+  [PERMISSIONS.LEAD_MOVE_BACK]: 'Send an enquiry back a stage',
   [PERMISSIONS.LEAD_CONVERT]: 'Convert leads to orders',
   [PERMISSIONS.CLIENT_VIEW]: 'View clients',
   [PERMISSIONS.CLIENT_MANAGE]: 'Add and edit clients',
@@ -133,8 +175,12 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.PAYMENT_RECORD]: 'Record payments',
   [PERMISSIONS.PAYMENT_DELETE]: 'Delete payments',
   [PERMISSIONS.CASH_DEPOSIT]: 'Record bank deposits',
-  [PERMISSIONS.CASH_POSITION_VIEW]: 'View cash position',
+  // The key stays as it is: renaming a permission string would silently strip
+  // it from every role a tenant has already saved.
+  [PERMISSIONS.CASH_POSITION_VIEW]: 'View transactions and cash',
   [PERMISSIONS.PRICING_EDIT]: 'Set rates and prices',
+  [PERMISSIONS.DISBURSEMENT_VIEW]: 'View payouts on orders',
+  [PERMISSIONS.DISBURSEMENT_MANAGE]: 'Record and settle payouts',
   [PERMISSIONS.CONFIG_VIEW]: 'View configuration',
   [PERMISSIONS.CONFIG_MANAGE]: 'Manage materials and sizes',
   [PERMISSIONS.WORKFLOW_MANAGE]: 'Manage the status flow',
@@ -174,6 +220,7 @@ export const DEFAULT_ROLES: {
     permissions: [
       PERMISSIONS.ORDER_VIEW, PERMISSIONS.ORDER_PUNCH, PERMISSIONS.ORDER_EDIT,
       PERMISSIONS.ORDER_MOVE_STATUS, PERMISSIONS.ORDER_ATTACH,
+      PERMISSIONS.ESTIMATE_VIEW, PERMISSIONS.ESTIMATE_MANAGE,
       PERMISSIONS.LEAD_VIEW, PERMISSIONS.LEAD_CREATE, PERMISSIONS.LEAD_EDIT,
       PERMISSIONS.LEAD_MOVE_STATUS, PERMISSIONS.LEAD_CONVERT,
       PERMISSIONS.CLIENT_VIEW, PERMISSIONS.CLIENT_MANAGE,

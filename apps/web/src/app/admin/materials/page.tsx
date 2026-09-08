@@ -27,6 +27,7 @@ export default function MaterialsAdminPage() {
 
   return (
     <Shell>
+      <div className="legacy">
       <h1 className="page-title">Materials</h1>
       <p className="page-sub">
         What can be picked while punching, and the thickness options for each.
@@ -37,17 +38,17 @@ export default function MaterialsAdminPage() {
 
       <div className="card">
         <h3>Add a material</h3>
-        <div className="row">
-          <div style={{ width: 140 }}>
+        <div className="field-row">
+          <div className="col" style={{ flexBasis: 140 }}>
             <label htmlFor="code">Code</label>
             <input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
           </div>
-          <div style={{ width: 240 }}>
+          <div className="col" style={{ flexBasis: 240 }}>
             <label htmlFor="name">Name</label>
             <input id="name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <button
-            className="primary"
+            className="primary row-action"
             disabled={!code || !name}
             onClick={() =>
               act(async () => {
@@ -80,7 +81,7 @@ export default function MaterialsAdminPage() {
 
         {loading ? <p className="muted">Loading…</p> : null}
 
-        <table>
+        <table className="table">
           <thead>
             <tr><th>Material</th><th>Thicknesses (stored in mm)</th><th style={{ width: 260 }}>Add thickness</th></tr>
           </thead>
@@ -141,6 +142,7 @@ export default function MaterialsAdminPage() {
           </tbody>
         </table>
       </div>
+    </div>
     </Shell>
   );
 }

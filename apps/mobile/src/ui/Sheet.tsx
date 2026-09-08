@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette, radius, spacing } from '../theme';
 import { Text } from './Text';
@@ -33,10 +33,13 @@ export function Sheet({
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <Animated.View entering={FadeIn.duration(180)} style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable testID="sheet-backdrop" style={StyleSheet.absoluteFill} onPress={onClose} />
         <Animated.View
-          entering={SlideInDown.springify().damping(20).stiffness(180)}
-          exiting={SlideOutDown.duration(180)}
+          // A plain rise from the bottom. A spring here overshoots and bounces,
+          // which reads as the sheet wobbling rather than arriving.
+          entering={SlideInDown.duration(240).easing(Easing.out(Easing.cubic))}
+          exiting={SlideOutDown.duration(180).easing(Easing.in(Easing.cubic))}
+          testID="sheet-surface"
           style={[
             styles.sheet,
             fullHeight && { height: '88%' },
@@ -51,12 +54,19 @@ export function Sheet({
                   <Text variant="small" tone="muted">{subtitle}</Text>
                 ) : null}
               </View>
-              <Pressable onPress={onClose} style={styles.close} hitSlop={8}>
+              <Pressable
+                onPress={onClose}
+                accessibilityRole="button"
+                // An icon-only pad; without this it announces as nothing.
+                accessibilityLabel="Close"
+                style={styles.close}
+                hitSlop={8}>
                 <Icon name="close" size={18} color={palette.textMuted} />
               </Pressable>
             </View>
           ) : null}
           <ScrollView
+            testID="sheet-body"
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.body}>
@@ -85,8 +95,17 @@ export function SheetOption({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.option, selected && styles.optionSelected]}>
-      {accent ? <View style={[styles.dot, { backgroundColor: accent }]} /> : null}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: Boolean(selected) }}
+      style={[
+        styles.option,
+        selected && styles.optionSelected,
+        selected && { borderColor: palette.accent },
+      ]}>
+      {accent ? (
+        <View testID="sheet-option-dot" style={[styles.dot, { backgroundColor: accent }]} />
+      ) : null}
       <View style={{ flex: 1 }}>
         <Text variant="body" bold={selected}>{label}</Text>
         {description ? (
@@ -128,7 +147,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: { paddingBottom: spacing.xl },
+  /*
+   * Generous, because the last control in a sheet is usually an accent button
+   * and its glow extends well past its box. With only a little padding the
+   * scroll view clipped that halo into a hard edge, which read as a broken
+   * shadow sitting under the button.
+   */
+  body: { paddingBottom: spacing.xxl + spacing.lg },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -141,6 +166,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.25)',
   },
-  optionSelected: { borderColor: palette.accent },
+  /** Border colour is applied inline — the accent is runtime-configurable. */
+  optionSelected: { borderWidth: 1 },
   dot: { width: 10, height: 10, borderRadius: 5 },
 });

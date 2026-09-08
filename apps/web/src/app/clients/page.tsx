@@ -1,62 +1,90 @@
 'use client';
 
 import { useState } from 'react';
-import type { Client, Paginated } from '@decor/shared';
-import { Shell } from '@/components/Shell';
+import { useRouter } from 'next/navigation';
+import type { Client } from '@decor/shared';
 import { api } from '@/lib/api';
-import { useApi } from '@/lib/useApi';
+import { usePaginated } from '@/lib/usePaginated';
+import { Shell } from '@/components/Shell';
+import {
+  Avatar,
+  Card,
+  EmptyState,
+  Field,
+  Icon,
+  ListFooter,
+  Loader,
+  PageHead,
+} from '@/ui';
 
 export default function ClientsPage() {
+  return (
+    <Shell>
+      <Clients />
+    </Shell>
+  );
+}
+
+function Clients() {
+  const router = useRouter();
   const [search, setSearch] = useState('');
-  const { data, error, loading } = useApi<Paginated<Client>>(
-    () => api.clients({ search: search || undefined, limit: 100 }),
+
+  const clients = usePaginated<Client>(
+    (page) => api.clients({ search: search || undefined, page, limit: 25 }),
     [search],
   );
 
   return (
-    <Shell>
-      <h1 className="page-title">Clients</h1>
-      <p className="page-sub">Added automatically as orders are punched.</p>
+    <>
+      <PageHead title="Clients" subtitle={`${clients.total} on file`} />
 
-      <div className="row" style={{ marginBottom: 14 }}>
-        <div style={{ width: 280 }}>
-          <label htmlFor="search">Search</label>
-          <input
-            id="search"
-            placeholder="Name, phone or code"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <Field
+        placeholder="Name, phone or code"
+        icon="search"
+        value={search}
+        onChange={setSearch}
+        pasteable={false}
+      />
+
+      {clients.loading ? (
+        <Loader />
+      ) : clients.items.length === 0 ? (
+        <EmptyState
+          icon="users"
+          title="No clients yet"
+          message="Clients are added automatically as orders are punched."
+        />
+      ) : (
+        <div className="stack-sm">
+          {clients.items.map((client) => (
+            <Card key={client.id} size="sm" className="row-card" onClick={() => router.push(`/clients/${client.id}`)}>
+              <div className="row">
+                <Avatar name={client.name} size={44} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="t-body bold truncate">{client.name}</div>
+                  <div className="t-tiny muted truncate">
+                    {client.code}
+                    {client.phone ? ` · ${client.phone}` : ''}
+                    {client.company ? ` · ${client.company}` : ''}
+                    {client.gstin ? ` · ${client.gstin}` : ''}
+                  </div>
+                </div>
+                <span className="t-tiny accent bold">{client._count?.orders ?? 0} orders</span>
+                <Icon name="chevronRight" size={16} color="var(--text-faint)" />
+              </div>
+            </Card>
+          ))}
         </div>
-      </div>
+      )}
 
-      {error ? <div className="banner danger">{error}</div> : null}
-
-      <div className="card scroll-x">
-        {loading ? (
-          <p className="muted">Loading…</p>
-        ) : (
-          <table>
-            <thead>
-              <tr><th>Code</th><th>Name</th><th>Company</th><th>Phone</th><th className="num">Orders</th></tr>
-            </thead>
-            <tbody>
-              {data?.data.map((client) => (
-                <tr key={client.id}>
-                  <td className="muted">{client.code}</td>
-                  <td><strong>{client.name}</strong></td>
-                  <td className="muted">{client.company ?? '—'}</td>
-                  <td>{client.phone ?? '—'}</td>
-                  <td className="num">{client._count?.orders ?? 0}</td>
-                </tr>
-              ))}
-              {data?.data.length === 0 ? (
-                <tr><td colSpan={5} className="muted">No clients yet.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </Shell>
+      <ListFooter
+        loading={clients.loadingMore}
+        hasMore={clients.hasMore}
+        shown={clients.items.length}
+        total={clients.total}
+        noun="clients"
+        onMore={clients.loadMore}
+      />
+    </>
   );
 }

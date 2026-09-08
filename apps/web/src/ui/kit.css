@@ -1,0 +1,1143 @@
+/*
+ * The component styles. Deliberately plain CSS rather than a utility framework:
+ * neumorphism is almost entirely shadow geometry, and expressing that as
+ * utility classes obscures the one thing worth reading.
+ */
+
+/* -- layout ---------------------------------------------------------------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.shell-nav {
+  padding: var(--s-xl) var(--s-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.shell-main {
+  padding: var(--s-xl) var(--s-xxl) 96px;
+  max-width: 1180px;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .shell-nav {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: var(--s-lg);
+  }
+  .shell-main {
+    padding: var(--s-lg) var(--s-lg) 72px;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+  margin-bottom: var(--s-xl);
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-md);
+  background: var(--grad-accent);
+  box-shadow: var(--glow);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+  padding: 11px var(--s-lg);
+  border-radius: var(--r-md);
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.16s var(--ease), background 0.16s var(--ease);
+}
+
+.nav-link:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.nav-link[data-active='true'] {
+  color: var(--text);
+  background: var(--grad-raised);
+  box-shadow: var(--lift-sm);
+}
+
+.nav-link[data-active='true'] svg {
+  color: var(--accent);
+}
+
+/*
+ * A category heading, which is also the way to fold the category away.
+ *
+ * The product is one module today and will be several; a menu that only grows
+ * becomes a menu nobody reads.
+ */
+.nav-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: var(--s-lg) var(--s-md) var(--s-sm);
+}
+
+.nav-group:hover {
+  color: var(--text);
+}
+
+/*
+ * The rule down the left of a category, and the step in from it.
+ *
+ * Without them the headings were the only thing saying where one category
+ * ended and the next began, and a settings group nested inside a category was
+ * indistinguishable from a category of its own. The line is what the eye
+ * follows; the indent is what says which line an item hangs from.
+ */
+.nav-section {
+  margin: 2px 0 var(--s-sm);
+  padding-left: var(--s-md);
+  border-left: 2px solid rgba(255, 255, 255, 0.14);
+}
+
+/* A group inside a group — settings that belong to one module — gets its own
+   rule, stepped in again so the two are never mistaken for each other. */
+.nav-section[data-depth='1'] {
+  margin-left: var(--s-sm);
+  border-left-color: rgba(255, 255, 255, 0.09);
+}
+
+/* The category you are actually in, so a glance at the rule answers "where am
+   I" without reading a single label. */
+.nav-section[data-current='true'] {
+  border-left-color: var(--accent);
+}
+
+/* The rule belongs to the category, so its heading sits on it rather than
+   inside it. */
+.nav-section > .nav-group {
+  margin-left: calc(var(--s-md) * -1);
+}
+
+/* -- surfaces -------------------------------------------------------------- */
+
+.card {
+  background: var(--grad-raised);
+  border-radius: var(--r-xl);
+  box-shadow: var(--lift-md);
+  padding: var(--s-xl);
+}
+
+.card-sm {
+  padding: var(--s-lg);
+  border-radius: var(--r-lg);
+}
+
+.card-accent {
+  background: var(--grad-accent);
+  color: var(--text-on-accent);
+  box-shadow: var(--glow);
+}
+
+/* A card you can click has to say so, or nobody clicks it. */
+.card-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  cursor: pointer;
+  transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease);
+}
+
+.card-link:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--lift-lg);
+}
+
+.card-link:active {
+  transform: translateY(0);
+  box-shadow: var(--press);
+}
+
+.well {
+  background: var(--grad-inset);
+  border-radius: var(--r-lg);
+  box-shadow: var(--press);
+  padding: var(--s-lg);
+}
+
+/* -- type ------------------------------------------------------------------ */
+
+.t-display { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; }
+.t-h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.t-h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.t-h3 { font-size: 18px; font-weight: 700; }
+.t-body { font-size: 15px; }
+.t-small { font-size: 13px; }
+.t-tiny { font-size: 11px; }
+.t-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.muted { color: var(--text-muted); }
+.faint { color: var(--text-faint); }
+.accent { color: var(--accent); }
+.on-accent { color: var(--text-on-accent); }
+.danger { color: var(--danger); }
+.warning { color: var(--warning); }
+.success { color: var(--success); }
+.bold { font-weight: 700; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* -- buttons --------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-sm);
+  /* Matches the field well's 50px, so a button beside an input lines up. */
+  height: 50px;
+  padding: 0 var(--s-xl);
+  border: 0;
+  border-radius: var(--r-pill);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.14s var(--ease), box-shadow 0.14s var(--ease),
+    filter 0.14s var(--ease);
+}
+
+.btn:active {
+  transform: scale(0.985);
+}
+
+.btn-primary {
+  background: var(--grad-accent);
+  color: var(--text-on-accent);
+  box-shadow: var(--glow);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.06);
+}
+
+.btn-dark {
+  background: var(--grad-raised);
+  color: var(--text);
+  box-shadow: var(--lift-sm);
+}
+
+/* Pressing a neumorphic button flips it from raised to inset, so it genuinely
+   looks pushed into the panel rather than just dimmed. */
+.btn-dark:active {
+  box-shadow: var(--press);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover {
+  color: var(--text);
+}
+
+.btn-danger {
+  background: var(--grad-raised);
+  color: var(--danger);
+  box-shadow: var(--lift-sm);
+}
+
+.btn-lg { height: 58px; font-size: 15px; padding: 0 var(--s-xxl); }
+.btn-sm { height: 40px; font-size: 13px; padding: 0 var(--s-lg); }
+.btn-block { width: 100%; }
+
+.btn:disabled {
+  cursor: not-allowed;
+  filter: none;
+  color: var(--text-faint);
+  background: var(--grad-raised);
+  box-shadow: var(--lift-sm);
+}
+
+/* -- fields ---------------------------------------------------------------- */
+
+.field {
+  display: block;
+  margin-bottom: var(--s-lg);
+}
+
+.field-label {
+  display: block;
+  /* One line, always the same height — see the note on .field-row. */
+  height: 15px;
+  line-height: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: var(--s-sm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/*
+ * One well containing everything — the icon, the input and the paste button.
+ * They previously each carried their own inset shadow, which read as three
+ * separate sunken shapes crammed into a row instead of one field.
+ */
+.field-well {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+  min-height: 50px;
+  background: var(--grad-inset);
+  border-radius: var(--r-lg);
+  box-shadow: var(--press);
+  padding: 0 var(--s-lg);
+  border: 1px solid transparent;
+  transition: border-color 0.16s var(--ease);
+}
+
+.field-well > svg { flex: none; }
+
+.field-well:focus-within {
+  border-color: var(--accent);
+}
+
+.field-well.is-error {
+  border-color: var(--danger);
+}
+
+.field-well input,
+.field-well textarea,
+.field-well select {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  padding: 13px 0;
+  font-size: 15px;
+  color: var(--text);
+  /* Safari draws its own inner shadow and rounding on inputs otherwise. */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.field-well textarea {
+  resize: vertical;
+  min-height: 84px;
+  line-height: 1.5;
+}
+
+.field-well input::placeholder,
+.field-well textarea::placeholder {
+  color: var(--text-faint);
+}
+
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* The clipboard offer. Only shown on an empty field, so it can never sit over
+   something the user has deliberately typed. */
+.paste-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  border: 0;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 107, 26, 0.14);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/*
+ * The bar a screen is worked with: its heading, its actions, and on a list the
+ * search and the filters. It stays at the top while the rest scrolls under it —
+ * having to scroll back up to change the search, to see which filters are on,
+ * or to reach the button that moves an enquiry along, is what makes a long
+ * screen tiring.
+ *
+ * Painted, or the content shows through it. The negative top margin swallows
+ * the page's own top padding so nothing appears above the bar as it pins.
+ */
+.sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+  margin: calc(var(--s-xl) * -1) calc(var(--s-xl) * -1) 0;
+  padding: var(--s-xl) var(--s-xl) var(--s-sm);
+}
+
+@media (max-width: 900px) {
+  .sticky-bar {
+    margin: calc(var(--s-lg) * -1) calc(var(--s-lg) * -1) 0;
+    padding: var(--s-lg) var(--s-lg) var(--s-sm);
+  }
+}
+
+/* -- picking a colour ------------------------------------------------------ */
+
+.colour-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: var(--r-lg);
+  padding: var(--s-lg);
+}
+
+.colour-preset {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-md);
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.colour-preset[data-on='true'] {
+  border-color: var(--text);
+}
+
+.colour-slider {
+  margin-top: var(--s-md);
+}
+
+/*
+ * The track shows the colours it is choosing between, which is the one thing a
+ * range input cannot do.
+ */
+.colour-track {
+  position: relative;
+  height: 26px;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: none;
+  margin-top: 4px;
+}
+
+.colour-track:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.colour-thumb {
+  position: absolute;
+  top: 2px;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  border-radius: 50%;
+  border: 3px solid var(--white);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+/* -- chips and pills ------------------------------------------------------- */
+
+/*
+ * A row of chips that wraps. It never scrolls sideways: a chip carries a
+ * shadow, and clipping one at the edge of a scroller squares it off.
+ */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  cursor: pointer;
+  padding: 9px var(--s-lg);
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--grad-raised);
+  box-shadow: var(--lift-sm);
+  transition: color 0.14s var(--ease), box-shadow 0.14s var(--ease);
+}
+
+.chip:hover { color: var(--text); }
+
+.chip[data-selected='true'] {
+  color: var(--white);
+  background: var(--grad-accent-soft);
+  box-shadow: var(--glow-soft);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* -- rows and lists -------------------------------------------------------- */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-md);
+}
+
+.stack { display: flex; flex-direction: column; gap: var(--s-md); }
+.stack-sm { display: flex; flex-direction: column; gap: var(--s-sm); }
+.stack-lg { display: flex; flex-direction: column; gap: var(--s-lg); }
+
+.wrap { display: flex; flex-wrap: wrap; gap: var(--s-sm); }
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-lg); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-lg); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-lg); }
+.grid-5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-md); }
+
+@media (max-width: 900px) {
+  .grid-3, .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* The home card's actions: still one row, just tighter. */
+  .grid-5 { gap: var(--s-sm); }
+}
+@media (max-width: 560px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); }
+}
+
+.icon-well {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--grad-inset);
+  box-shadow: var(--press);
+  color: var(--accent);
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--grad-raised);
+  box-shadow: var(--lift-sm);
+  font-weight: 800;
+  color: var(--accent);
+}
+
+/* -- page furniture -------------------------------------------------------- */
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-lg);
+  margin-bottom: var(--s-xl);
+  flex-wrap: wrap;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-md);
+  margin: var(--s-xxl) 0 var(--s-md);
+}
+
+.empty {
+  text-align: center;
+  padding: var(--s-xxl) var(--s-lg);
+  color: var(--text-muted);
+}
+
+.empty-mark {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--s-lg);
+  border-radius: var(--r-lg);
+  display: grid;
+  place-items: center;
+  background: var(--grad-inset);
+  box-shadow: var(--press);
+  color: var(--text-faint);
+}
+
+.divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.28);
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  margin: var(--s-lg) 0;
+}
+
+/* -- progress and meters --------------------------------------------------- */
+
+.track {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.track-fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--white);
+  transition: width 0.4s var(--ease);
+}
+
+/* -- table ----------------------------------------------------------------- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  text-align: left;
+  padding: var(--s-md) var(--s-lg);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 800;
+}
+
+.table td {
+  padding: var(--s-lg);
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.table tbody tr:hover td { background: rgba(255, 255, 255, 0.016); }
+.table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.scroll-x { overflow-x: auto; }
+
+/* -- sheet / modal --------------------------------------------------------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center;
+  padding: var(--s-lg);
+  z-index: 60;
+  animation: fade 0.18s var(--ease);
+}
+
+.sheet {
+  width: min(560px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--r-xxl);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: var(--s-xl);
+  /* A plain rise, no spring. A bouncing panel reads as the page wobbling. */
+  animation: rise 0.24s var(--ease);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-md);
+  margin-bottom: var(--s-lg);
+}
+
+.sheet-close {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 0;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  background: var(--surface-lit);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+}
+
+.sheet-option {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+  width: 100%;
+  text-align: left;
+  border: 0;
+  cursor: pointer;
+  padding: var(--s-md) var(--s-lg);
+  border-radius: var(--r-lg);
+  margin-bottom: var(--s-sm);
+  background: var(--surface-lit);
+  color: var(--text);
+}
+
+.sheet-option[data-selected='true'] {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+@keyframes fade { from { opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+@keyframes lift { from { opacity: 0; transform: translateY(10px); } }
+
+.enter { animation: lift 0.32s var(--ease) both; }
+
+/* -- spinner --------------------------------------------------------------- */
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+
+.loader {
+  display: grid;
+  place-items: center;
+  gap: var(--s-md);
+  padding: var(--s-xxl);
+  color: var(--text-muted);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* -- wheel picker ---------------------------------------------------------- */
+
+.wheel {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--surface-inset);
+}
+
+/* The window over the middle row. Under the list and not clickable, so a click
+   still lands on the option beneath it. */
+.wheel-window {
+  position: absolute;
+  left: var(--s-sm);
+  right: var(--s-sm);
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: var(--r-md);
+  background: var(--surface-lit);
+  pointer-events: none;
+}
+
+.wheel-scroll {
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+
+.wheel-scroll::-webkit-scrollbar { display: none; }
+
+.wheel-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-sm);
+  width: 100%;
+  border: 0;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  scroll-snap-align: center;
+  transition: opacity 0.12s linear;
+}
+
+.wheel-dot { width: 8px; height: 8px; border-radius: 4px; flex: none; }
+
+/* -- select ---------------------------------------------------------------- */
+
+.select { position: relative; }
+
+/* Matches .field-well exactly, so a select and an input never sit at different
+   heights beside each other in a form row. */
+.select-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+  width: 100%;
+  height: 50px;
+  padding: 0 var(--s-lg);
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  background: var(--grad-inset);
+  box-shadow: var(--press);
+  color: var(--text);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.select-trigger > span:first-of-type,
+.select-trigger > .truncate { flex: 1; min-width: 0; }
+
+.select-trigger:focus-visible,
+.select-trigger[aria-expanded='true'] { border-color: var(--accent); }
+
+.select-trigger:disabled { cursor: not-allowed; color: var(--text-faint); }
+
+.select-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: var(--s-sm);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: var(--lift-lg);
+  outline: none;
+  animation: lift 0.14s var(--ease);
+}
+
+.select-option {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+  width: 100%;
+  text-align: left;
+  border: 0;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text);
+  padding: 11px var(--s-md);
+  border-radius: var(--r-md);
+  font-size: 14px;
+}
+
+.select-option[data-active='true'] { background: var(--surface-lit); }
+.select-option[data-selected='true'] { font-weight: 700; }
+
+.select-dot { width: 8px; height: 8px; border-radius: 4px; flex: none; }
+
+/* -- home hero tiles ------------------------------------------------------- */
+
+/*
+ * Icon over label, inside one pad. Previously the label sat outside the pad,
+ * so the four tiles were different heights and their captions floated on the
+ * orange with nothing holding them.
+ */
+.hero-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-sm);
+  height: 88px;
+  border: 0;
+  cursor: pointer;
+  border-radius: var(--r-lg);
+  background: var(--grad-raised);
+  color: var(--text);
+  box-shadow: var(--lift-sm);
+  transition: transform 0.14s var(--ease), box-shadow 0.14s var(--ease);
+}
+
+.hero-tile:hover { transform: translateY(-1px); box-shadow: var(--lift-md); }
+.hero-tile:active { transform: translateY(0); box-shadow: var(--press); }
+.hero-tile svg { color: var(--accent); }
+
+/* -- list rows ------------------------------------------------------------- */
+
+/*
+ * A row card needs breathing room and a stable minimum height, or a title and
+ * a pill end up crammed onto one cramped line.
+ */
+/*
+ * A row in a list. Stacks its children rather than laying them beside each
+ * other: a card with a heading line and a detail line under it — an order and
+ * its items — was putting the two side by side, so neither spanned the card
+ * and the whole row bunched up on the left with the right half empty.
+ */
+.card.card-sm.row-card {
+  padding: var(--s-lg) var(--s-xl);
+  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--s-sm);
+}
+
+.card.card-sm.row-card > * { width: 100%; }
+
+/* -- image viewer ---------------------------------------------------------- */
+
+/*
+ * A picture opened over the page. Black rather than the app's ground, because
+ * a photograph is judged against black and a grey surround tints it.
+ */
+.viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewer-bar {
+  position: absolute;
+  /* Above the stage: a zoomed picture overflows its box and would otherwise
+     paint over the controls that undo the zoom. */
+  z-index: 2;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-md);
+  padding: var(--s-lg) var(--s-xl);
+  color: #ffffff;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+}
+
+.viewer-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+}
+
+.viewer-tools button {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 var(--s-sm);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewer-tools button:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.viewer-step {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.viewer-step:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.viewer-prev { left: var(--s-xl); }
+.viewer-next { right: var(--s-xl); }
+
+.viewer-stage {
+  width: 100%;
+  height: 100%;
+  /*
+   * Kept clear of the bar and the caption. Without this the picture is sized
+   * against the whole screen, so its top slides under the controls and its
+   * bottom under the caption — the two parts of a photograph most likely to
+   * carry the detail somebody opened it to read.
+   */
+  box-sizing: border-box;
+  padding: 74px clamp(12px, 9vw, 76px) 66px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* Only offer the grab cursor when there is somewhere to drag to. */
+.viewer-stage[data-zoomed='true'] { cursor: grab; }
+.viewer-stage[data-zoomed='true']:active { cursor: grabbing; }
+
+.viewer-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  user-select: none;
+}
+
+.viewer-caption {
+  z-index: 2;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--s-lg) var(--s-xl);
+  text-align: center;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 13px;
+}
+
+/* Thumbnails on a record — a reminder that a picture exists, and the way in. */
+.thumb-strip {
+  display: flex;
+  gap: var(--s-md);
+  overflow-x: auto;
+  padding-bottom: var(--s-sm);
+}
+
+.thumb-tile {
+  flex: 0 0 auto;
+  width: 104px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.thumb-image {
+  display: block;
+  width: 104px;
+  height: 104px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  background: var(--surface-inset);
+}
+
+/*
+ * The stage counts on the home card. Five across on a desktop, wrapping in
+ * pairs on a narrow window rather than shrinking to unreadable numbers.
+ */
+.stage-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--s-sm);
+  margin: var(--s-md) 0 var(--s-sm);
+}
+
+.stage-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--s-sm) 4px;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  text-align: center;
+}
+
+.stage-count:hover {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+/*
+ * One line, whatever the stage is called.
+ *
+ * Wrapped over two, "Order confirmed" and "QC & Sanding" pushed the row of
+ * counts out of line with each other and the card read as ragged. The size
+ * gives way before the line does.
+ */
+.stage-count .t-micro {
+  opacity: 0.8;
+  line-height: 1.2;
+  white-space: nowrap;
+  font-size: clamp(7px, 1.05vw, 10px);
+}
+
+/** A stage or material's colour, beside its name. */
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 5px;
+  flex: none;
+}

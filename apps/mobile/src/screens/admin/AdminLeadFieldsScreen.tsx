@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import type { CustomFieldDefinition, CustomFieldType, LeadSource } from '@decor/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import {
   Button,
   Card,
+  DataTable,
   Chip,
   Field,
   Icon,
@@ -76,34 +76,69 @@ export function AdminLeadFieldsScreen({ navigation }: { navigation: any }) {
       />
 
       <SectionHeader title="Fields" />
-      {fields.data.map((field, index) => (
-        <Animated.View
-          key={field.id}
-          entering={FadeInDown.delay(Math.min(index, 8) * 40).duration(300)}
-          layout={Layout.springify()}>
-          <Card tone="dark" style={{ ...styles.row, opacity: field.isActive ? 1 : 0.45 }}>
-            <View style={{ flex: 1 }}>
-              <Text variant="body" bold>
-                {field.label}{field.required ? ' *' : ''}
-              </Text>
-              <Text variant="tiny" tone="muted">
-                {field.key} · {field.type.replace('_', ' ').toLowerCase()}
-                {field.options.length ? ` · ${field.options.join(', ')}` : ''}
-              </Text>
-            </View>
-            <Chip
-              label={field.isActive ? 'Hide' : 'Restore'}
-              onPress={() =>
-                run(() =>
-                  field.isActive
-                    ? api.deactivateLeadField(field.id)
-                    : api.updateLeadField(field.id, { isActive: true }),
-                )
-              }
-            />
-          </Card>
-        </Animated.View>
-      ))}
+      <Card tone="dark" style={{ marginBottom: spacing.md }}>
+        <DataTable
+          minWidth={520}
+          rows={fields.data}
+          empty="No custom fields yet"
+          columns={[
+            {
+              key: 'label',
+              header: 'Field',
+              flex: 2,
+              render: (field) => (
+                <>
+                  <Text variant="small" bold numberOfLines={1}>
+                    {field.label}
+                    {field.required ? ' *' : ''}
+                  </Text>
+                  <Text variant="tiny" tone="faint" numberOfLines={1}>
+                    {field.key}
+                  </Text>
+                </>
+              ),
+            },
+            {
+              key: 'type',
+              header: 'Type',
+              flex: 1.1,
+              render: (field) => (
+                <Text variant="tiny" tone="muted">
+                  {field.type.replace('_', ' ').toLowerCase()}
+                </Text>
+              ),
+            },
+            {
+              key: 'options',
+              header: 'Options',
+              flex: 1.8,
+              render: (field) => (
+                <Text variant="tiny" tone="muted" numberOfLines={2}>
+                  {field.options.length ? field.options.join(', ') : '—'}
+                </Text>
+              ),
+            },
+            {
+              key: 'action',
+              header: '',
+              flex: 1.1,
+              align: 'right',
+              render: (field) => (
+                <Chip
+                  label={field.isActive ? 'Hide' : 'Restore'}
+                  onPress={() =>
+                    run(() =>
+                      field.isActive
+                        ? api.deactivateLeadField(field.id)
+                        : api.updateLeadField(field.id, { isActive: true }),
+                    )
+                  }
+                />
+              ),
+            },
+          ]}
+        />
+      </Card>
 
       <SectionHeader title="Sources" actionLabel="Add" onAction={() => setSourceSheet(true)} />
       <View style={styles.chipWrap}>

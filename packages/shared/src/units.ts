@@ -131,15 +131,22 @@ export function parseLengthToMm(
     );
   }
 
-  // Inches with a fraction: 6 1/2", 3/4 in
-  const inchFraction = text.match(
-    /^(?:(\d+(?:\.\d+)?)\s+)?(\d+)\/(\d+)\s*(?:"|in|inch|inches)$/,
+  /*
+   * A fraction: 6 1/2", 3/4 in, or a bare 3/4.
+   *
+   * The suffix is optional because the unit is usually already chosen
+   * elsewhere — a thickness field set to inches offers "3/4" as its own
+   * example, and typing exactly that used to read as nothing at all.
+   */
+  const fraction = text.match(
+    /^(?:(\d+(?:\.\d+)?)\s+)?(\d+)\/(\d+)\s*("|in|inch|inches)?$/,
   );
-  if (inchFraction) {
-    const whole = inchFraction[1] ? Number(inchFraction[1]) : 0;
-    const denominator = Number(inchFraction[3]);
+  if (fraction) {
+    const whole = fraction[1] ? Number(fraction[1]) : 0;
+    const denominator = Number(fraction[3]);
     if (!denominator) return null;
-    return round((whole + Number(inchFraction[2]) / denominator) * MM_PER_UNIT.IN, 3);
+    const unit = fraction[4] ? 'IN' : defaultUnit;
+    return round(toMm(whole + Number(fraction[2]) / denominator, unit), 3);
   }
 
   // Number with an explicit unit suffix, or a bare number in the active unit.

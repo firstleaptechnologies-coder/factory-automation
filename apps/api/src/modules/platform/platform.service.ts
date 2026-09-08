@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaClient, TenantIsolation, TenantStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -16,7 +18,7 @@ import {
 } from './dto/tenant.dto';
 
 @Injectable()
-export class PlatformService {
+export class PlatformService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
@@ -24,8 +26,45 @@ export class PlatformService {
     private readonly provisioning: TenantProvisioningService,
   ) {}
 
+  private readonly logger = new Logger(PlatformService.name);
+
   private get db(): PrismaClient {
     return this.prisma.platform;
+  }
+
+  /**
+   * Roles are seeded once, at provisioning, so a permission introduced by a
+   * later release would never reach a workspace that already exists. Reconcile
+   * the stock roles on boot; tenants' own roles are left alone.
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      // A suspended workspace nobody can sign into gains nothing from this;
+      // a trial one is in daily use and must not be left behind a release.
+      const tenants = await this.db.tenant.findMany({
+        where: { status: { not: TenantStatus.SUSPENDED } },
+        select: { id: true, slug: true, databaseUrl: true },
+      });
+      for (const tenant of tenants) {
+        const db = tenant.databaseUrl
+          ? new PrismaClient({
+              datasources: {
+                db: { url: this.encryption.decryptToString(tenant.databaseUrl) },
+              },
+            })
+          : this.db;
+        try {
+          await this.provisioning.syncSystemRoles(db, tenant.id);
+        } catch (error) {
+          // One unreachable dedicated database must not stop the API booting.
+          this.logger.warn(`Could not sync roles for ${tenant.slug}: ${String(error)}`);
+        } finally {
+          if (tenant.databaseUrl) await (db as PrismaClient).$disconnect();
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`Role sync skipped: ${String(error)}`);
+    }
   }
 
   async list() {

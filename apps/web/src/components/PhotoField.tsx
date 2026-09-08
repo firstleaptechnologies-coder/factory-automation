@@ -62,7 +62,11 @@ export function PhotoField({
   return (
     <div className="field">
       <label>{label}</label>
-      {hint ? <p className="muted" style={{ fontSize: 12, marginTop: -2 }}>{hint}</p> : null}
+      {hint ? (
+        <p className="t-tiny faint" style={{ margin: '0 0 var(--s-sm)', lineHeight: 1.45 }}>
+          {hint}
+        </p>
+      ) : null}
 
       <div
         className={`dropzone${dragging ? ' dragging' : ''}`}
@@ -75,6 +79,9 @@ export function PhotoField({
           void accept(e.dataTransfer.files);
         }}>
         {busy ? 'Optimising…' : 'Click or drop images here'}
+        {busy ? null : (
+          <span className="t-tiny faint">JPG, PNG or PDF — resized before upload</span>
+        )}
       </div>
 
       <input

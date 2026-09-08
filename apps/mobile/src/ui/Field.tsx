@@ -14,6 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { motion, palette, radius, spacing } from '../theme';
+import { useClipboardSuggestion } from '../hooks/useClipboardSuggestion';
 import { AccentSurface, Neumorph } from './Neumorph';
 import { Text } from './Text';
 import { Icon, IconName } from './Icon';
@@ -29,6 +30,8 @@ export function Field({
   icon,
   style,
   containerStyle,
+  pasteAccepts,
+  pasteable = true,
   ...props
 }: TextInputProps & {
   label?: string;
@@ -36,8 +39,22 @@ export function Field({
   error?: string | null;
   icon?: IconName;
   containerStyle?: ViewStyle;
+  /**
+   * Narrows what the clipboard button will offer for this field — a phone
+   * field should not offer to paste an address.
+   */
+  pasteAccepts?: (text: string) => boolean;
+  /** Off for fields where a paste makes no sense, like a password. */
+  pasteable?: boolean;
 }) {
   const focus = useSharedValue(0);
+  const clipboard = useClipboardSuggestion(pasteAccepts);
+
+  // Only offered on an empty field: over something already typed the button
+  // would be an invitation to destroy it.
+  const empty = !props.value;
+  const showPaste =
+    pasteable && empty && Boolean(clipboard.suggestion) && !props.secureTextEntry;
 
   const borderStyle = useAnimatedStyle(() => ({
     borderColor: interpolateColor(
@@ -58,10 +75,14 @@ export function Field({
           <Icon name={icon} size={18} color={palette.textMuted} />
         ) : null}
         <TextInput
+          // The label is drawn above the well; without this the input itself
+          // still reaches a screen reader as an unlabelled text box.
+          accessibilityLabel={label}
           {...props}
           placeholderTextColor={palette.textFaint}
           onFocus={(event) => {
             focus.value = withTiming(1, { duration: motion.fast });
+            if (pasteable && !props.secureTextEntry) clipboard.check();
             props.onFocus?.(event);
           }}
           onBlur={(event) => {
@@ -70,8 +91,27 @@ export function Field({
           }}
           style={[styles.input, icon ? { marginLeft: spacing.sm } : null, style]}
         />
+        {showPaste ? (
+          <Pressable
+            onPress={() => {
+              const value = clipboard.consume();
+              if (value) props.onChangeText?.(value);
+            }}
+            hitSlop={8}
+            style={styles.paste}>
+            <Icon name="clipboard" size={13} color={palette.accent} />
+            <Text variant="tiny" tone="accent" bold style={{ marginLeft: 4 }}>
+              Paste
+            </Text>
+          </Pressable>
+        ) : null}
       </Animated.View>
       </Neumorph>
+      {showPaste ? (
+        <Text variant="tiny" tone="faint" style={styles.hint} numberOfLines={1}>
+          On your clipboard: {clipboard.suggestion}
+        </Text>
+      ) : null}
       {error ? (
         <Text variant="tiny" tone="danger" style={styles.hint}>{error}</Text>
       ) : hint ? (
@@ -123,18 +163,20 @@ export function Chip({
   selected,
   onPress,
   accent,
+  icon,
 }: {
   label: string;
   selected?: boolean;
   onPress: () => void;
   accent?: string | null;
+  /** Marks a chip that goes somewhere, rather than one that sets a value. */
+  icon?: IconName;
 }) {
+  const tint = selected ? palette.white : palette.textMuted;
   const body = (
-    <View style={styles.chipLabel}>
-      <Text
-        variant="small"
-        bold
-        style={{ color: selected ? palette.white : palette.textMuted }}>
+    <View style={[styles.chipLabel, icon ? styles.chipWithIcon : null]}>
+      {icon ? <Icon name={icon} size={13} color={tint} /> : null}
+      <Text variant="small" bold style={{ color: tint }}>
         {label}
       </Text>
     </View>
@@ -144,7 +186,13 @@ export function Chip({
     <Pressable onPress={onPress}>
       {selected ? (
         accent ? (
-          <View style={[styles.chipLabel, { backgroundColor: accent, borderRadius: radius.pill }]}>
+          <View
+            style={[
+              styles.chipLabel,
+              icon ? styles.chipWithIcon : null,
+              { backgroundColor: accent, borderRadius: radius.pill },
+            ]}>
+            {icon ? <Icon name={icon} size={13} color={palette.white} /> : null}
             <Text variant="small" bold style={{ color: palette.white }}>{label}</Text>
           </View>
         ) : (
@@ -171,7 +219,7 @@ export function SelectField({
   onPress: () => void;
   icon?: IconName;
 }) {
-  const [pressed, setPressed] = useState(false);
+  const [, setPressed] = useState(false);
   return (
     <View style={styles.wrap}>
       {label ? (
@@ -198,6 +246,15 @@ export function SelectField({
 }
 
 const styles = StyleSheet.create({
+  paste: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,107,26,0.14)',
+    marginLeft: spacing.sm,
+  },
   wrap: { marginBottom: spacing.lg },
   label: { marginBottom: spacing.sm },
   field: {
@@ -216,4 +273,5 @@ const styles = StyleSheet.create({
   hint: { marginTop: spacing.xs, marginLeft: spacing.xs },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chipLabel: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm + 2 },
+  chipWithIcon: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
 });

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInRight, Layout } from 'react-native-reanimated';
-import type { Lead, Order, Paginated } from '@decor/shared';
-import { UNIT_LABEL } from '@decor/shared';
+import type { Lead, Order, Paginated, Workflow } from '@decor/shared';
+import { PERMISSIONS, UNIT_LABEL } from '@decor/shared';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { useDisplayUnit } from '../hooks/useUnit';
+import type { IconName } from '../ui';
 import {
   Avatar,
   Card,
@@ -20,33 +21,66 @@ import {
   SectionHeader,
   Text,
 } from '../ui';
-import { palette, spacing } from '../theme';
+import { font, palette, spacing } from '../theme';
+import { fitLabels } from '../lib/fitLabels';
 import { formatInr } from '../lib/format';
 
 /**
  * The home screen.
  *
- * One hero card carries the number that matters — the value sitting in the
- * pipeline — with the day's counts under it, then the four things people
- * actually do, then the live work. Everything below the hero is dark so the
- * hero is the only thing competing for a glance.
+ * The hero card answers the question the shop actually opens the app for:
+ * where the work is standing right now. Which stages it counts is the shop's
+ * own choice — set on Admin → Status flow → Main card — because the stage a
+ * joinery watches is not the stage a stone unit watches.
+ *
+ * Under it, the day's counts, the four things people do, then the live work.
+ * Everything below the hero is dark so the hero is the only thing competing
+ * for a glance.
  */
 export function HomeScreen({ navigation }: { navigation: any }) {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
   const [unit] = useDisplayUnit();
-  const [hideValue, setHideValue] = useState(false);
 
   const orders = useApi<Paginated<Order> & { unit: string }>(
     () => api.orders({ unit, limit: 6 }),
     [unit],
   );
   const leads = useApi<Paginated<Lead>>(() => api.leads({ converted: false, limit: 50 }), []);
+  // The counts ride along with the flow, so the summary costs no extra call.
+  const workflow = useApi<Workflow>(() => api.defaultWorkflow(), []);
 
-  const pipelineValue = (leads.data?.data ?? []).reduce(
-    (sum, lead) => sum + Number(lead.estimatedValue ?? 0),
-    0,
+  const summary = (workflow.data?.statuses ?? [])
+    .filter((status) => status.homeCardOrder !== null && status.homeCardOrder !== undefined)
+    .sort((a, b) => (a.homeCardOrder ?? 0) - (b.homeCardOrder ?? 0));
+
+  /*
+   * Both rows on the card are sized as rows, not as labels.
+   *
+   * Left to shrink themselves, five labels came out at five different sizes —
+   * "Design" full size beside a visibly smaller "Order confirmed" — which
+   * reads as a mistake rather than as a fit. Each row takes one size, worked
+   * out from its own longest member.
+   */
+  const [cardWidth, setCardWidth] = useState(0);
+  const stageSize = fitLabels(
+    summary.map((status) => status.name),
+    cardWidth,
+    { base: font.micro, min: 7, gap: spacing.xs },
   );
+  const tiles = [
+    can(PERMISSIONS.ESTIMATE_VIEW) && { icon: 'clipboard' as const, label: 'Quotes', to: 'Estimates' },
+    can(PERMISSIONS.CLIENT_VIEW) && { icon: 'users' as const, label: 'Clients', to: 'Clients' },
+    can(PERMISSIONS.CASH_POSITION_VIEW) && { icon: 'card' as const, label: 'Transactions', to: 'Transactions' },
+    can(PERMISSIONS.DISBURSEMENT_VIEW) && { icon: 'arrowUpRight' as const, label: 'Payout', to: 'DisbursementLedger' },
+    can(PERMISSIONS.ORDER_PUNCH) && { icon: 'plus' as const, label: 'Punch', to: 'PunchTab' },
+  ].filter(Boolean) as { icon: IconName; label: string; to: string }[];
+  const tileSize = fitLabels(
+    tiles.map((tile) => tile.label),
+    cardWidth,
+    { base: font.tiny, min: 8 },
+  );
+
   const openLeads = leads.data?.data.length ?? 0;
   const totalOrders = orders.data?.meta.total ?? 0;
 
@@ -69,33 +103,73 @@ export function HomeScreen({ navigation }: { navigation: any }) {
           </View>
         </Pressable>
         <View style={styles.topActions}>
-          <RoundButton icon="search" onPress={() => navigation.navigate('Search')} />
-          {isAdmin ? (
-            <RoundButton icon="tune" tone="accent" onPress={() => navigation.navigate('Admin')} />
-          ) : (
-            <RoundButton icon="settings" onPress={() => navigation.navigate('Settings')} />
-          )}
+          {/* Search and the settings dial both live in the bar now; the bell is
+              the only thing up here that is about this moment. */}
+          <RoundButton
+            icon="bell"
+            testID="open-notifications"
+            accessibilityLabel="Notifications"
+            onPress={() => navigation.navigate('Notifications')}
+          />
         </View>
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(420).springify()}>
         <Card tone="accent">
+          {/* One measurement, shared by both rows on the card. */}
+          <View
+            testID="home-card-measure"
+            style={styles.measure}
+            onLayout={(event) => setCardWidth(event.nativeEvent.layout.width)}
+          />
           <View style={styles.heroTop}>
             <Text variant="small" tone="onAccent" style={{ opacity: 0.75 }}>
-              Pipeline value
+              Where the work is
             </Text>
-            <Pressable onPress={() => setHideValue((v) => !v)} hitSlop={10}>
-              <Icon
-                name={hideValue ? 'eyeOff' : 'eye'}
-                size={18}
-                color={palette.textOnAccent}
-              />
-            </Pressable>
+            {isAdmin ? (
+              <Pressable
+                testID="edit-home-card"
+                onPress={() => navigation.navigate('MainCard')}
+                hitSlop={10}>
+                <Icon name="tune" size={18} color={palette.textOnAccent} />
+              </Pressable>
+            ) : null}
           </View>
 
-          <Text variant="display" tone="onAccent" style={styles.heroValue}>
-            {hideValue ? '••••••' : formatInr(pipelineValue)}
-          </Text>
+          {summary.length === 0 ? (
+            <Text variant="small" tone="onAccent" style={styles.heroEmpty}>
+              {isAdmin
+                ? 'No stages chosen yet — tap the dial to pick which ones this card counts.'
+                : 'No stages are being counted here yet.'}
+            </Text>
+          ) : (
+            <View style={styles.stageRow}>
+              {summary.map((status) => (
+                <Pressable
+                  key={status.id}
+                  testID={`home-stage-${status.id}`}
+                  style={styles.stage}
+                  onPress={() => navigation.navigate('Orders', { statusId: status.id })}>
+                  <Text variant="h1" tone="onAccent">
+                    {status._count?.ordersAtStatus ?? 0}
+                  </Text>
+                  {/*
+                    One line, shrinking to fit.
+                    Wrapped over two, "Order confirmed" and "QC & Sanding"
+                    pushed the row of counts out of line with each other and
+                    the card read as ragged.
+                  */}
+                  <Text
+                    variant="micro"
+                    tone="onAccent"
+                    numberOfLines={1}
+                    style={[styles.stageName, { fontSize: stageSize }]}>
+                    {status.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
           <View style={styles.heroMeta}>
             <View style={styles.heroBadge}>
@@ -109,11 +183,25 @@ export function HomeScreen({ navigation }: { navigation: any }) {
             </Text>
           </View>
 
+          {/*
+            The boards are not here: each is a way of looking at its own list,
+            reached from it. Punching is last — it is the one that starts
+            something rather than looks at something, and the thumb lands on
+            the right-hand end.
+          */}
           <View style={styles.heroActions}>
-            <IconTile icon="plus" label="Punch" tone="dark" onAccentGround onPress={() => navigation.navigate('PunchTab')} />
-            <IconTile icon="trend" label="Leads" tone="dark" onAccentGround onPress={() => navigation.navigate('Leads')} />
-            <IconTile icon="layers" label="Board" tone="dark" onAccentGround onPress={() => navigation.navigate('Board')} />
-            <IconTile icon="users" label="Clients" tone="dark" onAccentGround onPress={() => navigation.navigate('Clients')} />
+            {tiles.map((tile) => (
+              <IconTile
+                key={tile.label}
+                icon={tile.icon}
+                label={tile.label}
+                labelSize={tileSize}
+                tone="dark"
+                fluid
+                onAccentGround
+                onPress={() => navigation.navigate(tile.to)}
+              />
+            ))}
           </View>
         </Card>
       </Animated.View>
@@ -209,7 +297,15 @@ const styles = StyleSheet.create({
   identity: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   topActions: { flexDirection: 'row', gap: spacing.sm },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  heroValue: { marginTop: spacing.xs },
+  heroEmpty: { marginTop: spacing.md, opacity: 0.85, lineHeight: 18 },
+  /*
+   * Five across on a phone. Each stage gets an equal share and its name wraps
+   * to two lines rather than truncating — "Design approval" and "QC & Sanding"
+   * are only distinguishable in full.
+   */
+  stageRow: { flexDirection: 'row', marginTop: spacing.md, gap: spacing.xs },
+  stage: { flex: 1, alignItems: 'center' },
+  stageName: { textAlign: 'center', opacity: 0.8, marginTop: 2 },
   heroMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -224,6 +320,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
   },
+  measure: { height: 0 },
   heroActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -93,6 +93,43 @@ export class AuthService {
   }
 
   /** Does this workspace exist? Used by the app before asking for a password. */
+  /**
+   * The signed-in user, hydrated from the database.
+   *
+   * The token deliberately carries only an id, the role and the permissions —
+   * enough to authorise a request. The display name is read fresh here instead,
+   * so renaming somebody shows up straight away rather than on their next
+   * sign-in, and the token stays small.
+   */
+  async me(identity: {
+    id: string;
+    code?: string;
+    role?: string;
+    permissions?: string[];
+    isPlatform?: boolean;
+    tenant?: unknown;
+  }) {
+    if (identity.isPlatform) {
+      const admin = await this.prisma.platform.platformUser.findUnique({
+        where: { id: identity.id },
+        select: { id: true, name: true, email: true },
+      });
+      return { ...identity, name: admin?.name, email: admin?.email };
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: identity.id },
+      select: { id: true, code: true, name: true, role: true, roleRef: { select: { name: true } } },
+    });
+
+    return {
+      ...identity,
+      name: user?.name,
+      code: user?.code ?? identity.code,
+      roleName: user?.roleRef?.name ?? user?.role ?? identity.role,
+    };
+  }
+
   async lookupWorkspace(slug: string) {
     const tenant = await this.tenants.bySlugOrThrow(slug.trim());
     return { slug: tenant.slug, exists: true };

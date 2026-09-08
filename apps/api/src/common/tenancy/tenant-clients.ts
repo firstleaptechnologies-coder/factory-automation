@@ -17,7 +17,8 @@ export const TENANT_SCOPED_MODELS = new Set([
   'WorkflowTransition', 'StoredFile', 'Order', 'OrderItem', 'OrderAttachment',
   'OrderStatusHistory', 'Payment', 'CashDeposit', 'LeadSource',
   'CustomFieldDefinition', 'Lead', 'LeadStatusHistory', 'AppSetting',
-  'DocumentSequence', 'AuditLog',
+  'DocumentSequence', 'AuditLog', 'Disbursement', 'DisbursementCategory',
+  'Estimate', 'EstimateItem', 'FirmProfile',
 ]);
 
 /** Operations whose `where` should be narrowed to the tenant. */

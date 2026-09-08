@@ -1,0 +1,11 @@
+{
+  // The suite, type-checked the way the build is but including the specs and
+  // the helpers they share, which live outside `src` and so outside the
+  // build's rootDir.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./",
+    "noEmit": true
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

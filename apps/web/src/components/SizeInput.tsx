@@ -1,6 +1,7 @@
 'use client';
 
 import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, parseLengthToMm } from '@decor/shared';
+import { Select } from '@/ui';
 
 /**
  * A dimension box that accepts what people actually type.
@@ -40,14 +41,12 @@ export function SizeInput({
           style={invalid ? { borderColor: 'var(--danger)' } : undefined}
         />
         {onUnitChange ? (
-          <select
+          <Select
             value={unit}
-            onChange={(e) => onUnitChange(e.target.value as LengthUnit)}
-            style={{ width: 76 }}>
-            {LENGTH_UNITS.map((u) => (
-              <option key={u} value={u}>{UNIT_LABEL[u]}</option>
-            ))}
-          </select>
+            onChange={(value) => onUnitChange(value as LengthUnit)}
+            options={LENGTH_UNITS.map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
+            style={{ width: 96, marginBottom: 0 }}
+          />
         ) : null}
       </div>
       <div style={{ fontSize: 11, marginTop: 3 }} className={invalid ? 'error' : 'muted'}>

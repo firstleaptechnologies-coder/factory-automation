@@ -6,8 +6,24 @@ import {
   CashPositionQueryDto,
   RecordDepositDto,
   RecordPaymentDto,
+  TRANSACTION_KINDS,
+  TransactionQueryDto,
 } from './dto/payment.dto';
+import { paginate } from '../../common/dto/pagination.dto';
 import { tenantId } from '../../common/tenancy/tenant-context';
+
+/** One movement of money, whatever kind it was. */
+export interface TransactionRow {
+  id: string;
+  kind: 'PAYMENT_CASH' | 'PAYMENT_ONLINE' | 'BANK_DEPOSIT';
+  direction: 'IN' | 'OUT' | 'TRANSFER';
+  at: Date;
+  amount: number;
+  reference: string | null;
+  note: string | null;
+  order: { id: string; code: string; client: { name: string } } | null;
+  by: { id: string; name: string } | null;
+}
 
 @Injectable()
 export class PaymentsService {
@@ -222,6 +238,148 @@ export class PaymentsService {
     };
   }
 
+  /**
+   * Every movement of money except a payout, newest first.
+   *
+   * One list rather than one per source, because "what happened to the money"
+   * is a single question: cash taken, an online transfer, a trip to the bank —
+   * and, when they arrive, expenses. Payouts stay in their own ledger; they sit
+   * beside orders rather than inside them, and folding them in here would be
+   * the netting-off the books must not do.
+   *
+   * Assembled in memory rather than in SQL because the sources are separate
+   * tables with different shapes. Each is asked for at most the rows that could
+   * reach the requested page, so the work does not grow with the ledger.
+   */
+  async transactions(query: TransactionQueryDto) {
+    const kinds = query.kind ? [query.kind] : [...TRANSACTION_KINDS];
+    const window = {
+      ...(query.from ? { gte: new Date(query.from) } : {}),
+      ...(query.to ? { lte: new Date(query.to) } : {}),
+    };
+    const dated = query.from || query.to;
+    const search = query.search?.trim();
+    const reach = query.skip + query.limit;
+
+    const wantsCash = kinds.includes('PAYMENT_CASH');
+    const wantsOnline = kinds.includes('PAYMENT_ONLINE');
+    const wantsDeposits = kinds.includes('BANK_DEPOSIT');
+
+    const paymentWhere: Prisma.PaymentWhereInput = {
+      ...(dated ? { receivedAt: window } : {}),
+      ...(wantsCash && wantsOnline
+        ? {}
+        : { mode: wantsCash ? PaymentMode.CASH : PaymentMode.ONLINE }),
+      ...(search
+        ? {
+            OR: [
+              { reference: { contains: search, mode: 'insensitive' as const } },
+              { note: { contains: search, mode: 'insensitive' as const } },
+              { order: { code: { contains: search, mode: 'insensitive' as const } } },
+              {
+                order: {
+                  client: { name: { contains: search, mode: 'insensitive' as const } },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const depositWhere: Prisma.CashDepositWhereInput = {
+      ...(dated ? { depositedAt: window } : {}),
+      ...(search
+        ? {
+            OR: [
+              { bankReference: { contains: search, mode: 'insensitive' as const } },
+              { note: { contains: search, mode: 'insensitive' as const } },
+              {
+                payment: {
+                  order: { code: { contains: search, mode: 'insensitive' as const } },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const wantsPayments = wantsCash || wantsOnline;
+
+    const [payments, deposits, paymentCount, depositCount] = await Promise.all([
+      wantsPayments
+        ? this.prisma.payment.findMany({
+            where: paymentWhere,
+            orderBy: { receivedAt: 'desc' },
+            take: reach,
+            include: {
+              receivedBy: { select: { id: true, name: true } },
+              order: {
+                select: { id: true, code: true, client: { select: { name: true } } },
+              },
+            },
+          })
+        : [],
+      wantsDeposits
+        ? this.prisma.cashDeposit.findMany({
+            where: depositWhere,
+            orderBy: { depositedAt: 'desc' },
+            take: reach,
+            include: {
+              depositedBy: { select: { id: true, name: true } },
+              payment: {
+                select: {
+                  order: {
+                    select: { id: true, code: true, client: { select: { name: true } } },
+                  },
+                },
+              },
+            },
+          })
+        : [],
+      wantsPayments ? this.prisma.payment.count({ where: paymentWhere }) : 0,
+      wantsDeposits ? this.prisma.cashDeposit.count({ where: depositWhere }) : 0,
+    ]);
+
+    const rows: TransactionRow[] = [
+      ...payments.map((payment) => ({
+        id: `payment:${payment.id}`,
+        kind:
+          payment.mode === PaymentMode.CASH
+            ? ('PAYMENT_CASH' as const)
+            : ('PAYMENT_ONLINE' as const),
+        // Money arriving. A deposit is the same money moving, which is why the
+        // two must never be added together.
+        direction: 'IN' as const,
+        at: payment.receivedAt,
+        amount: round2(Number(payment.amount)),
+        reference: payment.reference,
+        note: payment.note,
+        order: payment.order,
+        by: payment.receivedBy,
+      })),
+      ...deposits.map((deposit) => ({
+        id: `deposit:${deposit.id}`,
+        kind: 'BANK_DEPOSIT' as const,
+        // Cash the shop already had, now in the bank: it changes where the
+        // money is, not how much of it there is.
+        direction: 'TRANSFER' as const,
+        at: deposit.depositedAt,
+        amount: round2(Number(deposit.amount)),
+        reference: deposit.bankReference,
+        note: deposit.note,
+        order: deposit.payment?.order ?? null,
+        by: deposit.depositedBy,
+      })),
+    ]
+      .sort((a, b) => b.at.getTime() - a.at.getTime())
+      .slice(query.skip, reach);
+
+    return paginate(rows, paymentCount + depositCount, {
+      page: query.page,
+      limit: query.limit,
+    });
+  }
+
   /** Cash still in hand, order by order — the list to take to the bank. */
   async cashInHandByOrder() {
     const payments = await this.prisma.payment.findMany({
@@ -277,7 +435,7 @@ export class PaymentsService {
 }
 
 /** One rule for the order's payment status, used everywhere it is set. */
-function deriveStatus(total: number, received: number): PaymentStatus {
+export function deriveStatus(total: number, received: number): PaymentStatus {
   if (received <= 0.009) return PaymentStatus.PENDING;
   // A hair of tolerance: rupee rounding should not leave an order forever
   // "partial" by two paise.

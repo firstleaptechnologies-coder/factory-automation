@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   CustomFieldEntity,
   Prisma,
@@ -20,6 +25,10 @@ import {
   UpdateLeadDto,
 } from './dto/lead.dto';
 import { tenantId } from '../../common/tenancy/tenant-context';
+import { PERMISSIONS } from '@decor/shared';
+
+/** How many cards one board column carries before it says "and N more". */
+const BOARD_COLUMN_LIMIT = 20;
 
 const LEAD_INCLUDE = {
   client: { select: { id: true, code: true, name: true, phone: true } },
@@ -28,6 +37,19 @@ const LEAD_INCLUDE = {
   owner: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
   convertedOrder: { select: { id: true, code: true } },
+  /* What has actually been quoted for this enquiry, newest first. */
+  estimates: {
+    orderBy: { createdAt: 'desc' as const },
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      grandTotal: true,
+      issuedOn: true,
+      validTill: true,
+      orderId: true,
+    },
+  },
 };
 
 @Injectable()
@@ -55,7 +77,10 @@ export class LeadsService {
   // -- leads ----------------------------------------------------------------
 
   async list(query: LeadQueryDto) {
+    const quiet = await this.quietCutoff();
+
     const where: Prisma.LeadWhereInput = {
+      ...(quiet ? (query.archived ? goneQuiet(quiet) : stillLive(quiet)) : {}),
       ...(query.statusId ? { statusId: query.statusId } : {}),
       ...(query.ownerId ? { ownerId: query.ownerId } : {}),
       ...(query.sourceId ? { sourceId: query.sourceId } : {}),
@@ -204,7 +229,7 @@ export class LeadsService {
   async changeStatus(
     id: string,
     dto: ChangeLeadStatusDto,
-    user?: { id: string; role?: string },
+    user?: { id: string; role?: string; permissions?: string[] },
   ) {
     const lead = await this.prisma.lead.findUnique({
       where: { id },
@@ -225,12 +250,7 @@ export class LeadsService {
     });
 
     if (!transition) {
-      const target = await this.prisma.workflowStatus.findUnique({
-        where: { id: dto.toStatusId },
-      });
-      throw new BadRequestException(
-        `The pipeline does not allow moving from ${lead.status.name} to ${target?.name ?? 'that stage'}`,
-      );
+      return this.moveBack(lead, dto, user);
     }
 
     if (
@@ -250,21 +270,79 @@ export class LeadsService {
       );
     }
 
+    return this.applyStatus(lead, dto, user, false);
+  }
+
+  /**
+   * Sending an enquiry back a stage.
+   *
+   * The same rule orders have: the move must exist on the canvas the other way
+   * round, the person must be allowed to make it, and the caller must say so
+   * deliberately. An enquiry that was quoted and is being talked about again
+   * is the case this is for.
+   */
+  private async moveBack(
+    lead: { id: string; statusId: string; workflowId: string; status: { name: string } },
+    dto: ChangeLeadStatusDto,
+    user?: { id: string; role?: string; permissions?: string[] },
+  ) {
+    const target = await this.prisma.workflowStatus.findUnique({
+      where: { id: dto.toStatusId },
+    });
+
+    const backwards = await this.prisma.workflowTransition.findUnique({
+      where: {
+        workflowId_fromStatusId_toStatusId: {
+          workflowId: lead.workflowId,
+          fromStatusId: dto.toStatusId,
+          toStatusId: lead.statusId,
+        },
+      },
+    });
+
+    if (!backwards) {
+      throw new BadRequestException(
+        `The pipeline does not allow moving from ${lead.status.name} to ${target?.name ?? 'that stage'}`,
+      );
+    }
+
+    if (!user?.permissions?.includes(PERMISSIONS.LEAD_MOVE_BACK)) {
+      throw new ForbiddenException(
+        `Going back from ${lead.status.name} to ${target?.name ?? 'that stage'} is not a move the pipeline draws. Only somebody allowed to send enquiries back can do it.`,
+      );
+    }
+
+    if (!dto.reverse) {
+      throw new BadRequestException(
+        `${lead.status.name} → ${target?.name ?? 'that stage'} is a move back, not part of the usual journey. Confirm it before it is made.`,
+      );
+    }
+
+    return this.applyStatus(lead, dto, user, true);
+  }
+
+  private async applyStatus(
+    lead: { id: string; statusId: string },
+    dto: ChangeLeadStatusDto,
+    user: { id: string } | undefined,
+    reversed: boolean,
+  ) {
     await this.prisma.$transaction([
-      this.prisma.lead.update({ where: { id }, data: { statusId: dto.toStatusId } }),
+      this.prisma.lead.update({ where: { id: lead.id }, data: { statusId: dto.toStatusId } }),
       this.prisma.leadStatusHistory.create({
         data: {
           tenantId: tenantId(),
-          leadId: id,
+          leadId: lead.id,
           fromStatusId: lead.statusId,
           toStatusId: dto.toStatusId,
           note: dto.note,
+          reversed,
           changedById: user?.id,
         },
       }),
     ]);
 
-    return this.findOne(id);
+    return this.findOne(lead.id);
   }
 
   /**
@@ -350,26 +428,78 @@ export class LeadsService {
   /** Pipeline view: leads grouped under the stages the admin configured. */
   async board(workflowId?: string) {
     const workflow = await this.resolveWorkflow(workflowId);
+    const quiet = cutoffFrom(workflow.leadExpiryDays);
 
-    const leads = await this.prisma.lead.findMany({
-      where: { workflowId: workflow.id },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-      include: LEAD_INCLUDE,
-    });
+    // Capped per column, like the order board, and each column fetched on its
+    // own so a busy stage cannot starve the rest. The value is the whole
+    // column's — a pipeline figure that moved with how many cards happened to
+    // be loaded would be worthless.
+    const ordered = workflow.statuses
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const columns = await Promise.all(
+      ordered.map(async (status) => {
+        // An enquiry that has gone quiet is off the board — it lives in the
+        // archive until somebody touches it again.
+        const where = {
+          workflowId: workflow.id,
+          statusId: status.id,
+          ...(quiet ? stillLive(quiet) : {}),
+        };
+        /*
+         * What the column is worth: the quoted figure where a quote went out,
+         * the guess where none has. Two aggregates rather than one because
+         * that is a coalesce, and summing both columns outright would count
+         * the leads that have been quoted twice over.
+         */
+        const [leads, stats, quoted] = await Promise.all([
+          this.prisma.lead.findMany({
+            where,
+            orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+            include: LEAD_INCLUDE,
+            take: BOARD_COLUMN_LIMIT,
+          }),
+          this.prisma.lead.aggregate({
+            where: { ...where, quotedValue: null },
+            _count: { _all: true },
+            _sum: { estimatedValue: true },
+          }),
+          this.prisma.lead.aggregate({
+            where: { ...where, quotedValue: { not: null } },
+            _count: { _all: true },
+            _sum: { quotedValue: true },
+          }),
+        ]);
+        return {
+          status,
+          leads,
+          total: stats._count._all + quoted._count._all,
+          value:
+            Number(stats._sum.estimatedValue ?? 0) + Number(quoted._sum.quotedValue ?? 0),
+        };
+      }),
+    );
 
     return {
       workflow: { id: workflow.id, code: workflow.code, name: workflow.name },
-      columns: workflow.statuses
-        .slice()
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((status) => ({
-          status,
-          leads: leads.filter((lead) => lead.statusId === status.id),
-          value: leads
-            .filter((lead) => lead.statusId === status.id)
-            .reduce((sum, lead) => sum + Number(lead.estimatedValue ?? 0), 0),
-        })),
+      columns,
     };
+  }
+
+  /**
+   * The moment before which an untouched enquiry counts as gone quiet.
+   *
+   * Worked out on the way past rather than stamped on the row by a nightly job:
+   * there is nothing to run, nothing to fall behind, and the moment somebody
+   * touches a quiet lead it is live again because the clock is its own
+   * `updatedAt`.
+   */
+  private async quietCutoff(): Promise<Date | null> {
+    const workflow = await this.prisma.workflow.findFirst({
+      where: { kind: WorkflowKind.LEAD, isDefault: true, isActive: true },
+    });
+    return cutoffFrom(workflow?.leadExpiryDays);
   }
 
   private async resolveWorkflow(workflowId?: string) {
@@ -390,4 +520,36 @@ export class LeadsService {
     }
     return workflow;
   }
+}
+
+/** Days into a moment. Zero and null both mean nothing ever goes quiet. */
+function cutoffFrom(days?: number | null): Date | null {
+  if (!days || days <= 0) return null;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return cutoff;
+}
+
+/**
+ * An enquiry nobody has touched since the cutoff, and that has not already
+ * finished. A won lead is not stale, it is done; a lost one has been dealt
+ * with, and a stage the shop marked terminal is the shop saying so.
+ */
+function goneQuiet(cutoff: Date): Prisma.LeadWhereInput {
+  return {
+    updatedAt: { lt: cutoff },
+    convertedOrderId: null,
+    status: { isTerminal: false },
+  };
+}
+
+/** Everything else — what the list and the board show. */
+function stillLive(cutoff: Date): Prisma.LeadWhereInput {
+  return {
+    NOT: {
+      updatedAt: { lt: cutoff },
+      convertedOrderId: null,
+      status: { isTerminal: false },
+    },
+  };
 }

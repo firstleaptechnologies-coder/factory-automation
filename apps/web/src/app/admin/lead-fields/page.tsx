@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { CustomFieldDefinition, CustomFieldType, LeadSource } from '@decor/shared';
 import { Shell } from '@/components/Shell';
 import { api } from '@/lib/api';
+import { Select } from '@/ui';
 
 const TYPES: CustomFieldType[] = [
   'TEXT', 'LONG_TEXT', 'NUMBER', 'DATE', 'BOOLEAN', 'SELECT', 'MULTI_SELECT', 'PHONE', 'EMAIL',
@@ -50,6 +51,7 @@ export default function LeadFieldsAdminPage() {
 
   return (
     <Shell>
+      <div className="legacy">
       <h1 className="page-title">Lead fields</h1>
       <p className="page-sub">
         Add what this shop needs to capture. The lead form builds itself from these.
@@ -59,8 +61,8 @@ export default function LeadFieldsAdminPage() {
 
       <div className="card">
         <h3>Add a field</h3>
-        <div className="row">
-          <div style={{ width: 220 }}>
+        <div className="field-row">
+          <div className="col" style={{ flexBasis: 220 }}>
             <label>Label</label>
             <input
               value={field.label}
@@ -68,7 +70,7 @@ export default function LeadFieldsAdminPage() {
               onChange={(e) => setField({ ...field, label: e.target.value })}
             />
           </div>
-          <div style={{ width: 180 }}>
+          <div className="col" style={{ flexBasis: 180 }}>
             <label>Key (optional)</label>
             <input
               value={field.key}
@@ -76,16 +78,16 @@ export default function LeadFieldsAdminPage() {
               onChange={(e) => setField({ ...field, key: e.target.value })}
             />
           </div>
-          <div style={{ width: 160 }}>
-            <label>Type</label>
-            <select
+          <div className="col" style={{ flexBasis: 160 }}>
+            <Select
+              label="Type"
               value={field.type}
-              onChange={(e) => setField({ ...field, type: e.target.value as CustomFieldType })}>
-              {TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
-            </select>
+              onChange={(value) => setField({ ...field, type: value as CustomFieldType })}
+              options={TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
+            />
           </div>
           {needsOptions ? (
-            <div style={{ width: 260 }}>
+            <div className="col" style={{ flexBasis: 260 }}>
               <label>Options (comma separated)</label>
               <input
                 value={field.options}
@@ -94,17 +96,19 @@ export default function LeadFieldsAdminPage() {
               />
             </div>
           ) : null}
-          <div style={{ width: 110 }}>
-            <label>Required</label>
-            <select
+          <div className="col" style={{ flexBasis: 110 }}>
+            <Select
+              label="Required"
               value={field.required ? 'yes' : 'no'}
-              onChange={(e) => setField({ ...field, required: e.target.value === 'yes' })}>
-              <option value="no">No</option>
-              <option value="yes">Yes</option>
-            </select>
+              onChange={(value) => setField({ ...field, required: value === 'yes' })}
+              options={[
+                { value: 'no', label: 'No' },
+                { value: 'yes', label: 'Yes' },
+              ]}
+            />
           </div>
           <button
-            className="primary"
+            className="primary row-action"
             disabled={!field.label.trim()}
             onClick={() =>
               act(async () => {
@@ -132,7 +136,7 @@ export default function LeadFieldsAdminPage() {
           Removing a field hides it from the form but keeps the values already captured,
           so old leads stay readable.
         </p>
-        <table>
+        <table className="table">
           <thead>
             <tr><th>Label</th><th>Key</th><th>Type</th><th>Options</th><th>Required</th><th /></tr>
           </thead>
@@ -164,7 +168,7 @@ export default function LeadFieldsAdminPage() {
 
       <div className="card" style={{ marginTop: 14 }}>
         <h3>Lead sources</h3>
-        <div className="row" style={{ marginBottom: 12 }}>
+        <div className="field-row" style={{ marginBottom: 12 }}>
           <div style={{ width: 150 }}>
             <label>Code</label>
             <input
@@ -172,11 +176,12 @@ export default function LeadFieldsAdminPage() {
               onChange={(e) => setSource({ ...source, code: e.target.value.toUpperCase() })}
             />
           </div>
-          <div style={{ width: 220 }}>
+          <div className="col" style={{ flexBasis: 220 }}>
             <label>Name</label>
             <input value={source.name} onChange={(e) => setSource({ ...source, name: e.target.value })} />
           </div>
           <button
+            className="row-action"
             disabled={!source.code || !source.name}
             onClick={() =>
               act(async () => {
@@ -195,6 +200,7 @@ export default function LeadFieldsAdminPage() {
           ))}
         </div>
       </div>
+    </div>
     </Shell>
   );
 }

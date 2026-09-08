@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Lead, LengthUnit, Material, Order, PunchItemInput } from '@decor/shared';
 import { LENGTH_UNITS, UNIT_LABEL, parseLengthToMm } from '@decor/shared';
 import { api } from '@/lib/api';
+import { Select } from '@/ui';
 
 interface ItemDraft {
   key: string;
@@ -152,31 +153,33 @@ export function ConvertLeadDialog({
                     onChange={(e) => patch(item.key, { width: e.target.value })}
                   />
                 </div>
-                <div className="field">
-                  <label>Material</label>
-                  <select
-                    value={item.materialId}
-                    onChange={(e) =>
-                      patch(item.key, { materialId: e.target.value, materialThicknessId: '' })
-                    }>
-                    <option value="">Select…</option>
-                    {materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Thickness</label>
-                  <select
-                    value={item.materialThicknessId}
-                    disabled={!material}
-                    onChange={(e) => patch(item.key, { materialThicknessId: e.target.value })}>
-                    <option value="">—</option>
-                    {material?.thicknesses.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label ?? `${Number(t.valueMm)} mm`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  label="Material"
+                  value={item.materialId}
+                  placeholder="Select…"
+                  onChange={(value) =>
+                    patch(item.key, { materialId: value, materialThicknessId: '' })
+                  }
+                  options={materials.map((m) => ({
+                    value: m.id,
+                    label: m.name,
+                    color: m.color,
+                  }))}
+                />
+                <Select
+                  label="Thickness"
+                  value={item.materialThicknessId}
+                  disabled={!material}
+                  placeholder="—"
+                  onChange={(value) => patch(item.key, { materialThicknessId: value })}
+                  options={[
+                    { value: '', label: '—' },
+                    ...(material?.thicknesses ?? []).map((t) => ({
+                      value: t.id,
+                      label: t.label ?? `${Number(t.valueMm)} mm`,
+                    })),
+                  ]}
+                />
                 <div className="field">
                   <label>Qty</label>
                   <input
@@ -190,7 +193,7 @@ export function ConvertLeadDialog({
           );
         })}
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <div className="button-row">
           <button onClick={() => setItems((rows) => [...rows, blank()])}>+ Add item</button>
           <div className="spacer" />
           <button onClick={onClose}>Cancel</button>

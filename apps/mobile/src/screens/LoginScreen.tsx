@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   FadeIn,
@@ -11,26 +11,43 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { Button, Field, Icon, Text, haptic } from '../ui';
-import { gradients, palette, radius, shadow, spacing } from '../theme';
+import { AccentSurface, Button, Field, Icon, Text, haptic } from '../ui';
+import { gradients, palette, radius, spacing } from '../theme';
+
+type Mode = 'workspace' | 'credentials' | 'platform';
 
 /**
  * Sign in.
  *
- * The lime mark breathes slowly while the screen is idle. It is a small thing,
- * but it makes the app feel awake before anyone has touched it.
+ * Two steps, because a person cannot be identified until the workspace is
+ * known — employee codes are unique inside a business, not across the platform,
+ * and two clients may both have an ADMIN. The workspace is remembered after the
+ * first time, so the shop only ever types it once.
  */
 export function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, signInAsPlatform, workspace: savedWorkspace } = useAuth();
   const insets = useSafeAreaInsets();
+
+  const [mode, setMode] = useState<Mode>('workspace');
+  const [workspace, setWorkspace] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // A device that has signed in before skips straight to the password.
+  useEffect(() => {
+    if (savedWorkspace) {
+      setWorkspace(savedWorkspace);
+      setMode('credentials');
+    }
+  }, [savedWorkspace]);
+
   const breathe = useSharedValue(0);
-  React.useEffect(() => {
+  useEffect(() => {
     breathe.value = withRepeat(
       withSequence(withTiming(1, { duration: 2200 }), withTiming(0, { duration: 2200 })),
       -1,
@@ -43,11 +60,31 @@ export function LoginScreen() {
     opacity: 0.85 + breathe.value * 0.15,
   }));
 
+  const continueToCredentials = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      // Checked before asking for a password, so a typo in the workspace is
+      // caught while it is still obvious what went wrong.
+      await api.workspaceExists(workspace.trim().toLowerCase());
+      setMode('credentials');
+      haptic('impactLight');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That workspace was not found');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = async () => {
     setError(null);
     setBusy(true);
     try {
-      await signIn(identifier.trim(), password);
+      if (mode === 'platform') {
+        await signInAsPlatform(email.trim(), password);
+      } else {
+        await signIn(workspace.trim().toLowerCase(), identifier.trim(), password);
+      }
       haptic('notificationSuccess');
     } catch (e) {
       haptic('notificationError');
@@ -63,42 +100,122 @@ export function LoginScreen() {
         style={[styles.container, { paddingTop: insets.top }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Animated.View entering={FadeIn.duration(600)} style={styles.brandBlock}>
-          <Animated.View style={[markStyle, shadow.glow]}>
-            <LinearGradient colors={gradients.accent} style={styles.mark}>
-              <Icon name="scan" size={34} color={palette.textOnAccent} strokeWidth={2} />
-            </LinearGradient>
+          <Animated.View style={markStyle}>
+            <AccentSurface radius={radius.xxl} contentStyle={styles.mark}>
+              <Icon name="scan" size={34} color={palette.white} strokeWidth={2} />
+            </AccentSurface>
           </Animated.View>
           <Text variant="h1" style={styles.brand}>Decor Bucket</Text>
-          <Text variant="small" tone="muted">Order punching for the floor</Text>
+          <Text variant="small" tone="muted">
+            {mode === 'platform' ? 'Platform administration' : 'Order punching for the floor'}
+          </Text>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(200).duration(500).springify()}>
-          <Field
-            label="Employee code"
-            placeholder="e.g. SALES01"
-            value={identifier}
-            onChangeText={setIdentifier}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            icon="user"
-          />
-          <Field
-            label="Password"
-            placeholder="••••••••"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            icon="settings"
-            onSubmitEditing={submit}
-            error={error}
-          />
+          {mode === 'workspace' ? (
+            <>
+              <Field
+                label="Workspace"
+                placeholder="your-shop"
+                value={workspace}
+                onChangeText={setWorkspace}
+                autoCapitalize="none"
+                autoCorrect={false}
+                icon="box"
+                error={error}
+                hint="The short name your provider gave you."
+                onSubmitEditing={continueToCredentials}
+              />
+              <Button
+                title="Continue"
+                size="lg"
+                loading={busy}
+                disabled={!workspace.trim()}
+                onPress={continueToCredentials}
+              />
+            </>
+          ) : mode === 'credentials' ? (
+            <>
+              <Pressable onPress={() => { setMode('workspace'); setError(null); }}>
+                <View style={styles.workspaceChip}>
+                  <Icon name="box" size={14} color={palette.accent} />
+                  <Text variant="small" tone="accent" bold style={{ marginLeft: 6 }}>
+                    {workspace}
+                  </Text>
+                  <Text variant="tiny" tone="muted" style={{ marginLeft: 8 }}>change</Text>
+                </View>
+              </Pressable>
 
-          <Button title="Sign in" size="lg" loading={busy} onPress={submit} />
+              <Field
+                label="Employee code"
+                placeholder="e.g. ADMIN"
+                value={identifier}
+                onChangeText={setIdentifier}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                icon="user"
+              />
+              <Field
+                label="Password"
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                icon="settings"
+                onSubmitEditing={submit}
+                error={error}
+              />
+              <Button
+                title="Sign in"
+                size="lg"
+                loading={busy}
+                disabled={!identifier.trim() || !password}
+                onPress={submit}
+              />
+            </>
+          ) : (
+            <>
+              <Field
+                label="Email"
+                placeholder="you@example.com"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                icon="user"
+              />
+              <Field
+                label="Password"
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                icon="settings"
+                onSubmitEditing={submit}
+                error={error}
+              />
+              <Button
+                title="Sign in to platform"
+                size="lg"
+                loading={busy}
+                disabled={!email.trim() || !password}
+                onPress={submit}
+              />
+            </>
+          )}
         </Animated.View>
 
-        <Text variant="tiny" tone="faint" style={styles.footer}>
-          Code, phone or email all work.
-        </Text>
+        <Pressable
+          onPress={() => {
+            setMode(mode === 'platform' ? 'workspace' : 'platform');
+            setError(null);
+            setPassword('');
+          }}
+          style={styles.footerLink}>
+          <Text variant="tiny" tone="faint">
+            {mode === 'platform' ? 'Sign in to a workspace instead' : 'Platform administration'}
+          </Text>
+        </Pressable>
       </KeyboardAvoidingView>
     </View>
   );
@@ -108,13 +225,17 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: palette.bg },
   container: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl },
   brandBlock: { alignItems: 'center', marginBottom: spacing.xxl },
-  mark: {
-    width: 82,
-    height: 82,
-    borderRadius: radius.xxl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  mark: { width: 82, height: 82, alignItems: 'center', justifyContent: 'center' },
   brand: { marginTop: spacing.lg },
-  footer: { textAlign: 'center', marginTop: spacing.xl },
+  workspaceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: palette.surfaceInset,
+  },
+  footerLink: { alignItems: 'center', marginTop: spacing.xl },
 });

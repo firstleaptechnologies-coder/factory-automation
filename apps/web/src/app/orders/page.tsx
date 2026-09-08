@@ -1,159 +1,222 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Material, Order, Workflow } from '@decor/shared';
-import { DEFAULT_UNIT, LENGTH_UNITS, LengthUnit, UNIT_LABEL, formatLength } from '@decor/shared';
-import { Shell } from '@/components/Shell';
+import { LENGTH_UNITS, PERMISSIONS, UNIT_LABEL } from '@decor/shared';
+import type { LengthUnit } from '@decor/shared';
 import { api } from '@/lib/api';
+import { useApi } from '@/lib/useApi';
+import { usePaginated } from '@/lib/usePaginated';
+import { useAuth } from '@/lib/auth';
+import { Shell } from '@/components/Shell';
+import { FilterSheet } from '@/components/FilterSheet';
+import {
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  Field,
+  ListFooter,
+  Loader,
+  PageHead,
+  Pill,
+} from '@/ui';
+import { formatInr, relativeTime } from '@/lib/format';
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [workflow, setWorkflow] = useState<Workflow | null>(null);
-
-  const [unit, setUnit] = useState<LengthUnit>(DEFAULT_UNIT);
-  const [search, setSearch] = useState('');
-  const [statusId, setStatusId] = useState('');
-  const [materialId, setMaterialId] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([api.materials(), api.defaultWorkflow()])
-      .then(([m, w]) => { setMaterials(m); setWorkflow(w); })
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      api
-        .orders({
-          unit,
-          search: search || undefined,
-          statusId: statusId || undefined,
-          materialId: materialId || undefined,
-          limit: 50,
-        })
-        .then((result) => { setOrders(result.data); setError(null); })
-        .catch((e) => setError(e instanceof Error ? e.message : 'Could not load orders'))
-        .finally(() => setLoading(false));
-    }, 180);
-    return () => clearTimeout(timer);
-  }, [unit, search, statusId, materialId]);
-
   return (
     <Shell>
-      <h1 className="page-title">Orders</h1>
-      <p className="page-sub">
-        Sizes are stored in millimetres and shown in whichever unit you pick.
-      </p>
+      <Orders />
+    </Shell>
+  );
+}
 
-      <div className="row" style={{ marginBottom: 14 }}>
-        <div style={{ width: 240 }}>
-          <label htmlFor="search">Search</label>
-          <input
-            id="search"
-            placeholder="Order no, client or location"
+function Orders() {
+  const router = useRouter();
+  const { can } = useAuth();
+  const [search, setSearch] = useState('');
+  const [statusId, setStatusId] = useState<string | null>(null);
+  const [materialId, setMaterialId] = useState<string | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [unit, setUnit] = useState<LengthUnit>('FT');
+
+  const workflow = useApi<Workflow>(() => api.defaultWorkflow(), []);
+  const materials = useApi<Material[]>(() => api.materials(), []);
+
+  const orders = usePaginated<Order>(
+    (page) =>
+      api.orders({
+        unit,
+        search: search || undefined,
+        statusId: statusId ?? undefined,
+        materialId: materialId ?? undefined,
+        page,
+        limit: 25,
+      }),
+    [unit, search, statusId, materialId],
+  );
+
+  const active = [statusId, materialId].filter(Boolean).length;
+
+  return (
+    <>
+      {/* Everything the list is worked with stays at the top; only the rows
+          scroll. */}
+      <div className="sticky-bar">
+      <PageHead
+        title="Orders"
+        subtitle={`${orders.total} total`}
+        action={
+          <div className="row">
+            {/*
+              The board is a way of looking at this list, not a place of its
+              own — so it is reached from here rather than from the sidebar.
+            */}
+            <Button title="Board" variant="dark" onClick={() => router.push('/board')} />
+            {can(PERMISSIONS.ORDER_PUNCH) ? (
+              <Button title="Punch order" icon="plus" onClick={() => router.push('/punch')} />
+            ) : null}
+          </div>
+        }
+      />
+
+      <div className="toolbar">
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <Field
+            placeholder="Order number, client or location"
+            icon="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={setSearch}
+            pasteable={false}
+            style={{ marginBottom: 0 }}
           />
         </div>
-        <div style={{ width: 190 }}>
-          <label htmlFor="status">Status</label>
-          <select id="status" value={statusId} onChange={(e) => setStatusId(e.target.value)}>
-            <option value="">All</option>
-            {workflow?.statuses.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-        <div style={{ width: 190 }}>
-          <label htmlFor="material">Material</label>
-          <select id="material" value={materialId} onChange={(e) => setMaterialId(e.target.value)}>
-            <option value="">All</option>
-            {materials.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label>Show sizes in</label>
-          <div className="unit-toggle">
-            {LENGTH_UNITS.map((u) => (
-              <button
-                key={u}
-                type="button"
-                className={unit === u ? 'active' : ''}
-                onClick={() => setUnit(u)}>
-                {UNIT_LABEL[u]}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Button
+          title={active === 0 ? 'Filter' : `${active} filter${active === 1 ? '' : 's'}`}
+          variant={active === 0 ? 'dark' : 'primary'}
+          icon="filter"
+          onClick={() => setFilterOpen(true)}
+        />
       </div>
 
-      {error ? <div className="banner danger">{error}</div> : null}
-
-      <div className="card scroll-x">
-        {loading ? (
-          <p className="muted">Loading…</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Order</th>
-                <th>Client</th>
-                <th>Location</th>
-                <th>Items</th>
-                <th>Status</th>
-                <th>Punched</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => (
-                <tr key={order.id}>
-                  <td>
-                    <Link href={`/orders/${order.id}`}><strong>{order.code}</strong></Link>
-                    {order.priority !== 'NORMAL' ? (
-                      <div className="muted" style={{ fontSize: 11 }}>{order.priority}</div>
-                    ) : null}
-                  </td>
-                  <td>{order.client.name}</td>
-                  <td className="muted">{order.location}</td>
-                  <td>
-                    {order.items.map((item) => (
-                      <div key={item.id} style={{ fontSize: 13 }}>
-                        {item.display
-                          ? `${item.display.length} × ${item.display.width} ${UNIT_LABEL[item.display.unit]}`
-                          : '—'}
-                        {item.display?.thickness
-                          ? ` · ${item.display.thickness} ${UNIT_LABEL[item.display.thicknessUnit]}`
-                          : ''}
-                        <span className="muted"> · {item.material.name} × {item.quantity}</span>
-                      </div>
-                    ))}
-                  </td>
-                  <td>
-                    <span className="pill" style={{ background: order.status.color }}>
-                      {order.status.name}
-                    </span>
-                  </td>
-                  <td className="muted">
-                    {new Date(order.createdAt).toLocaleDateString('en-IN', {
-                      day: '2-digit', month: 'short',
-                    })}
-                  </td>
-                </tr>
-              ))}
-              {orders.length === 0 ? (
-                <tr><td colSpan={6} className="muted">No orders match.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        )}
+      <div className="wrap" style={{ marginBottom: 'var(--s-lg)' }}>
+        <span className="t-tiny faint" style={{ alignSelf: 'center', marginRight: 4 }}>
+          Sizes in
+        </span>
+        {LENGTH_UNITS.map((option) => (
+          <Chip
+            key={option}
+            label={UNIT_LABEL[option]}
+            selected={unit === option}
+            onClick={() => setUnit(option)}
+          />
+        ))}
       </div>
-    </Shell>
+      </div>
+
+      <div style={{ height: 'var(--s-lg)' }} />
+
+      {orders.loading ? (
+        <Loader />
+      ) : orders.items.length === 0 ? (
+        <EmptyState
+          icon="clipboard"
+          title="No orders match"
+          message="Try clearing the search or the filters."
+        />
+      ) : (
+        <div className="stack-sm">
+          {orders.items.map((order) => (
+            <Card key={order.id} size="sm" className="row-card" onClick={() => router.push(`/orders/${order.id}`)}>
+              <div className="row-between">
+                <div style={{ minWidth: 0 }}>
+                  <div className="t-h3 truncate">{order.client.name}</div>
+                  <div className="t-tiny muted truncate">
+                    {order.code} · {order.location} · {relativeTime(order.createdAt)}
+                  </div>
+                </div>
+                <div className="row">
+                  {Number(order.grandTotal) > 0 ? (
+                    <span className="t-body bold accent">{formatInr(order.grandTotal)}</span>
+                  ) : null}
+                  <Pill label={order.status.name} color={order.status.color} />
+                </div>
+              </div>
+
+              {/* The card stacks its children, so the items sit under the
+                  heading line rather than beside the money. */}
+              <div className="wrap">
+                {order.items.map((item) => (
+                  <span key={item.id} className="t-tiny muted">
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 7,
+                        height: 7,
+                        borderRadius: 4,
+                        marginRight: 6,
+                        background: item.material.color ?? 'var(--text-faint)',
+                      }}
+                    />
+                    {item.display
+                      ? `${item.display.length} × ${item.display.width} ${UNIT_LABEL[item.display.unit]}`
+                      : '—'}
+                    {' · '}
+                    {item.material.name} × {item.quantity}
+                  </span>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <FilterSheet
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        title="Filter orders"
+        dimensions={[
+          {
+            key: 'statusId',
+            label: 'Stage',
+            options: [
+              { id: null, label: 'Any stage' },
+              ...(workflow.data?.statuses ?? []).map((status) => ({
+                id: status.id,
+                label: status.name,
+                color: status.color,
+              })),
+            ],
+          },
+          {
+            key: 'materialId',
+            label: 'Material',
+            options: [
+              { id: null, label: 'Any material' },
+              ...(materials.data ?? []).map((material) => ({
+                id: material.id,
+                label: material.name,
+                color: material.color,
+              })),
+            ],
+          },
+        ]}
+        value={{ statusId, materialId }}
+        onApply={(next) => {
+          setStatusId(next.statusId ?? null);
+          setMaterialId(next.materialId ?? null);
+        }}
+      />
+
+      <ListFooter
+        loading={orders.loadingMore}
+        hasMore={orders.hasMore}
+        shown={orders.items.length}
+        total={orders.total}
+        noun="orders"
+        onMore={orders.loadMore}
+      />
+    </>
   );
 }

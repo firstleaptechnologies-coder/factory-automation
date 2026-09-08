@@ -1,13 +1,14 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import type { Workflow, WorkflowStatus } from '@decor/shared';
+import { Alert, StyleSheet, View } from 'react-native';
+import type { Workflow, WorkflowStatus, WorkflowTransition } from '@decor/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import {
   Button,
   Card,
+  DataTable,
   Chip,
+  ColorPicker,
   Field,
   Icon,
   Loader,
@@ -22,7 +23,8 @@ import {
 import { palette, radius, spacing } from '../../theme';
 
 const CATEGORIES = ['OPEN', 'IN_PROGRESS', 'DONE', 'CANCELLED'] as const;
-const COLORS = ['#6B7785', '#2F81F7', '#D6F55B', '#D29922', '#8957E5', '#2EA043', '#DA3633'];
+/** What a new stage starts as, before anybody picks. */
+const DEFAULT_COLOR = '#6B7785';
 
 /**
  * The flow editor, made for a phone.
@@ -35,7 +37,6 @@ const COLORS = ['#6B7785', '#2F81F7', '#D6F55B', '#D29922', '#8957E5', '#2EA043'
 export function AdminFlowScreen({ navigation }: { navigation: any }) {
   const workflows = useApi<Workflow[]>(() => api.workflows(), []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const activeId = selectedId ?? workflows.data?.find((w) => w.isDefault)?.id ?? workflows.data?.[0]?.id;
@@ -46,9 +47,12 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
 
   const [statusSheet, setStatusSheet] = useState(false);
   const [editing, setEditing] = useState<WorkflowStatus | null>(null);
-  const [form, setForm] = useState({ code: '', name: '', color: COLORS[0], category: 'OPEN' as string });
+  const [form, setForm] = useState({ code: '', name: '', color: DEFAULT_COLOR, category: 'OPEN' as string });
 
   const [transitionFrom, setTransitionFrom] = useState<WorkflowStatus | null>(null);
+  const [expirySheet, setExpirySheet] = useState(false);
+  const [quoteSheet, setQuoteSheet] = useState(false);
+  const [expiryDays, setExpiryDays] = useState('');
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -69,6 +73,58 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
 
   const outgoing = (statusId: string) =>
     data.transitions.filter((t) => t.fromStatusId === statusId);
+
+  const ordered = data.statuses.slice().sort((a, b) => a.sortOrder - b.sortOrder);
+
+  /**
+   * Dropping a move rewrites the whole graph, because that is the shape the API
+   * takes — it replaces the transition set rather than deleting one edge.
+   */
+  /** Open the sheet on an existing stage, from wherever it was tapped. */
+  const openStage = (status: WorkflowStatus) => {
+    setEditing(status);
+    setForm({
+      code: status.code,
+      name: status.name,
+      color: status.color,
+      category: status.category,
+    });
+    setStatusSheet(true);
+  };
+
+  const removeTransition = (from: WorkflowStatus, transition: WorkflowTransition) => {
+    const target = statusById(transition.toStatusId);
+    Alert.alert(
+      'Remove this move?',
+      `Orders will no longer be able to go from ${from.name} to ${target?.name}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () =>
+            run(() =>
+              api.saveWorkflowGraph(data.id, {
+                positions: data.statuses.map((s) => ({
+                  id: s.id,
+                  canvasX: s.canvasX,
+                  canvasY: s.canvasY,
+                })),
+                transitions: data.transitions
+                  .filter((t) => t.id !== transition.id)
+                  .map((t) => ({
+                    fromStatusId: t.fromStatusId,
+                    toStatusId: t.toStatusId,
+                    label: t.label,
+                    requiresNote: t.requiresNote,
+                    allowedRoles: t.allowedRoles,
+                  })),
+              }),
+            ),
+        },
+      ],
+    );
+  };
   const statusById = (id: string) => data.statuses.find((s) => s.id === id);
 
   return (
@@ -79,81 +135,197 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
         onBack={() => navigation.goBack()}
       />
 
-      {(workflows.data?.length ?? 0) > 1 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.wfRow}>
-          {workflows.data?.map((w) => (
-            <View key={w.id} style={{ marginRight: spacing.sm }}>
+      {/*
+        Wraps rather than scrolls sideways. A horizontal ScrollView clips its
+        children's shadows at both edges, so the last chip came out with a hard
+        squared-off shadow hanging over the screen edge.
+      */}
+      <View style={styles.wfRow}>
+        {(workflows.data?.length ?? 0) > 1
+          ? workflows.data?.map((w) => (
               <Chip
-                label={`${w.name} · ${w.kind === 'LEAD' ? 'leads' : 'orders'}`}
+                key={w.id}
+                label={w.name}
                 selected={w.id === activeId}
                 onPress={() => setSelectedId(w.id)}
               />
-            </View>
-          ))}
-        </ScrollView>
-      ) : null}
+            ))
+          : null}
+        {/* Not a workflow, but this is where an admin comes to think about
+            stages — so the screen that picks which of them the home card
+            counts is reached from here. */}
+        <Chip icon="tune" label="Main card" onPress={() => navigation.navigate('MainCard')} />
+      </View>
 
       <Text variant="tiny" tone="faint" style={styles.hint}>
         This graph is the rule the API enforces. A move with no arrow is refused.
+        Tap a stage to rename it, recolour it or take it out.
       </Text>
+
+      {data.kind === 'LEAD' ? (
+        <Card
+          tone="dark"
+          style={styles.expiry}
+          onPress={() => {
+            setExpiryDays(data.leadExpiryDays ? String(data.leadExpiryDays) : '');
+            setExpirySheet(true);
+          }}>
+          <View style={{ flex: 1 }}>
+            <Text variant="label" tone="muted">Goes quiet after</Text>
+            <Text variant="tiny" tone="faint">
+              {data.leadExpiryDays
+                ? `${data.leadExpiryDays} days untouched and an enquiry moves to the archive.`
+                : 'Never. Enquiries stay on the board however long they sit.'}
+            </Text>
+          </View>
+          <Text variant="h3" tone="accent">
+            {data.leadExpiryDays ? `${data.leadExpiryDays}d` : 'Off'}
+          </Text>
+        </Card>
+      ) : null}
+
+      {/*
+        Which stage means a quote has gone out.
+        Configured rather than inferred: one shop's pipeline says "Quoted", the
+        next says "Estimate sent", and a third quotes twice and cares only
+        about the second.
+      */}
+      {data.kind === 'LEAD' ? (
+        <Card
+          tone="dark"
+          style={styles.expiry}
+          onPress={() => setQuoteSheet(true)}>
+          <View style={{ flex: 1 }}>
+            <Text variant="label" tone="muted">Sending a quote means</Text>
+            <Text variant="tiny" tone="faint">
+              {data.quoteStatusId
+                ? 'An enquiry moves here when a quote is sent to the client.'
+                : 'A quote is recorded against the enquiry but moves it nowhere.'}
+            </Text>
+          </View>
+          <Text variant="body" bold tone={data.quoteStatusId ? 'accent' : 'faint'}>
+            {statusById(data.quoteStatusId ?? '')?.name ?? 'No move'}
+          </Text>
+        </Card>
+      ) : null}
+
+      <Button
+        title="Open the canvas"
+        variant="dark"
+        icon={<Icon name="flow" size={17} color={palette.text} />}
+        onPress={() => navigation.navigate('FlowCanvas', { workflowId: activeId })}
+        style={{ marginBottom: spacing.md }}
+      />
 
       <Button
         title="Add stage"
         icon={<Icon name="plus" size={17} color={palette.textOnAccent} />}
         onPress={() => {
           setEditing(null);
-          setForm({ code: '', name: '', color: COLORS[0], category: 'OPEN' });
+          setForm({ code: '', name: '', color: DEFAULT_COLOR, category: 'OPEN' });
           setStatusSheet(true);
         }}
         style={{ marginBottom: spacing.lg }}
       />
 
-      {data.statuses
-        .slice()
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((status, index) => (
-          <Animated.View
-            key={status.id}
-            entering={FadeInDown.delay(Math.min(index, 8) * 40).duration(300)}
-            layout={Layout.springify()}>
-            <Card tone="dark" style={styles.stage}>
-              <View style={styles.stageHead}>
-                <View style={[styles.stageBar, { backgroundColor: status.color }]} />
-                <View style={{ flex: 1 }}>
-                  <View style={styles.stageTitleRow}>
-                    <Text variant="h3">{status.name}</Text>
-                    {status.isInitial ? <Pill label="START" color={palette.accent} small /> : null}
-                    {status.isTerminal ? <Pill label="END" color={palette.surfaceLit} small /> : null}
-                  </View>
-                  <Text variant="tiny" tone="muted">
-                    {status.code} · {status.category.replace('_', ' ').toLowerCase()}
-                    {status.parentId ? ` · under ${statusById(status.parentId)?.name}` : ''}
-                    {status._count?.ordersAtStatus ? ` · ${status._count.ordersAtStatus} here` : ''}
-                  </Text>
-                </View>
-                <Button
-                  title="Edit"
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => {
-                    setEditing(status);
-                    setForm({
-                      code: status.code,
-                      name: status.name,
-                      color: status.color,
-                      category: status.category,
-                    });
-                    setStatusSheet(true);
-                  }}
-                />
-              </View>
+      {/*
+        The stages are a table: a fixed set of facts repeated down the screen,
+        which is exactly what somebody checking a flow is scanning.
 
-              <Text variant="label" tone="faint" style={styles.movesLabel}>
-                Moves out — tap to remove
+        The moves out of a stage are the exception. As a column of wrapping
+        chips they set the width of the whole table — 760 points of it, so on a
+        phone the table scrolled sideways and every row stood as tall as its
+        chips while the visible part of it sat empty. They belong under their
+        stage, where they cost no width, and the facts above them fit the
+        screen and can be read straight down.
+      */}
+      <Card tone="dark">
+        <DataTable
+          rows={ordered}
+          empty="No stages yet — add one to start the flow"
+          columns={[
+            {
+              key: 'stage',
+              header: 'Stage',
+              flex: 3,
+              render: (status) => (
+                /* The whole stage opens the editor, not just the Edit chip. */
+                <View
+                  style={styles.stageCell}
+                  testID={`edit-stage-${status.id}`}
+                  onTouchEnd={() => openStage(status)}>
+                  <View style={[styles.stageBar, { backgroundColor: status.color }]} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={styles.stageTitleRow}>
+                      <Text variant="small" bold numberOfLines={1}>{status.name}</Text>
+                      {status.isInitial ? (
+                        <Pill label="START" color={palette.accent} small />
+                      ) : null}
+                      {status.isTerminal ? (
+                        <Pill label="END" color={palette.surfaceLit} small />
+                      ) : null}
+                    </View>
+                    <Text variant="tiny" tone="faint" numberOfLines={1}>
+                      {status.code}
+                      {status.parentId
+                        ? ` · under ${statusById(status.parentId)?.name}`
+                        : ''}
+                    </Text>
+                  </View>
+                </View>
+              ),
+            },
+            {
+              key: 'category',
+              header: 'Means',
+              flex: 1.2,
+              render: (status) => (
+                <Text variant="tiny" tone="muted" numberOfLines={2}>
+                  {status.category.replace('_', ' ').toLowerCase()}
+                </Text>
+              ),
+            },
+            {
+              key: 'here',
+              header: 'Here',
+              flex: 0.8,
+              align: 'right',
+              render: (status) => (
+                <Text variant="small" tone={status._count?.ordersAtStatus ? 'accent' : 'faint'} bold>
+                  {status._count?.ordersAtStatus ?? 0}
+                </Text>
+              ),
+            },
+            {
+              key: 'edit',
+              header: '',
+              flex: 0.45,
+              align: 'right',
+              /*
+               * A pencil rather than the word: the column is a thumb wide now
+               * that the table fits the screen, and "Edit" wrapped to "Edi/t"
+               * inside it.
+               */
+              render: (status) => (
+                <View
+                  testID={`edit-chip-${status.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit ${status.name}`}
+                  style={styles.editButton}
+                  onTouchEnd={() => openStage(status)}>
+                  <Icon name="edit" size={16} color={palette.textMuted} />
+                </View>
+              ),
+            },
+          ]}
+          detail={(status) => (
+            <View style={styles.moves}>
+              <Text variant="tiny" tone="faint" style={styles.movesLabel}>
+                Moves out — tap one to remove it
               </Text>
               <View style={styles.chipWrap}>
                 {outgoing(status.id).length === 0 ? (
-                  <Text variant="tiny" tone="faint">Nothing leaves this stage</Text>
+                  <Text variant="tiny" tone="faint">Nothing leaves here</Text>
                 ) : (
                   outgoing(status.id).map((transition) => {
                     const target = statusById(transition.toStatusId);
@@ -163,47 +335,17 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
                         label={`→ ${target?.name ?? '?'}${transition.requiresNote ? ' *' : ''}`}
                         accent={target?.color}
                         selected
-                        onPress={() =>
-                          Alert.alert(
-                            'Remove this move?',
-                            `Orders will no longer be able to go from ${status.name} to ${target?.name}.`,
-                            [
-                              { text: 'Cancel', style: 'cancel' },
-                              {
-                                text: 'Remove',
-                                style: 'destructive',
-                                onPress: () =>
-                                  run(() =>
-                                    api.saveWorkflowGraph(data.id, {
-                                      positions: data.statuses.map((s) => ({
-                                        id: s.id,
-                                        canvasX: s.canvasX,
-                                        canvasY: s.canvasY,
-                                      })),
-                                      transitions: data.transitions
-                                        .filter((t) => t.id !== transition.id)
-                                        .map((t) => ({
-                                          fromStatusId: t.fromStatusId,
-                                          toStatusId: t.toStatusId,
-                                          label: t.label,
-                                          requiresNote: t.requiresNote,
-                                          allowedRoles: t.allowedRoles,
-                                        })),
-                                    }),
-                                  ),
-                              },
-                            ],
-                          )
-                        }
+                        onPress={() => removeTransition(status, transition)}
                       />
                     );
                   })
                 )}
                 <Chip label="+ Move" onPress={() => setTransitionFrom(status)} />
               </View>
-            </Card>
-          </Animated.View>
-        ))}
+            </View>
+          )}
+        />
+      </Card>
 
       <Sheet
         visible={statusSheet}
@@ -224,19 +366,13 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
           />
         ) : null}
 
-        <Text variant="label" tone="muted" style={styles.sheetLabel}>Colour</Text>
-        <View style={styles.chipWrap}>
-          {COLORS.map((color) => (
-            <View
-              key={color}
-              style={[
-                styles.swatch,
-                { backgroundColor: color },
-                form.color === color && styles.swatchActive,
-              ]}
-              onTouchEnd={() => setForm({ ...form, color })}
-            />
-          ))}
+        {/* Any colour at all: a shop has its own idea of what a stage looks
+            like, and seven of ours was never going to cover it. */}
+        <View style={styles.sheetLabel}>
+          <ColorPicker
+            value={form.color}
+            onChange={(color) => setForm({ ...form, color })}
+          />
         </View>
 
         <Text variant="label" tone="muted" style={styles.sheetLabel}>Category</Text>
@@ -319,6 +455,77 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
       </Sheet>
 
       <Sheet
+        visible={expirySheet}
+        title="Goes quiet after"
+        subtitle="An enquiry nobody has touched for this long moves to the archive"
+        onClose={() => setExpirySheet(false)}>
+        <Text variant="small" tone="muted" style={{ marginTop: 0 }}>
+          Touching one — a note, a move, a call logged — starts the clock again,
+          so this only ever catches the ones that were genuinely dropped. Leave
+          it empty to keep every enquiry on the board for good.
+        </Text>
+        <Field
+          label="Days"
+          placeholder="30"
+          value={expiryDays}
+          onChangeText={setExpiryDays}
+          keyboardType="number-pad"
+          hint={
+            expiryDays.trim() === '' || Number(expiryDays) === 0
+              ? 'Nothing will be archived.'
+              : `Archived after ${Number(expiryDays)} days untouched.`
+          }
+        />
+        <Button
+          title="Save"
+          loading={busy}
+          onPress={() =>
+            run(async () => {
+              await api.updateWorkflow(data.id, {
+                leadExpiryDays: expiryDays.trim() === '' ? null : Number(expiryDays),
+              });
+              setExpirySheet(false);
+            })
+          }
+        />
+      </Sheet>
+
+      <Sheet
+        visible={quoteSheet}
+        title="Sending a quote means"
+        subtitle="Where an enquiry goes when a quote reaches the client"
+        onClose={() => setQuoteSheet(false)}>
+        <Text variant="small" tone="muted" style={{ marginTop: 0 }}>
+          The move is made through this same graph, so an enquiry only moves
+          where the pipeline allows it. The quote is recorded either way.
+        </Text>
+        <SheetOption
+          label="Nothing — leave it where it is"
+          selected={!data.quoteStatusId}
+          onPress={() =>
+            run(async () => {
+              await api.updateWorkflow(data.id, { quoteStatusId: null });
+              setQuoteSheet(false);
+            })
+          }
+        />
+        {ordered.map((status) => (
+          <SheetOption
+            key={status.id}
+            label={status.name}
+            accent={status.color}
+            selected={data.quoteStatusId === status.id}
+            onPress={() =>
+              run(async () => {
+                await api.updateWorkflow(data.id, { quoteStatusId: status.id });
+                setQuoteSheet(false);
+              })
+            }
+          />
+        ))}
+      </Sheet>
+
+      <Sheet
         visible={Boolean(transitionFrom)}
         title={`Move out of ${transitionFrom?.name ?? ''}`}
         subtitle="Pick where this stage can go"
@@ -372,13 +579,32 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
-  wfRow: { marginBottom: spacing.md },
+  wfRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
   hint: { marginBottom: spacing.lg },
+  expiry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
   stage: { marginBottom: spacing.md },
   stageHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  stageBar: { width: 4, height: 40, borderRadius: 2 },
+  /* The stage cell: its colour bar and the name beside it, no outer margin. */
+  stageCell: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  stageBar: { width: 4, height: 30, borderRadius: 2 },
   stageTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  movesLabel: { marginTop: spacing.lg, marginBottom: spacing.sm },
+  editButton: { padding: spacing.xs },
+  moves: { paddingLeft: spacing.md },
+  movesLabel: {
+    marginBottom: spacing.xs,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   sheetLabel: { marginTop: spacing.lg, marginBottom: spacing.sm },
   swatch: { width: 38, height: 38, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent' },
