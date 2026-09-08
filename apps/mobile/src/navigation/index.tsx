@@ -60,6 +60,14 @@ import { AdminExpenseOptionsScreen } from '../screens/admin/AdminExpenseOptionsS
 import { AdminRolesScreen } from '../screens/admin/AdminRolesScreen';
 import { AdminLetterTemplatesScreen } from '../screens/admin/AdminLetterTemplatesScreen';
 import { EmployeeLettersScreen } from '../screens/EmployeeLettersScreen';
+import { VendorsScreen } from '../screens/VendorsScreen';
+import { VendorDetailScreen } from '../screens/VendorDetailScreen';
+import { PurchasesScreen } from '../screens/PurchasesScreen';
+import { PurchaseEditScreen } from '../screens/PurchaseEditScreen';
+import { PurchaseDetailScreen } from '../screens/PurchaseDetailScreen';
+import { StockScreen } from '../screens/StockScreen';
+import { StockMovesScreen } from '../screens/StockMovesScreen';
+import { WasteScreen } from '../screens/WasteScreen';
 import { TenantsScreen } from '../screens/platform/TenantsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -158,6 +166,14 @@ export function RootNavigator() {
             <Stack.Screen name="AdminRoles" component={AdminRolesScreen} />
             <Stack.Screen name="AdminLetterTemplates" component={AdminLetterTemplatesScreen} />
             <Stack.Screen name="EmployeeLetters" component={EmployeeLettersScreen} />
+            <Stack.Screen name="Vendors" component={VendorsScreen} />
+            <Stack.Screen name="VendorDetail" component={VendorDetailScreen} />
+            <Stack.Screen name="Purchases" component={PurchasesScreen} />
+            <Stack.Screen name="PurchaseEdit" component={PurchaseEditScreen} />
+            <Stack.Screen name="PurchaseDetail" component={PurchaseDetailScreen} />
+            <Stack.Screen name="Stock" component={StockScreen} />
+            <Stack.Screen name="StockMoves" component={StockMovesScreen} />
+            <Stack.Screen name="Waste" component={WasteScreen} />
             <Stack.Screen name="Employees" component={EmployeesScreen} />
             <Stack.Screen name="EmployeeForm" component={EmployeeFormScreen} />
             <Stack.Screen name="EmployeeDetail" component={EmployeeDetailScreen} />

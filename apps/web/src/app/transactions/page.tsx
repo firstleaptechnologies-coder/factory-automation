@@ -41,6 +41,9 @@ const TONE: Record<TransactionKind, string> = {
   PAYMENT_ONLINE: 'var(--info)',
   BANK_DEPOSIT: 'var(--text-muted)',
   EXPENSE: 'var(--warning)',
+  PURCHASE: 'var(--info)',
+  SALARY: 'var(--accent)',
+  ADVANCE: 'var(--text-muted)',
 };
 
 /**
@@ -279,6 +282,9 @@ function Transactions() {
                 color: TONE.BANK_DEPOSIT,
               },
               { id: 'EXPENSE', label: TRANSACTION_LABELS.EXPENSE, color: TONE.EXPENSE },
+              { id: 'PURCHASE', label: TRANSACTION_LABELS.PURCHASE, color: TONE.PURCHASE },
+              { id: 'SALARY', label: TRANSACTION_LABELS.SALARY, color: TONE.SALARY },
+              { id: 'ADVANCE', label: TRANSACTION_LABELS.ADVANCE, color: TONE.ADVANCE },
             ],
           },
         ]}

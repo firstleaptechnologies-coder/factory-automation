@@ -30,9 +30,11 @@ export const MODULES = {
   /** Employees, attendance and what they are paid. */
   HR: 'hr',
 
+  /** Vendors, what was bought, what is on the rack and what was wasted. */
+  PURCHASING: 'purchasing',
+
   // Not built yet. Named here so the plans they belong to can be sold, and so
   // nothing has to be renamed when they arrive.
-  PURCHASING: 'purchasing',
   REPORTS: 'reports',
   ANALYTICS: 'analytics',
   AI: 'ai',
@@ -65,7 +67,7 @@ export const MODULE_CATALOGUE: Module[] = [
   { key: MODULES.QUOTES, label: 'Quotes', blurb: 'Priced quotations, before there is an order' },
   { key: MODULES.FINANCE, label: 'Finances', blurb: 'Payments, the cash position and the payout ledger' },
   { key: MODULES.EXPENSES, label: 'Expenses', blurb: 'What the shop spends, and on what' },
-  { key: MODULES.PURCHASING, label: 'Purchasing', blurb: 'Vendors, purchase orders and stock', comingSoon: true },
+  { key: MODULES.PURCHASING, label: 'Purchasing', blurb: 'Vendors, purchase orders, stock and waste' },
   { key: MODULES.HR, label: 'People', blurb: 'Employees, attendance and salary' },
   { key: MODULES.REPORTS, label: 'Reports', blurb: 'Exports for the shop and for its accountant', comingSoon: true },
   { key: MODULES.ANALYTICS, label: 'Analytics', blurb: 'Cycle times, conversion and what is stuck', comingSoon: true },

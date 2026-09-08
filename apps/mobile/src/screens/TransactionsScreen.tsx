@@ -32,6 +32,9 @@ const TONE: Record<TransactionKind, string> = {
   PAYMENT_ONLINE: palette.info,
   BANK_DEPOSIT: palette.textMuted,
   EXPENSE: palette.warning,
+  PURCHASE: palette.info,
+  SALARY: palette.accent,
+  ADVANCE: palette.textMuted,
 };
 
 const KINDS = [
@@ -40,6 +43,9 @@ const KINDS = [
   { id: 'PAYMENT_ONLINE', label: TRANSACTION_LABELS.PAYMENT_ONLINE, color: TONE.PAYMENT_ONLINE },
   { id: 'BANK_DEPOSIT', label: TRANSACTION_LABELS.BANK_DEPOSIT, color: TONE.BANK_DEPOSIT },
   { id: 'EXPENSE', label: TRANSACTION_LABELS.EXPENSE, color: TONE.EXPENSE },
+  { id: 'PURCHASE', label: TRANSACTION_LABELS.PURCHASE, color: TONE.PURCHASE },
+  { id: 'SALARY', label: TRANSACTION_LABELS.SALARY, color: TONE.SALARY },
+  { id: 'ADVANCE', label: TRANSACTION_LABELS.ADVANCE, color: TONE.ADVANCE },
 ];
 
 /**

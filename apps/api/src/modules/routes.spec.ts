@@ -31,6 +31,8 @@ import { AttendanceController } from './attendance/attendance.controller';
 import { PayrollController } from './payroll/payroll.controller';
 import { RolesController } from './roles/roles.controller';
 import { LettersController } from './letters/letters.controller';
+import { VendorsController } from './vendors/vendors.controller';
+import { PurchasesController } from './purchases/purchases.controller';
 
 /**
  * The API's own wiring, read off the decorators.
@@ -65,6 +67,8 @@ const CONTROLLERS = [
   PayrollController,
   RolesController,
   LettersController,
+  VendorsController,
+  PurchasesController,
 ];
 
 const METHOD_NAME: Record<number, string> = {

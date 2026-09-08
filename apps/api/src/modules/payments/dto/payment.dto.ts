@@ -75,6 +75,9 @@ export const TRANSACTION_KINDS = [
   'PAYMENT_ONLINE',
   'BANK_DEPOSIT',
   'EXPENSE',
+  'PURCHASE',
+  'SALARY',
+  'ADVANCE',
 ] as const;
 
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];

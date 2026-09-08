@@ -184,6 +184,9 @@ export const TRANSACTION_KINDS = [
   'PAYMENT_ONLINE',
   'BANK_DEPOSIT',
   'EXPENSE',
+  'PURCHASE',
+  'SALARY',
+  'ADVANCE',
 ] as const;
 
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
@@ -211,6 +214,9 @@ export const TRANSACTION_LABELS: Record<TransactionKind, string> = {
   PAYMENT_ONLINE: 'Online in',
   BANK_DEPOSIT: 'Banked',
   EXPENSE: 'Spent',
+  PURCHASE: 'Bought',
+  SALARY: 'Wages',
+  ADVANCE: 'Advance',
 };
 
 export interface CashPosition {
@@ -1310,4 +1316,205 @@ export interface LetterDraft {
   kind: LetterKind;
   title: string;
   body: string;
+}
+
+// ---------------------------------------------------------------------------
+// Buying, stock and waste
+// ---------------------------------------------------------------------------
+
+/** Somebody the shop buys from. Not the same model as a client. */
+export interface Vendor {
+  id: string;
+  code: string;
+  name: string;
+  phone?: string | null;
+  altPhone?: string | null;
+  email?: string | null;
+  gstin?: string | null;
+  company?: string | null;
+  stateCode?: string | null;
+  stateName?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  /** What the shop buys from them, in its own words. */
+  supplies?: string | null;
+  paymentTermDays?: number | null;
+  isActive: boolean;
+  _count?: { purchases: number };
+  createdAt: string;
+}
+
+export type PurchaseStatus =
+  | 'DRAFT'
+  | 'ORDERED'
+  | 'PART_RECEIVED'
+  | 'RECEIVED'
+  | 'CANCELLED';
+
+export const PURCHASE_STATUS_LABELS: Record<PurchaseStatus, string> = {
+  DRAFT: 'Draft',
+  ORDERED: 'Ordered',
+  PART_RECEIVED: 'Part arrived',
+  RECEIVED: 'Arrived',
+  CANCELLED: 'Cancelled',
+};
+
+export interface PurchaseItem {
+  id: string;
+  materialId: string;
+  material: { id: string; code: string; name: string; stockUnit: string };
+  thicknessId?: string | null;
+  thickness?: { id: string; valueMm: string | number; label?: string | null } | null;
+  unit: string;
+  quantity: string | number;
+  rate: string | number;
+  gstRatePct: string | number;
+  taxAmount: string | number;
+  lineTotal: string | number;
+  /** How much of this line has actually turned up. */
+  receivedQuantity: string | number;
+  note?: string | null;
+}
+
+export interface Purchase {
+  id: string;
+  code: string;
+  status: PurchaseStatus;
+  vendorId: string;
+  vendor: { id: string; code: string; name: string; gstin?: string | null };
+  orderedOn?: string | null;
+  expectedOn?: string | null;
+  /** The vendor's own paperwork, once it arrives. */
+  billNumber?: string | null;
+  billedOn?: string | null;
+  paidOn?: string | null;
+  paidMode?: PaymentMode | null;
+  subtotal: string | number;
+  taxTotal: string | number;
+  total: string | number;
+  otherCharges: string | number;
+  note?: string | null;
+  items?: PurchaseItem[];
+  _count?: { items: number };
+  createdAt: string;
+}
+
+/** Every change to what is on the rack. Nothing sets a level directly. */
+export type StockMoveKind =
+  | 'RECEIPT'
+  | 'CONSUMPTION'
+  | 'OFFCUT'
+  | 'WASTE'
+  | 'ADJUSTMENT'
+  | 'RETURN';
+
+export const STOCK_MOVE_LABELS: Record<StockMoveKind, string> = {
+  RECEIPT: 'Arrived',
+  CONSUMPTION: 'Issued',
+  OFFCUT: 'Offcut back',
+  WASTE: 'Wasted',
+  ADJUSTMENT: 'Counted',
+  RETURN: 'Sent back',
+};
+
+/** What a person may record by hand. A delivery arrives against a purchase. */
+export const RECORDABLE_MOVES: StockMoveKind[] = [
+  'CONSUMPTION',
+  'OFFCUT',
+  'WASTE',
+  'ADJUSTMENT',
+  'RETURN',
+];
+
+export interface StockMove {
+  id: string;
+  materialId: string;
+  material: { id: string; code: string; name: string; stockUnit: string };
+  thickness?: { id: string; valueMm: string | number; label?: string | null } | null;
+  kind: StockMoveKind;
+  /** Signed: negative took material off the rack. */
+  quantity: string | number;
+  unit: string;
+  rate?: string | number | null;
+  order?: { id: string; code: string } | null;
+  reason?: string | null;
+  note?: string | null;
+  at: string;
+  recordedBy?: { id: string; name: string } | null;
+}
+
+export interface StockLevel {
+  material: {
+    id: string;
+    code: string;
+    name: string;
+    color?: string | null;
+    stockUnit: string;
+    reorderLevel?: number | null;
+  };
+  quantity: number;
+  value: number;
+  averageRate: number;
+  /** At or below the level the shop set. */
+  low: boolean;
+  byThickness: {
+    thickness: { id: string; valueMm: number; label?: string | null };
+    quantity: number;
+  }[];
+}
+
+export interface StockLevels {
+  rows: StockLevel[];
+  totals: { value: number; low: number };
+}
+
+/** What became of the material that left the rack. */
+export interface WasteRow {
+  material: { id: string; code: string; name: string; stockUnit: string };
+  consumed: number;
+  offcut: number;
+  wasted: number;
+  /** Waste as a share of what was issued, not of what was bought. */
+  wastePct: number;
+}
+
+export interface WasteReport {
+  from: string;
+  to: string;
+  rows: WasteRow[];
+  totals: Omit<WasteRow, 'material'>;
+}
+
+/** What a form sends when writing an order. */
+export interface PurchaseInput {
+  vendorId: string;
+  expectedOn?: string;
+  otherCharges?: number;
+  note?: string;
+  items: {
+    materialId: string;
+    thicknessId?: string;
+    unit?: string;
+    quantity: number;
+    rate: number;
+    gstRatePct?: number;
+    taxAmount?: number;
+    note?: string;
+  }[];
+}
+
+export interface VendorInput {
+  name: string;
+  phone?: string;
+  altPhone?: string;
+  email?: string;
+  gstin?: string;
+  company?: string;
+  stateCode?: string;
+  stateName?: string;
+  address?: string;
+  notes?: string;
+  supplies?: string;
+  paymentTermDays?: number;
+  isActive?: boolean;
 }

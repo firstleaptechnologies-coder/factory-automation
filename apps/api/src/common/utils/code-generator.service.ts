@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { tenantId } from '../tenancy/tenant-context';
 
-type Sequenced = 'order' | 'client' | 'lead' | 'estimate' | 'employee';
+type Sequenced = 'order' | 'client' | 'lead' | 'estimate' | 'employee' | 'vendor' | 'purchase';
 
 const PREFIX: Record<Sequenced, string> = {
   order: 'ORD',
@@ -11,6 +11,8 @@ const PREFIX: Record<Sequenced, string> = {
   lead: 'LD',
   estimate: 'EST',
   employee: 'EMP',
+  vendor: 'VEN',
+  purchase: 'PO',
 };
 
 /**
@@ -27,6 +29,11 @@ const BY_FINANCIAL_YEAR: Record<Sequenced, boolean> = {
   lead: true,
   estimate: true,
   employee: false,
+  /// A vendor is a party, like an employee, not a document.
+  vendor: false,
+  /// A purchase order is the shop's own paperwork, so it is dated like the
+  /// rest of it.
+  purchase: true,
 };
 
 type Client = PrismaService | Prisma.TransactionClient;

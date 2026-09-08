@@ -97,6 +97,17 @@ export const PERMISSIONS = {
   SALARY_MANAGE: 'salary.manage',
   SALARY_PAY: 'salary.pay',
 
+  // Buying and stock. Ordering and paying a bill are gated apart, as drafting
+  // a month and paying it are — and what is on the rack is readable by the
+  // floor, who need it to know whether they can start.
+  VENDOR_VIEW: 'vendor.view',
+  VENDOR_MANAGE: 'vendor.manage',
+  PURCHASE_VIEW: 'purchase.view',
+  PURCHASE_MANAGE: 'purchase.manage',
+  PURCHASE_PAY: 'purchase.pay',
+  STOCK_VIEW: 'stock.view',
+  STOCK_MOVE: 'stock.move',
+
   // Shop configuration
   CONFIG_VIEW: 'config.view',
   CONFIG_MANAGE: 'config.manage',
@@ -202,6 +213,18 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
     ],
   },
   {
+    label: 'Buying and stock',
+    permissions: [
+      PERMISSIONS.VENDOR_VIEW,
+      PERMISSIONS.VENDOR_MANAGE,
+      PERMISSIONS.PURCHASE_VIEW,
+      PERMISSIONS.PURCHASE_MANAGE,
+      PERMISSIONS.PURCHASE_PAY,
+      PERMISSIONS.STOCK_VIEW,
+      PERMISSIONS.STOCK_MOVE,
+    ],
+  },
+  {
     label: 'People',
     permissions: [
       PERMISSIONS.EMPLOYEE_VIEW,
@@ -221,6 +244,18 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
       PERMISSIONS.CONFIG_MANAGE,
       PERMISSIONS.WORKFLOW_MANAGE,
       PERMISSIONS.GST_MANAGE,
+    ],
+  },
+  {
+    label: 'Buying and stock',
+    permissions: [
+      PERMISSIONS.VENDOR_VIEW,
+      PERMISSIONS.VENDOR_MANAGE,
+      PERMISSIONS.PURCHASE_VIEW,
+      PERMISSIONS.PURCHASE_MANAGE,
+      PERMISSIONS.PURCHASE_PAY,
+      PERMISSIONS.STOCK_VIEW,
+      PERMISSIONS.STOCK_MOVE,
     ],
   },
   {
@@ -266,6 +301,13 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.SALARY_VIEW]: 'See what people are paid',
   [PERMISSIONS.SALARY_MANAGE]: 'Set pay, give advances, draft a month',
   [PERMISSIONS.SALARY_PAY]: 'Pay a month',
+  [PERMISSIONS.VENDOR_VIEW]: 'View vendors',
+  [PERMISSIONS.VENDOR_MANAGE]: 'Add and edit vendors',
+  [PERMISSIONS.PURCHASE_VIEW]: 'View purchases',
+  [PERMISSIONS.PURCHASE_MANAGE]: 'Order, receive and bill',
+  [PERMISSIONS.PURCHASE_PAY]: 'Pay a purchase bill',
+  [PERMISSIONS.STOCK_VIEW]: 'See what is on the rack',
+  [PERMISSIONS.STOCK_MOVE]: 'Issue, adjust and record waste',
   [PERMISSIONS.PLATFORM_RELEASE_VIEW]: 'See app releases',
   [PERMISSIONS.PLATFORM_RELEASE_MANAGE]: 'Publish app releases',
   [PERMISSIONS.PLATFORM_TENANT_CREATE]: 'Provision workspaces',

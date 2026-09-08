@@ -258,7 +258,9 @@ describe('a workspace’s plan', () => {
     // Offering to add what they already have is offering nothing.
     expect(screen.queryByText('Orders')).not.toBeInTheDocument();
     expect(screen.getByText('People')).toBeInTheDocument();
-    expect(screen.getByText('Purchasing (soon)')).toBeInTheDocument();
+    expect(screen.getByText('Purchasing')).toBeInTheDocument();
+    // Reports is the next module still to come.
+    expect(screen.getByText('Reports (soon)')).toBeInTheDocument();
   });
 
   it('saves the plan and the extras together', async () => {

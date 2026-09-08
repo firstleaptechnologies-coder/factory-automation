@@ -536,11 +536,28 @@ function dateWindow(query: { from?: string; to?: string }): Prisma.LedgerEntryWh
 }
 
 /** Which ledger rows each kind on the Transactions screen is made of. */
-const KIND_ROWS: Record<TransactionKind, Prisma.LedgerEntryWhereInput> = {
+export const KIND_ROWS: Record<TransactionKind, Prisma.LedgerEntryWhereInput> = {
   PAYMENT_CASH: { sourceType: 'Payment', account: LedgerAccount.CASH },
   PAYMENT_ONLINE: { sourceType: 'Payment', account: LedgerAccount.BANK },
   BANK_DEPOSIT: { sourceType: 'CashDeposit' },
   EXPENSE: { sourceType: 'Expense' },
+  PURCHASE: { sourceType: 'Purchase' },
+  SALARY: { sourceType: 'Payslip' },
+  ADVANCE: { sourceType: 'SalaryAdvance' },
+};
+
+/**
+ * Ledger sources this screen deliberately leaves out, and why.
+ *
+ * Listed rather than simply absent. The filter above names what it wants so a
+ * payout cannot arrive here by being forgotten about — but that safety turns
+ * into a different bug the moment a module posts something nobody adds, which
+ * is exactly what happened when purchases shipped. `transactions.spec.ts`
+ * reads both lists against the source and fails on the next one.
+ */
+export const NOT_A_TRANSACTION: Record<string, string> = {
+  Disbursement:
+    'a payout: it sits beside an order rather than inside one, and folding it in here would be the netting-off the books must not do',
 };
 
 /**
@@ -583,6 +600,9 @@ export function transactionFilter(
 export function kindOf(row: { sourceType: string; account: LedgerAccount }): TransactionKind {
   if (row.sourceType === 'CashDeposit') return 'BANK_DEPOSIT';
   if (row.sourceType === 'Expense') return 'EXPENSE';
+  if (row.sourceType === 'Purchase') return 'PURCHASE';
+  if (row.sourceType === 'Payslip') return 'SALARY';
+  if (row.sourceType === 'SalaryAdvance') return 'ADVANCE';
   return row.account === LedgerAccount.CASH ? 'PAYMENT_CASH' : 'PAYMENT_ONLINE';
 }
 

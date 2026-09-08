@@ -101,6 +101,21 @@ flowchart LR
   Home --> cat_people
   subgraph cat_vendors["Vendor management"]
     direction TB
+    vendor_list["Vendors"]
+    vendor_new["Add a vendor"]
+    vendor_list --> vendor_new
+    vendor_detail["One vendor"]
+    vendor_list --> vendor_detail
+    purchases["Purchases"]
+    purchase_new["New order"]
+    purchases --> purchase_new
+    purchase_detail["One purchase"]
+    purchases --> purchase_detail
+    stock["Stock"]
+    stock_material["One material’s moves"]
+    stock --> stock_material
+    stock_waste["Waste"]
+    stock --> stock_waste
     clients["Clients"]
     client_detail["One client"]
     clients --> client_detail
@@ -201,6 +216,15 @@ flowchart LR
 
 | Screen | Web | App route | Permission |
 | --- | --- | --- | --- |
+| Vendors | `/vendors` | `Vendors` | `vendor.view` |
+|   ↳ Add a vendor | `/vendors/new` | — | `vendor.manage` |
+|   ↳ One vendor | `/vendors/[id]` | `VendorDetail` | — |
+| Purchases | `/purchases` | `Purchases` | `purchase.view` |
+|   ↳ New order | `/purchases/new` | `PurchaseEdit` | `purchase.manage` |
+|   ↳ One purchase | `/purchases/[id]` | `PurchaseDetail` | — |
+| Stock | `/stock` | `Stock` | `stock.view` |
+|   ↳ One material’s moves | `/stock/[materialId]` | `StockMoves` | — |
+|   ↳ Waste | `/stock/waste` | `Waste` | — |
 | Clients | `/clients` | `Clients` | `client.view` |
 |   ↳ One client | `/clients/[id]` | `ClientDetail` | — |
 |     ↳ Billing details | `/clients/[id]/firm` | `ClientFirm` | — |

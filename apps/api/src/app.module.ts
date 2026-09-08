@@ -38,6 +38,8 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { LettersModule } from './modules/letters/letters.module';
+import { VendorsModule } from './modules/vendors/vendors.module';
+import { PurchasesModule } from './modules/purchases/purchases.module';
 import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
@@ -79,6 +81,8 @@ import { PlatformModule } from './modules/platform/platform.module';
     PayrollModule,
     RolesModule,
     LettersModule,
+    VendorsModule,
+    PurchasesModule,
     EstimatesModule,
     PlatformModule,
   ],

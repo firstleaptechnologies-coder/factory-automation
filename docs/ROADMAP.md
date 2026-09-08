@@ -450,23 +450,38 @@ blocks anything, and the second wants a commercial answer first — see G11.
     and `routes.spec.ts` fails on the next one that is not. The handful of
     deliberately open reads are listed there by name with the reason.
 
-### Phase 6 · Buying and stock — item 9 — **XL**
+### Phase 6 · Buying and stock — item 9 — **XL** · *complete, 9 September 2026*
 
-The largest genuinely new module, because it brings inventory with it.
-
-- **Vendor master** — the "Vendor management" category currently holds only
-  Clients, which is a hint the model was always intended.
-- Purchase order → goods receipt → purchase bill → payment, each posting to the
-  ledger.
-- **Material stock and valuation** against the existing `Material` /
-  `MaterialThickness`, with reorder alerts.
-- **Consumption and wastage** — offcuts and scrap are first-class in this
-  business and are the number the owner cannot see today. Consumption links a
-  sheet to the order it was cut for; the remainder is either stock or waste, and
-  waste is a reportable number, not a rounding difference.
-- Rule to settle here: a purchase bill is the source for anything that becomes
-  stock; `Expense` is for spend that does not. Both post to the ledger, so
-  neither can hide from Transactions.
+- **Vendor master.** A separate model from `Client` although the columns rhyme:
+  the same firm is occasionally both, and merging them would give one screen
+  listing everybody the shop deals with in either direction with no way to say
+  which way. Retired, never deleted — every purchase hangs off the row.
+- **Order → delivery → bill → payment**, four separate acts because a shop does
+  them days apart, each gated separately. Ordering and billing are one row: a
+  shop this size sends an order and gets a bill against it, and splitting them
+  would mean two documents for the one conversation. What has arrived is
+  counted **per line**, so an order cannot read "arrived" while a line is
+  outstanding — the state a shop chases a supplier from.
+- **Stock is summed, never set.** Every change is a `StockMove`; there is no
+  level anybody can type over, because a quantity that can be overwritten is a
+  quantity with no explanation behind it. Valued at what was actually paid, so
+  a rack holding sheets bought at two prices is worth two prices. Broken down
+  by thickness, because 18mm and 6mm ply are not interchangeable. Reorder
+  alerts fire *at* the level, not below it.
+- **Waste is first-class**, and measured against what was **issued** rather than
+  what was bought — a shop that buys a hundred sheets and cuts ten has wasted a
+  share of ten, and dividing by a hundred would make every month look better the
+  more it ordered. An offcut is not waste: it went back on the rack. Waste and a
+  stocktake both require a reason.
+- **The rule is enforced, not just stated.** Stock arrives only against a
+  purchase — recording a receipt by hand is refused — so everything on the rack
+  has a bill behind it, and `Expense` is spend that does not become stock.
+- **The gap this closed:** Transactions named the kinds it showed, so purchases,
+  salaries and advances posted to the ledger and appeared nowhere. It still
+  names them (a payout must stay out by construction), but
+  `transactions.coverage.spec.ts` now reads every `sourceType` the API posts and
+  fails on the next one that is neither shown nor deliberately excluded with a
+  written reason.
 
 ### Phase 7 · Documents — item 10, and the invoice it needs — **M**
 

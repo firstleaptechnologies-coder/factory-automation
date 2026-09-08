@@ -16,6 +16,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'NotificationTemplate', 'Expense', 'ExpenseOption', 'ExpenseEditHistory',
   'Employee', 'Attendance', 'PayStructure', 'SalaryAdvance', 'SalaryRun', 'Payslip',
   'LetterTemplate', 'Letter',
+  'Vendor', 'Purchase', 'PurchaseItem', 'StockMove',
 ]);
 
 

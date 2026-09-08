@@ -437,6 +437,8 @@ model User {
   employee          Employee?            @relation("EmployeeLogin")
   employeesCreated  Employee[]           @relation("EmployeeCreatedBy")
   attendanceMarked  Attendance[]         @relation("AttendanceMarkedBy")
+  vendorsCreated    Vendor[]             @relation("VendorCreatedBy")
+  stockMovesMade    StockMove[]          @relation("StockMoveBy")
 
   @@unique([tenantId, code])
   @@unique([tenantId, email])
@@ -534,8 +536,16 @@ model Material {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  thicknesses MaterialThickness[]
-  orderItems  OrderItem[]
+  thicknesses    MaterialThickness[]
+  orderItems     OrderItem[]
+  purchaseItems  PurchaseItem[]
+  stockMoves     StockMove[]
+
+  /// Order again when the rack falls below this many, in the unit below.
+  /// Null means nobody is watching this material.
+  reorderLevel Decimal? @db.Decimal(14, 3)
+  /// What one of them is: a sheet, a kilo, a length. The shop's own word.
+  stockUnit    String   @default("sheet")
 
   @@unique([tenantId, code])
   @@index([isActive, sortOrder])
@@ -556,7 +566,9 @@ model MaterialThickness {
   sortOrder  Int      @default(0)
   isActive   Boolean  @default(true)
 
-  orderItems OrderItem[]
+  orderItems    OrderItem[]
+  purchaseItems PurchaseItem[]
+  stockMoves    StockMove[]
 
   @@unique([materialId, valueMm])
   @@index([materialId, isActive])
@@ -888,6 +900,7 @@ model Order {
   disbursements Disbursement[]
   ledgerEntries LedgerEntry[]
   expenses      Expense[]
+  stockMoves    StockMove[]
   /// Set when this order came from a lead.
   fromLead      Lead?                @relation("LeadConversion")
 
@@ -1678,6 +1691,245 @@ model Letter {
 
   @@index([tenantId, employeeId, issuedOn])
   @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// Buying, stock and waste
+// ---------------------------------------------------------------------------
+//
+// A purchase bill is the source of anything that becomes stock; an `Expense` is
+// spend that does not. Both post to the ledger, so neither can hide from
+// Transactions — and the line between them is the only rule anybody has to
+// remember when deciding where a payment goes.
+
+/// Somebody the shop buys from.
+///
+/// A separate model from `Client` although the columns rhyme: the same firm is
+/// occasionally both, and merging them would mean one screen listing everybody
+/// the shop deals with in either direction, with no way to say which way.
+model Vendor {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  code     String
+  name     String
+
+  phone    String?
+  altPhone String?
+  email    String?
+  gstin    String?
+  /// The trading name on their paperwork, which is rarely the person's name.
+  company  String?
+
+  /// Their state, as the GST code and name ("08-Rajasthan"). It decides whether
+  /// a purchase is intra-state (CGST + SGST) or inter-state (IGST), so a bill
+  /// cannot be entered correctly without it.
+  stateCode String?
+  stateName String?
+
+  address String?
+  notes   String?
+  /// What the shop buys from them, in its own words — "boards", "hardware".
+  supplies String?
+
+  /// How long they usually take to be paid, in days. Nothing is enforced on
+  /// it; it is what the shop tells itself when deciding what to order.
+  paymentTermDays Int?
+
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdBy   User?    @relation("VendorCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchases Purchase[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@index([tenantId])
+}
+
+/// One order placed on a vendor, and the bill it becomes.
+///
+/// Ordering and billing are the same row rather than two. A shop this size
+/// sends an order and gets a bill against it; splitting them would mean two
+/// documents to reconcile for the one conversation that actually happened.
+/// What separates them is time: `billNumber` and `billedOn` are the vendor's
+/// paperwork, filled in when it arrives.
+model Purchase {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  /// PO-2627-0001. Dated, because the shop's own paperwork is.
+  code     String
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id])
+
+  status PurchaseStatus @default(DRAFT)
+
+  orderedOn DateTime? @db.Date
+  /// When the vendor says it will arrive. Not enforced; it is what the shop
+  /// chases against.
+  expectedOn DateTime? @db.Date
+
+  /// The vendor's own bill, once there is one.
+  billNumber String?
+  billedOn   DateTime? @db.Date
+
+  /// Where the money went, once it has. A purchase can be received and unpaid
+  /// for weeks — that is the normal case, and the reason this is nullable.
+  paidOn   DateTime?    @db.Date
+  paidMode PaymentMode?
+
+  /// The totals, held rather than recomputed on every read.
+  ///
+  /// A bill from a vendor is a document with figures on it, and those figures
+  /// are what the shop owes whatever this system would have calculated. When
+  /// they disagree the bill wins, and the difference is somebody's to look at.
+  subtotal Decimal @db.Decimal(14, 2) @default(0)
+  taxTotal Decimal @db.Decimal(14, 2) @default(0)
+  total    Decimal @db.Decimal(14, 2) @default(0)
+
+  /// Anything on the bill that is not a line: freight, loading, a round-off.
+  otherCharges Decimal @db.Decimal(14, 2) @default(0)
+  note         String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items      PurchaseItem[]
+  stockMoves StockMove[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, vendorId])
+  @@index([tenantId])
+}
+
+/// One line of a purchase: a material, a thickness, a quantity and a rate.
+model PurchaseItem {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
+  id         String   @id @default(cuid())
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  materialId  String
+  material    Material           @relation(fields: [materialId], references: [id])
+  thicknessId String?
+  thickness   MaterialThickness? @relation(fields: [thicknessId], references: [id])
+
+  /// What one of them is: a sheet, a kilo, a length. The shop's own word,
+  /// because a "sheet" of 18mm ply and a "kilo" of brass are both one line.
+  unit String @default("sheet")
+
+  quantity Decimal @db.Decimal(14, 3)
+  rate     Decimal @db.Decimal(14, 2)
+  /// The tax on this line, as a rate and as an amount. Copied off the bill
+  /// rather than derived: a vendor's arithmetic is what the shop owes.
+  gstRatePct Decimal @db.Decimal(5, 2) @default(0)
+  taxAmount  Decimal @db.Decimal(14, 2) @default(0)
+  lineTotal  Decimal @db.Decimal(14, 2)
+
+  /// How much of this line has actually turned up.
+  receivedQuantity Decimal @db.Decimal(14, 3) @default(0)
+
+  note String?
+
+  stockMoves StockMove[]
+
+  @@index([tenantId, purchaseId])
+  @@index([tenantId, materialId])
+  @@index([tenantId])
+}
+
+/// Every change to what is on the rack.
+///
+/// Signed: a receipt is positive, a consumption negative. The quantity on hand
+/// is the sum of these rows and nothing else — no level anybody can type over,
+/// because a figure that can be overwritten is a figure with no explanation
+/// behind it. "Where did four sheets go" is the question this table answers.
+model StockMove {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+
+  materialId  String
+  material    Material           @relation(fields: [materialId], references: [id])
+  thicknessId String?
+  thickness   MaterialThickness? @relation(fields: [thicknessId], references: [id])
+
+  kind StockMoveKind
+  /// Signed, in the material's own unit. Negative takes stock off the rack.
+  quantity Decimal @db.Decimal(14, 3)
+  unit     String  @default("sheet")
+
+  /// What it cost, per unit, when that is known.
+  ///
+  /// Carried on the move rather than on the material so a rack holding sheets
+  /// bought at two prices can still be valued: the shop paid what it paid, and
+  /// averaging it away at the door loses the only figure an accountant wants.
+  rate Decimal? @db.Decimal(14, 2)
+
+  /// Where it came from, or went.
+  purchaseId     String?
+  purchase       Purchase?     @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  purchaseItemId String?
+  purchaseItem   PurchaseItem? @relation(fields: [purchaseItemId], references: [id], onDelete: SetNull)
+  orderId        String?
+  order          Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  /// Why, in the shop's words. Required for waste and for an adjustment: a
+  /// sheet that vanished with no reason beside it is the thing this module
+  /// exists to stop.
+  reason String?
+  note   String?
+
+  at          DateTime @db.Date
+  recordedById String?
+  recordedBy   User?   @relation("StockMoveBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, materialId, thicknessId])
+  @@index([tenantId, kind, at])
+  @@index([tenantId, orderId])
+  @@index([tenantId])
+}
+
+/// Where a purchase has got to.
+///
+/// DRAFT is a list somebody is still writing. ORDERED has been sent. Goods
+/// arrive against it — possibly in more than one delivery — and it is RECEIVED
+/// when everything ordered has come, PART_RECEIVED while some has.
+enum PurchaseStatus {
+  DRAFT
+  ORDERED
+  PART_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+/// What a movement of stock was.
+///
+/// Every change to what is on the rack is one of these rows, and the quantity
+/// on hand is their sum. Nothing sets a level directly: a figure that could be
+/// typed over is a figure with no explanation behind it, and "where did four
+/// sheets go" is the question this module exists to answer.
+enum StockMoveKind {
+  /// A delivery arrived against a purchase.
+  RECEIPT
+  /// Issued to an order and cut.
+  CONSUMPTION
+  /// The usable remainder of a sheet, back on the rack.
+  OFFCUT
+  /// Cut away and gone: the kerf, the trim, the piece that broke.
+  WASTE
+  /// A count found something different from the books.
+  ADJUSTMENT
+  /// Sent back to the vendor.
+  RETURN
 }
 
 // ---------------------------------------------------------------------------

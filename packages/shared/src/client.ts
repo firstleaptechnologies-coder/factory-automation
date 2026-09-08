@@ -61,6 +61,15 @@ import type {
   Letter,
   LetterDraft,
   LetterTemplate,
+  Purchase,
+  PurchaseInput,
+  PurchaseStatus,
+  StockLevels,
+  StockMove,
+  StockMoveKind,
+  Vendor,
+  VendorInput,
+  WasteReport,
   WorkspaceRole,
   WorkspaceUser,
   MarkInput,
@@ -1008,6 +1017,122 @@ export class ApiClient {
   /** A draft can be thrown away. Anything further along cannot. */
   discardSalaryRun(id: string) {
     return this.del<{ id: string }>(`/payroll/runs/${id}`);
+  }
+
+  // -- buying and stock ------------------------------------------------------
+
+  /**
+   * Everybody the shop buys from.
+   *
+   * A separate list from clients although the columns rhyme: the same firm is
+   * occasionally both, and one list would have no way to say which way.
+   */
+  vendors(query?: { includeInactive?: boolean; search?: string; page?: number; limit?: number }) {
+    return this.get<Paginated<Vendor>>('/vendors', query);
+  }
+
+  vendor(id: string) {
+    return this.get<Vendor>(`/vendors/${id}`);
+  }
+
+  createVendor(body: VendorInput) {
+    return this.post<Vendor>('/vendors', body);
+  }
+
+  updateVendor(id: string, body: VendorInput) {
+    return this.patch<Vendor>(`/vendors/${id}`, body);
+  }
+
+  /** Retires them. Every purchase ever placed still hangs off the row. */
+  retireVendor(id: string) {
+    return this.del<Vendor>(`/vendors/${id}`);
+  }
+
+  purchases(query?: {
+    status?: PurchaseStatus;
+    vendorId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.get<Paginated<Purchase>>('/purchases', query);
+  }
+
+  purchase(id: string) {
+    return this.get<Purchase>(`/purchases/${id}`);
+  }
+
+  createPurchase(body: PurchaseInput) {
+    return this.post<Purchase>('/purchases', body);
+  }
+
+  /** Only a draft. Once it is sent, receive against it instead. */
+  updatePurchase(id: string, body: PurchaseInput) {
+    return this.patch<Purchase>(`/purchases/${id}`, body);
+  }
+
+  placePurchase(id: string) {
+    return this.post<Purchase>(`/purchases/${id}/place`);
+  }
+
+  /** A delivery. Stock arrives here and nowhere else. */
+  receivePurchase(
+    id: string,
+    body: { lines: { purchaseItemId: string; quantity: number }[]; at?: string; note?: string },
+  ) {
+    return this.post<Purchase>(`/purchases/${id}/receive`, body);
+  }
+
+  /** The vendor's own paperwork, once it arrives. */
+  billPurchase(id: string, body: { billNumber: string; billedOn: string; otherCharges?: number }) {
+    return this.post<Purchase>(`/purchases/${id}/bill`, body);
+  }
+
+  payPurchase(id: string, body: { mode: PaymentMode; paidOn?: string }) {
+    return this.post<Purchase>(`/purchases/${id}/pay`, body);
+  }
+
+  /** Cancels one nothing has arrived against. */
+  cancelPurchase(id: string) {
+    return this.del<Purchase>(`/purchases/${id}`);
+  }
+
+  /** What is on the rack, and what it is worth. */
+  stockLevels(query?: { materialId?: string; search?: string; lowOnly?: boolean }) {
+    return this.get<StockLevels>('/stock', {
+      ...query,
+      lowOnly: query?.lowOnly ? 'true' : undefined,
+    });
+  }
+
+  /** Every move against one material — the story of the rack. */
+  stockMoves(materialId: string) {
+    return this.get<StockMove[]>(`/stock/${materialId}/moves`);
+  }
+
+  /**
+   * Issuing, the offcut back, the waste, a count.
+   *
+   * Never a delivery: stock arrives against a purchase, so that everything on
+   * the rack has a bill behind it.
+   */
+  recordStockMove(body: {
+    materialId: string;
+    thicknessId?: string;
+    kind: StockMoveKind;
+    quantity: number;
+    unit?: string;
+    orderId?: string;
+    at?: string;
+    reason?: string;
+    note?: string;
+  }) {
+    return this.post<StockMove>('/stock/moves', body);
+  }
+
+  /** What became of the material that left the rack. */
+  wasteReport(query: { from: string; to: string; materialId?: string }) {
+    return this.get<WasteReport>('/stock/waste', query);
   }
 
   // -- letters ---------------------------------------------------------------

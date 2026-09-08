@@ -294,6 +294,57 @@ describe('endpoints', () => {
     ['cashPosition', (a) => a.cashPosition(), 'GET', '/payments/cash-position'],
     ['cashInHand', (a) => a.cashInHand(), 'GET', '/payments/cash-in-hand'],
 
+    ['vendors', (a) => a.vendors(), 'GET', '/vendors'],
+    ['vendor', (a) => a.vendor('v1'), 'GET', '/vendors/v1'],
+    ['createVendor', (a) => a.createVendor({ name: 'V' }), 'POST', '/vendors'],
+    ['updateVendor', (a) => a.updateVendor('v1', { name: 'V' }), 'PATCH', '/vendors/v1'],
+    ['retireVendor', (a) => a.retireVendor('v1'), 'DELETE', '/vendors/v1'],
+
+    ['purchases', (a) => a.purchases(), 'GET', '/purchases'],
+    ['purchase', (a) => a.purchase('p1'), 'GET', '/purchases/p1'],
+    [
+      'createPurchase',
+      (a) => a.createPurchase({ vendorId: 'v1', items: [] }),
+      'POST',
+      '/purchases',
+    ],
+    [
+      'updatePurchase',
+      (a) => a.updatePurchase('p1', { vendorId: 'v1', items: [] }),
+      'PATCH',
+      '/purchases/p1',
+    ],
+    ['placePurchase', (a) => a.placePurchase('p1'), 'POST', '/purchases/p1/place'],
+    [
+      'receivePurchase',
+      (a) => a.receivePurchase('p1', { lines: [] }),
+      'POST',
+      '/purchases/p1/receive',
+    ],
+    [
+      'billPurchase',
+      (a) => a.billPurchase('p1', { billNumber: 'B1', billedOn: '2026-09-09' }),
+      'POST',
+      '/purchases/p1/bill',
+    ],
+    ['payPurchase', (a) => a.payPurchase('p1', { mode: 'CASH' }), 'POST', '/purchases/p1/pay'],
+    ['cancelPurchase', (a) => a.cancelPurchase('p1'), 'DELETE', '/purchases/p1'],
+
+    ['stockLevels', (a) => a.stockLevels(), 'GET', '/stock'],
+    ['stockMoves', (a) => a.stockMoves('m1'), 'GET', '/stock/m1/moves'],
+    [
+      'recordStockMove',
+      (a) => a.recordStockMove({ materialId: 'm1', kind: 'WASTE', quantity: 1 }),
+      'POST',
+      '/stock/moves',
+    ],
+    [
+      'wasteReport',
+      (a) => a.wasteReport({ from: '2026-09-01', to: '2026-09-30' }),
+      'GET',
+      '/stock/waste',
+    ],
+
     ['letterTemplates', (a) => a.letterTemplates(), 'GET', '/letters/templates'],
     [
       'createLetterTemplate',

@@ -409,6 +409,87 @@ export const NAV_GROUPS: NavGroup[] = [
     blurb: 'Everyone the shop deals with',
     items: [
       {
+        key: 'vendor-list',
+        module: MODULES.PURCHASING,
+        label: 'Vendors',
+        icon: 'box',
+        permission: PERMISSIONS.VENDOR_VIEW,
+        web: '/vendors',
+        app: 'Vendors',
+        children: [
+          {
+            /*
+             * Web only. The app writes a vendor on the same screen it reads
+             * one — there is not enough to a vendor to justify two — so it has
+             * no separate route to name here.
+             */
+            key: 'vendor-new',
+            label: 'Add a vendor',
+            icon: 'plus',
+            permission: PERMISSIONS.VENDOR_MANAGE,
+            web: '/vendors/new',
+          },
+          {
+            key: 'vendor-detail',
+            label: 'One vendor',
+            icon: 'box',
+            web: '/vendors/[id]',
+            app: 'VendorDetail',
+          },
+        ],
+      },
+      {
+        key: 'purchases',
+        module: MODULES.PURCHASING,
+        label: 'Purchases',
+        icon: 'clipboard',
+        permission: PERMISSIONS.PURCHASE_VIEW,
+        web: '/purchases',
+        app: 'Purchases',
+        children: [
+          {
+            key: 'purchase-new',
+            label: 'New order',
+            icon: 'plus',
+            permission: PERMISSIONS.PURCHASE_MANAGE,
+            web: '/purchases/new',
+            app: 'PurchaseEdit',
+          },
+          {
+            key: 'purchase-detail',
+            label: 'One purchase',
+            icon: 'clipboard',
+            web: '/purchases/[id]',
+            app: 'PurchaseDetail',
+          },
+        ],
+      },
+      {
+        key: 'stock',
+        module: MODULES.PURCHASING,
+        label: 'Stock',
+        icon: 'layers',
+        permission: PERMISSIONS.STOCK_VIEW,
+        web: '/stock',
+        app: 'Stock',
+        children: [
+          {
+            key: 'stock-material',
+            label: 'One material’s moves',
+            icon: 'history',
+            web: '/stock/[materialId]',
+            app: 'StockMoves',
+          },
+          {
+            key: 'stock-waste',
+            label: 'Waste',
+            icon: 'trend',
+            web: '/stock/waste',
+            app: 'Waste',
+          },
+        ],
+      },
+      {
         key: 'clients',
         module: MODULES.CLIENTS,
         label: 'Clients',
