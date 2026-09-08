@@ -311,9 +311,18 @@ blocks anything, and the second wants a commercial answer first — see G11.
 
 ### Phase 4 · The ledger and Expenses — item 7 — **L**
 
-- Introduce `LedgerEntry` (D1) and migrate payments, deposits and disbursements
-  onto it, leaving those tables and their screens exactly as they behave now.
-  Transactions and cash-in-hand start reading the ledger.
+- **Done, 8 September.** `LedgerEntry` (D1) exists and payments, deposits and
+  settled payouts post to it, idempotently on `(tenantId, sourceType,
+  sourceId)`, so the nightly reconcile is safe to run whenever. Transactions
+  and cash-in-hand now read the ledger: one ordered table, so paging is the
+  database's job, and a module that posts appears on the screen the day it
+  ships. Two things the move settled that adding up four tables never could:
+  cash handed to a fitter leaves the drawer (shown on its own line, and never
+  netted off the order it came from), and a settled payout can no longer be
+  cancelled — the money has gone, so what came back is a new record.
+  - Left for a later change: **reversing a settled payout**, the mirror of
+    payment reversal. Until it exists a mistaken payout can be corrected only
+    by someone with database access.
 - **Expenses**, ported from momentum-arena's shape: `Expense` +
   `ExpenseEditHistory` + `ExpenseOption` (tenant-editable dropdowns for
   category, paid-by, mode — the reason their expense screen never needs a

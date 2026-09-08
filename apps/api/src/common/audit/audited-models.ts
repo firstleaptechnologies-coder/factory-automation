@@ -19,6 +19,8 @@ export const NOT_AUDITED: Record<string, string> = {
     'holds the file bytes; a diff of it would copy every uploaded photo into the log',
   Notification:
     'already a record of something that happened; auditing it would log the log',
+  LedgerEntry:
+    'a posting of rows that are audited already — auditing it would say everything twice',
 };
 
 export const AUDITED_MODELS: Set<string> = new Set(

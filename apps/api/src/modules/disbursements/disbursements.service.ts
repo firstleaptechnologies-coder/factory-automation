@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DisbursementStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { LedgerService } from '../ledger/ledger.service';
+import { disbursementPosting } from '../ledger/postings';
 import { tenantId } from '../../common/tenancy/tenant-context';
 import { paginate } from '../../common/dto/pagination.dto';
 import { round2 } from '../../common/utils/pricing';
@@ -33,7 +35,12 @@ const INCLUDE = {
  */
 @Injectable()
 export class DisbursementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Named for what it is rather than `ledger`, which this service already
+    // uses for the payout ledger the accountant reconciles.
+    private readonly books: LedgerService,
+  ) {}
 
   /** What this tenant calls these charges. */
   async label(): Promise<string> {
@@ -142,7 +149,7 @@ export class DisbursementsService {
       throw new BadRequestException('That payout is already settled');
     }
 
-    return this.prisma.disbursement.update({
+    const settled = await this.prisma.disbursement.update({
       where: { id },
       data: {
         status: DisbursementStatus.PAID,
@@ -154,6 +161,17 @@ export class DisbursementsService {
       },
       include: INCLUDE,
     });
+
+    /*
+     * Posted now rather than when it was planned: a planned payout is an
+     * intention, and an intention is not a movement of money. It sits beside
+     * the order it came from and never reduces what that order collected.
+     */
+    await this.books.post(
+      disbursementPosting({ ...settled, amount: Number(settled.amount) }),
+    );
+
+    return settled;
   }
 
   async update(id: string, dto: UpdateDisbursementDto) {
@@ -165,8 +183,22 @@ export class DisbursementsService {
   async remove(id: string) {
     const row = await this.prisma.disbursement.findFirst({ where: { id } });
     if (!row) throw new NotFoundException('Payout not found');
-    // Cancelled rather than deleted: a settled payout is a record the
-    // accountant may need to see even after it is written off.
+
+    /*
+     * A payout that was settled has already left the drawer, and its ledger
+     * row says so. Cancelling it here would take it off this screen while the
+     * books went on counting the money as spent — the two disagreeing quietly,
+     * which is the one thing the ledger exists to prevent. Money that actually
+     * came back is a new record, not the erasure of an old one.
+     */
+    if (row.status === DisbursementStatus.PAID) {
+      throw new BadRequestException(
+        'That payout has already been paid — record the money coming back rather than cancelling it',
+      );
+    }
+
+    // Cancelled rather than deleted: a planned payout that was dropped is
+    // still something the shop may want to see it decided against.
     return this.prisma.disbursement.update({
       where: { id },
       data: { status: DisbursementStatus.CANCELLED },

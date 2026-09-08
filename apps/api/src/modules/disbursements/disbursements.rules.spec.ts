@@ -1,14 +1,24 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DisbursementStatus, PaymentMode } from '@prisma/client';
 import { DisbursementsService } from './disbursements.service';
-import { inTenant, prismaMock } from '../../../test/prisma-mock';
+import { inTenant, prismaMock, ledgerMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;
 
 function build() {
   const db = prismaMock() as never as Db;
+  // The database hands back the row it updated, and the service posts a
+  // settled payout to the ledger.
+  db.disbursement.update = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+    id: 'd1',
+    orderId: 'o1',
+    amount: 12000,
+    payeeName: 'Ramesh',
+    category: null,
+    ...data,
+  }));
   db.order.findFirst = jest.fn(async () => ({ id: 'o1', code: 'ORD-1' }));
-  return { service: new DisbursementsService(db as never), db };
+  return { service: new DisbursementsService(db as never, ledgerMock() as never), db };
 }
 
 describe('label', () => {
@@ -194,11 +204,23 @@ describe('update and remove', () => {
     const { service, db } = build();
     db.disbursement.findFirst = jest.fn(async () => ({ id: 'd1' }));
     await service.remove('d1');
-    // A settled payout is a record the accountant may need even after write-off.
+    // A payout the shop decided against is still something it decided.
     expect(db.disbursement.update.mock.calls[0][0].data).toEqual({
       status: DisbursementStatus.CANCELLED,
     });
     expect(db.disbursement.delete).not.toHaveBeenCalled();
+  });
+
+  it('will not cancel a payout that has already been paid', async () => {
+    const { service, db } = build();
+    db.disbursement.findFirst = jest.fn(async () => ({
+      id: 'd1',
+      status: DisbursementStatus.PAID,
+    }));
+    // The money left the drawer and the ledger says so. Cancelling here would
+    // take it off this screen while the books went on counting it as spent.
+    await expect(service.remove('d1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.disbursement.update).not.toHaveBeenCalled();
   });
 
   it('refuses to remove a missing payout', async () => {

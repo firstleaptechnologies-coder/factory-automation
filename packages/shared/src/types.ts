@@ -208,6 +208,10 @@ export interface CashPosition {
   cash: {
     received: number;
     deposited: number;
+    /** Cash handed out of the drawer — a payout settled in cash, and later an
+     * expense paid the same way. Shown on its own line: it leaves the drawer,
+     * but it never reduces the order it came from. */
+    paidOut: number;
     inHand: number;
     receipts: number;
     depositsUnallocated: number;

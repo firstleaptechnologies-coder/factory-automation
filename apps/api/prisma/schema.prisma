@@ -431,6 +431,7 @@ model User {
   disbursements     Disbursement[]       @relation("DisbursementRecordedBy")
   estimates         Estimate[]           @relation("EstimateCreatedBy")
   notifications     Notification[]       @relation("NotificationFor")
+  ledgerEntries     LedgerEntry[]
 
   @@unique([tenantId, code])
   @@unique([tenantId, email])
@@ -480,6 +481,7 @@ model Client {
 
   orders    Order[]
   locations ClientLocation[]
+  ledgerEntries LedgerEntry[]
   leads     Lead[]
   estimates Estimate[]
 
@@ -877,6 +879,7 @@ model Order {
   statusHistory OrderStatusHistory[]
   payments      Payment[]
   disbursements Disbursement[]
+  ledgerEntries LedgerEntry[]
   /// Set when this order came from a lead.
   fromLead      Lead?                @relation("LeadConversion")
 
@@ -1182,6 +1185,100 @@ model Disbursement {
 
   @@index([tenantId, orderId])
   @@index([tenantId, status])
+}
+
+// ---------------------------------------------------------------------------
+// The ledger
+// ---------------------------------------------------------------------------
+//
+// Every rupee that moves posts a row here, whatever moved it: a client's
+// payment, a trip to the bank, a payout, and — as they arrive — an expense, a
+// purchase bill, a salary.
+//
+// The tables above keep their own shape, because each carries meaning this one
+// does not: a Payment knows which order it settles, a Disbursement knows who is
+// owed. What they gain is a posting. Transactions, cash in hand, the reports
+// and the accountant's export all read from here, so a money feature that does
+// not post is a feature that visibly does not exist rather than one that
+// quietly does not count.
+//
+// The standing rule is unchanged by any of it: payouts are recorded beside
+// orders and never netted off them. An order's collected value is the sum of
+// its payments; nothing here subtracts from that.
+
+/// Which side of the books an entry belongs to.
+enum LedgerDirection {
+  /// Money arriving: a client paying.
+  IN
+  /// Money leaving: a payout, an expense, a salary.
+  OUT
+  /// Money moving between the shop's own places: cash walked to the bank.
+  TRANSFER
+}
+
+/// Where the money sat.
+enum LedgerAccount {
+  CASH
+  BANK
+}
+
+model LedgerEntry {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+
+  /// When the money moved, which is not always when somebody typed it in.
+  at        DateTime
+  direction LedgerDirection
+  /// The account whose balance changed. A transfer names the account the money
+  /// left — cash in hand is the number this shop actually asks about, and the
+  /// bank's own statement is the truth for the other side.
+  account   LedgerAccount
+
+  /// Signed on purpose.
+  ///
+  /// A correction posts the negative of what it takes back, under the same
+  /// direction as the original, so every total is a plain sum and no reader
+  /// has to know which kinds cancel which.
+  amount Decimal @db.Decimal(14, 2)
+
+  /// The row that caused this, and its table. Unique together, so posting the
+  /// same source twice cannot double-count it — which is what makes a
+  /// reconcile safe to run whenever.
+  sourceType String
+  sourceId   String
+
+  orderId  String?
+  order    Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  /// Who the money came from or went to, when no row in this database is them.
+  party    String?
+
+  /// What an accountant needs, and a screen does not.
+  ///
+  /// Kept because the shop wants an export their CA can post from: an amount
+  /// and a date are a bank statement, not a ledger.
+  accountHead String?
+  /// RECEIPT | PAYMENT | CONTRA | JOURNAL — the voucher kind Tally and its
+  /// like expect.
+  voucher     String
+  /// The tax inside `amount`, where it is known.
+  taxAmount   Decimal? @db.Decimal(14, 2)
+  gstin       String?
+  reference   String?
+  note        String?
+
+  /// Who entered it. Nulled rather than removed if that person's account ever
+  /// goes: a money row outlives the staff list.
+  recordedById String?
+  recordedBy   User?   @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, sourceType, sourceId])
+  @@index([tenantId, at])
+  @@index([tenantId, direction, at])
+  @@index([tenantId, orderId])
 }
 
 // ---------------------------------------------------------------------------

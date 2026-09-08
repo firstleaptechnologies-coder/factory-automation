@@ -46,6 +46,7 @@ const MODELS = [
   'tenant',
   'platformUser',
   'auditLog',
+  'ledgerEntry',
   'notification',
   'notificationTemplate',
   'jobLease',
@@ -123,4 +124,18 @@ export function inTenant<T>(fn: () => T): T {
  */
 export function notificationsMock(): { raise: jest.Mock } {
   return { raise: jest.fn(async () => 1) };
+}
+
+/**
+ * A stand-in for the ledger.
+ *
+ * Every money service posts to it, and no test about pricing or status rules
+ * cares what it wrote — the ones that do assert on this directly.
+ */
+export function ledgerMock(): { post: jest.Mock; write: jest.Mock; cashInHand: jest.Mock } {
+  return {
+    post: jest.fn(async (..._args: unknown[]) => undefined),
+    write: jest.fn(async (..._args: unknown[]) => undefined),
+    cashInHand: jest.fn(async () => 0),
+  };
 }

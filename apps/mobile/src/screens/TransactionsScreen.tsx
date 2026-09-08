@@ -133,6 +133,13 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
           <Text variant="small" tone="onAccent" style={{ opacity: 0.8, marginTop: 4 }}>
             of {formatInr(data.cash.received)} taken in cash
           </Text>
+          {/* Named rather than absorbed: cash handed to a fitter has left the
+              drawer, and a shop counting its notes should be told why. */}
+          {data.cash.paidOut > 0 ? (
+            <Text variant="small" tone="onAccent" style={{ opacity: 0.8 }}>
+              less {formatInr(data.cash.paidOut)} paid out in cash
+            </Text>
+          ) : null}
         </Card>
       </Animated.View>
 

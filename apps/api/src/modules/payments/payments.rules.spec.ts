@@ -1,13 +1,45 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PaymentMode } from '@prisma/client';
 import { PaymentsService } from './payments.service';
-import { inTenant, prismaMock, notificationsMock } from '../../../test/prisma-mock';
+import { inTenant, prismaMock, notificationsMock, ledgerMock } from '../../../test/prisma-mock';
+
+/** The ledger the service posted to, for the tests that care. */
+let posted: ReturnType<typeof ledgerMock>;
 
 function serviceWithOrder(order: unknown) {
   const db = prismaMock();
   (db as never as Record<string, Record<string, jest.Mock>>).order.findUnique =
     jest.fn(async () => order);
-  return { service: new PaymentsService(db, notificationsMock() as never), db } as {
+  // The database hands back the row it made, and the service posts it to the
+  // ledger — so the stand-in has to hand one back too.
+  (db as never as Record<string, Record<string, jest.Mock>>).payment.create = jest.fn(
+    async ({ data }: { data: Record<string, unknown> }) => {
+      // Prisma hands back nested creates as the rows they became, not as the
+      // instruction that made them.
+      const nested = (data.deposits as { create?: unknown } | undefined)?.create;
+      const made = nested ? ([] as Record<string, unknown>[]).concat(nested as never) : [];
+      return {
+        ...data,
+        id: 'created',
+        receivedAt: new Date('2026-09-08T10:00:00.000Z'),
+        deposits: made.map((deposit, index) => ({
+          id: `banked-${index}`,
+          depositedAt: new Date('2026-09-08T16:00:00.000Z'),
+          ...deposit,
+        })),
+      };
+    },
+  );
+  (db as never as Record<string, Record<string, jest.Mock>>).cashDeposit.create = jest.fn(
+    async ({ data }: { data: Record<string, unknown> }) => ({
+      id: 'banked',
+      depositedAt: new Date('2026-09-08T16:00:00.000Z'),
+      payment: null,
+      ...data,
+    }),
+  );
+  posted = ledgerMock();
+  return { service: new PaymentsService(db, notificationsMock() as never, posted as never), db } as {
     service: PaymentsService;
     db: Record<string, Record<string, jest.Mock>>;
   };
@@ -113,7 +145,14 @@ describe('banking cash later', () => {
   function serviceWithPayment(payment: unknown) {
     const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
     db.payment.findUnique = jest.fn(async () => payment);
-    return { service: new PaymentsService(db as never, notificationsMock() as never), db };
+    // The database hands back the row it made, and the service posts it.
+    db.cashDeposit.create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: 'banked',
+      depositedAt: new Date('2026-09-08T16:00:00.000Z'),
+      payment: null,
+      ...data,
+    }));
+    return { service: new PaymentsService(db as never, notificationsMock() as never, ledgerMock() as never), db };
   }
 
   it('refuses to deposit against an online payment', async () => {
@@ -160,8 +199,18 @@ describe('banking cash later', () => {
   });
 
   it('allows an unattached deposit, for cash that cannot be traced to one receipt', async () => {
-    const db = prismaMock();
-    const service = new PaymentsService(db, notificationsMock() as never);
+    const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
+    db.cashDeposit.create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: 'banked',
+      depositedAt: new Date('2026-09-08T16:00:00.000Z'),
+      payment: null,
+      ...data,
+    }));
+    const service = new PaymentsService(
+      db as never,
+      notificationsMock() as never,
+      ledgerMock() as never,
+    );
     await expect(
       inTenant(() => service.deposit({ amount: 2500 } as never)),
     ).resolves.toBeDefined();
@@ -198,11 +247,21 @@ describe('reversing a payment', () => {
   function serviceWithPayment(over: Record<string, unknown> = {}) {
     const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
     db.payment.findUnique = jest.fn(async () => ({ ...PAYMENT, ...over }));
-    db.payment.create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
-      id: 'p2',
-      ...data,
-    }));
-    return { service: new PaymentsService(db as never, notificationsMock() as never), db };
+    db.payment.create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
+      const nested = (data.deposits as { create?: unknown } | undefined)?.create;
+      const made = nested ? ([] as Record<string, unknown>[]).concat(nested as never) : [];
+      return {
+        ...data,
+        id: 'p2',
+        receivedAt: new Date('2026-09-08T10:00:00.000Z'),
+        deposits: made.map((deposit, index) => ({
+          id: `unbanked-${index}`,
+          depositedAt: new Date('2026-09-08T16:00:00.000Z'),
+          ...deposit,
+        })),
+      };
+    });
+    return { service: new PaymentsService(db as never, notificationsMock() as never, ledgerMock() as never), db };
   }
 
   const reverse = (service: PaymentsService, reason = 'Entered twice') =>
@@ -278,9 +337,91 @@ describe('reversing a payment', () => {
   it('says so when the receipt is not there', async () => {
     const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
     db.payment.findUnique = jest.fn(async () => null);
-    const service = new PaymentsService(db as never, notificationsMock() as never);
+    const service = new PaymentsService(db as never, notificationsMock() as never, ledgerMock() as never);
     await expect(inTenant(() => service.reverse('nope', 'x', 'u1'))).rejects.toThrow(
       NotFoundException,
     );
+  });
+});
+
+
+/**
+ * Everything that moves money posts to the ledger.
+ *
+ * Not tidiness: a module that does not post is missing from Transactions and
+ * from the reports, and the point of one posting layer is that it is missing
+ * *visibly* rather than quietly.
+ */
+describe('what reaches the books', () => {
+  it('posts a receipt as money in', async () => {
+    const { service } = serviceWithOrder({ ...ORDER, client: { gstin: '27AAAPV1234C1ZV' } });
+    await inTenant(() =>
+      service.record('order-1', { amount: 7200, mode: PaymentMode.CASH } as never, 'u1'),
+    );
+
+    expect(posted.post.mock.calls[0][0]).toMatchObject({
+      sourceType: 'Payment',
+      direction: 'IN',
+      account: 'CASH',
+      amount: 7200,
+      voucher: 'RECEIPT',
+      orderId: 'order-1',
+    });
+  });
+
+  it('posts cash banked with it as a transfer, not as an outflow', async () => {
+    const { service } = serviceWithOrder(ORDER);
+    await inTenant(() =>
+      service.record(
+        'order-1',
+        { amount: 7200, mode: PaymentMode.CASH, depositedAmount: 5000 } as never,
+        'u1',
+      ),
+    );
+
+    // The shop has not spent it; it has only moved it.
+    expect(posted.post.mock.calls[1][0]).toMatchObject({
+      sourceType: 'CashDeposit',
+      direction: 'TRANSFER',
+      account: 'CASH',
+      amount: 5000,
+    });
+  });
+
+  it('posts the correction when a receipt is taken back', async () => {
+    const db = prismaMock() as never as Record<string, Record<string, jest.Mock>>;
+    db.payment.findUnique = jest.fn(async () => ({
+      id: 'p1',
+      orderId: 'order-1',
+      amount: 40000,
+      mode: PaymentMode.CASH,
+      receivedAt: new Date('2026-09-01T10:00:00Z'),
+      reversalOfId: null,
+      reversedBy: null,
+      deposits: [],
+      order: { id: 'order-1', grandTotal: 47200, payments: [{ amount: 40000 }] },
+    }));
+    db.payment.create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+      ...data,
+      id: 'p2',
+      receivedAt: new Date('2026-09-08T10:00:00.000Z'),
+      deposits: [],
+    }));
+    const ledger = ledgerMock();
+    const service = new PaymentsService(
+      db as never,
+      notificationsMock() as never,
+      ledger as never,
+    );
+
+    await inTenant(() => service.reverse('p1', 'Entered twice', 'u1'));
+
+    // Same direction, negative amount — so every total stays a plain sum.
+    expect(ledger.post.mock.calls[0][0]).toMatchObject({
+      sourceType: 'Payment',
+      direction: 'IN',
+      amount: -40000,
+      note: 'Entered twice',
+    });
   });
 });

@@ -104,6 +104,13 @@ function Transactions() {
         <div className="t-small on-accent" style={{ opacity: 0.8, marginTop: 4 }}>
           out of {formatInr(data.cash.received)} taken in cash
         </div>
+        {/* Named rather than absorbed: cash handed to a fitter has left the
+            drawer, and a shop counting its notes should be told why. */}
+        {data.cash.paidOut > 0 && (
+          <div className="t-small on-accent" style={{ opacity: 0.8 }}>
+            less {formatInr(data.cash.paidOut)} paid out in cash
+          </div>
+        )}
       </Card>
 
       {/* The bifurcation: where the money came in and where it went. */}

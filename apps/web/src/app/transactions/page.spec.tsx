@@ -20,7 +20,7 @@ jest.mock('@/components/Shell', () => ({
 }));
 
 const POSITION = {
-  cash: { received: 50000, deposited: 30000, inHand: 20000 },
+  cash: { received: 50000, deposited: 30000, paidOut: 0, inHand: 20000 },
   online: { received: 25000 },
 };
 
@@ -212,4 +212,19 @@ describe('filtering', () => {
     // A page of 25 filtered in the browser would hide the rest of the ledger.
     expect(apiMock.transactions.mock.calls.at(-1)![0]).toMatchObject({ page: 1 });
   });
+});
+
+it('says where the cash went when some of it was paid out', async () => {
+  // A payout leaves the drawer, so the drawer figure has to account for it —
+  // and say so, rather than quietly showing a smaller number.
+  await mount({
+    cash: { received: 50000, deposited: 30000, paidOut: 5000, inHand: 15000 },
+    online: { received: 25000 },
+  });
+  expect(await screen.findByText(/paid out in cash/)).toBeInTheDocument();
+});
+
+it('keeps the payout line off a shop that has paid nothing out', async () => {
+  await mount();
+  expect(screen.queryByText(/paid out in cash/)).toBeNull();
 });

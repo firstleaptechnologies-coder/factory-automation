@@ -1,66 +1,83 @@
-import { PaymentsService } from './payments.service';
-import { prismaMock, notificationsMock } from '../../../test/prisma-mock';
+import { PaymentsService, kindOf, transactionFilter } from './payments.service';
+import { TRANSACTION_KINDS } from './dto/payment.dto';
+import { prismaMock, notificationsMock, ledgerMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;
 
 const at = (iso: string) => new Date(iso);
 
-const PAYMENTS = [
+/** Ledger rows, which is what this screen has read since the books arrived. */
+const ROWS = [
   {
-    id: 'p1',
-    amount: 25000,
-    mode: 'CASH',
-    reference: null,
-    note: 'Advance',
-    receivedAt: at('2026-09-06T10:00:00Z'),
-    receivedBy: { id: 'u1', name: 'Ravi' },
+    id: 'l3',
+    sourceType: 'Payment',
+    sourceId: 'p2',
+    account: 'BANK',
+    direction: 'IN',
+    at: at('2026-09-08T10:00:00Z'),
+    amount: 18000,
+    reference: 'UTR9988',
+    note: null,
+    recordedBy: { id: 'u1', name: 'Ravi' },
+    order: { id: 'o2', code: 'ORD-2', client: { name: 'Bhatia' } },
+  },
+  {
+    id: 'l2',
+    sourceType: 'CashDeposit',
+    sourceId: 'd1',
+    account: 'CASH',
+    direction: 'TRANSFER',
+    at: at('2026-09-07T10:00:00Z'),
+    amount: 20000,
+    reference: 'HDFC-771',
+    note: null,
+    recordedBy: { id: 'u2', name: 'Nakul' },
     order: { id: 'o1', code: 'ORD-1', client: { name: 'Verma Interiors' } },
   },
   {
-    id: 'p2',
-    amount: 18000,
-    mode: 'ONLINE',
-    reference: 'UTR9988',
-    note: null,
-    receivedAt: at('2026-09-08T10:00:00Z'),
-    receivedBy: { id: 'u1', name: 'Ravi' },
-    order: { id: 'o2', code: 'ORD-2', client: { name: 'Bhatia' } },
+    id: 'l1',
+    sourceType: 'Payment',
+    sourceId: 'p1',
+    account: 'CASH',
+    direction: 'IN',
+    at: at('2026-09-06T10:00:00Z'),
+    amount: 25000,
+    reference: null,
+    note: 'Advance',
+    recordedBy: { id: 'u1', name: 'Ravi' },
+    order: { id: 'o1', code: 'ORD-1', client: { name: 'Verma Interiors' } },
   },
 ];
 
-const DEPOSITS = [
-  {
-    id: 'd1',
-    amount: 20000,
-    bankReference: 'HDFC-771',
-    note: null,
-    depositedAt: at('2026-09-07T10:00:00Z'),
-    depositedBy: { id: 'u2', name: 'Nakul' },
-    payment: { order: { id: 'o1', code: 'ORD-1', client: { name: 'Verma Interiors' } } },
-  },
-];
-
-function build(payments = PAYMENTS, deposits = DEPOSITS) {
+function build(rows: unknown[] = ROWS) {
   const db = prismaMock() as never as Db;
-  db.payment.findMany = jest.fn(async () => payments);
-  db.cashDeposit.findMany = jest.fn(async () => deposits);
-  db.payment.count = jest.fn(async () => payments.length);
-  db.cashDeposit.count = jest.fn(async () => deposits.length);
-  return { service: new PaymentsService(db as never, notificationsMock() as never), db };
+  db.ledgerEntry.findMany = jest.fn(async () => rows);
+  db.ledgerEntry.count = jest.fn(async () => rows.length);
+  return {
+    service: new PaymentsService(
+      db as never,
+      notificationsMock() as never,
+      ledgerMock() as never,
+    ),
+    db,
+  };
 }
 
 const query = (over: Record<string, unknown> = {}) =>
   ({ page: 1, limit: 20, skip: 0, ...over }) as never;
 
+/** The clauses a filter is made of: kinds, then dates, then any search. */
+const parts = (where: { AND?: unknown }) => where.AND as unknown[];
+
+/** The kind clauses a filter ended up asking for. */
+const kindsIn = (where: { AND?: unknown }) => JSON.stringify(parts(where)[0]);
+
 it('puts every kind of movement in one list, newest first', async () => {
-  const { service } = build();
+  const { service, db } = build();
   const page = await service.transactions(query());
   // "What happened to the money" is a single question, whatever the source.
-  expect(page.data.map((row) => row.id)).toEqual([
-    'payment:p2',
-    'deposit:d1',
-    'payment:p1',
-  ]);
+  expect(page.data.map((row) => row.id)).toEqual(['l3', 'l2', 'l1']);
+  expect(db.ledgerEntry.findMany.mock.calls[0][0].orderBy).toEqual({ at: 'desc' });
 });
 
 it('names each row for what it actually was', async () => {
@@ -95,92 +112,105 @@ it('carries the order and the person, so a row can be accounted for', async () =
   });
 });
 
-it('says how many movements there are altogether', async () => {
-  const { service } = build();
-  const page = await service.transactions(query());
-  expect(page.meta.total).toBe(3);
+it('reads the payer and the payee off the row itself', () => {
+  // A ledger row knows which account it moved, so nothing here has to open the
+  // payment table to find out whether it was cash.
+  expect(kindOf({ sourceType: 'Payment', account: 'CASH' as never })).toBe('PAYMENT_CASH');
+  expect(kindOf({ sourceType: 'Payment', account: 'BANK' as never })).toBe('PAYMENT_ONLINE');
+  expect(kindOf({ sourceType: 'CashDeposit', account: 'CASH' as never })).toBe('BANK_DEPOSIT');
 });
 
-describe('filtering', () => {
+describe('what this screen may show', () => {
+  it('names the kinds it wants rather than the ones it does not', () => {
+    const where = transactionFilter({}, TRANSACTION_KINDS);
+    const asked = kindsIn(where);
+    expect(asked).toContain('Payment');
+    expect(asked).toContain('CashDeposit');
+  });
+
+  it('leaves payouts out, because they sit beside orders and not inside them', () => {
+    // Folding a payout in here would net it off the money the order collected.
+    // The filter lists what it wants, so a payout cannot arrive by being
+    // forgotten about — not even one posted to the ledger long after this.
+    const where = transactionFilter({}, TRANSACTION_KINDS);
+    expect(kindsIn(where)).not.toContain('Disbursement');
+  });
+
   it('asks only for cash when cash is what was asked for', async () => {
     const { service, db } = build();
     await service.transactions(query({ kind: 'PAYMENT_CASH' }));
-    expect(db.payment.findMany.mock.calls[0][0].where.mode).toBe('CASH');
-    // Deposits are a different kind; they must not be fetched at all.
-    expect(db.cashDeposit.findMany).not.toHaveBeenCalled();
+    expect(kindsIn(db.ledgerEntry.findMany.mock.calls[0][0].where)).toEqual(
+      JSON.stringify({ OR: [{ sourceType: 'Payment', account: 'CASH' }] }),
+    );
   });
 
   it('asks only for online when online is what was asked for', async () => {
     const { service, db } = build();
     await service.transactions(query({ kind: 'PAYMENT_ONLINE' }));
-    expect(db.payment.findMany.mock.calls[0][0].where.mode).toBe('ONLINE');
+    expect(kindsIn(db.ledgerEntry.findMany.mock.calls[0][0].where)).toContain('BANK');
   });
 
   it('asks only for trips to the bank', async () => {
     const { service, db } = build();
-    const page = await service.transactions(query({ kind: 'BANK_DEPOSIT' }));
-    expect(db.payment.findMany).not.toHaveBeenCalled();
-    expect(page.data.every((row) => row.kind === 'BANK_DEPOSIT')).toBe(true);
-    expect(page.meta.total).toBe(1);
-  });
-
-  it('does not narrow by mode when both kinds of payment are wanted', async () => {
-    const { service, db } = build();
-    await service.transactions(query());
-    expect(db.payment.findMany.mock.calls[0][0].where.mode).toBeUndefined();
-  });
-
-  it('windows each source on its own date column', async () => {
-    const { service, db } = build();
-    await service.transactions(query({ from: '2026-09-01', to: '2026-09-30' }));
-    expect(db.payment.findMany.mock.calls[0][0].where.receivedAt).toBeDefined();
-    expect(db.cashDeposit.findMany.mock.calls[0][0].where.depositedAt).toBeDefined();
-  });
-
-  it('leaves the dates alone when none were given', async () => {
-    const { service, db } = build();
-    await service.transactions(query());
-    expect(db.payment.findMany.mock.calls[0][0].where.receivedAt).toBeUndefined();
-  });
-
-  it('searches an order, a client and a reference', async () => {
-    const { service, db } = build();
-    await service.transactions(query({ search: 'UTR99' }));
-    const where = db.payment.findMany.mock.calls[0][0].where;
-    expect(JSON.stringify(where.OR)).toContain('UTR99');
-    // A trip to the bank has a bank reference rather than an order of its own.
-    expect(JSON.stringify(db.cashDeposit.findMany.mock.calls[0][0].where.OR)).toContain(
-      'bankReference',
+    await service.transactions(query({ kind: 'BANK_DEPOSIT' }));
+    expect(kindsIn(db.ledgerEntry.findMany.mock.calls[0][0].where)).toEqual(
+      JSON.stringify({ OR: [{ sourceType: 'CashDeposit' }] }),
     );
+  });
+
+  it('windows on the day the money moved', () => {
+    const where = transactionFilter(
+      { from: '2026-09-01', to: '2026-09-30' },
+      TRANSACTION_KINDS,
+    );
+    expect(JSON.stringify(where.AND)).toContain('"at"');
+  });
+
+  it('leaves the dates alone when none were given', () => {
+    const where = transactionFilter({}, TRANSACTION_KINDS);
+    expect(JSON.stringify(parts(where)[1])).toBe('{}');
+  });
+
+  it('searches an order, a client, a reference and whoever was paid', () => {
+    const where = transactionFilter({ search: 'UTR99' }, TRANSACTION_KINDS);
+    const asked = JSON.stringify(parts(where)[2]);
+    for (const field of ['reference', 'note', 'party', 'code', 'name']) {
+      expect(asked).toContain(field);
+    }
+    expect(asked).toContain('UTR99');
+  });
+
+  it('trims a search that is only spaces rather than looking for them', () => {
+    const where = transactionFilter({ search: '   ' }, TRANSACTION_KINDS);
+    expect(parts(where).length).toBe(2);
   });
 });
 
 describe('paging', () => {
-  it('asks each source only for the rows that could reach this page', async () => {
+  it('leaves the paging to the database', async () => {
     const { service, db } = build();
     await service.transactions(query({ page: 3, limit: 10, skip: 20 }));
-    // Otherwise the work grows with the ledger rather than with the page.
-    expect(db.payment.findMany.mock.calls[0][0].take).toBe(30);
-    expect(db.cashDeposit.findMany.mock.calls[0][0].take).toBe(30);
+    // One ordered table, so the work grows with the page rather than with the
+    // ledger — which is what merging two sources in memory could not promise.
+    const call = db.ledgerEntry.findMany.mock.calls[0][0];
+    expect(call.skip).toBe(20);
+    expect(call.take).toBe(10);
   });
 
-  it('cuts the merged list to the page that was asked for', async () => {
-    const { service } = build();
-    const page = await service.transactions(query({ page: 2, limit: 2, skip: 2 }));
-    expect(page.data.map((row) => row.id)).toEqual(['payment:p1']);
-  });
-
-  it('counts both sources towards the total', async () => {
+  it('counts every movement the filter covers, not the page in hand', async () => {
     const { service, db } = build();
-    db.payment.count = jest.fn(async () => 140);
-    db.cashDeposit.count = jest.fn(async () => 9);
+    db.ledgerEntry.count = jest.fn(async () => 149);
     const page = await service.transactions(query());
     expect(page.meta.total).toBe(149);
+    // Counted through the same filter the rows came from, or the two disagree.
+    expect(db.ledgerEntry.count.mock.calls[0][0].where).toEqual(
+      db.ledgerEntry.findMany.mock.calls[0][0].where,
+    );
   });
 });
 
 it('says nothing rather than breaking on a shop that has taken nothing', async () => {
-  const { service } = build([], []);
+  const { service } = build([]);
   const page = await service.transactions(query());
   expect(page.data).toEqual([]);
   expect(page.meta.total).toBe(0);

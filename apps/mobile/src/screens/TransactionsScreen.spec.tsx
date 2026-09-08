@@ -41,7 +41,7 @@ const FEED = [
 ];
 
 const POSITION = {
-  cash: { received: 30000, deposited: 18000, inHand: 12000 },
+  cash: { received: 30000, deposited: 18000, paidOut: 0, inHand: 12000 },
   online: { received: 45000, receipts: 3 },
   deposits: 2,
 };
@@ -233,5 +233,21 @@ describe('filtering', () => {
         expect.objectContaining({ search: 'UTR99' }),
       ),
     );
+  });
+
+  it('says where the cash went when some of it was paid out', async () => {
+    // A payout leaves the drawer, so the drawer figure has to account for it —
+    // and say so, rather than quietly showing a smaller number.
+    await mount({
+      cash: { received: 30000, deposited: 18000, paidOut: 4000, inHand: 8000 },
+      online: { received: 45000, receipts: 3 },
+      deposits: 2,
+    });
+    expect(await screen.findByText(/paid out in cash/)).toBeTruthy();
+  });
+
+  it('keeps the payout line off a shop that has paid nothing out', async () => {
+    await mount();
+    expect(screen.queryByText(/paid out in cash/)).toBeNull();
   });
 });

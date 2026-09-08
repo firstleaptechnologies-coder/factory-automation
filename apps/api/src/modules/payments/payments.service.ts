@@ -1,13 +1,22 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PaymentMode, PaymentStatus, Prisma } from '@prisma/client';
+import {
+  LedgerAccount,
+  LedgerDirection,
+  PaymentMode,
+  PaymentStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { LedgerService } from '../ledger/ledger.service';
+import { depositPosting, paymentPosting } from '../ledger/postings';
 import { round2 } from '../../common/utils/pricing';
 import {
   CashPositionQueryDto,
   RecordDepositDto,
   RecordPaymentDto,
   TRANSACTION_KINDS,
+  TransactionKind,
   TransactionQueryDto,
 } from './dto/payment.dto';
 import { paginate } from '../../common/dto/pagination.dto';
@@ -31,6 +40,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly ledger: LedgerService,
   ) {}
 
   /**
@@ -44,7 +54,7 @@ export class PaymentsService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       // The client comes along for what the notification will say.
-      include: { payments: true, client: { select: { name: true } } },
+      include: { payments: true, client: { select: { name: true, gstin: true } } },
     });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
@@ -104,6 +114,13 @@ export class PaymentsService {
       return payment;
     });
 
+    /*
+     * Post it. After the transaction, not inside it: the money has been taken
+     * either way, and a ledger row that could not be written is something the
+     * nightly reconcile picks up rather than a reason to refuse a receipt.
+     */
+    await this.postReceipt(recorded, order);
+
     await this.notifications.raise('payment.recorded', {
       entity: 'Order',
       entityId: orderId,
@@ -117,6 +134,47 @@ export class PaymentsService {
     });
 
     return recorded;
+  }
+
+  /**
+   * Put a receipt and anything banked with it into the ledger.
+   *
+   * One place, so a receipt and its correction are posted by the same code —
+   * the correction is the same row with a negative amount, and nothing here
+   * has to know which is which.
+   */
+  private async postReceipt(
+    payment: {
+      id: string;
+      orderId: string;
+      amount: unknown;
+      mode: PaymentMode;
+      receivedAt: Date;
+      reference?: string | null;
+      note?: string | null;
+      reason?: string | null;
+      reversalOfId?: string | null;
+      receivedById?: string | null;
+      deposits?: {
+        id: string;
+        amount: unknown;
+        depositedAt: Date;
+        bankReference?: string | null;
+        note?: string | null;
+        depositedById?: string | null;
+      }[];
+    },
+    order: { clientId?: string | null; code?: string | null; client?: { gstin?: string | null } | null },
+  ): Promise<void> {
+    await this.ledger.post(
+      paymentPosting({ ...payment, amount: Number(payment.amount) }, order),
+    );
+
+    for (const deposit of payment.deposits ?? []) {
+      await this.ledger.post(
+        depositPosting({ ...deposit, amount: Number(deposit.amount) }, { orderId: payment.orderId }),
+      );
+    }
   }
 
   /** Cash walked to the bank. Attach it to a payment when it is traceable. */
@@ -143,7 +201,7 @@ export class PaymentsService {
       }
     }
 
-    return this.prisma.cashDeposit.create({
+    const banked = await this.prisma.cashDeposit.create({
       data: {
         tenantId: tenantId(),
         paymentId: dto.paymentId,
@@ -153,7 +211,14 @@ export class PaymentsService {
         note: dto.note,
         depositedById: userId,
       },
+      include: { payment: { select: { orderId: true } } },
     });
+
+    await this.ledger.post(
+      depositPosting({ ...banked, amount: Number(banked.amount) }, banked.payment),
+    );
+
+    return banked;
   }
 
   /** The money picture for one order. */
@@ -209,54 +274,55 @@ export class PaymentsService {
   /**
    * Cash across the whole shop.
    *
-   * Deposits that were not attributed to a payment still reduce what is in
-   * hand — one trip to the bank often covers several orders' takings — so they
-   * are counted here even though no single order can claim them.
+   * Read from the ledger rather than added up from the payment tables: cash
+   * handed to a fitter leaves the drawer just as surely as cash walked to the
+   * bank, and a figure that only knew about receipts and deposits overstated
+   * what was actually there. The payout is shown on its own line — it reduces
+   * the drawer, never the order it came from.
    */
   async cashPosition(query: CashPositionQueryDto) {
-    const where = query.from || query.to
-      ? {
-          receivedAt: {
-            ...(query.from ? { gte: new Date(query.from) } : {}),
-            ...(query.to ? { lte: new Date(query.to) } : {}),
-          },
-        }
-      : {};
+    const window = dateWindow(query);
 
-    const [cashPayments, onlinePayments, allDeposits, unallocated] = await Promise.all([
-      this.prisma.payment.aggregate({
-        where: { ...where, mode: PaymentMode.CASH },
-        _sum: { amount: true },
-        _count: { _all: true },
+    const [received, banked, paidOut, online, unallocated] = await Promise.all([
+      this.total({ ...window, direction: LedgerDirection.IN, account: LedgerAccount.CASH }),
+      this.total({
+        ...window,
+        direction: LedgerDirection.TRANSFER,
+        account: LedgerAccount.CASH,
       }),
-      this.prisma.payment.aggregate({
-        where: { ...where, mode: PaymentMode.ONLINE },
-        _sum: { amount: true },
-        _count: { _all: true },
-      }),
-      this.prisma.cashDeposit.aggregate({ _sum: { amount: true }, _count: { _all: true } }),
-      this.prisma.cashDeposit.aggregate({
-        where: { paymentId: null },
-        _sum: { amount: true },
+      this.total({ ...window, direction: LedgerDirection.OUT, account: LedgerAccount.CASH }),
+      this.total({ ...window, direction: LedgerDirection.IN, account: LedgerAccount.BANK }),
+      this.total({
+        ...window,
+        direction: LedgerDirection.TRANSFER,
+        account: LedgerAccount.CASH,
+        orderId: null,
       }),
     ]);
 
-    const cashReceived = Number(cashPayments._sum.amount ?? 0);
-    const depositedTotal = Number(allDeposits._sum.amount ?? 0);
-
     return {
       cash: {
-        received: round2(cashReceived),
-        deposited: round2(depositedTotal),
-        inHand: round2(cashReceived - depositedTotal),
-        receipts: cashPayments._count._all,
-        depositsUnallocated: round2(Number(unallocated._sum.amount ?? 0)),
+        received: received.amount,
+        deposited: banked.amount,
+        paidOut: paidOut.amount,
+        inHand: round2(received.amount - banked.amount - paidOut.amount),
+        receipts: received.count,
+        depositsUnallocated: unallocated.amount,
       },
-      online: {
-        received: round2(Number(onlinePayments._sum.amount ?? 0)),
-        receipts: onlinePayments._count._all,
-      },
-      deposits: allDeposits._count._all,
+      online: { received: online.amount, receipts: online.count },
+      deposits: banked.count,
+    };
+  }
+
+  private async total(where: Prisma.LedgerEntryWhereInput) {
+    const result = await this.prisma.ledgerEntry.aggregate({
+      where,
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
+    return {
+      amount: round2(Number(result._sum.amount ?? 0)),
+      count: result._count._all,
     };
   }
 
@@ -265,138 +331,33 @@ export class PaymentsService {
    *
    * One list rather than one per source, because "what happened to the money"
    * is a single question: cash taken, an online transfer, a trip to the bank —
-   * and, when they arrive, expenses. Payouts stay in their own ledger; they sit
-   * beside orders rather than inside them, and folding them in here would be
-   * the netting-off the books must not do.
+   * and, when they arrive, expenses. It reads the ledger, so a module that
+   * posts is on this screen the day it ships and one that forgets to post is
+   * visibly absent rather than quietly missing.
    *
-   * Assembled in memory rather than in SQL because the sources are separate
-   * tables with different shapes. Each is asked for at most the rows that could
-   * reach the requested page, so the work does not grow with the ledger.
+   * Payouts stay in their own ledger. They sit beside orders rather than
+   * inside them, and folding them in here would be the netting-off the books
+   * must not do — the filter lists the kinds it wants, so nothing arrives on
+   * this screen by accident.
    */
   async transactions(query: TransactionQueryDto) {
-    const kinds = query.kind ? [query.kind] : [...TRANSACTION_KINDS];
-    const window = {
-      ...(query.from ? { gte: new Date(query.from) } : {}),
-      ...(query.to ? { lte: new Date(query.to) } : {}),
-    };
-    const dated = query.from || query.to;
-    const search = query.search?.trim();
-    const reach = query.skip + query.limit;
+    const where = transactionFilter(query, query.kind ? [query.kind] : TRANSACTION_KINDS);
 
-    const wantsCash = kinds.includes('PAYMENT_CASH');
-    const wantsOnline = kinds.includes('PAYMENT_ONLINE');
-    const wantsDeposits = kinds.includes('BANK_DEPOSIT');
-
-    const paymentWhere: Prisma.PaymentWhereInput = {
-      ...(dated ? { receivedAt: window } : {}),
-      ...(wantsCash && wantsOnline
-        ? {}
-        : { mode: wantsCash ? PaymentMode.CASH : PaymentMode.ONLINE }),
-      ...(search
-        ? {
-            OR: [
-              { reference: { contains: search, mode: 'insensitive' as const } },
-              { note: { contains: search, mode: 'insensitive' as const } },
-              { order: { code: { contains: search, mode: 'insensitive' as const } } },
-              {
-                order: {
-                  client: { name: { contains: search, mode: 'insensitive' as const } },
-                },
-              },
-            ],
-          }
-        : {}),
-    };
-
-    const depositWhere: Prisma.CashDepositWhereInput = {
-      ...(dated ? { depositedAt: window } : {}),
-      ...(search
-        ? {
-            OR: [
-              { bankReference: { contains: search, mode: 'insensitive' as const } },
-              { note: { contains: search, mode: 'insensitive' as const } },
-              {
-                payment: {
-                  order: { code: { contains: search, mode: 'insensitive' as const } },
-                },
-              },
-            ],
-          }
-        : {}),
-    };
-
-    const wantsPayments = wantsCash || wantsOnline;
-
-    const [payments, deposits, paymentCount, depositCount] = await Promise.all([
-      wantsPayments
-        ? this.prisma.payment.findMany({
-            where: paymentWhere,
-            orderBy: { receivedAt: 'desc' },
-            take: reach,
-            include: {
-              receivedBy: { select: { id: true, name: true } },
-              order: {
-                select: { id: true, code: true, client: { select: { name: true } } },
-              },
-            },
-          })
-        : [],
-      wantsDeposits
-        ? this.prisma.cashDeposit.findMany({
-            where: depositWhere,
-            orderBy: { depositedAt: 'desc' },
-            take: reach,
-            include: {
-              depositedBy: { select: { id: true, name: true } },
-              payment: {
-                select: {
-                  order: {
-                    select: { id: true, code: true, client: { select: { name: true } } },
-                  },
-                },
-              },
-            },
-          })
-        : [],
-      wantsPayments ? this.prisma.payment.count({ where: paymentWhere }) : 0,
-      wantsDeposits ? this.prisma.cashDeposit.count({ where: depositWhere }) : 0,
+    const [rows, count] = await Promise.all([
+      this.prisma.ledgerEntry.findMany({
+        where,
+        orderBy: { at: 'desc' },
+        skip: query.skip,
+        take: query.limit,
+        include: {
+          recordedBy: { select: { id: true, name: true } },
+          order: { select: { id: true, code: true, client: { select: { name: true } } } },
+        },
+      }),
+      this.prisma.ledgerEntry.count({ where }),
     ]);
 
-    const rows: TransactionRow[] = [
-      ...payments.map((payment) => ({
-        id: `payment:${payment.id}`,
-        kind:
-          payment.mode === PaymentMode.CASH
-            ? ('PAYMENT_CASH' as const)
-            : ('PAYMENT_ONLINE' as const),
-        // Money arriving. A deposit is the same money moving, which is why the
-        // two must never be added together.
-        direction: 'IN' as const,
-        at: payment.receivedAt,
-        amount: round2(Number(payment.amount)),
-        reference: payment.reference,
-        note: payment.note,
-        order: payment.order,
-        by: payment.receivedBy,
-      })),
-      ...deposits.map((deposit) => ({
-        id: `deposit:${deposit.id}`,
-        kind: 'BANK_DEPOSIT' as const,
-        // Cash the shop already had, now in the bank: it changes where the
-        // money is, not how much of it there is.
-        direction: 'TRANSFER' as const,
-        at: deposit.depositedAt,
-        amount: round2(Number(deposit.amount)),
-        reference: deposit.bankReference,
-        note: deposit.note,
-        order: deposit.payment?.order ?? null,
-        by: deposit.depositedBy,
-      })),
-    ]
-      .sort((a, b) => b.at.getTime() - a.at.getTime())
-      .slice(query.skip, reach);
-
-    return paginate(rows, paymentCount + depositCount, {
+    return paginate(rows.map(toTransaction), count, {
       page: query.page,
       limit: query.limit,
     });
@@ -527,6 +488,8 @@ export class PaymentsService {
       return reversal;
     });
 
+    await this.postReceipt(taken, payment.order);
+
     await this.notifications.raise('payment.reversed', {
       entity: 'Order',
       entityId: payment.orderId,
@@ -559,4 +522,90 @@ export function deriveStatus(total: number, received: number): PaymentStatus {
 
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
+}
+
+/** The `at` window a dated query asks for, or nothing at all. */
+function dateWindow(query: { from?: string; to?: string }): Prisma.LedgerEntryWhereInput {
+  if (!query.from && !query.to) return {};
+  return {
+    at: {
+      ...(query.from ? { gte: new Date(query.from) } : {}),
+      ...(query.to ? { lte: new Date(query.to) } : {}),
+    },
+  };
+}
+
+/** Which ledger rows each kind on the Transactions screen is made of. */
+const KIND_ROWS: Record<TransactionKind, Prisma.LedgerEntryWhereInput> = {
+  PAYMENT_CASH: { sourceType: 'Payment', account: LedgerAccount.CASH },
+  PAYMENT_ONLINE: { sourceType: 'Payment', account: LedgerAccount.BANK },
+  BANK_DEPOSIT: { sourceType: 'CashDeposit' },
+};
+
+/**
+ * The ledger rows one view of the Transactions screen covers.
+ *
+ * Pure, and exported, because what this screen may show is a rule about the
+ * books: it names the kinds it wants rather than excluding the ones it does
+ * not, so a payout — or anything else posted later — cannot arrive here by
+ * being forgotten about.
+ */
+export function transactionFilter(
+  query: { from?: string; to?: string; search?: string },
+  kinds: readonly TransactionKind[],
+): Prisma.LedgerEntryWhereInput {
+  const search = query.search?.trim();
+  const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
+
+  return {
+    AND: [
+      { OR: kinds.map((kind) => KIND_ROWS[kind]) },
+      dateWindow(query),
+      ...(search
+        ? [
+            {
+              OR: [
+                { reference: contains(search) },
+                { note: contains(search) },
+                { party: contains(search) },
+                { order: { code: contains(search) } },
+                { order: { client: { name: contains(search) } } },
+              ],
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
+/** What kind of movement a ledger row is, on this screen's terms. */
+export function kindOf(row: { sourceType: string; account: LedgerAccount }): TransactionKind {
+  if (row.sourceType === 'CashDeposit') return 'BANK_DEPOSIT';
+  return row.account === LedgerAccount.CASH ? 'PAYMENT_CASH' : 'PAYMENT_ONLINE';
+}
+
+/** A ledger row as the screen reads it. */
+function toTransaction(row: {
+  id: string;
+  sourceType: string;
+  account: LedgerAccount;
+  direction: LedgerDirection;
+  at: Date;
+  amount: Prisma.Decimal;
+  reference: string | null;
+  note: string | null;
+  order: { id: string; code: string; client: { name: string } } | null;
+  recordedBy: { id: string; name: string } | null;
+}): TransactionRow {
+  return {
+    id: row.id,
+    kind: kindOf(row),
+    direction: row.direction,
+    at: row.at,
+    amount: round2(Number(row.amount)),
+    reference: row.reference,
+    note: row.note,
+    order: row.order,
+    by: row.recordedBy,
+  };
 }
