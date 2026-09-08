@@ -286,6 +286,7 @@ describe('endpoints', () => {
     ['createGstSlab', (a) => a.createGstSlab({ name: '18%', ratePct: 18 }), 'POST', '/config/gst-slabs'],
     ['updateGstSlab', (a) => a.updateGstSlab('g1', {}), 'PATCH', '/config/gst-slabs/g1'],
 
+    ['sendLogs', (a) => a.sendLogs({ client: 'app', entries: [] }), 'POST', '/logs'],
     ['paymentSummary', (a) => a.paymentSummary('o1'), 'GET', '/orders/o1/payments'],
     ['recordPayment', (a) => a.recordPayment('o1', { amount: 1 } as never), 'POST', '/orders/o1/payments'],
     ['reversePayment', (a) => a.reversePayment('p1', 'why'), 'POST', '/payments/p1/reverse'],

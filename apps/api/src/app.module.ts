@@ -10,12 +10,14 @@ import { JobsModule } from './common/jobs/jobs.module';
 import { TenancyModule } from './common/tenancy/tenancy.module';
 import { TenantInterceptor } from './common/tenancy/tenant.interceptor';
 import { ActorInterceptor } from './common/audit/actor.interceptor';
+import { ServerLogInterceptor } from './common/logs/server-log.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { HistoryModule } from './modules/history/history.module';
+import { LogsModule } from './modules/logs/logs.module';
 import { UsersModule } from './modules/users/users.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { ConfigurationModule } from './modules/config/config.module';
@@ -48,6 +50,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     AuthModule,
     HealthModule,
     HistoryModule,
+    LogsModule,
     UsersModule,
     ClientsModule,
     ConfigurationModule,
@@ -66,6 +69,12 @@ import { PlatformModule } from './modules/platform/platform.module';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ActorInterceptor },
+    /*
+     * Last, so it runs innermost: the tenant and the person are already in
+     * context by the time it reads them, and the duration it measures is the
+     * handler's rather than the whole chain's.
+     */
+    { provide: APP_INTERCEPTOR, useClass: ServerLogInterceptor },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],

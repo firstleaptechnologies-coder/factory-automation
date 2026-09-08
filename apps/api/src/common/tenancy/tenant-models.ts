@@ -15,3 +15,15 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Estimate', 'EstimateItem', 'FirmProfile',
 ]);
 
+
+/**
+ * Models that name a tenant without belonging to one.
+ *
+ * The operational logs record which workspace a request was for, because a
+ * pattern is only visible across them — but they are ours rather than the
+ * shop's, they live in the platform database, and scoping them to a tenant
+ * would hide exactly the view they exist for. Listed here rather than left out
+ * quietly, so the coverage spec can tell a deliberate exception from an
+ * omission that leaks one business's rows into another's.
+ */
+export const PLATFORM_MODELS_NAMING_A_TENANT = new Set(['ServerLog', 'ClientLog']);

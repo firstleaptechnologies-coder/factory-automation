@@ -437,6 +437,27 @@ export class ApiClient {
   }
 
   /**
+   * Send what this client saw.
+   *
+   * Batched by the caller and sent behind the ordinary token. Never include a
+   * token, a password or a client's private business in `context` — the server
+   * cannot tell one string from another, so this is the side that must not.
+   */
+  sendLogs(batch: {
+    client: 'app' | 'web';
+    platform?: string;
+    appVersion?: string;
+    entries: {
+      level: 'info' | 'warn' | 'error';
+      message: string;
+      at: string;
+      context?: Record<string, unknown>;
+    }[];
+  }) {
+    return this.post<{ recorded: number }>('/logs', batch);
+  }
+
+  /**
    * Everything that happened to one thing, newest first.
    *
    * One method for every kind rather than one per screen: the shape that comes

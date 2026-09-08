@@ -45,3 +45,24 @@ Anything on a clock is a `@Cron` handler that calls
 gives it a lease, so one instance runs it, and a `JobRun` row, so anyone can ask
 whether it ran last night and what it did. A job that reaches into the scheduler
 by itself has neither.
+
+## Three logs, and which one a change belongs in
+
+- **`AuditLog`** — the shop's own business record, in the tenant's database.
+  Written underneath every write by the Prisma extension in
+  `apps/api/src/common/audit/`; nothing calls it. When a change has a reason
+  worth keeping — a reversal, a correction — wrap the write in
+  `withAuditNote({ reason })`, which must **await** the callback: a Prisma
+  promise is lazy, and handed back unawaited the note attaches to nothing.
+- **`ServerLog`** — ours, in the platform database, across tenants: what was
+  called, what it cost, what failed and the reference the caller was shown.
+  Written by an interceptor. Successful reads are deliberately not recorded.
+- **`ClientLog`** — what the app and the browser saw, sent in batches through
+  `POST /logs` and queued on the device until it can be sent.
+
+A model that holds a shop's data is audited or is listed in `NOT_AUDITED` with
+a reason — `audited-models.spec.ts` fails otherwise.
+
+Money rows are append-only. A receipt is corrected by recording its opposite,
+never by editing or deleting it; the same will hold for everything that posts
+to the ledger.

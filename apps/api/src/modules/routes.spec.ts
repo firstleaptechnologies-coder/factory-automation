@@ -14,6 +14,7 @@ import { EstimatesController } from './estimates/estimates.controller';
 import { FilesController } from './files/files.controller';
 import { HealthController } from './health/health.controller';
 import { HistoryController } from './history/history.controller';
+import { LogsController } from './logs/logs.controller';
 import { LeadsController } from './leads/leads.controller';
 import { OrdersController } from './orders/orders.controller';
 import { PaymentsController } from './payments/payments.controller';
@@ -38,6 +39,7 @@ const CONTROLLERS = [
   FilesController,
   HealthController,
   HistoryController,
+  LogsController,
   LeadsController,
   OrdersController,
   PaymentsController,
@@ -127,6 +129,18 @@ it('leaves nothing but signing in reachable without a token', () => {
     'POST /auth/platform/login',
     'POST /auth/workspace',
   ]);
+});
+
+it('takes what the clients saw behind a token, and slowly', () => {
+  const prototype = LogsController.prototype as unknown as Record<string, object>;
+  const guards = ((Reflect.getMetadata(GUARDS_METADATA, prototype.record) as { name: string }[]) ?? [])
+    .map((guard) => guard.name);
+
+  // An anonymous endpoint that accepts arbitrary text is a free place to write
+  // into somebody else's database, and a client stuck in a crash loop should
+  // not be able to fill the table while it is at it.
+  expect(find('LogsController', 'record').isPublic).toBe(false);
+  expect(guards).toContain('ThrottlerGuard');
 });
 
 describe('history', () => {
@@ -339,9 +353,26 @@ describe('the control plane', () => {
 });
 
 describe('everything that changes something', () => {
+  /**
+   * Writes that deliberately carry no permission.
+   *
+   * Reporting what a client saw is not an action on the shop's data: it writes
+   * to our own operational log, every signed-in person's device does it, and
+   * gating it would mean a crash going unreported by whoever hit it. Listed
+   * here rather than left out quietly, so the rule below stays sharp.
+   */
+  const OPEN_WRITES = new Set(['LogsController.record']);
+
   const mutating = routes.filter(
-    (route) => route.method !== 'GET' && !route.isPublic,
+    (route) =>
+      route.method !== 'GET' &&
+      !route.isPublic &&
+      !OPEN_WRITES.has(`${route.controller}.${route.handler}`),
   );
+
+  it('leaves almost nothing ungated', () => {
+    expect(OPEN_WRITES.size).toBeLessThan(3);
+  });
 
   it('is not a short list', () => {
     expect(mutating.length).toBeGreaterThan(25);

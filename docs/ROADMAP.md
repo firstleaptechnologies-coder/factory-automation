@@ -191,25 +191,29 @@ assuming the current pace and that tests and both clients ship in the same chang
 reports which deployment it is), and an external error sink such as Sentry,
 which needs an account.*
 
-### Phase 1 · The spine — items 1 and 11 — **M**
+### Phase 1 · The spine — items 1 and 11 — **M** — *shipped 8 September 2026*
 
-- **`AuditEvent`** — a Prisma client extension captures before/after on a
-  registered list of models, with the actor pulled from the tenant context.
-  Domain moves that are not row diffs (status moved, status *reversed*, money
-  recorded, quote sent) are written explicitly so they read as sentences rather
-  than as JSON diffs.
-- **A History tab** on order, payment, lead, quote and client detail — both
-  clients. Orders and leads already show status history; this widens it to
-  edits, and gives payments one for the first time.
-- **Append-only money** (D3): reversal + replacement, with reason.
-- **`ServerLog`** — an interceptor recording action, outcome, latency, tenant
-  and actor, sampled for reads and complete for writes.
-- **Client logs** — a batched, MMKV-queued ingest endpoint from the app and web,
-  so a crash on the floor is visible without asking someone to describe it.
-- Retention crons for both operational tables.
-
-*Reference: momentum-arena `lib/server-log.ts`, `ServerActionLog` — same shape,
-plus the tenant column and the audit half it does not have.*
+- **`AuditEvent`** — the dormant `AuditLog` table is now written underneath
+  every write by a Prisma extension, so no write path can skip it. A spec reads
+  the tenant-scoped model list and fails when a model is neither audited nor
+  exempted with a reason. Only changed fields are kept; file bytes, password
+  hashes and connection strings never are; the actor comes from the verified
+  token; `withAuditNote({ reason })` carries the why.
+- **What a row belongs to** — a line, a payment or a photo records which order
+  it hangs off, so an order's history holds the argument rather than only its
+  own columns.
+- **A History section** on order, enquiry, quote and client detail, on both
+  clients, merging the trail with the status moves and dropping the audit row
+  whose only change is the stage — the move row says it better.
+- **Append-only money** — a receipt is never edited or deleted. Taking one back
+  records its opposite, with a reason, and un-banks any cash that had already
+  been deposited.
+- **`ServerLog`** — an interceptor recording every write and every failure with
+  the reference the caller was shown, in the platform database, across tenants.
+- **`ClientLog`** — `POST /logs`, with both clients queueing what they saw and
+  sending it when the network comes back; crashes are reported on the way down.
+- **Retention** — a nightly job keeps 30 days of both operational logs. The
+  audit trail is not touched: it is the shop's record, and it is kept.
 
 ### Phase 2 · Native release train — items 2 and 3 — **L**
 

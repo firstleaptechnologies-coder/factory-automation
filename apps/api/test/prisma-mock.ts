@@ -47,6 +47,8 @@ const MODELS = [
   'auditLog',
   'jobLease',
   'jobRun',
+  'serverLog',
+  'clientLog',
 ];
 
 const OPERATIONS = [

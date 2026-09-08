@@ -8,6 +8,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { currentTenant } from '../tenancy/tenant-context';
+import { REFERENCE } from '../logs/server-log.interceptor';
 
 /**
  * What the caller is told, and what we keep.
@@ -30,7 +31,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const response = http.getResponse();
     const request = http.getRequest();
-    const reference = randomUUID().replace(/-/g, '').slice(0, 8);
+    /*
+     * The same code the log already recorded, where there is one.
+     *
+     * The interceptor sees the error first and writes the row; showing a
+     * different code here would mean the eight characters somebody reads out
+     * over the phone matched nothing.
+     */
+    const reference =
+      ((request as Record<string, unknown> | undefined)?.[REFERENCE] as string | undefined) ??
+      randomUUID().replace(/-/g, '').slice(0, 8);
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();

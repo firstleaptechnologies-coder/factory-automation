@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { TENANT_SCOPED_MODELS } from './tenant-clients';
+import { PLATFORM_MODELS_NAMING_A_TENANT, TENANT_SCOPED_MODELS } from './tenant-models';
 
 /**
  * The list and the schema, kept honest against each other.
@@ -43,9 +43,22 @@ describe('tenant scoping', () => {
     const unscoped = models()
       .filter(declaresTenantId)
       .map((model) => model.name)
-      .filter((name) => !TENANT_SCOPED_MODELS.has(name));
+      .filter(
+        (name) =>
+          !TENANT_SCOPED_MODELS.has(name) && !PLATFORM_MODELS_NAMING_A_TENANT.has(name),
+      );
 
     expect(unscoped).toEqual([]);
+  });
+
+  it('keeps the list of deliberate exceptions short, and real', () => {
+    const names = new Set(models().map((model) => model.name));
+    for (const name of PLATFORM_MODELS_NAMING_A_TENANT) {
+      // An exception for a model that no longer exists hides a real gap.
+      expect(names.has(name)).toBe(true);
+      expect(TENANT_SCOPED_MODELS.has(name)).toBe(false);
+    }
+    expect(PLATFORM_MODELS_NAMING_A_TENANT.size).toBeLessThan(5);
   });
 
   it('scopes nothing that has no tenant to be scoped to', () => {

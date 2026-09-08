@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { JobLeaseService } from './job-lease.service';
 import { JobRunnerService } from './job-runner.service';
 import { JobRetentionJob } from './job-retention.job';
+import { LogRetentionJob } from './log-retention.job';
 import { TenantHealthJob } from './tenant-health.job';
 
 /**
@@ -15,7 +16,13 @@ import { TenantHealthJob } from './tenant-health.job';
  */
 @Module({
   imports: [ScheduleModule.forRoot()],
-  providers: [JobLeaseService, JobRunnerService, TenantHealthJob, JobRetentionJob],
+  providers: [
+    JobLeaseService,
+    JobRunnerService,
+    TenantHealthJob,
+    JobRetentionJob,
+    LogRetentionJob,
+  ],
   exports: [JobRunnerService],
 })
 export class JobsModule {}
