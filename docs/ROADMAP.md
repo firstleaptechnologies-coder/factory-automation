@@ -376,8 +376,24 @@ blocks anything, and the second wants a commercial answer first — see G11.
     cannot show what it does not have, so treating absence as "clear it" wiped
     the Aadhaar of anybody whose phone number was corrected. Sending it empty
     still clears it, which is a thing somebody does on purpose.
-- **Attendance** — and a naming collision to settle: this app already means
-  something specific by *punch*. Attendance should read **"mark in / mark out"**.
+- **Attendance — done, 9 September.** The naming collision is settled: this app
+  means something specific by *punch*, so attendance reads **"mark in / mark
+  out"** everywhere, on both clients and in the code.
+  - The register is marked **a day at a time**, because that is how a shop does
+    it — somebody stands at the door and goes down the list — and it saves in
+    one transaction. Half a marked register is worse than an unmarked one:
+    nobody can tell which half.
+  - The **people lead, not the rows**. A register showing only what was entered
+    would make a morning nobody marked look like a morning nobody came in.
+  - One row per person per day, so marking twice **corrects** rather than
+    counting anybody twice.
+  - The month per person — payable days, where a half day counts as half, plus
+    overtime in minutes — is what the salary run will read, shown before
+    anybody is paid from it.
+  - A `calendar.ts` in the shared package came out of this: every date a person
+    picks is now a **local** calendar day. `toISOString().slice(0, 10)` answers
+    in UTC, so a shop in India opening the register before half past five in
+    the morning was shown yesterday.
 - **Salary** — *decided 8 September: a mix, fully configurable.* Monthly salary,
   daily wage and piece rate are pay **structures** attached to an employee, not
   a shape chosen for the product — nobody knows yet how a given client pays.

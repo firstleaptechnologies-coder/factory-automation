@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Employee, EmployeeIdentifiers } from '@decor/shared';
-import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS } from '@decor/shared';
+import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS, today } from '@decor/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';
@@ -30,7 +30,7 @@ export function EmployeeDetailScreen({ navigation, route }: { navigation: any; r
 
   const [secrets, setSecrets] = useState<EmployeeIdentifiers | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const [leftOn, setLeftOn] = useState(new Date().toISOString().slice(0, 10));
+  const [leftOn, setLeftOn] = useState(today());
   const [busy, setBusy] = useState(false);
 
   const canManage = can(PERMISSIONS.EMPLOYEE_MANAGE);

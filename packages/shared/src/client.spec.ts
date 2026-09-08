@@ -317,6 +317,15 @@ describe('endpoints', () => {
       '/employees/e1/left',
     ],
 
+    ['attendanceDay', (a) => a.attendanceDay('2026-09-09'), 'GET', '/attendance/day'],
+    ['markAttendance', (a) => a.markAttendance('2026-09-09', []), 'POST', '/attendance/day'],
+    [
+      'attendanceSummary',
+      (a) => a.attendanceSummary({ from: '2026-09-01', to: '2026-09-30' }),
+      'GET',
+      '/attendance/summary',
+    ],
+
     ['expenses', (a) => a.expenses(), 'GET', '/expenses'],
     ['expense', (a) => a.expense('e1'), 'GET', '/expenses/e1'],
     ['createExpense', (a) => a.createExpense({ amount: 1 } as never), 'POST', '/expenses'],

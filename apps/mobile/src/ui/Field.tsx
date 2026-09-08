@@ -164,6 +164,7 @@ export function Chip({
   onPress,
   accent,
   icon,
+  testID,
 }: {
   label: string;
   selected?: boolean;
@@ -171,6 +172,8 @@ export function Chip({
   accent?: string | null;
   /** Marks a chip that goes somewhere, rather than one that sets a value. */
   icon?: IconName;
+  /** For when the same word appears on several chips on one screen. */
+  testID?: string;
 }) {
   const tint = selected ? palette.white : palette.textMuted;
   const body = (
@@ -183,7 +186,7 @@ export function Chip({
   );
 
   return (
-    <Pressable onPress={onPress}>
+    <Pressable onPress={onPress} testID={testID}>
       {selected ? (
         accent ? (
           <View

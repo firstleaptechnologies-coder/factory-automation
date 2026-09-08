@@ -3,16 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Expense, ExpenseFormOptions, ExpenseOptionField } from '@decor/shared';
-import { EXPENSE_FIELD_HINTS, EXPENSE_FIELD_LABELS } from '@decor/shared';
+import { EXPENSE_FIELD_HINTS, EXPENSE_FIELD_LABELS, today } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Button, Card, Chip, Field, Loader, PageHead } from '@/ui';
 import { Select } from '@/ui/Select';
-
-/** Today, as the date column means it. */
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** The order the form asks for the five lists in. */
 const FIELDS: ExpenseOptionField[] = [

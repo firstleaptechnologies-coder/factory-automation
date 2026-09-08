@@ -3,16 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Employee, EmploymentStatus, WorkspaceUser } from '@decor/shared';
-import { EMPLOYMENT_STATUS_LABELS } from '@decor/shared';
+import { EMPLOYMENT_STATUS_LABELS, today } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Button, Card, Field, Loader, PageHead, SectionHead } from '@/ui';
 import { Select } from '@/ui/Select';
-
-/** Today, as the date column means it. */
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * Add somebody, or correct their details.

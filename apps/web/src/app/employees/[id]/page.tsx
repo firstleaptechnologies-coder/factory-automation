@@ -3,7 +3,7 @@
 import { Suspense, use, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Employee, EmployeeIdentifiers } from '@decor/shared';
-import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS } from '@decor/shared';
+import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS, today } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
@@ -37,7 +37,7 @@ function Detail({ id }: { id: string }) {
 
   const [secrets, setSecrets] = useState<EmployeeIdentifiers | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const [leftOn, setLeftOn] = useState(new Date().toISOString().slice(0, 10));
+  const [leftOn, setLeftOn] = useState(today());
   const [busy, setBusy] = useState(false);
 
   const canManage = can(PERMISSIONS.EMPLOYEE_MANAGE);

@@ -83,6 +83,9 @@ flowchart LR
     employees --> employee_form
     employee_detail["One employee"]
     employees --> employee_detail
+    attendance["Attendance"]
+    attendance_month["The month, per person"]
+    attendance --> attendance_month
   end
   Home --> cat_people
   subgraph cat_vendors["Vendor management"]
@@ -171,6 +174,8 @@ flowchart LR
 | Employees | `/employees` | `Employees` | `employee.view` |
 |   ↳ Add an employee | `/employees/new` | `EmployeeForm` | `employee.manage` |
 |   ↳ One employee | `/employees/[id]` | `EmployeeDetail` | — |
+| Attendance | `/attendance` | `Attendance` | `attendance.view` |
+|   ↳ The month, per person | `/attendance/month` | `AttendanceMonth` | — |
 
 ### Vendor management
 

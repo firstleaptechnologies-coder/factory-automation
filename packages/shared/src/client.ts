@@ -51,11 +51,14 @@ import type {
   ReleaseAsset,
   ReleaseStatus,
   VersionGate,
+  AttendanceDay,
+  AttendanceMonth,
   Employee,
   EmployeeIdentifiers,
   EmployeeInput,
   EmploymentStatus,
   WorkspaceUser,
+  MarkInput,
   Expense,
   ExpenseAnalytics,
   ExpenseEdit,
@@ -870,6 +873,33 @@ export class ApiClient {
   /** Somebody has left. The row stays; their login is switched off. */
   markEmployeeLeft(id: string, leftOn: string) {
     return this.post<Employee>(`/employees/${id}/left`, { leftOn });
+  }
+
+  // -- the register ----------------------------------------------------------
+
+  /**
+   * Everyone who could be marked on one day, with whatever they were marked.
+   *
+   * The people lead, not the rows: a register showing only what was entered
+   * would make a morning nobody marked look like a morning nobody came in.
+   */
+  attendanceDay(date: string) {
+    return this.get<AttendanceDay>('/attendance/day', { date });
+  }
+
+  /**
+   * Marks the register for one day.
+   *
+   * A day at a time rather than a row at a time, because that is how a shop
+   * marks it. Marking the same day again corrects it.
+   */
+  markAttendance(date: string, marks: MarkInput[]) {
+    return this.post<AttendanceDay>('/attendance/day', { date, marks });
+  }
+
+  /** What each person's month came to — what a salary run reads. */
+  attendanceSummary(query: { from: string; to: string; employeeId?: string }) {
+    return this.get<AttendanceMonth>('/attendance/summary', query);
   }
 
   // -- the firm, and the documents it prints ---------------------------------

@@ -436,6 +436,7 @@ model User {
   expenseEdits      ExpenseEditHistory[] @relation("ExpenseEditBy")
   employee          Employee?            @relation("EmployeeLogin")
   employeesCreated  Employee[]           @relation("EmployeeCreatedBy")
+  attendanceMarked  Attendance[]         @relation("AttendanceMarkedBy")
 
   @@unique([tenantId, code])
   @@unique([tenantId, email])
@@ -1370,6 +1371,8 @@ model Employee {
   userId String? @unique
   user   User?   @relation("EmployeeLogin", fields: [userId], references: [id], onDelete: SetNull)
 
+  attendance Attendance[]
+
   createdById String?
   createdBy   User?    @relation("EmployeeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
@@ -1378,6 +1381,62 @@ model Employee {
   @@unique([tenantId, code])
   @@index([tenantId, status])
   @@index([tenantId, department])
+  @@index([tenantId])
+}
+
+/// What one person's day was.
+///
+/// A day is one of these, not a number of hours: a shop marks the register in
+/// the morning and the accountant is paid to know what "half day" means here.
+/// Times are recorded beside it when the shop bothers with them, and ignored
+/// when it does not.
+enum AttendanceMark {
+  PRESENT
+  HALF_DAY
+  ABSENT
+  /// Away with the shop's blessing — paid or not is the pay structure's
+  /// business, not this row's.
+  LEAVE
+  /// The shop was shut: a festival, or the weekly off.
+  HOLIDAY
+  WEEKLY_OFF
+}
+
+/// One person, one day.
+///
+/// Called marking in and out, never punching. This app already means something
+/// specific by *punch* — an order gets punched — and a floor that hears one
+/// word for two things will eventually do the wrong one.
+model Attendance {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  date DateTime       @db.Date
+  mark AttendanceMark @default(PRESENT)
+
+  /// The clock, where the shop keeps one. Absent is not the same as absent
+  /// from work: plenty of shops mark the register and never look at a time.
+  inAt  DateTime?
+  outAt DateTime?
+  /// Minutes past the ordinary day, which the pay structure decides what to do
+  /// with. Held in minutes because half an hour is a real answer.
+  overtimeMinutes Int @default(0)
+
+  note String?
+
+  markedById String?
+  markedBy   User?    @relation("AttendanceMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  /// One row per person per day, so marking the register twice corrects it
+  /// rather than counting somebody twice.
+  @@unique([tenantId, employeeId, date])
+  @@index([tenantId, date])
+  @@index([tenantId, employeeId, date])
   @@index([tenantId])
 }
 

@@ -11,6 +11,7 @@ export type IconName =
   | 'home'
   | 'card'
   | 'search'
+  | 'history'
   | 'settings'
   | 'tune'
   | 'user'
@@ -137,6 +138,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21V3Z" />
       <path d="M9.5 8h5M9.5 12h5" />
+    </>
+  ),
+  // A clock with an arrow running backwards round it: what happened before.
+  history: (
+    <>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" />
+      <path d="M3 4v4h4" />
+      <path d="M12 8v4.5l3 1.8" />
     </>
   ),
   trend: <path d="M3 17.5 9.5 11l4 4L21 7.5M15 7.5h6v6" />,

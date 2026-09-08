@@ -332,6 +332,24 @@ export const NAV_GROUPS: NavGroup[] = [
           },
         ],
       },
+      {
+        key: 'attendance',
+        module: MODULES.HR,
+        label: 'Attendance',
+        icon: 'check',
+        permission: PERMISSIONS.ATTENDANCE_VIEW,
+        web: '/attendance',
+        app: 'Attendance',
+        children: [
+          {
+            key: 'attendance-month',
+            label: 'The month, per person',
+            icon: 'history',
+            web: '/attendance/month',
+            app: 'AttendanceMonth',
+          },
+        ],
+      },
     ],
   },
   {

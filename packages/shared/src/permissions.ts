@@ -85,6 +85,11 @@ export const PERMISSIONS = {
   EMPLOYEE_MANAGE: 'employee.manage',
   EMPLOYEE_IDENTIFIERS: 'employee.identifiers',
 
+  // The register. Marking it is a daily job for whoever stands at the door;
+  // reading it is what the salary run and the shop's questions need.
+  ATTENDANCE_VIEW: 'attendance.view',
+  ATTENDANCE_MARK: 'attendance.mark',
+
   // Shop configuration
   CONFIG_VIEW: 'config.view',
   CONFIG_MANAGE: 'config.manage',
@@ -195,6 +200,8 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
       PERMISSIONS.EMPLOYEE_VIEW,
       PERMISSIONS.EMPLOYEE_MANAGE,
       PERMISSIONS.EMPLOYEE_IDENTIFIERS,
+      PERMISSIONS.ATTENDANCE_VIEW,
+      PERMISSIONS.ATTENDANCE_MARK,
     ],
   },
   {
@@ -244,6 +251,8 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.EMPLOYEE_VIEW]: 'View the staff list',
   [PERMISSIONS.EMPLOYEE_MANAGE]: 'Add and edit employees',
   [PERMISSIONS.EMPLOYEE_IDENTIFIERS]: 'Read Aadhaar, PAN and bank details',
+  [PERMISSIONS.ATTENDANCE_VIEW]: 'See the attendance register',
+  [PERMISSIONS.ATTENDANCE_MARK]: 'Mark people in and out',
   [PERMISSIONS.PLATFORM_RELEASE_VIEW]: 'See app releases',
   [PERMISSIONS.PLATFORM_RELEASE_MANAGE]: 'Publish app releases',
   [PERMISSIONS.PLATFORM_TENANT_CREATE]: 'Provision workspaces',

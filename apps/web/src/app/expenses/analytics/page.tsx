@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ExpenseAnalytics, ExpenseSlice } from '@decor/shared';
+import { isoDate } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Shell } from '@/components/Shell';
@@ -20,8 +21,9 @@ type Window = (typeof WINDOWS)[number]['key'];
 /** The first day of the window, or nothing at all for all time. */
 export function windowStart(key: Window, now = new Date()): string | undefined {
   if (key === 'all') return undefined;
-  const month = key === 'month' ? now.getMonth() : 0;
-  return new Date(Date.UTC(now.getFullYear(), month, 1)).toISOString().slice(0, 10);
+  // Local, like every date a person picks: a shop is asking about its own
+  // year, not about UTC's.
+  return isoDate(new Date(now.getFullYear(), key === 'month' ? now.getMonth() : 0, 1));
 }
 
 export default function ExpenseAnalyticsPage() {

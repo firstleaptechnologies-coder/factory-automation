@@ -1068,3 +1068,88 @@ export interface EmployeeInput {
   emergencyPhone?: string;
   userId?: string;
 }
+
+/**
+ * What one person's day was.
+ *
+ * Called marking in and out, never punching: this app already means something
+ * specific by *punch*, and a floor that hears one word for two things will
+ * eventually do the wrong one.
+ */
+export type AttendanceMark =
+  | 'PRESENT'
+  | 'HALF_DAY'
+  | 'ABSENT'
+  | 'LEAVE'
+  | 'HOLIDAY'
+  | 'WEEKLY_OFF';
+
+export const ATTENDANCE_MARKS: AttendanceMark[] = [
+  'PRESENT',
+  'HALF_DAY',
+  'ABSENT',
+  'LEAVE',
+  'HOLIDAY',
+  'WEEKLY_OFF',
+];
+
+export const ATTENDANCE_LABELS: Record<AttendanceMark, string> = {
+  PRESENT: 'In',
+  HALF_DAY: 'Half day',
+  ABSENT: 'Absent',
+  LEAVE: 'Leave',
+  HOLIDAY: 'Holiday',
+  WEEKLY_OFF: 'Weekly off',
+};
+
+/** One person on the register for a day. */
+export interface AttendanceRow {
+  employee: {
+    id: string;
+    code: string;
+    name: string;
+    designation?: string | null;
+    department?: string | null;
+    status: EmploymentStatus;
+  };
+  /** False when nobody has said anything about this person today. */
+  marked: boolean;
+  mark: AttendanceMark | null;
+  inAt?: string | null;
+  outAt?: string | null;
+  overtimeMinutes: number;
+  note?: string | null;
+  markedBy?: { id: string; name: string } | null;
+}
+
+export interface AttendanceDay {
+  date: string;
+  rows: AttendanceRow[];
+}
+
+export interface AttendanceSummary {
+  present: number;
+  halfDays: number;
+  absent: number;
+  leave: number;
+  holidays: number;
+  /** Present plus half a day for each half day — what a daily wage multiplies. */
+  payableDays: number;
+  overtimeMinutes: number;
+}
+
+export interface AttendanceMonth {
+  from: string;
+  to: string;
+  rows: (AttendanceSummary & { employee: AttendanceRow['employee'] })[];
+}
+
+/** What the register sends when it is marked. */
+export interface MarkInput {
+  employeeId: string;
+  mark: AttendanceMark;
+  inAt?: string;
+  outAt?: string;
+  overtimeMinutes?: number;
+  note?: string;
+}

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Employee, EmploymentStatus, WorkspaceUser } from '@decor/shared';
-import { EMPLOYMENT_STATUS_LABELS } from '@decor/shared';
+import { EMPLOYMENT_STATUS_LABELS, today } from '@decor/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import {
@@ -17,11 +17,6 @@ import {
   haptic,
 } from '../ui';
 import { spacing } from '../theme';
-
-/** Today, as the date column means it. */
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * Add somebody, or correct their details.

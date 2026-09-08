@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Expense, ExpenseFormOptions, ExpenseOptionField } from '@decor/shared';
-import { EXPENSE_FIELD_HINTS, EXPENSE_FIELD_LABELS } from '@decor/shared';
+import { EXPENSE_FIELD_HINTS, EXPENSE_FIELD_LABELS, today } from '@decor/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import {
@@ -18,11 +18,6 @@ import {
   haptic,
 } from '../ui';
 import { spacing } from '../theme';
-
-/** Today, as the date column means it. */
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * Record what was spent, or correct it.
