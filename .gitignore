@@ -22,3 +22,6 @@ apps/api/src/**/*.js.map
 apps/api/test/**/*.js
 apps/api/test/**/*.d.ts
 apps/api/test/**/*.js.map
+
+# TypeScript's incremental build cache. Machine-local, and noisy in a diff.
+*.tsbuildinfo

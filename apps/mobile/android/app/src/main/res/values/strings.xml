@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">DecorBucket</string>
+    <!--
+      The channel the app asks for. A string resource rather than a literal in
+      the manifest because expo-updates reads the headers as one JSON value.
+    -->
+    <string name="expo_updates_request_headers" translatable="false">{"expo-channel-name":"development"}</string>
 </resources>

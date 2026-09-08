@@ -1,3 +1,5 @@
+# Expo's autolinking, which is what finds expo-updates and the modules core.
+require File.join(File.dirname(`node --print "require.resolve('expo/package.json')"`), "scripts/autolinking")
 # Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
@@ -5,7 +7,10 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-platform :ios, min_ios_version_supported
+# Expo SDK 57's modules require 16.4, which is above React Native's own floor.
+# Everything the shop runs is well past it — the oldest iPhone that matters here
+# is on iOS 17.
+platform :ios, '16.4'
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']
@@ -15,7 +20,22 @@ if linkage != nil
 end
 
 target 'DecorBucket' do
-  config = use_native_modules!
+  use_expo_modules!
+
+  # Expo's autolinking answers for both its own modules and the community
+  # ones, so `use_native_modules!` is given its list rather than the CLI's.
+  config_command = [
+    'node',
+    '--no-warnings',
+    '--eval',
+    'require(require.resolve(\'expo-modules-autolinking\', { paths: [require.resolve(\'expo/package.json\')] }))(process.argv.slice(1))',
+    'react-native-config',
+    '--json',
+    '--platform',
+    'ios'
+  ]
+
+  config = use_native_modules!(config_command)
 
   use_react_native!(
     :path => config[:reactNativePath],

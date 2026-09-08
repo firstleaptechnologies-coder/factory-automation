@@ -4,6 +4,7 @@ import { LENGTH_UNITS, UNIT_LABEL } from '@decor/shared';
 import { useAuth } from '../auth/AuthContext';
 import { useDisplayUnit } from '../hooks/useUnit';
 import { API_BASE_URL } from '../api/client';
+import { runningVersion } from '../lib/ota';
 import {
   Avatar,
   Button,
@@ -48,6 +49,12 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
 
       <SectionHeader title="About" />
       <Card tone="dark">
+        {/*
+          Which build this is, in the words the release console uses — so
+          somebody on the floor can say "OTA 7" down the phone instead of
+          describing what they see.
+        */}
+        <Row label="Version" value={versionLabel()} />
         <Row label="Server" value={API_BASE_URL.replace('/api', '')} />
         <Row label="Signed in as" value={user?.code ?? '—'} />
         <Row label="Role" value={user?.role ?? '—'} />
@@ -66,6 +73,12 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
       />
     </Screen>
   );
+}
+
+/** "1 · OTA 7", or just the runtime version where no update has been taken. */
+function versionLabel(): string {
+  const { runtime, ota } = runningVersion();
+  return ota === null ? runtime : `${runtime} · OTA ${ota}`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

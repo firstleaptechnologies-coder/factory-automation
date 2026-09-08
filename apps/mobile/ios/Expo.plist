@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EXUpdatesEnabled</key>
+	<true/>
+	<!--
+		Where the app asks what it should be running.
+
+		Development points at a machine on the desk; this has to change when
+		there is a staging or production API. It is baked into the binary, so
+		changing it is a store release rather than an update.
+	-->
+	<key>EXUpdatesURL</key>
+	<string>http://localhost:3001/api/updates/manifest</string>
+	<!--
+		Must match the runtime version the release was published against. Bump
+		it whenever the native side changes: a bundle built for different
+		native code is an app that crashes on launch with no way back except
+		the store.
+	-->
+	<key>EXUpdatesRuntimeVersion</key>
+	<string>1</string>
+	<key>EXUpdatesCheckOnLaunch</key>
+	<string>ALWAYS</string>
+	<!-- Never hold the splash screen waiting for a download. -->
+	<key>EXUpdatesLaunchWaitMs</key>
+	<integer>0</integer>
+	<key>EXUpdatesRequestHeaders</key>
+	<dict>
+		<key>expo-channel-name</key>
+		<string>development</string>
+	</dict>
+</dict>
+</plist>

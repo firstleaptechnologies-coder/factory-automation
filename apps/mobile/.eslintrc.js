@@ -9,7 +9,17 @@ module.exports = {
        * reads as an undefined variable, which buried the four real problems
        * under thirty-three imaginary ones.
        */
-      files: ['**/*.spec.ts', '**/*.spec.tsx', 'test/**/*.ts', 'test/**/*.tsx', 'jest.setup.js', 'jest.after-env.js'],
+      files: [
+        '**/*.spec.ts',
+        '**/*.spec.tsx',
+        // The stand-ins the suite runs against live here too, and they are
+        // written with jest's own globals.
+        'test/**/*.ts',
+        'test/**/*.tsx',
+        'test/**/*.js',
+        'jest.setup.js',
+        'jest.after-env.js',
+      ],
       env: { jest: true },
     },
   ],

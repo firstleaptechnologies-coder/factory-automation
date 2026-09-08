@@ -14,6 +14,20 @@
       android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
+      <!--
+        What the app asks for on launch, and where.
+
+        The URL is baked into the binary, so it changes with a store release
+        rather than with an update; the runtime version must match what a
+        release was published against.
+      -->
+      <meta-data android:name="expo.modules.updates.ENABLED" android:value="true" />
+      <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="http://10.0.2.2:3001/api/updates/manifest" />
+      <meta-data android:name="expo.modules.updates.EXPO_RUNTIME_VERSION" android:value="1" />
+      <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS" />
+      <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0" />
+      <meta-data android:name="expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY" android:value="@string/expo_updates_request_headers" />
+
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

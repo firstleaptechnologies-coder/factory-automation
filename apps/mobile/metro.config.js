@@ -1,5 +1,8 @@
 const path = require('path');
-const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
+// Expo's defaults, merged with React Native's: the modules are registered
+// through Expo's entry point, so its config has to be the base.
+const {getDefaultConfig} = require('expo/metro-config');
+const {mergeConfig} = require('@react-native/metro-config');
 
 const workspaceRoot = path.resolve(__dirname, '../..');
 const sharedSrc = path.resolve(workspaceRoot, 'packages/shared/src');

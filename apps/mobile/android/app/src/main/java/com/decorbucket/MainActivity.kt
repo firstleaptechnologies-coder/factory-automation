@@ -1,5 +1,7 @@
 package com.decorbucket
 
+import expo.modules.ReactActivityDelegateWrapper
+
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -18,5 +20,11 @@ class MainActivity : ReactActivity() {
    * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
-      DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+      // Wrapped so Expo's modules see the activity's lifecycle — expo-updates
+      // needs it to know when the app came to the front.
+      ReactActivityDelegateWrapper(
+          this,
+          fabricEnabled,
+          DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled),
+      )
 }

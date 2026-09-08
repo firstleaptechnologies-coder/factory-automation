@@ -8,21 +8,26 @@ so it is obvious what unlocks when you get to it.
 
 ---
 
-## 1. React Native 0.87.1 → 0.86.3 — **decided 8 September: pin back**
+## 1. ~~React Native 0.87.1 → 0.86.3~~ — **done, 8 September 2026**
 
-`expo-updates` needs the Expo modules in the app, and Expo SDK 57 (current)
-pins **react-native 0.86.3**. This app is on **0.87.1**.
+Pinned to 0.86.3 and the Expo modules are in, so the app can now take updates
+over the air.
 
-- **Recommended:** pin back one minor. Momentum Arena runs the same combination
-  one version behind (SDK 56 on RN 0.85.2), so it is proven. Reanimated 4 and
-  worklets need re-checking after the pin.
-- **The alternative:** wait for the SDK that supports 0.87 and ship the app's
-  OTA client then. The OTA *server* is built either way, so nothing else waits.
+**Reanimated and worklets did have to move**, and not for the reason it first
+looked like. Both 4.6.0 and 0.12.1 accept React Native 0.86 on their own
+(`"0.83 - 0.87"`), so the pin alone did not disturb them — but Expo's
+`expo-modules-core@57` accepts worklets `0.7–0.10` and Reanimated 4.6 demands
+`0.12.x`. The two cannot both be satisfied. So the app now runs the set Expo
+SDK 57 is built against: **Reanimated 4.5.1 and worklets 0.10.1**, both of
+which declare `react-native: "0.83 - 0.86"` themselves. Gesture Handler 3.2.1
+and Skia 2.11.2 needed no change — their peer ranges are open.
 
-**Decided: take Momentum's combination and pin back**, then re-check Reanimated
-4 and worklets against it. In progress — nothing else in the roadmap depends on
-it; the update server, the publish script and the release console at
-`/platform/releases` are already built and working.
+The other thing the pin cost was the iOS floor: Expo SDK 57's modules need
+**16.4**, and the app was on 15.1.
+
+*Remaining, and it is yours:* the update URL in `apps/mobile/app.json` points at
+`http://localhost:3001` because there is nowhere else yet. It has to change when
+there is a staging or production API — see item 4.
 
 ## 2. A Firebase project — **blocks push notifications**
 

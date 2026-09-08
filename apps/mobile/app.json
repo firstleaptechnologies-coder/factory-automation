@@ -1,4 +1,23 @@
 {
   "name": "DecorBucket",
-  "displayName": "DecorBucket"
+  "displayName": "DecorBucket",
+  "expo": {
+    "name": "DecorBucket",
+    "slug": "decor-bucket",
+    "runtimeVersion": "1",
+    "ios": {
+      "bundleIdentifier": "com.decorbucket"
+    },
+    "android": {
+      "package": "com.decorbucket"
+    },
+    "updates": {
+      "enabled": true,
+      "url": "http://localhost:3001/api/updates/manifest",
+      "checkAutomatically": "ON_LOAD",
+      "requestHeaders": {
+        "expo-channel-name": "development"
+      }
+    }
+  }
 }
