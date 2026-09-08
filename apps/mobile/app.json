@@ -6,10 +6,10 @@
     "slug": "decor-bucket",
     "runtimeVersion": "1",
     "ios": {
-      "bundleIdentifier": "com.decorbucket"
+      "bundleIdentifier": "com.firstleap.factoryautomation"
     },
     "android": {
-      "package": "com.decorbucket"
+      "package": "com.firstleap.factoryautomation"
     },
     "updates": {
       "enabled": true,

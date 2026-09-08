@@ -91,9 +91,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.decorbucket"
+    namespace "com.firstleap.factoryautomation"
     defaultConfig {
-        applicationId "com.decorbucket"
+        applicationId "com.firstleap.factoryautomation"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
