@@ -478,7 +478,8 @@ describe('what sending a quote means', () => {
 
   it('says plainly when a quote moves nothing', async () => {
     await mount(LEAD_FLOW);
-    expect(screen.getByText('No move')).toBeTruthy();
+    // Two cards say "No move" now — this one and the declined-quote one.
+    expect(screen.getAllByText('No move').length).toBe(2);
     expect(
       screen.getByText('A quote is recorded against the enquiry but moves it nowhere.'),
     ).toBeTruthy();
@@ -624,5 +625,57 @@ describe('the colour a stage is given', () => {
     await submitStage();
     await waitFor(() => expect(mockAddStatus).toHaveBeenCalled());
     expect(mockAddStatus.mock.calls[0][1].color).toBe('#123456');
+  });
+});
+
+
+/**
+ * The client said no.
+ *
+ * Some shops close a declined enquiry; others keep it and work it again — so
+ * where it goes is theirs to say, and saying nothing is a real answer.
+ */
+describe('what turning a quote down means', () => {
+  const LEAD_FLOW = { ...GRAPH, kind: 'LEAD' };
+
+  it('asks where the enquiry should go', async () => {
+    await mount(LEAD_FLOW);
+    expect(screen.getByText('Turning a quote down means')).toBeTruthy();
+  });
+
+  it('is not asked on an order flow, which is not quoted', async () => {
+    await mount();
+    expect(screen.queryByText('Turning a quote down means')).toBeNull();
+  });
+
+  it('says plainly when a declined quote moves nothing', async () => {
+    await mount(LEAD_FLOW);
+    expect(
+      screen.getByText('A declined quote is recorded but moves the enquiry nowhere.'),
+    ).toBeTruthy();
+  });
+
+  it('saves the stage that was picked', async () => {
+    await mount(LEAD_FLOW);
+    await fireEvent.press(
+      screen.getByText('A declined quote is recorded but moves the enquiry nowhere.'),
+    );
+    await screen.findByText('Nothing — leave it where it is');
+    // The stage names appear in the table below as well as in the sheet.
+    await fireEvent.press(screen.getAllByText('Delivered').at(-1)!);
+
+    await waitFor(() =>
+      expect(mockUpdateWorkflow).toHaveBeenCalledWith('w1', { lostStatusId: 's3' }),
+    );
+  });
+
+  it('turns it off again', async () => {
+    await mount({ ...LEAD_FLOW, lostStatusId: 's3' });
+    await fireEvent.press(screen.getByText('An enquiry moves here when the client says no.'));
+    await fireEvent.press(await screen.findByText('Nothing — leave it where it is'));
+
+    await waitFor(() =>
+      expect(mockUpdateWorkflow).toHaveBeenCalledWith('w1', { lostStatusId: null }),
+    );
   });
 });

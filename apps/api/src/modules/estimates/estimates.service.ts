@@ -261,6 +261,9 @@ export class EstimatesService {
       if (status === EstimateStatus.SENT && before.status !== EstimateStatus.SENT) {
         await this.markLeadQuoted(estimate.leadId, estimate.code, userId);
       }
+      if (status === EstimateStatus.DECLINED && before.status !== EstimateStatus.DECLINED) {
+        await this.markLeadLost(estimate.leadId, estimate.code, userId);
+      }
     }
 
     /*
@@ -477,6 +480,33 @@ export class EstimatesService {
    * be the tail wagging the dog.
    */
   private async markLeadQuoted(leadId: string, estimateCode: string, userId?: string) {
+    await this.moveLead(leadId, 'quoteStatusId', `Quote ${estimateCode} sent`, userId);
+  }
+
+  /**
+   * The client said no.
+   *
+   * Which stage that means is the shop's own: one pipeline says "Lost", another
+   * says "Closed — no", and a third keeps declined enquiries where they are and
+   * works them again. So it is configured, and an unset stage moves nothing.
+   */
+  private async markLeadLost(leadId: string, estimateCode: string, userId?: string) {
+    await this.moveLead(leadId, 'lostStatusId', `Quote ${estimateCode} declined`, userId);
+  }
+
+  /**
+   * Move an enquiry to one of its pipeline's configured stages.
+   *
+   * Through the same graph everything else obeys: a pipeline with no arrow from
+   * where the enquiry is to where this would put it simply does not move, which
+   * is the shop's drawing being respected rather than worked around.
+   */
+  private async moveLead(
+    leadId: string,
+    stage: 'quoteStatusId' | 'lostStatusId',
+    note: string,
+    userId?: string,
+  ) {
     const lead = await this.prisma.lead.findFirst({
       where: { id: leadId },
       select: { id: true, statusId: true, workflowId: true },
@@ -485,9 +515,9 @@ export class EstimatesService {
 
     const workflow = await this.prisma.workflow.findFirst({
       where: { id: lead.workflowId },
-      select: { quoteStatusId: true },
+      select: { quoteStatusId: true, lostStatusId: true },
     });
-    const target = workflow?.quoteStatusId;
+    const target = workflow?.[stage];
     if (!target || target === lead.statusId) return;
 
     const allowed = await this.prisma.workflowTransition.findUnique({
@@ -509,7 +539,7 @@ export class EstimatesService {
           leadId,
           fromStatusId: lead.statusId,
           toStatusId: target,
-          note: `Quote ${estimateCode} sent`,
+          note,
           changedById: userId,
         },
       }),

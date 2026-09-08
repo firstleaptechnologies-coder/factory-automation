@@ -80,13 +80,15 @@ export class WorkflowsService {
 
   /**
    * Rename a flow, say how long an enquiry may sit before it goes quiet, or
-   * name the stage that means a quote has gone out.
+   * name the stages that mean a quote has gone out and that the client said
+   * no.
    */
   async update(id: string, dto: UpdateWorkflowDto) {
     const workflow = await this.findOne(id);
 
-    if (dto.quoteStatusId) {
-      const known = workflow.statuses.some((status) => status.id === dto.quoteStatusId);
+    for (const stage of [dto.quoteStatusId, dto.lostStatusId]) {
+      if (!stage) continue;
+      const known = workflow.statuses.some((status) => status.id === stage);
       if (!known) {
         throw new BadRequestException('That stage does not belong to this flow');
       }
@@ -103,6 +105,9 @@ export class WorkflowsService {
           : {}),
         ...(dto.quoteStatusId !== undefined
           ? { quoteStatusId: dto.quoteStatusId || null }
+          : {}),
+        ...(dto.lostStatusId !== undefined
+          ? { lostStatusId: dto.lostStatusId || null }
           : {}),
       },
     });

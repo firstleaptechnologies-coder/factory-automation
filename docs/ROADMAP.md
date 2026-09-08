@@ -322,9 +322,11 @@ subscription records.
   `EncryptionService`, and last-4 kept in clear for display, as momentum does.
 - **Attendance** — and a naming collision to settle: this app already means
   something specific by *punch*. Attendance should read **"mark in / mark out"**.
-- **Salary** — monthly plus **daily wage and piece rate**, which is how a CNC
-  floor actually pays; overtime; advances against salary; a monthly salary run
-  producing payslips that **post to the ledger** as outflows (D1).
+- **Salary** — *decided 8 September: a mix, fully configurable.* Monthly salary,
+  daily wage and piece rate are pay **structures** attached to an employee, not
+  a shape chosen for the product — nobody knows yet how a given client pays.
+  Plus overtime, advances against salary, and a monthly run producing payslips
+  that **post to the ledger** as outflows (D1).
 - Letters — offer, NDA, responsibility — port from momentum's templates, which
   snapshot what was printed so history survives an edit to the employee.
 - **Roles and permissions UI** (item 12), which does not exist on either client
@@ -358,7 +360,8 @@ not the thing itself.
 
 - **Tax invoice**: financial-year-aware, gapless numbering; the firm's own
   particulars from `FirmProfile`; CGST/SGST/IGST split already implemented in
-  `pricing.ts`; issued from an order.
+  `pricing.ts`; issued from an order. *Decided 8 September: raised from this
+  system, on demand — somebody asks for it and it downloads.*
 - **Delivery challan** for dispatch.
 - **Credit note** against an invoice, with a reason, the GST reversal, its
   effect on receivables and its posting to the ledger. Debit note if they raise
@@ -367,6 +370,10 @@ not the thing itself.
   turnover threshold, but the invoice model should not have to change when it is.
 
 ### Phase 8 · Reports and exports — item 4 — **M**
+
+*Decided 8 September: an accounting export is wanted as an option, so the ledger
+in Phase 4 records account head, party, tax split and voucher kind — and the
+CA's copy is an Excel workbook rather than invoices raised somewhere else.*
 
 Queued jobs, exactly momentum's shape: a `Report` row goes QUEUED → GENERATING →
 READY → EXPIRED, a scheduled worker builds the workbook, bytes are stored
@@ -450,11 +457,24 @@ Ordered by how much it would hurt to discover late.
 
 ---
 
-## Part 5 — decisions I need from you
+## Part 5 — decisions, answered 8 September 2026
 
-*Everything waiting on you — these decisions plus the accounts and credentials
-— is collected in [WAITING-ON-YOU.md](WAITING-ON-YOU.md), with what each one
-blocks.*
+*All five are answered. They are kept in
+[WAITING-ON-YOU.md](WAITING-ON-YOU.md) alongside the accounts and credentials
+still outstanding, because they are the assumptions the phases ahead are built
+on and it is cheaper to find a wrong one written down.*
+
+- **React Native pins back to 0.86.3** to adopt Expo Updates, taking Momentum's
+  proven combination. Reanimated 4 and worklets re-checked against it.
+- **Pay is a mix, and fully configurable** — Phase 5 builds monthly salary,
+  daily wage and piece rate as per-employee structures rather than choosing one.
+- **GST invoices are raised from this system**, on demand and downloadable; the
+  CA is served by an Excel export rather than raising them elsewhere.
+- **Modules are sold separately** — shipped.
+- **A Tally / accounting export is wanted**, so Phase 4's ledger records account
+  head, party, tax split and voucher kind, not only an amount and a date.
+- **A declined quote moves its enquiry**, to a stage the shop configures —
+  shipped.
 
 Each has my recommendation; none of them blocks Phase 0 or Phase 1.
 

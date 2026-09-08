@@ -11,11 +11,21 @@ const findFirst = jest.fn(async (..._args: unknown[]) => ({
   roleRef: { permissions: ['order.view', 'order.move_back'] },
 }) as unknown);
 
+/** The platform user behind a control-plane token, read live. */
+const platformUser = jest.fn(async (..._args: unknown[]) => ({
+  name: 'Nakul',
+  role: 'SUPPORT',
+  isActive: true,
+}) as unknown);
+
 const strategy = () =>
   new JwtStrategy(
     { get: () => 'test-secret' } as never,
     { byIdOrThrow } as never,
-    { user: { findFirst } } as never,
+    {
+      user: { findFirst },
+      platform: { platformUser: { findUnique: platformUser } },
+    } as never,
   );
 
 beforeEach(() => {
@@ -25,6 +35,7 @@ beforeEach(() => {
     role: 'ADMIN',
     roleRef: { permissions: ['order.view', 'order.move_back'] },
   });
+  platformUser.mockResolvedValue({ name: 'Nakul', role: 'SUPPORT', isActive: true });
 });
 
 const payload = (over: Partial<JwtPayload> = {}): JwtPayload => ({
@@ -92,7 +103,7 @@ it('stops working once the tenant is gone or suspended', async () => {
 describe('a platform administrator', () => {
   it('needs no workspace at all', async () => {
     const user = await strategy().validate({ sub: 'p1', isPlatform: true });
-    expect(user).toEqual({ id: 'p1', isPlatform: true, permissions: [] });
+    expect(user).toMatchObject({ id: 'p1', isPlatform: true, name: 'Nakul' });
     expect(byIdOrThrow).not.toHaveBeenCalled();
   });
 
@@ -101,5 +112,53 @@ describe('a platform administrator', () => {
     // They belong to no workspace; a tenant here would scope the control plane.
     expect(user).not.toHaveProperty('tenant');
     expect(byIdOrThrow).not.toHaveBeenCalled();
+  });
+
+  it('is allowed what their job allows now, not what the token said', async () => {
+    const user = (await strategy().validate({
+      sub: 'p1',
+      isPlatform: true,
+      // A token signed while they were an owner.
+      permissions: ['platform.tenant.manage', 'platform.release.manage'],
+    })) as { permissions: string[] };
+
+    // They are support now, and support ships nothing.
+    expect(user.permissions).toContain('platform.impersonate');
+    expect(user.permissions).not.toContain('platform.release.manage');
+  });
+
+  it('stops working the moment the account is switched off', async () => {
+    platformUser.mockResolvedValue({ name: 'Nakul', role: 'OWNER', isActive: false });
+    await expect(
+      strategy().validate({ sub: 'p1', isPlatform: true }),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('gives an unknown role the least, not the most', async () => {
+    platformUser.mockResolvedValue({ name: 'Nakul', role: 'TYPO', isActive: true });
+    const user = (await strategy().validate({ sub: 'p1', isPlatform: true })) as {
+      permissions: string[];
+    };
+    expect(user.permissions).toEqual(['platform.tenant.view']);
+  });
+});
+
+describe('somebody from the platform inside a workspace', () => {
+  it('carries who is really doing it', async () => {
+    const user = (await strategy().validate(
+      payload({ impersonatedBy: { id: 'p1', name: 'Nakul' } }),
+    )) as { impersonatedBy?: { name: string } };
+
+    // The trail, the log and the screen all read off this.
+    expect(user.impersonatedBy).toEqual({ id: 'p1', name: 'Nakul' });
+  });
+
+  it('is otherwise the account itself, with the account’s permissions', async () => {
+    const user = (await strategy().validate(
+      payload({ impersonatedBy: { id: 'p1', name: 'Nakul' } }),
+    )) as { id: string; permissions: string[] };
+
+    expect(user.id).toBe('u1');
+    expect(user.permissions).toEqual(['order.view', 'order.move_back']);
   });
 });

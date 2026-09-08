@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Tenant, TenantIsolation } from '@decor/shared';
-import { MODULE_CATALOGUE, PLANS, planFor } from '@decor/shared';
+import { MODULE_CATALOGUE, PERMISSIONS, PLANS, planFor } from '@decor/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
@@ -35,7 +35,7 @@ const STATUS_COLOR: Record<string, string> = {
  */
 export default function TenantsPage() {
   const router = useRouter();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, can, openWorkspace } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -54,6 +54,22 @@ export default function TenantsPage() {
   const [ownerPassword, setOwnerPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /* Which workspace is being opened to help, if any, and why. */
+  const [openFor, setOpenFor] = useState<Tenant | null>(null);
+  const [reason, setReason] = useState('');
+
+  const open = async () => {
+    if (!openFor) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await openWorkspace(openFor.id, reason.trim());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not open that workspace');
+      setBusy(false);
+    }
+  };
 
   /* Which workspace's plan is being changed, if any. */
   const [planFor_, setPlanFor] = useState<Tenant | null>(null);
@@ -157,12 +173,50 @@ export default function TenantsPage() {
                     {planFor(tenant.plan).label} · {tenant.effectiveModules?.length ?? 0} modules
                   </span>
                   <Chip label="Plan" onClick={() => openPlan(tenant)} />
+                  {can(PERMISSIONS.PLATFORM_IMPERSONATE) ? (
+                    <Chip
+                      label="Open"
+                      onClick={() => {
+                        setOpenFor(tenant);
+                        setReason('');
+                        setError(null);
+                      }}
+                    />
+                  ) : null}
                 </div>
               </div>
             </Card>
           ))}
         </div>
       )}
+
+      <Sheet
+        open={Boolean(openFor)}
+        title={`Open ${openFor?.name ?? ''}`}
+        subtitle="You will be working as their administrator, under your own name"
+        onClose={() => setOpenFor(null)}>
+        <p className="t-small muted">
+          This is written into {openFor?.name}&rsquo;s own history, and the session ends by
+          itself after half an hour. Everything you do there is recorded under your name, not
+          theirs.
+        </p>
+        <Field
+          label="Why are you going in?"
+          placeholder="Their board is not loading and they are on the phone"
+          value={reason}
+          onChange={setReason}
+          autoFocus
+        />
+        {error ? <p className="t-small danger">{error}</p> : null}
+        <Button
+          title="Open their workspace"
+          block
+          loading={busy}
+          // The shop reads this sentence months later; a word is not a reason.
+          disabled={reason.trim().length < 8}
+          onClick={open}
+        />
+      </Sheet>
 
       <Sheet
         open={Boolean(planFor_)}

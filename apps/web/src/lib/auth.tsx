@@ -22,6 +22,15 @@ interface AuthState {
   loading: boolean;
   signIn: (workspace: string, identifier: string, password: string) => Promise<void>;
   signInAsPlatform: (email: string, password: string) => Promise<void>;
+  /**
+   * Open a workspace to help whoever is in it.
+   *
+   * Swaps this browser's session for a short-lived one inside that shop. The
+   * banner stays up the whole time, because a support session that looks like
+   * an ordinary one is how a shop ends up believing its own admin did
+   * something.
+   */
+  openWorkspace: (tenantId: string, reason: string) => Promise<void>;
   signOut: () => void;
   /** Forget the workspace too, for a browser moving between businesses. */
   forgetWorkspace: () => void;
@@ -83,6 +92,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [router],
   );
 
+  const openWorkspace = useCallback(
+    async (tenantId: string, reason: string) => {
+      const session = await api.openWorkspace(tenantId, reason);
+      saveToken(session.accessToken);
+      setWorkspace(session.workspace.slug);
+      setUser(await api.me());
+      router.push('/');
+    },
+    [router],
+  );
+
   const signOut = useCallback(() => {
     clearToken();
     setUser(null);
@@ -113,12 +133,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       signIn,
       signInAsPlatform,
+      openWorkspace,
       signOut,
       forgetWorkspace,
       can,
       has,
     }),
-    [user, workspace, loading, signIn, signInAsPlatform, signOut, forgetWorkspace, can, has],
+    [
+      user,
+      workspace,
+      loading,
+      signIn,
+      signInAsPlatform,
+      openWorkspace,
+      signOut,
+      forgetWorkspace,
+      can,
+      has,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

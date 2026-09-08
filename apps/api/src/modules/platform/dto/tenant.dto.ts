@@ -69,3 +69,14 @@ export class ChangeIsolationDto {
   /** Required when moving to DEDICATED. */
   @IsOptional() @IsString() databaseUrl?: string;
 }
+
+/**
+ * Opening a workspace to help.
+ *
+ * The reason is not a formality: it is written into that shop's own history,
+ * and it is the sentence they read months later when they ask who was in their
+ * business and why.
+ */
+export class ImpersonateDto {
+  @IsString() @MinLength(8) reason!: string;
+}

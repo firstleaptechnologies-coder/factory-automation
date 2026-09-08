@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';
-import { PLATFORM_PERMISSIONS } from '@decor/shared';
+import { platformPermissionsFor } from '@decor/shared';
 import {
   runInTenant,
   runAsPlatform,
@@ -99,10 +99,9 @@ export class AuthService {
         // Carried so a change made while helping a shop is signed with a name
         // in their own audit trail, not with an id from another database.
         name: admin.name,
-        // Everything the platform side can do. There is one kind of platform
-        // user today; when there are several — support, billing, engineering —
-        // this becomes a role of their own rather than a list here.
-        permissions: PLATFORM_PERMISSIONS,
+        // What this person's job is, not what the platform can do. Somebody
+        // answering a support call has no business publishing a release.
+        permissions: platformPermissionsFor(admin.role),
       }),
       user: { id: admin.id, name: admin.name, email: admin.email, isPlatform: true },
     };
@@ -123,6 +122,8 @@ export class AuthService {
     role?: string;
     permissions?: string[];
     isPlatform?: boolean;
+    platformRole?: string;
+    impersonatedBy?: { id: string; name: string };
     tenant?: unknown;
   }) {
     if (identity.isPlatform) {
@@ -133,6 +134,7 @@ export class AuthService {
       return {
         id: identity.id,
         isPlatform: true,
+        platformRole: identity.platformRole,
         permissions: identity.permissions ?? [],
         name: admin?.name,
         email: admin?.email,
@@ -161,6 +163,8 @@ export class AuthService {
       role: user?.role ?? identity.role,
       roleName: user?.roleRef?.name ?? user?.role ?? identity.role,
       permissions: identity.permissions ?? [],
+      // Says, for as long as it lasts, that this is not really them.
+      impersonatedBy: identity.impersonatedBy,
       workspace: tenant
         ? { slug: tenant.slug, tenantId: tenant.tenantId, modules: tenant.modules }
         : undefined,

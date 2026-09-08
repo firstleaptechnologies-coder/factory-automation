@@ -31,6 +31,16 @@ export interface AuthUser {
   permissions: string[];
   /** Set for platform admins, who belong to no workspace. */
   isPlatform?: boolean;
+  /** Which job they do on the platform side: OWNER, SUPPORT, BILLING, ENGINEER. */
+  platformRole?: string;
+  /**
+   * Set when somebody from the platform is inside this workspace to help.
+   *
+   * Everything they do is signed with their name in the shop's own history, and
+   * the screen says so the whole time: a support session that looks like an
+   * ordinary one is how a shop ends up believing its own admin did something.
+   */
+  impersonatedBy?: { id: string; name: string };
   /**
    * The workspace they signed into, and what it has bought.
    *
@@ -310,6 +320,8 @@ export interface Workflow {
   leadExpiryDays?: number | null;
   /** The stage an enquiry moves to when a quote is sent. Lead flows only. */
   quoteStatusId?: string | null;
+  /** Where an enquiry goes when the client turns the quote down. */
+  lostStatusId?: string | null;
   id: string;
   code: string;
   name: string;

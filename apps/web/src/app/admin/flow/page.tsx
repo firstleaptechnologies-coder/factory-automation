@@ -324,6 +324,23 @@ export default function FlowBuilderPage() {
    * next says "Estimate sent", and a third quotes twice and cares only about
    * the second.
    */
+  const saveLostStage = async (statusId: string) => {
+    if (!workflow) return;
+    setMessage(null);
+    try {
+      await api.updateWorkflow(workflow.id, { lostStatusId: statusId || null });
+      await load(workflow.id);
+      setMessage({
+        text: statusId
+          ? 'Saved. A quote turned down moves the enquiry there.'
+          : 'Saved. A quote turned down is recorded but moves nothing.',
+        tone: 'success',
+      });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : 'Could not save', tone: 'danger' });
+    }
+  };
+
   const saveQuoteStage = async (statusId: string) => {
     if (!workflow) return;
     setMessage(null);
@@ -453,6 +470,33 @@ export default function FlowBuilderPage() {
                 label="Stage"
                 value={workflow.quoteStatusId ?? ''}
                 onChange={(value) => void saveQuoteStage(value)}
+                options={[
+                  { value: '', label: 'Nothing — leave it where it is' },
+                  ...workflow.statuses.map((status) => ({
+                    value: status.id,
+                    label: status.name,
+                    description: status.category.replace('_', ' ').toLowerCase(),
+                  })),
+                ]}
+              />
+            </div>
+          </div>
+
+          <div className="toolbar" style={{ marginBottom: 0, marginTop: 'var(--s-md)' }}>
+            <div>
+              <h3 style={{ margin: 0 }}>Turning a quote down means</h3>
+              <p className="muted" style={{ fontSize: 12, margin: '4px 0 0' }}>
+                Where an enquiry goes when the client says no. Some shops call it
+                Lost and close it; others keep it and work it again — so it moves
+                only where you say it should, and only where the pipeline allows.
+              </p>
+            </div>
+            <div className="spacer" />
+            <div style={{ width: 260 }}>
+              <Select
+                label="Stage"
+                value={workflow.lostStatusId ?? ''}
+                onChange={(value) => void saveLostStage(value)}
                 options={[
                   { value: '', label: 'Nothing — leave it where it is' },
                   ...workflow.statuses.map((status) => ({

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Tenant, TenantIsolation } from '@decor/shared';
+import { PERMISSIONS } from '@decor/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../auth/AuthContext';
@@ -36,8 +37,31 @@ const STATUS_COLOR: Record<string, string> = {
  * workspace, only the platform creates them.
  */
 export function TenantsScreen({ navigation: _navigation }: { navigation: any }) {
-  const { signOut } = useAuth();
+  const { signOut, can, openWorkspace } = useAuth();
   const tenants = useApi<Tenant[]>(() => api.tenants(), []);
+
+  /* Which workspace is being opened to help, and why. */
+  const [openFor, setOpenFor] = useState<Tenant | null>(null);
+  const [reason, setReason] = useState('');
+  const [opening, setOpening] = useState(false);
+
+  const open = async () => {
+    if (!openFor) return;
+    setOpening(true);
+    try {
+      await openWorkspace(openFor.id, reason.trim());
+      haptic('notificationSuccess');
+      setOpenFor(null);
+    } catch (e) {
+      haptic('notificationError');
+      Alert.alert(
+        'Could not open it',
+        e instanceof Error ? e.message : 'Unknown error',
+      );
+    } finally {
+      setOpening(false);
+    }
+  };
 
   const [sheet, setSheet] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -130,6 +154,18 @@ export function TenantsScreen({ navigation: _navigation }: { navigation: any }) 
                 ) : null}
               </View>
 
+              {can(PERMISSIONS.PLATFORM_IMPERSONATE) ? (
+                <View style={styles.metaRow}>
+                  <Chip
+                    label="Open to help"
+                    onPress={() => {
+                      setOpenFor(tenant);
+                      setReason('');
+                    }}
+                  />
+                </View>
+              ) : null}
+
               {tenant.counts ? (
                 <View style={styles.counts}>
                   {tenant.counts.unreachable ? (
@@ -147,6 +183,30 @@ export function TenantsScreen({ navigation: _navigation }: { navigation: any }) 
           </Animated.View>
         ))
       )}
+
+      <Sheet
+        visible={Boolean(openFor)}
+        title={`Open ${openFor?.name ?? ''}`}
+        subtitle="You will be working as their administrator, under your own name"
+        onClose={() => setOpenFor(null)}>
+        <Text variant="small" tone="muted" style={{ marginBottom: spacing.md }}>
+          This is written into their own history, and the session ends by itself after half an
+          hour. Everything you do there is recorded under your name, not theirs.
+        </Text>
+        <Field
+          label="Why are you going in?"
+          placeholder="Their board is not loading and they are on the phone"
+          value={reason}
+          onChangeText={setReason}
+        />
+        <Button
+          title="Open their workspace"
+          loading={opening}
+          // The shop reads this sentence months later; a word is not a reason.
+          disabled={reason.trim().length < 8}
+          onPress={open}
+        />
+      </Sheet>
 
       <Sheet
         visible={sheet}

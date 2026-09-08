@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../auth/AuthContext';
 import { TabBar } from './TabBar';
+import { SupportBanner } from '../components/SupportBanner';
 import { Loader } from '../ui';
 import { palette } from '../theme';
 
@@ -96,6 +97,8 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer theme={navTheme}>
+      {/* Above every screen, for as long as the session lasts. */}
+      <SupportBanner />
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

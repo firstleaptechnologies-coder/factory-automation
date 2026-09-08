@@ -8,7 +8,8 @@ const platform = {
   changeIsolation: jest.fn(async (..._a: unknown[]) => 'moved'),
 };
 
-const controller = new PlatformController(platform as never);
+const impersonation = { start: jest.fn(async (..._a: unknown[]) => ({ accessToken: 'tok' })) };
+const controller = new PlatformController(platform as never, impersonation as never);
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -38,4 +39,18 @@ it('moves a workspace between a shared database and its own', async () => {
   const dto = { isolation: 'DEDICATED', databaseUrl: 'postgres://host/db' };
   await controller.changeIsolation('t1', dto as never);
   expect(platform.changeIsolation).toHaveBeenCalledWith('t1', dto);
+});
+
+
+it('opens a workspace with the reason and who is asking', async () => {
+  await controller.open('t1', { reason: 'Their board is not loading' } as never, {
+    id: 'p1',
+    name: 'Nakul',
+  } as never);
+
+  // The reason travels: it is written into that shop's own history.
+  expect(impersonation.start).toHaveBeenCalledWith('t1', 'Their board is not loading', {
+    id: 'p1',
+    name: 'Nakul',
+  });
 });

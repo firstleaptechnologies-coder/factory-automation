@@ -139,6 +139,23 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="shell">
+      {/*
+        Up the whole time, and not dismissible.
+
+        A support session that looks like an ordinary one is how a shop ends up
+        believing its own admin did something.
+      */}
+      {user.impersonatedBy ? (
+        <div className="support-banner" role="status">
+          <span>
+            <strong>{user.impersonatedBy.name}</strong> from Decor Bucket support is in this
+            workspace as {user.name}. Everything done here is recorded under that name.
+          </span>
+          <button type="button" className="chip" onClick={signOut}>
+            Leave
+          </button>
+        </div>
+      ) : null}
       <nav className="shell-nav">
         <Link href="/" className="brand">
           <span className="brand-mark">

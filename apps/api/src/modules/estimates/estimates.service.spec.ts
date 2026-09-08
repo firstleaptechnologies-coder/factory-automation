@@ -317,7 +317,10 @@ describe('the enquiry a quote belongs to', () => {
       workflowId: 'w1',
       convertedOrderId: null,
     }));
-    db.workflow.findFirst = jest.fn(async () => ({ quoteStatusId: 'quoted' }));
+    db.workflow.findFirst = jest.fn(async () => ({
+      quoteStatusId: 'quoted',
+      lostStatusId: 'lost',
+    }));
     db.workflowTransition.findUnique = jest.fn(async () => ({ id: 't1' }));
   }
 
@@ -676,5 +679,115 @@ describe('an accepted quote that becomes work', () => {
     await inTenant(() => service.convertToOrder('e1', { location: 'Site A' }));
     expect(orders.punch).toHaveBeenCalled();
     expect(db.lead.update).not.toHaveBeenCalled();
+  });
+});
+
+
+/**
+ * The client said no.
+ *
+ * A declined quote moves the enquiry to whichever stage that shop calls lost —
+ * configured, because one pipeline says "Lost", another says "Closed — no", and
+ * a third keeps them and works them again.
+ */
+describe('a quote that is turned down', () => {
+  /** Stage moves only — settling the quoted figure writes to the lead too. */
+  const movedStage = (db: Db) =>
+    db.lead.update.mock.calls
+      .map((call: any[]) => call[0].data)
+      .filter((data: Record<string, unknown>) => 'statusId' in data);
+
+  function build() {
+    const db = prismaMock() as never as Db;
+    db.estimate.findFirst = jest.fn(async () => ({
+      id: 'e1',
+      code: 'EST-1',
+      leadId: 'ld1',
+      status: EstimateStatus.SENT,
+      grandTotal: 450000,
+      items: [],
+    }));
+    db.estimate.update = jest.fn(async () => ({
+      id: 'e1',
+      code: 'EST-1',
+      leadId: 'ld1',
+      grandTotal: 450000,
+      status: EstimateStatus.DECLINED,
+    }));
+    db.lead.findFirst = jest.fn(async () => ({
+      id: 'ld1',
+      statusId: 'quoted',
+      workflowId: 'w1',
+      convertedOrderId: null,
+    }));
+    db.workflow.findFirst = jest.fn(async () => ({
+      quoteStatusId: 'quoted',
+      lostStatusId: 'lost',
+    }));
+    db.workflowTransition.findUnique = jest.fn(async () => ({ id: 't1' }));
+    db.estimate.aggregate = jest.fn(async () => ({ _sum: { grandTotal: null }, _count: 0 }));
+    db.estimate.findMany = jest.fn(async () => []);
+    return {
+      service: new EstimatesService(
+        db as never,
+        { next: jest.fn(async () => 'EST-2') } as never,
+        {} as never,
+        notificationsMock() as never,
+      ),
+      db,
+    };
+  }
+
+  it('moves the enquiry to the stage the shop calls lost', async () => {
+    const { service, db } = build();
+    await inTenant(() => service.setStatus('e1', EstimateStatus.DECLINED, 'u1'));
+
+    expect(movedStage(db)).toEqual([{ statusId: 'lost' }]);
+  });
+
+  it('says in the enquiry’s history which quote was turned down', async () => {
+    const { service, db } = build();
+    await inTenant(() => service.setStatus('e1', EstimateStatus.DECLINED, 'u1'));
+
+    expect(db.leadStatusHistory.create.mock.calls.at(-1)?.[0].data).toMatchObject({
+      toStatusId: 'lost',
+      note: 'Quote EST-1 declined',
+      changedById: 'u1',
+    });
+  });
+
+  it('moves nothing where the pipeline has no such stage', async () => {
+    const { service, db } = build();
+    db.workflow.findFirst = jest.fn(async () => ({ quoteStatusId: 'quoted', lostStatusId: null }));
+
+    await inTenant(() => service.setStatus('e1', EstimateStatus.DECLINED, 'u1'));
+
+    // A shop that works declined enquiries again should keep them where they
+    // are. Settling the quoted figure still happens; the stage does not move.
+    expect(movedStage(db)).toEqual([]);
+  });
+
+  it('respects the drawing: no arrow, no move', async () => {
+    const { service, db } = build();
+    db.workflowTransition.findUnique = jest.fn(async () => null);
+
+    await inTenant(() => service.setStatus('e1', EstimateStatus.DECLINED, 'u1'));
+
+    expect(movedStage(db)).toEqual([]);
+  });
+
+  it('does not move it a second time when the status is set again', async () => {
+    const { service, db } = build();
+    db.estimate.findFirst = jest.fn(async () => ({
+      id: 'e1',
+      code: 'EST-1',
+      leadId: 'ld1',
+      status: EstimateStatus.DECLINED,
+      grandTotal: 450000,
+      items: [],
+    }));
+
+    await inTenant(() => service.setStatus('e1', EstimateStatus.DECLINED, 'u1'));
+    expect(movedStage(db)).toEqual([]);
   });
 });

@@ -1199,3 +1199,32 @@
   font-weight: 700;
   text-align: center;
 }
+
+/**
+ * Somebody from the platform is inside this workspace.
+ *
+ * Loud, fixed and not dismissible. It is the shop's assurance that they can
+ * tell our hands from their own.
+ */
+.support-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-md);
+  padding: 8px var(--s-lg);
+  background: var(--warning);
+  color: #1f2327;
+  font-size: 13px;
+  text-align: center;
+}
+
+.support-banner .chip {
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  border: 0;
+}

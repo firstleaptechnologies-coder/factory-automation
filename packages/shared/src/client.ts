@@ -370,6 +370,7 @@ export class ApiClient {
       description?: string;
       leadExpiryDays?: number | null;
       quoteStatusId?: string | null;
+      lostStatusId?: string | null;
     },
   ) {
     return this.patch<Workflow>(`/workflows/${workflowId}`, body);
@@ -809,6 +810,22 @@ export class ApiClient {
   }
 
   // -- releases (the app binary and what it runs) ---------------------------
+
+  /**
+   * Open a workspace to help whoever is in it.
+   *
+   * Comes back with a short-lived token for one of their own accounts. The
+   * reason is written into that shop's own history, so it is not optional and
+   * it is not for us.
+   */
+  openWorkspace(tenantId: string, reason: string) {
+    return this.post<{
+      accessToken: string;
+      workspace: { slug: string; name: string };
+      as: string;
+      expiresIn: string;
+    }>(`/platform/tenants/${tenantId}/open`, { reason });
+  }
 
   releases(query?: { channel?: string; platform?: string }) {
     return this.get<Release[]>('/platform/releases', query);

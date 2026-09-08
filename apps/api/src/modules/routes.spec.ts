@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { PATH_METADATA, METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common';
-import { DEFAULT_ROLES } from '@decor/shared';
+import { DEFAULT_ROLES, PLATFORM_ROLES } from '@decor/shared';
 import { PERMISSIONS_KEY } from '../common/decorators/permissions.decorator';
 import { ROLES_KEY } from '../common/decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
@@ -163,6 +163,35 @@ it('takes what the clients saw behind a token, and slowly', () => {
   // not be able to fill the table while it is at it.
   expect(find('LogsController', 'record').isPublic).toBe(false);
   expect(guards).toContain('ThrottlerGuard');
+});
+
+describe('the platform’s own powers', () => {
+  it('holds opening a workspace apart from everything else', () => {
+    // It is the one platform power that reaches inside a shop's data, and it
+    // should be possible to hand somebody the release console without it.
+    expect(find('PlatformController', 'open').permissions).toEqual(['platform.impersonate']);
+  });
+
+  it('gives that to support and to nobody else by default', () => {
+    const holders = PLATFORM_ROLES.filter((role) =>
+      role.permissions.includes('platform.impersonate' as never),
+    ).map((role) => role.key);
+
+    expect(holders).toEqual(['OWNER', 'SUPPORT']);
+  });
+
+  it('keeps billing and engineering out of a shop’s data', () => {
+    for (const key of ['BILLING', 'ENGINEER']) {
+      const role = PLATFORM_ROLES.find((one) => one.key === key)!;
+      expect(role.permissions).not.toContain('platform.impersonate');
+    }
+  });
+
+  it('grants no platform power to any of a tenant’s roles', () => {
+    for (const role of DEFAULT_ROLES) {
+      expect(role.permissions.some((one) => one.startsWith('platform.'))).toBe(false);
+    }
+  });
 });
 
 describe('what a plan reaches', () => {

@@ -52,6 +52,7 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
   const [transitionFrom, setTransitionFrom] = useState<WorkflowStatus | null>(null);
   const [expirySheet, setExpirySheet] = useState(false);
   const [quoteSheet, setQuoteSheet] = useState(false);
+  const [lostSheet, setLostSheet] = useState(false);
   const [expiryDays, setExpiryDays] = useState('');
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -205,6 +206,22 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
           </View>
           <Text variant="body" bold tone={data.quoteStatusId ? 'accent' : 'faint'}>
             {statusById(data.quoteStatusId ?? '')?.name ?? 'No move'}
+          </Text>
+        </Card>
+      ) : null}
+
+      {data.kind === 'LEAD' ? (
+        <Card tone="dark" style={styles.expiry} onPress={() => setLostSheet(true)}>
+          <View style={{ flex: 1 }}>
+            <Text variant="label" tone="muted">Turning a quote down means</Text>
+            <Text variant="tiny" tone="faint">
+              {data.lostStatusId
+                ? 'An enquiry moves here when the client says no.'
+                : 'A declined quote is recorded but moves the enquiry nowhere.'}
+            </Text>
+          </View>
+          <Text variant="body" bold tone={data.lostStatusId ? 'accent' : 'faint'}>
+            {statusById(data.lostStatusId ?? '')?.name ?? 'No move'}
           </Text>
         </Card>
       ) : null}
@@ -519,6 +536,41 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
               run(async () => {
                 await api.updateWorkflow(data.id, { quoteStatusId: status.id });
                 setQuoteSheet(false);
+              })
+            }
+          />
+        ))}
+      </Sheet>
+
+      <Sheet
+        visible={lostSheet}
+        title="Turning a quote down means"
+        subtitle="Where an enquiry goes when the client says no"
+        onClose={() => setLostSheet(false)}>
+        <Text variant="small" tone="muted" style={{ marginTop: 0 }}>
+          Some shops close it; others keep it and work it again. The move is made
+          through this same graph, so it only happens where the pipeline allows.
+        </Text>
+        <SheetOption
+          label="Nothing — leave it where it is"
+          selected={!data.lostStatusId}
+          onPress={() =>
+            run(async () => {
+              await api.updateWorkflow(data.id, { lostStatusId: null });
+              setLostSheet(false);
+            })
+          }
+        />
+        {ordered.map((status) => (
+          <SheetOption
+            key={status.id}
+            label={status.name}
+            accent={status.color}
+            selected={data.lostStatusId === status.id}
+            onPress={() =>
+              run(async () => {
+                await api.updateWorkflow(data.id, { lostStatusId: status.id });
+                setLostSheet(false);
               })
             }
           />

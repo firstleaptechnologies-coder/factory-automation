@@ -4,7 +4,8 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { runInTenant } from '../../common/tenancy/tenant-context';
+import { platformPermissionsFor } from '@decor/shared';
+import { runAsPlatform, runInTenant } from '../../common/tenancy/tenant-context';
 
 export interface JwtPayload {
   sub: string;
@@ -14,6 +15,14 @@ export interface JwtPayload {
   role?: string;
   permissions?: string[];
   isPlatform?: boolean;
+  /**
+   * Set when somebody from the platform is inside a workspace to help.
+   *
+   * The token is otherwise an ordinary tenant token — the permissions are the
+   * account's own — so this is what makes it obvious in the audit trail, on the
+   * screen, and in the log that it was not really them.
+   */
+  impersonatedBy?: { id: string; name: string };
 }
 
 /**
@@ -39,11 +48,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: JwtPayload) {
     if (payload.isPlatform) {
+      /*
+       * What their job allows now, not what it allowed at sign-in — the same
+       * argument as for a tenant's role below. Somebody moved off support
+       * should stop being able to open workspaces immediately.
+       */
+      const admin = await runAsPlatform(() =>
+        this.prisma.platform.platformUser.findUnique({
+          where: { id: payload.sub },
+          select: { name: true, role: true, isActive: true },
+        }),
+      );
+      if (!admin?.isActive) throw new UnauthorizedException('This account is no longer active');
+
       return {
         id: payload.sub,
-        name: payload.name,
+        name: admin.name,
         isPlatform: true,
-        permissions: payload.permissions ?? [],
+        platformRole: admin.role,
+        permissions: platformPermissionsFor(admin.role),
       };
     }
 
@@ -73,6 +96,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       id: payload.sub,
       code: payload.code,
+      // Carried through so the trail, the log and the screen all say that
+      // somebody from the platform was the one doing this.
+      impersonatedBy: payload.impersonatedBy,
       // Read here rather than carried in the token, so a person who changes
       // their name is named correctly in what they do next.
       name: user.name,

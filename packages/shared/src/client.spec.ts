@@ -362,6 +362,12 @@ describe('endpoints', () => {
       '/notifications/settings/order.moved',
     ],
 
+    [
+      'openWorkspace',
+      (a) => a.openWorkspace('t1', 'Their board is not loading'),
+      'POST',
+      '/platform/tenants/t1/open',
+    ],
     ['releases', (a) => a.releases(), 'GET', '/platform/releases'],
     ['release', (a) => a.release('r1'), 'GET', '/platform/releases/r1'],
     [

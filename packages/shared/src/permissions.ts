@@ -93,6 +93,17 @@ export const PERMISSIONS = {
    */
   PLATFORM_RELEASE_VIEW: 'platform.release.view',
   PLATFORM_RELEASE_MANAGE: 'platform.release.manage',
+  /** Provisioning a new workspace, which seeds a whole shop. */
+  PLATFORM_TENANT_CREATE: 'platform.tenant.create',
+  /**
+   * Opening somebody's workspace to help them.
+   *
+   * Held apart from everything else because it is the one platform power that
+   * reaches inside a shop's own data. It is time-limited, it needs a reason,
+   * and it writes that reason into the shop's own audit trail — so they can see
+   * we were there even if nobody told them.
+   */
+  PLATFORM_IMPERSONATE: 'platform.impersonate',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -198,6 +209,8 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.PAYMENT_DELETE]: 'Take a receipt back',
   [PERMISSIONS.PLATFORM_RELEASE_VIEW]: 'See app releases',
   [PERMISSIONS.PLATFORM_RELEASE_MANAGE]: 'Publish app releases',
+  [PERMISSIONS.PLATFORM_TENANT_CREATE]: 'Provision workspaces',
+  [PERMISSIONS.PLATFORM_IMPERSONATE]: 'Open a workspace to help',
   [PERMISSIONS.CASH_DEPOSIT]: 'Record bank deposits',
   // The key stays as it is: renaming a permission string would silently strip
   // it from every role a tenant has already saved.
@@ -263,3 +276,63 @@ export const DEFAULT_ROLES: {
     ],
   },
 ];
+
+/**
+ * Who works on the product, and what each of them may do.
+ *
+ * The people who own the product are not all the same person: somebody
+ * answering a support call needs to open a workspace and needs nothing to do
+ * with releases; whoever ships the app needs the opposite; billing changes what
+ * a shop pays for and should not be inside their data at all.
+ *
+ * A fixed list rather than the composable roles a tenant gets: there are four
+ * of us, not four hundred, and the blast radius here is every workspace.
+ */
+export const PLATFORM_ROLES: {
+  key: string;
+  label: string;
+  blurb: string;
+  permissions: Permission[];
+}[] = [
+  {
+    key: 'OWNER',
+    label: 'Owner',
+    blurb: 'Everything, including provisioning a new workspace',
+    permissions: [...PLATFORM_PERMISSIONS],
+  },
+  {
+    key: 'SUPPORT',
+    label: 'Support',
+    blurb: 'Can open a workspace to help, and see what the app is running',
+    permissions: [
+      PERMISSIONS.PLATFORM_TENANT_VIEW,
+      PERMISSIONS.PLATFORM_IMPERSONATE,
+      PERMISSIONS.PLATFORM_RELEASE_VIEW,
+    ],
+  },
+  {
+    key: 'BILLING',
+    label: 'Billing',
+    blurb: 'Changes what a workspace is on. Never inside their data',
+    permissions: [PERMISSIONS.PLATFORM_TENANT_VIEW, PERMISSIONS.PLATFORM_TENANT_MANAGE],
+  },
+  {
+    key: 'ENGINEER',
+    label: 'Engineering',
+    blurb: 'Ships the app. Sees workspaces, does not go into one',
+    permissions: [
+      PERMISSIONS.PLATFORM_TENANT_VIEW,
+      PERMISSIONS.PLATFORM_RELEASE_VIEW,
+      PERMISSIONS.PLATFORM_RELEASE_MANAGE,
+    ],
+  },
+];
+
+export const DEFAULT_PLATFORM_ROLE = 'OWNER';
+
+export function platformPermissionsFor(role?: string | null): Permission[] {
+  const found = PLATFORM_ROLES.find((one) => one.key === role);
+  // An unknown role is given the least, not the most: a typo on a row must not
+  // hand somebody every workspace.
+  return found?.permissions ?? [PERMISSIONS.PLATFORM_TENANT_VIEW];
+}

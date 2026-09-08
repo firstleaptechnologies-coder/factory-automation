@@ -15,7 +15,13 @@ export class ActorInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const user = request?.user as
-      | { id?: string; code?: string; name?: string; isPlatform?: boolean }
+      | {
+          id?: string;
+          code?: string;
+          name?: string;
+          isPlatform?: boolean;
+          impersonatedBy?: { id: string; name: string };
+        }
       | undefined;
 
     if (!user) return next.handle();
@@ -26,7 +32,14 @@ export class ActorInterceptor implements NestInterceptor {
         // id would not point at anything here. They are named instead.
         userId: user.isPlatform ? undefined : user.id,
         code: user.code,
-        name: user.isPlatform && user.name ? `${user.name} (Decor Bucket support)` : user.name,
+        /*
+         * Whose name goes on the change.
+         *
+         * Somebody from the platform inside a workspace is using a borrowed
+         * account, and the shop's history must say so — otherwise their own
+         * admin appears to have done things they never did.
+         */
+        name: actorName(user),
         platform: typeof request.headers?.['x-client'] === 'string'
           ? String(request.headers['x-client'])
           : undefined,
@@ -34,4 +47,17 @@ export class ActorInterceptor implements NestInterceptor {
       () => next.handle(),
     );
   }
+}
+
+/** Who to name in the trail: the person, not the account they are using. */
+function actorName(user: {
+  name?: string;
+  isPlatform?: boolean;
+  impersonatedBy?: { name: string };
+}): string | undefined {
+  if (user.impersonatedBy) {
+    return `${user.impersonatedBy.name} (Decor Bucket support, as ${user.name ?? 'an admin'})`;
+  }
+  if (user.isPlatform && user.name) return `${user.name} (Decor Bucket support)`;
+  return user.name;
 }

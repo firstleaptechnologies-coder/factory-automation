@@ -38,6 +38,8 @@ export class UpdateWorkflowDto {
    * records itself against the enquiry but moves nothing.
    */
   @IsOptional() @IsString() quoteStatusId?: string | null;
+  /** Where an enquiry goes when the client turns the quote down. */
+  @IsOptional() @IsString() lostStatusId?: string | null;
 }
 
 export class StatusDto {

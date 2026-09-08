@@ -462,6 +462,19 @@ it('offers the main card from here, since this is where stages are thought about
   expect(push).toHaveBeenCalledWith('/admin/main-card');
 });
 
+/**
+ * The picker under one heading.
+ *
+ * There are two of these panels now — a quote going out and a quote turned
+ * down — so "the last select on the page" stopped meaning anything.
+ */
+const pickerUnder = (heading: string): HTMLElement => {
+  const panel = Array.from(document.querySelectorAll('.toolbar')).find((node) =>
+    node.querySelector('h3')?.textContent?.startsWith(heading),
+  )!;
+  return panel.querySelector('.select-trigger') as HTMLElement;
+};
+
 describe('when an enquiry goes quiet', () => {
   const LEAD_FLOW = { ...GRAPH, kind: 'LEAD', leadExpiryDays: 30 };
 
@@ -520,10 +533,11 @@ describe('when an enquiry goes quiet', () => {
     expect(screen.queryByText('Sending a quote means')).not.toBeInTheDocument();
   });
 
+
+
   it('saves the stage that was picked', async () => {
     await mount(LEAD_FLOW);
-    const trigger = Array.from(document.querySelectorAll('.select-trigger')).at(-1)!;
-    fireEvent.click(trigger);
+    fireEvent.click(pickerUnder('Sending a quote means'));
     // "Delivered" also names a stage in the table below.
     await waitFor(() =>
       expect(document.querySelectorAll('.select-option').length).toBeGreaterThan(0),
@@ -540,8 +554,7 @@ describe('when an enquiry goes quiet', () => {
 
   it('turns it off again, so a quote moves nothing', async () => {
     await mount({ ...LEAD_FLOW, quoteStatusId: 's3' });
-    const trigger = Array.from(document.querySelectorAll('.select-trigger')).at(-1)!;
-    fireEvent.click(trigger);
+    fireEvent.click(pickerUnder('Sending a quote means'));
     await waitFor(() =>
       expect(document.querySelectorAll('.select-option').length).toBeGreaterThan(0),
     );
@@ -702,5 +715,60 @@ describe('the colour a stage is given', () => {
     fireEvent.click(screen.getAllByText('Save stage').at(-1)!);
     await waitFor(() => expect(apiMock.updateStatus).toHaveBeenCalled());
     expect(apiMock.updateStatus.mock.calls[0][1].color).toBe('#123456');
+  });
+});
+
+
+/**
+ * The client said no.
+ *
+ * Some shops close a declined enquiry; others keep it and work it again — so
+ * where it goes is theirs to say, and saying nothing is a real answer.
+ */
+describe('when a quote is turned down', () => {
+  const LEAD_FLOW = { ...GRAPH, kind: 'LEAD', leadExpiryDays: 30 };
+
+  it('asks where the enquiry should go', async () => {
+    await mount(LEAD_FLOW);
+    expect(screen.getByText('Turning a quote down means')).toBeInTheDocument();
+  });
+
+  it('is not asked on an order flow, which is not quoted', async () => {
+    await mount();
+    expect(screen.queryByText('Turning a quote down means')).not.toBeInTheDocument();
+  });
+
+  it('saves the stage that was picked', async () => {
+    await mount(LEAD_FLOW);
+    fireEvent.click(pickerUnder('Turning a quote down means'));
+    await waitFor(() =>
+      expect(document.querySelectorAll('.select-option').length).toBeGreaterThan(0),
+    );
+    fireEvent.click(
+      Array.from(document.querySelectorAll('.select-option')).find((node) =>
+        node.textContent?.startsWith('Delivered'),
+      )!,
+    );
+
+    await waitFor(() =>
+      expect(apiMock.updateWorkflow).toHaveBeenCalledWith('w1', { lostStatusId: 's3' }),
+    );
+  });
+
+  it('turns it off again, so a declined quote moves nothing', async () => {
+    await mount({ ...LEAD_FLOW, lostStatusId: 's3' });
+    fireEvent.click(pickerUnder('Turning a quote down means'));
+    await waitFor(() =>
+      expect(document.querySelectorAll('.select-option').length).toBeGreaterThan(0),
+    );
+    fireEvent.click(
+      Array.from(document.querySelectorAll('.select-option')).find((node) =>
+        node.textContent?.startsWith('Nothing'),
+      )!,
+    );
+
+    await waitFor(() =>
+      expect(apiMock.updateWorkflow).toHaveBeenCalledWith('w1', { lostStatusId: null }),
+    );
   });
 });

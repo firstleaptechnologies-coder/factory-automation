@@ -248,3 +248,28 @@ describe('syncSystemRoles', () => {
     await expect(service.syncSystemRoles(db as never, 't1')).resolves.toBe(0);
   });
 });
+
+
+/**
+ * The two stages a lead pipeline names.
+ *
+ * A shop that never opens the flow screen should still have a quote move the
+ * enquiry and a refusal close it.
+ */
+describe('what a new lead pipeline points at', () => {
+  it('names the stage a quote goes out at, and the one a refusal ends at', async () => {
+    const { service, db } = build();
+    await service.seed(db as never, 't1', OWNER);
+
+    expect(dataOf(db.workflow.update)).toEqual([
+      { quoteStatusId: 'st-QUOTED', lostStatusId: 'st-LOST' },
+    ]);
+  });
+
+  it('leaves the order flow pointing at neither, since orders are not quoted', async () => {
+    const { service, db } = build();
+    await service.seed(db as never, 't1', OWNER);
+    // Only the lead pipeline names them.
+    expect(db.workflow.update).toHaveBeenCalledTimes(1);
+  });
+});

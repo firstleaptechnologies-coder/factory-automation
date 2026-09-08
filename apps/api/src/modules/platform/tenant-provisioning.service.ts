@@ -251,6 +251,8 @@ export class TenantProvisioningService {
       kind: WorkflowKind.LEAD,
       stages,
       moves,
+      quoteStage: 'QUOTED',
+      lostStage: 'LOST',
     });
 
     const sources = [
@@ -300,6 +302,9 @@ export class TenantProvisioningService {
       kind: WorkflowKind;
       stages: Record<string, never>[] | any[];
       moves: [string, string, { label?: string; requiresNote?: boolean }?][];
+      /** Stage codes the flow itself points at, once the stages exist. */
+      quoteStage?: string;
+      lostStage?: string;
     },
   ) {
     const workflow = await db.workflow.create({
@@ -333,6 +338,23 @@ export class TenantProvisioningService {
         },
       });
       ids.set(stage.code, saved.id);
+    }
+
+    /*
+     * The two stages the pipeline itself names.
+     *
+     * Set here rather than left empty because a shop that never opens the flow
+     * screen should still have a quote move the enquiry and a refusal close it
+     * — and they can change or clear either afterwards.
+     */
+    if (spec.quoteStage || spec.lostStage) {
+      await db.workflow.update({
+        where: { id: workflow.id },
+        data: {
+          ...(spec.quoteStage ? { quoteStatusId: ids.get(spec.quoteStage) } : {}),
+          ...(spec.lostStage ? { lostStatusId: ids.get(spec.lostStage) } : {}),
+        },
+      });
     }
 
     for (const [from, to, options] of spec.moves) {

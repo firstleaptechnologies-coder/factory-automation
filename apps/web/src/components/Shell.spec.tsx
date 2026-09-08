@@ -326,3 +326,40 @@ describe('what a plan reaches', () => {
     expect(screen.getByText('Leads')).toBeInTheDocument();
   });
 });
+
+
+/**
+ * Somebody from the platform inside a workspace.
+ *
+ * A support session that looks like an ordinary one is how a shop ends up
+ * believing its own admin did something.
+ */
+describe('the support banner', () => {
+  it('is not there in an ordinary session', () => {
+    mount();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('names who is in here, and as whom', () => {
+    mount({
+      user: {
+        name: 'Administrator',
+        permissions: [],
+        impersonatedBy: { id: 'p1', name: 'Nakul' },
+      },
+    });
+
+    const banner = screen.getByRole('status');
+    expect(banner).toHaveTextContent('Nakul');
+    expect(banner).toHaveTextContent('as Administrator');
+    expect(banner).toHaveTextContent('recorded under that name');
+  });
+
+  it('offers the way out', () => {
+    mount({
+      user: { name: 'Administrator', permissions: [], impersonatedBy: { id: 'p1', name: 'Nakul' } },
+    });
+    fireEvent.click(screen.getByText('Leave'));
+    expect(signOut).toHaveBeenCalled();
+  });
+});

@@ -8,7 +8,7 @@ so it is obvious what unlocks when you get to it.
 
 ---
 
-## 1. React Native 0.87.1 → 0.86.3 — **blocks OTA in the app**
+## 1. React Native 0.87.1 → 0.86.3 — **decided 8 September: pin back**
 
 `expo-updates` needs the Expo modules in the app, and Expo SDK 57 (current)
 pins **react-native 0.86.3**. This app is on **0.87.1**.
@@ -19,10 +19,10 @@ pins **react-native 0.86.3**. This app is on **0.87.1**.
 - **The alternative:** wait for the SDK that supports 0.87 and ship the app's
   OTA client then. The OTA *server* is built either way, so nothing else waits.
 
-**Say which and I will do it.** Nothing else in the roadmap depends on this —
-the update server, the publish script and the release console at
-`/platform/releases` are all built and working; only the app's own client for
-them waits on this decision.
+**Decided: take Momentum's combination and pin back**, then re-check Reanimated
+4 and worklets against it. In progress — nothing else in the roadmap depends on
+it; the update server, the publish script and the release console at
+`/platform/releases` are already built and working.
 
 ## 2. A Firebase project — **blocks push notifications**
 
@@ -84,16 +84,24 @@ BSP takes weeks, so the application is worth starting well before the code.
 
 ---
 
-## Decisions I still need (from `docs/ROADMAP.md`, Part 5)
+## Decisions — answered 8 September 2026
 
-- [ ] **How does the floor get paid** — monthly salary, daily wage, piece rate,
-      or a mix? Needed before Phase 5 (HR); it decides the shape of the salary
-      run.
-- [ ] **Are GST invoices raised from this system**, or does the CA raise them in
-      Tally? If Tally, Phase 7 needs an export they can import.
-- [ ] **Do tenants buy modules separately from day one?** (I recommend yes; the
-      entitlement layer is cheap now and a rewrite later.)
-- [ ] **Is a Tally / accounting export required?** Better known before Phase 4
-      than after — it changes what the ledger has to record.
-- [ ] **Declined quote → Lost?** Deferred on 8 September; you asked to be
-      reminded around the 12th.
+Kept here rather than deleted: these are the assumptions the phases ahead are
+being built on, and if one of them turns out wrong it is cheaper to find it
+written down.
+
+- **How the floor gets paid** — *a mix, and fully configurable*: nobody knows
+  yet how a given client pays. So Phase 5 builds monthly salary, daily wage and
+  piece rate as configurable pay structures per employee rather than choosing
+  one shape.
+- **GST invoices** — *raised from this system, on demand*: an invoice is
+  generated and downloadable whenever somebody asks for one. The CA is served
+  by an Excel export rather than by raising invoices themselves.
+- **Modules sold separately** — *yes*, and the entitlement layer for it shipped
+  on 8 September: plans, per-tenant extras, and two gates on every route.
+- **A Tally / accounting export** — *yes, as an option*. Phase 4's ledger has to
+  record what such an export needs: account head, party, tax split and voucher
+  kind, not only an amount and a date.
+- **A declined quote moves its enquiry** — *yes*. Shipped 8 September: which
+  stage it moves to is configured on the lead pipeline, because one shop calls
+  it Lost and another keeps working it.

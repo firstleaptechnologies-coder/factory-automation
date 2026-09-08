@@ -78,12 +78,18 @@ model Tenant {
   @@index([status])
 }
 
-/// Super admins. They belong to no tenant and can provision them.
+/// The people who own the product. They belong to no tenant.
 model PlatformUser {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String
   passwordHash String
+  /// OWNER | SUPPORT | BILLING | ENGINEER — the list lives in @decor/shared.
+  ///
+  /// A fixed set rather than the composable roles a tenant gets: there are a
+  /// few of us, not a few hundred, and the blast radius here is every
+  /// workspace.
+  role         String   @default("OWNER")
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -610,6 +616,14 @@ model Workflow {
   /// the second. Null means sending a quote records itself against the lead
   /// but moves nothing.
   quoteStatusId String?
+
+  /// The stage an enquiry moves to when the client turns a quote down.
+  ///
+  /// Configured for the same reason as the one above: one pipeline says "Lost",
+  /// another says "Closed — no", and a third keeps declined enquiries where
+  /// they are and works them again. Null means a declined quote is recorded
+  /// against the enquiry and moves nothing.
+  lostStatusId String?
 
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt

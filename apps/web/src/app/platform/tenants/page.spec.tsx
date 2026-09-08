@@ -1,4 +1,5 @@
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { PERMISSIONS } from '@decor/shared';
 import TenantsPage from './page';
 
 const apiMock = { tenants: jest.fn(), createTenant: jest.fn(), updateTenant: jest.fn() };
@@ -16,6 +17,8 @@ const replace = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ replace, push: jest.fn() }) }));
 
 const signOut = jest.fn();
+const openWorkspace = jest.fn();
+let granted: string[] = [];
 let auth: Record<string, unknown>;
 jest.mock('@/lib/auth', () => ({ useAuth: () => auth }));
 
@@ -45,7 +48,14 @@ async function mount(rows: unknown[] = [TENANT]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  auth = { user: { id: 'p1', isPlatform: true }, loading: false, signOut };
+  granted = [PERMISSIONS.PLATFORM_IMPERSONATE];
+  auth = {
+    user: { id: 'p1', isPlatform: true },
+    loading: false,
+    signOut,
+    can: (permission: string) => granted.includes(permission),
+    openWorkspace,
+  };
   apiMock.updateTenant.mockResolvedValue({});
   // The list is fetched whoever is looking, so it always needs an answer.
   apiMock.tenants.mockResolvedValue([]);
@@ -268,5 +278,50 @@ describe('a workspace’s plan', () => {
     });
 
     expect(apiMock.updateTenant).toHaveBeenCalledWith('t1', { plan: 'shop', modules: ['hr'] });
+  });
+});
+
+
+/**
+ * Opening a workspace to help.
+ *
+ * The one platform power that reaches inside a shop's data, so the screen makes
+ * it deliberate rather than convenient.
+ */
+describe('opening a workspace', () => {
+  const openSheet = async () => {
+    await mount();
+    fireEvent.click((await screen.findAllByText('Open'))[0]);
+    await screen.findByText(/You will be working as their administrator/);
+  };
+
+  it('is offered only to somebody allowed to', async () => {
+    granted = [];
+    await mount();
+    await screen.findByText('Decor Bucket');
+    expect(screen.queryByText('Open')).not.toBeInTheDocument();
+  });
+
+  it('says what it means before it does it', async () => {
+    await openSheet();
+    expect(screen.getByText(/recorded under your name, not/)).toBeInTheDocument();
+  });
+
+  it('will not go in on a word', async () => {
+    await openSheet();
+    // The shop reads this sentence in their own history months later.
+    expect(screen.getByRole('button', { name: 'Open their workspace' })).toBeDisabled();
+  });
+
+  it('goes in with a reason', async () => {
+    await openSheet();
+    fireEvent.change(field('Why are you going in?'), {
+      target: { value: 'Their board is not loading' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Open their workspace' }));
+    });
+
+    expect(openWorkspace).toHaveBeenCalledWith('t1', 'Their board is not loading');
   });
 });
