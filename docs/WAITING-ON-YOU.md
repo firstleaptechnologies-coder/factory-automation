@@ -122,10 +122,27 @@ You said fix all three, and all three are fixed:
   `POST /disbursements/:id/reverse`. A payout that was only ever planned is
   still cancelled instead, because an intention is not a movement of money.
 
-**Still true and worth knowing:** the expenses module is off by default. It is
-a module like the others, so every workspace that should have it needs it
-switched on from the platform console. I turned it on for `decorbucket` in
-development.
+**Still true and worth knowing:** **Expenses and People are modules**, and both
+are off by default. Every workspace that should have them needs them switched
+on from the platform console — I turned both on for `decorbucket` in
+development. A workspace without People has no employees, no register, no
+payroll and no letters; roles are deliberately outside every module, because a
+workspace that could not manage them is one nobody could take a permission
+away in.
+
+## One thing Phase 5 turned up that is worth your eye
+
+Building the roles screen made it obvious that **a good deal of the API was
+still gated on the old coarse role** (SALES / MANAGER / PRODUCTION) rather than
+on permissions, and that several reads were gated on nothing at all — a role
+with every box unticked could still read every order in the shop. Nobody had
+noticed, because the only roles were four seeded ones that could all see
+orders.
+
+That is fixed: every write hangs off a permission, every read of a shop's own
+rows does too, and `routes.spec.ts` now fails on the next route that does not.
+**If you had given anybody a custom role before today, check it again** — it
+now governs things it previously did not.
 
 ---
 
