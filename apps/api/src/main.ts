@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
+import { currentRole, runsScheduledWork } from './common/jobs/role';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -28,8 +29,16 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
+
+  // Said out loud, because the difference between the two is invisible
+  // otherwise: an api process that was meant to be the worker looks perfectly
+  // healthy right up until somebody asks why last night's reconcile never ran.
+  const role = currentRole();
   // eslint-disable-next-line no-console
-  console.log(`Decor Bucket API listening on http://localhost:${port}/api`);
+  console.log(
+    `Decor Bucket API listening on http://localhost:${port}/api ` +
+      `— role "${role}", scheduled work ${runsScheduledWork(role) ? 'armed' : 'off'}`,
+  );
 }
 
 void bootstrap();

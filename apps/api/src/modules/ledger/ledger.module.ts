@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { LedgerService } from './ledger.service';
 import { LedgerReconcileJob } from './ledger-reconcile.job';
 import { JobsModule } from '../../common/jobs/jobs.module';
+import { currentRole, runsScheduledWork } from '../../common/jobs/role';
 
 /**
  * Global, because everything that moves money posts to it.
@@ -14,7 +15,12 @@ import { JobsModule } from '../../common/jobs/jobs.module';
 @Module({
   // For the runner the nightly reconcile takes its lease from.
   imports: [JobsModule],
-  providers: [LedgerService, LedgerReconcileJob],
+  // The reconcile job lives with the rest of the scheduled work: an API
+  // process should not arm a 03:20 handler it is never meant to run.
+  providers: [
+    LedgerService,
+    ...(runsScheduledWork(currentRole()) ? [LedgerReconcileJob] : []),
+  ],
   exports: [LedgerService],
 })
 export class LedgerModule {}
