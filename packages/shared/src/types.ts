@@ -1153,3 +1153,115 @@ export interface MarkInput {
   overtimeMinutes?: number;
   note?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Pay
+// ---------------------------------------------------------------------------
+
+/**
+ * How somebody is paid.
+ *
+ * Three kinds rather than one shape, because nobody knows how a given shop
+ * pays. One person can be on more than one at once — a base salary plus a rate
+ * per panel is a real arrangement — so a payslip is the sum of their lines.
+ */
+export type PayKind = 'MONTHLY' | 'DAILY' | 'PIECE';
+
+export const PAY_KINDS: PayKind[] = ['MONTHLY', 'DAILY', 'PIECE'];
+
+export const PAY_KIND_LABELS: Record<PayKind, string> = {
+  MONTHLY: 'Monthly salary',
+  DAILY: 'Daily wage',
+  PIECE: 'Per piece',
+};
+
+export const PAY_KIND_HINTS: Record<PayKind, string> = {
+  MONTHLY: 'A month’s pay, divided by the days this shop calls a month',
+  DAILY: 'A day’s wage, multiplied by the days actually worked',
+  PIECE: 'So much for each one made — say what a piece is',
+};
+
+export interface PayStructure {
+  id: string;
+  employeeId: string;
+  employee?: { id: string; code: string; name: string; designation?: string | null };
+  kind: PayKind;
+  rate: string | number;
+  pieceLabel?: string | null;
+  overtimeHourlyRate?: string | number | null;
+  effectiveFrom: string;
+  /** Set when a later arrangement replaced this one. */
+  effectiveTo?: string | null;
+  note?: string | null;
+  createdAt: string;
+}
+
+export interface SalaryAdvance {
+  id: string;
+  employeeId: string;
+  employee?: { id: string; code: string; name: string };
+  amount: string | number;
+  givenOn: string;
+  mode: PaymentMode;
+  note?: string | null;
+  recoveredAmount: string | number;
+  createdAt: string;
+}
+
+export type SalaryRunStatus = 'DRAFT' | 'APPROVED' | 'PAID';
+
+export const SALARY_RUN_LABELS: Record<SalaryRunStatus, string> = {
+  DRAFT: 'Draft',
+  APPROVED: 'Approved',
+  PAID: 'Paid',
+};
+
+/** One line of a payslip, snapshotted so it survives a later raise. */
+export interface PayLine {
+  kind: PayKind | 'OVERTIME';
+  label: string;
+  rate: number;
+  quantity: number;
+  amount: number;
+}
+
+export interface Payslip {
+  id: string;
+  runId: string;
+  employeeId: string;
+  employee: {
+    id: string;
+    code: string;
+    name: string;
+    designation?: string | null;
+    department?: string | null;
+  };
+  payableDays: string | number;
+  overtimeMinutes: number;
+  pieces?: number | null;
+  lines: PayLine[];
+  gross: string | number;
+  advanceDeducted: string | number;
+  otherDeductions: string | number;
+  deductionNote?: string | null;
+  net: string | number;
+  note?: string | null;
+}
+
+export interface SalaryRun {
+  id: string;
+  month: string;
+  status: SalaryRunStatus;
+  workingDays: number;
+  note?: string | null;
+  approvedAt?: string | null;
+  paidAt?: string | null;
+  paidMode?: PaymentMode | null;
+  createdAt: string;
+  _count?: { payslips: number };
+}
+
+export interface SalaryRunDetail extends SalaryRun {
+  payslips: Payslip[];
+  totals: { gross: number; advances: number; deductions: number; net: number; count: number };
+}

@@ -49,6 +49,10 @@ import { EmployeeFormScreen } from '../screens/EmployeeFormScreen';
 import { EmployeeDetailScreen } from '../screens/EmployeeDetailScreen';
 import { AttendanceScreen } from '../screens/AttendanceScreen';
 import { AttendanceMonthScreen } from '../screens/AttendanceMonthScreen';
+import { SalaryScreen } from '../screens/SalaryScreen';
+import { SalaryRunScreen } from '../screens/SalaryRunScreen';
+import { PayStructuresScreen } from '../screens/PayStructuresScreen';
+import { SalaryAdvancesScreen } from '../screens/SalaryAdvancesScreen';
 import { ExpenseFormScreen } from '../screens/ExpenseFormScreen';
 import { ExpenseDetailScreen } from '../screens/ExpenseDetailScreen';
 import { ExpenseAnalyticsScreen } from '../screens/ExpenseAnalyticsScreen';
@@ -153,6 +157,10 @@ export function RootNavigator() {
             <Stack.Screen name="EmployeeDetail" component={EmployeeDetailScreen} />
             <Stack.Screen name="Attendance" component={AttendanceScreen} />
             <Stack.Screen name="AttendanceMonth" component={AttendanceMonthScreen} />
+            <Stack.Screen name="Salary" component={SalaryScreen} />
+            <Stack.Screen name="SalaryRun" component={SalaryRunScreen} />
+            <Stack.Screen name="PayStructures" component={PayStructuresScreen} />
+            <Stack.Screen name="SalaryAdvances" component={SalaryAdvancesScreen} />
             <Stack.Screen name="FirmProfile" component={FirmProfileScreen} />
             <Stack.Screen name="Estimates" component={EstimatesScreen} />
             <Stack.Screen name="EstimateEdit" component={EstimateEditScreen} />

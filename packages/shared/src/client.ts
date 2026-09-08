@@ -59,6 +59,12 @@ import type {
   EmploymentStatus,
   WorkspaceUser,
   MarkInput,
+  PayKind,
+  PayStructure,
+  Payslip,
+  SalaryAdvance,
+  SalaryRun,
+  SalaryRunDetail,
   Expense,
   ExpenseAnalytics,
   ExpenseEdit,
@@ -900,6 +906,80 @@ export class ApiClient {
   /** What each person's month came to — what a salary run reads. */
   attendanceSummary(query: { from: string; to: string; employeeId?: string }) {
     return this.get<AttendanceMonth>('/attendance/summary', query);
+  }
+
+  // -- pay -------------------------------------------------------------------
+
+  payStructures(employeeId?: string) {
+    return this.get<PayStructure[]>('/payroll/structures', employeeId ? { employeeId } : undefined);
+  }
+
+  /**
+   * Puts somebody on a new arrangement.
+   *
+   * A raise is a new row rather than an edit: last month's payslip has to stay
+   * explicable after this month's rise.
+   */
+  setPayStructure(body: {
+    employeeId: string;
+    kind: PayKind;
+    rate: number;
+    pieceLabel?: string;
+    overtimeHourlyRate?: number;
+    effectiveFrom: string;
+    note?: string;
+  }) {
+    return this.post<PayStructure>('/payroll/structures', body);
+  }
+
+  salaryAdvances(employeeId?: string) {
+    return this.get<SalaryAdvance[]>('/payroll/advances', employeeId ? { employeeId } : undefined);
+  }
+
+  /** Money handed over before it is earned. It leaves the drawer today. */
+  giveSalaryAdvance(body: {
+    employeeId: string;
+    amount: number;
+    givenOn: string;
+    mode: PaymentMode;
+    note?: string;
+  }) {
+    return this.post<SalaryAdvance>('/payroll/advances', body);
+  }
+
+  salaryRuns() {
+    return this.get<SalaryRun[]>('/payroll/runs');
+  }
+
+  salaryRun(id: string) {
+    return this.get<SalaryRunDetail>(`/payroll/runs/${id}`);
+  }
+
+  /** Opens a month and works out what everybody is owed. Draft on purpose. */
+  openSalaryRun(body: { month: string; workingDays: number; note?: string }) {
+    return this.post<SalaryRunDetail>('/payroll/runs', body);
+  }
+
+  adjustPayslip(
+    runId: string,
+    payslipId: string,
+    body: { pieces?: number; otherDeductions?: number; deductionNote?: string; note?: string },
+  ) {
+    return this.patch<Payslip>(`/payroll/runs/${runId}/payslips/${payslipId}`, body);
+  }
+
+  approveSalaryRun(id: string) {
+    return this.post<SalaryRunDetail>(`/payroll/runs/${id}/approve`);
+  }
+
+  /** Pays it, and posts a ledger entry per person. */
+  paySalaryRun(id: string, mode: PaymentMode) {
+    return this.post<SalaryRunDetail>(`/payroll/runs/${id}/pay`, { mode });
+  }
+
+  /** A draft can be thrown away. Anything further along cannot. */
+  discardSalaryRun(id: string) {
+    return this.del<{ id: string }>(`/payroll/runs/${id}`);
   }
 
   // -- the firm, and the documents it prints ---------------------------------

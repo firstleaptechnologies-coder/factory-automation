@@ -394,11 +394,29 @@ blocks anything, and the second wants a commercial answer first — see G11.
     picks is now a **local** calendar day. `toISOString().slice(0, 10)` answers
     in UTC, so a shop in India opening the register before half past five in
     the morning was shown yesterday.
-- **Salary** — *decided 8 September: a mix, fully configurable.* Monthly salary,
-  daily wage and piece rate are pay **structures** attached to an employee, not
-  a shape chosen for the product — nobody knows yet how a given client pays.
-  Plus overtime, advances against salary, and a monthly run producing payslips
-  that **post to the ledger** as outflows (D1).
+- **Salary — done, 9 September.** *Decided 8 September: a mix, fully
+  configurable* — and that is what it is. Monthly salary, daily wage and piece
+  rate are **structures attached to a person**, and somebody can be on more
+  than one at once: a base salary plus a rate per panel produces two lines on
+  one payslip. Choosing a single shape for the product would have made that
+  unrepresentable.
+  - **A raise is a new structure**, not an edit. The one it replaces is closed
+    the day before the new one starts, so last month's payslip still divides by
+    last month's rate.
+  - A monthly salary is divided by **the days the shop calls a month**, stated
+    when the month is opened and kept on the run — some shops pay for 26 days
+    and dividing by 30 would quietly dock everybody four days.
+  - **Overtime** is paid once however many structures somebody is on, at the
+    rate from the most recently effective one that names one.
+  - **Advances** leave the drawer the day they are given, so they post then —
+    and come back off payslips oldest-first, never more than the pay, with the
+    remainder outstanding. Which advance gave back how much is recorded on the
+    payslip: crediting every advance with the whole deduction would mark two
+    repaid on one month's recovery.
+  - Draft → approved → paid, with **paying gated separately**: working out what
+    a month costs and handing the money over are different decisions. A paid
+    month cannot be changed, and each payslip **posts its own ledger line**, so
+    the month reconciles person by person rather than as a total.
 - Letters — offer, NDA, responsibility — port from momentum's templates, which
   snapshot what was printed so history survives an edit to the employee.
 - **Roles and permissions UI** (item 12), which does not exist on either client

@@ -1371,7 +1371,10 @@ model Employee {
   userId String? @unique
   user   User?   @relation("EmployeeLogin", fields: [userId], references: [id], onDelete: SetNull)
 
-  attendance Attendance[]
+  attendance    Attendance[]
+  payStructures PayStructure[]
+  advances      SalaryAdvance[]
+  payslips      Payslip[]
 
   createdById String?
   createdBy   User?    @relation("EmployeeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -1437,6 +1440,179 @@ model Attendance {
   @@unique([tenantId, employeeId, date])
   @@index([tenantId, date])
   @@index([tenantId, employeeId, date])
+  @@index([tenantId])
+}
+
+/// How somebody is paid.
+///
+/// Three kinds rather than one shape, because nobody knows how a given shop
+/// pays: the office may be on a monthly salary, the floor on a daily wage, and
+/// a polisher on so much a panel. One person can be on more than one at once —
+/// a base salary plus a rate per piece is a real arrangement — so a payslip is
+/// the sum of their structures rather than a single sum.
+enum PayKind {
+  MONTHLY
+  DAILY
+  PIECE
+}
+
+/// One way a person is paid, from a given date.
+///
+/// A raise is a **new row**, not an edit: last month's payslip has to stay
+/// explicable after this month's rise, and a rate that changed underneath it
+/// would make the two disagree with nobody able to say why.
+model PayStructure {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  kind PayKind
+  /// The monthly salary, the day's wage, or the rate for one piece.
+  rate Decimal @db.Decimal(14, 2)
+  /// PIECE only: what one piece is, in the shop's own word — "panel", "sheet".
+  pieceLabel String?
+
+  /// What an hour past the ordinary day is worth. Null means this arrangement
+  /// does not pay overtime.
+  overtimeHourlyRate Decimal? @db.Decimal(14, 2)
+
+  effectiveFrom DateTime  @db.Date
+  /// Closed when a new arrangement replaces this one.
+  effectiveTo   DateTime? @db.Date
+  note          String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, employeeId, effectiveFrom])
+  @@index([tenantId])
+}
+
+/// Money handed to somebody against a salary not yet earned.
+///
+/// It leaves the drawer the day it is given, so it posts to the ledger then —
+/// and comes back off the payslip that pays the month it was advanced against.
+model SalaryAdvance {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  amount  Decimal     @db.Decimal(14, 2)
+  givenOn DateTime    @db.Date
+  mode    PaymentMode
+  note    String?
+
+  /// How much of it a payslip has taken back so far. An advance is recovered
+  /// in instalments when one month's pay cannot carry all of it.
+  recoveredAmount Decimal @db.Decimal(14, 2) @default(0)
+
+  givenById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, employeeId])
+  @@index([tenantId, givenOn])
+  @@index([tenantId])
+}
+
+/// Where a month's pay has got to.
+///
+/// A draft can be changed and thrown away. Once it is paid the money has gone,
+/// so it is fixed: a correction is next month's adjustment, not a rewrite of
+/// what was handed over.
+enum SalaryRunStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+/// One month's pay for the whole shop.
+model SalaryRun {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+
+  /// The month it pays for, held as its first day.
+  month  DateTime        @db.Date
+  status SalaryRunStatus @default(DRAFT)
+
+  /// How many days the shop counts as a full month.
+  ///
+  /// Stated by the shop rather than counted off a calendar: some pay for 26
+  /// days and some for 30, and a monthly salary is divided by whichever this
+  /// shop means. Kept on the run so last March's payslips still divide by what
+  /// last March used.
+  workingDays Int
+
+  note String?
+
+  approvedAt DateTime?
+  paidAt     DateTime?
+  /// How the money went out, once it has.
+  paidMode   PaymentMode?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  payslips Payslip[]
+
+  /// One run per month, so a shop cannot pay February twice by accident.
+  @@unique([tenantId, month])
+  @@index([tenantId, status])
+  @@index([tenantId])
+}
+
+/// What one person is paid for one month, and why.
+model Payslip {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId   String
+  id         String    @id @default(cuid())
+  runId      String
+  run        SalaryRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  /// What the register came to, copied here rather than looked up later.
+  ///
+  /// A payslip has to explain itself after somebody corrects the attendance or
+  /// changes the pay structure — and it cannot do that if it fetches both
+  /// again every time it is opened.
+  payableDays     Decimal @db.Decimal(6, 2)
+  overtimeMinutes Int     @default(0)
+  /// PIECE work: how many, entered by the shop for this month.
+  pieces          Int?
+
+  /// Every line that made the gross, snapshotted the same way.
+  /// `[{ kind, label, rate, quantity, amount }]`
+  lines Json
+
+  gross           Decimal @db.Decimal(14, 2)
+  /// Advances taken back this month.
+  advanceDeducted Decimal @db.Decimal(14, 2) @default(0)
+  /// Which advance gave back how much: `[{ advanceId, amount }]`.
+  ///
+  /// The total alone would not do. Crediting every advance an employee holds
+  /// with the whole deduction would mark two of them repaid on one month's
+  /// recovery, and the shop would never see the money again.
+  recoveries      Json?
+  /// Anything else the shop is holding back, with a reason.
+  otherDeductions Decimal @db.Decimal(14, 2) @default(0)
+  deductionNote   String?
+  net             Decimal @db.Decimal(14, 2)
+
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, runId, employeeId])
+  @@index([tenantId, employeeId])
   @@index([tenantId])
 }
 

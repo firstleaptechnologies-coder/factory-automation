@@ -90,6 +90,13 @@ export const PERMISSIONS = {
   ATTENDANCE_VIEW: 'attendance.view',
   ATTENDANCE_MARK: 'attendance.mark',
 
+  // Pay. Seeing what somebody earns is the most sensitive thing in a small
+  // shop, so it is gated apart from the staff list — and paying a month is
+  // gated again, because that is money leaving.
+  SALARY_VIEW: 'salary.view',
+  SALARY_MANAGE: 'salary.manage',
+  SALARY_PAY: 'salary.pay',
+
   // Shop configuration
   CONFIG_VIEW: 'config.view',
   CONFIG_MANAGE: 'config.manage',
@@ -202,6 +209,9 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
       PERMISSIONS.EMPLOYEE_IDENTIFIERS,
       PERMISSIONS.ATTENDANCE_VIEW,
       PERMISSIONS.ATTENDANCE_MARK,
+      PERMISSIONS.SALARY_VIEW,
+      PERMISSIONS.SALARY_MANAGE,
+      PERMISSIONS.SALARY_PAY,
     ],
   },
   {
@@ -253,6 +263,9 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.EMPLOYEE_IDENTIFIERS]: 'Read Aadhaar, PAN and bank details',
   [PERMISSIONS.ATTENDANCE_VIEW]: 'See the attendance register',
   [PERMISSIONS.ATTENDANCE_MARK]: 'Mark people in and out',
+  [PERMISSIONS.SALARY_VIEW]: 'See what people are paid',
+  [PERMISSIONS.SALARY_MANAGE]: 'Set pay, give advances, draft a month',
+  [PERMISSIONS.SALARY_PAY]: 'Pay a month',
   [PERMISSIONS.PLATFORM_RELEASE_VIEW]: 'See app releases',
   [PERMISSIONS.PLATFORM_RELEASE_MANAGE]: 'Publish app releases',
   [PERMISSIONS.PLATFORM_TENANT_CREATE]: 'Provision workspaces',

@@ -83,6 +83,13 @@ flowchart LR
     employees --> employee_form
     employee_detail["One employee"]
     employees --> employee_detail
+    salary["Salary"]
+    salary_run["One month"]
+    salary --> salary_run
+    salary_pay["How people are paid"]
+    salary --> salary_pay
+    salary_advances["Advances"]
+    salary --> salary_advances
     attendance["Attendance"]
     attendance_month["The month, per person"]
     attendance --> attendance_month
@@ -174,6 +181,10 @@ flowchart LR
 | Employees | `/employees` | `Employees` | `employee.view` |
 |   ↳ Add an employee | `/employees/new` | `EmployeeForm` | `employee.manage` |
 |   ↳ One employee | `/employees/[id]` | `EmployeeDetail` | — |
+| Salary | `/salary` | `Salary` | `salary.view` |
+|   ↳ One month | `/salary/[id]` | `SalaryRun` | — |
+|   ↳ How people are paid | `/salary/structures` | `PayStructures` | `salary.manage` |
+|   ↳ Advances | `/salary/advances` | `SalaryAdvances` | `salary.manage` |
 | Attendance | `/attendance` | `Attendance` | `attendance.view` |
 |   ↳ The month, per person | `/attendance/month` | `AttendanceMonth` | — |
 

@@ -326,6 +326,38 @@ describe('endpoints', () => {
       '/attendance/summary',
     ],
 
+    ['payStructures', (a) => a.payStructures(), 'GET', '/payroll/structures'],
+    [
+      'setPayStructure',
+      (a) => a.setPayStructure({ employeeId: 'e1', kind: 'MONTHLY', rate: 1, effectiveFrom: '2026-10-01' }),
+      'POST',
+      '/payroll/structures',
+    ],
+    ['salaryAdvances', (a) => a.salaryAdvances(), 'GET', '/payroll/advances'],
+    [
+      'giveSalaryAdvance',
+      (a) => a.giveSalaryAdvance({ employeeId: 'e1', amount: 1, givenOn: '2026-09-05', mode: 'CASH' }),
+      'POST',
+      '/payroll/advances',
+    ],
+    ['salaryRuns', (a) => a.salaryRuns(), 'GET', '/payroll/runs'],
+    ['salaryRun', (a) => a.salaryRun('r1'), 'GET', '/payroll/runs/r1'],
+    [
+      'openSalaryRun',
+      (a) => a.openSalaryRun({ month: '2026-09', workingDays: 26 }),
+      'POST',
+      '/payroll/runs',
+    ],
+    [
+      'adjustPayslip',
+      (a) => a.adjustPayslip('r1', 'p1', { pieces: 10 }),
+      'PATCH',
+      '/payroll/runs/r1/payslips/p1',
+    ],
+    ['approveSalaryRun', (a) => a.approveSalaryRun('r1'), 'POST', '/payroll/runs/r1/approve'],
+    ['paySalaryRun', (a) => a.paySalaryRun('r1', 'ONLINE'), 'POST', '/payroll/runs/r1/pay'],
+    ['discardSalaryRun', (a) => a.discardSalaryRun('r1'), 'DELETE', '/payroll/runs/r1'],
+
     ['expenses', (a) => a.expenses(), 'GET', '/expenses'],
     ['expense', (a) => a.expense('e1'), 'GET', '/expenses/e1'],
     ['createExpense', (a) => a.createExpense({ amount: 1 } as never), 'POST', '/expenses'],

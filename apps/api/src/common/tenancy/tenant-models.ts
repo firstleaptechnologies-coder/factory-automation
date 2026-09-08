@@ -14,7 +14,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'DocumentSequence', 'AuditLog', 'Disbursement', 'DisbursementCategory',
   'Estimate', 'EstimateItem', 'FirmProfile', 'Notification', 'LedgerEntry',
   'NotificationTemplate', 'Expense', 'ExpenseOption', 'ExpenseEditHistory',
-  'Employee', 'Attendance',
+  'Employee', 'Attendance', 'PayStructure', 'SalaryAdvance', 'SalaryRun', 'Payslip',
 ]);
 
 
