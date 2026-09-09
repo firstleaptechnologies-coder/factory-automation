@@ -2,18 +2,14 @@ import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import type { WorkspaceRole, WorkspaceUser } from '@fas/shared';
-import {
-  PERMISSIONS,
-  PERMISSION_GROUPS,
-  PERMISSION_LABELS,
-} from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
+import { PermissionTree } from '../../components/PermissionTree';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../auth/AuthContext';
 import {
   Button,
   Card,
-  Chip,
   Field,
   Icon,
   Loader,
@@ -37,7 +33,7 @@ import { palette, spacing } from '../../theme';
  * than as a list of strings.
  */
 export function AdminRolesScreen({ navigation }: { navigation: any }) {
-  const { can } = useAuth();
+  const { can, has } = useAuth();
   const roles = useApi<WorkspaceRole[]>(() => api.roles(), []);
   const users = useApi<WorkspaceUser[]>(() => api.users(), []);
 
@@ -76,13 +72,6 @@ export function AdminRolesScreen({ navigation }: { navigation: any }) {
     setEditing(null);
     setCreating(false);
   };
-
-  const toggle = (permission: string) =>
-    setGranted((current) =>
-      current.includes(permission)
-        ? current.filter((one) => one !== permission)
-        : [...current, permission],
-    );
 
   const save = () =>
     run(async () => {
@@ -164,21 +153,9 @@ export function AdminRolesScreen({ navigation }: { navigation: any }) {
         subtitle="Tick what this kind of person may do"
         onClose={closeRole}>
         <Field label="Called" value={name} onChangeText={setName} />
-        {PERMISSION_GROUPS.map((group) => (
-          <View key={group.label} style={styles.group}>
-            <Text variant="label" tone="muted">{group.label}</Text>
-            <View style={styles.chips}>
-              {group.permissions.map((permission) => (
-                <Chip
-                  key={permission}
-                  label={PERMISSION_LABELS[permission] ?? permission}
-                  selected={granted.includes(permission)}
-                  onPress={() => toggle(permission)}
-                />
-              ))}
-            </View>
-          </View>
-        ))}
+        <View style={styles.tree}>
+          <PermissionTree granted={granted} has={has} onChange={setGranted} />
+        </View>
         <Button
           title="Save"
           loading={busy}
@@ -228,6 +205,5 @@ const styles = StyleSheet.create({
   card: { marginBottom: spacing.sm },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   sectionLabel: { marginTop: spacing.xl, marginBottom: spacing.sm },
-  group: { marginBottom: spacing.md },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  tree: { marginTop: spacing.md, marginBottom: spacing.lg },
 });

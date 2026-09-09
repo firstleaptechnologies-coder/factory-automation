@@ -20,8 +20,14 @@ jest.mock('../../api/client', () => ({
 }));
 
 let mockPermissions: string[] = [];
+let mockModules: string[] = [];
 jest.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ can: (p: string) => mockPermissions.includes(p) }),
+  useAuth: () => ({
+    can: (p: string) => mockPermissions.includes(p),
+    // What the workspace bought. The tree greys out the rest rather than
+    // hiding it.
+    has: (m: string) => mockModules.includes(m),
+  }),
 }));
 
 const OWNER = {
@@ -58,6 +64,7 @@ const navigation = { goBack: jest.fn() };
 beforeEach(() => {
   jest.clearAllMocks();
   mockPermissions = [PERMISSIONS.USER_VIEW, PERMISSIONS.ROLE_MANAGE];
+  mockModules = ['orders', 'clients', 'leads', 'quotes', 'finance'];
   mockRoles.mockResolvedValue([OWNER, ACCOUNTANT]);
   mockUsers.mockResolvedValue([USER]);
   mockCreate.mockResolvedValue(ACCOUNTANT);
@@ -85,16 +92,38 @@ it('says which role each person is actually on', async () => {
   expect(await screen.findByText('PROD01 · Owner')).toBeTruthy();
 });
 
-it('groups the permissions the way the product is, in words', async () => {
+// Ten sections open at once is a screen nobody scrolls to the end of, so a
+// section is shut until somebody opens it.
+const openSection = async (label: string) => {
+  await fireEvent.press(await screen.findByText(label));
+};
+
+it('shows the permissions as a tree, a section at a time', async () => {
   await mount();
   await fireEvent.press(screen.getByText('Accountant'));
-  expect(await screen.findByText('Money')).toBeTruthy();
+
+  // Shut: the section is named, the permissions inside it are not shown.
+  expect(await screen.findByText('Finances')).toBeTruthy();
+  expect(screen.queryByText('View payments')).toBeNull();
+
+  await openSection('Finances');
+  expect(await screen.findByText('Money in and out')).toBeTruthy();
   expect(screen.getByText('View payments')).toBeTruthy();
+});
+
+it('counts what is held under a section without opening it', async () => {
+  await mount();
+  await fireEvent.press(screen.getByText('Accountant'));
+
+  // Accountant holds one finance permission. Somebody scanning the list can
+  // see that without opening ten sections.
+  expect(await screen.findByText(/^1 of \d+$/)).toBeTruthy();
 });
 
 it('saves what was ticked', async () => {
   await mount();
   await fireEvent.press(screen.getByText('Accountant'));
+  await openSection('Finances');
   await fireEvent.press(await screen.findByText('Record payments'));
   await fireEvent.press(screen.getByText('Save'));
   await waitFor(() =>
@@ -103,6 +132,23 @@ it('saves what was ticked', async () => {
       permissions: [PERMISSIONS.PAYMENT_VIEW, PERMISSIONS.PAYMENT_RECORD],
     }),
   );
+});
+
+// Somebody looking for Purchasing needs to see that it exists and is not on
+// their plan, not conclude the product has no such thing.
+it('greys a section the workspace has not bought rather than hiding it', async () => {
+  await mount();
+  await fireEvent.press(screen.getByText('Accountant'));
+
+  expect(await screen.findByText('Buying and stock')).toBeTruthy();
+  // Named as the thing they would buy — the plan calls it Purchasing.
+  expect(
+    screen.getByText(/Purchasing is not on this workspace’s plan/),
+  ).toBeTruthy();
+
+  // And it cannot be ticked open into permissions that would grant nothing.
+  await openSection('Buying and stock');
+  expect(screen.queryByText('Record a purchase')).toBeNull();
 });
 
 it('offers to remove a role the shop wrote, but never a seeded one', async () => {
