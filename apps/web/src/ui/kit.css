@@ -704,6 +704,11 @@
   animation: rise 0.24s var(--ease);
 }
 
+/* Room for something with structure — a permission tree, a wide table. */
+.sheet-wide {
+  width: min(920px, 100%);
+}
+
 .sheet-head {
   display: flex;
   align-items: flex-start;

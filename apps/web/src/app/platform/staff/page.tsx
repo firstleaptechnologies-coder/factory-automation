@@ -163,6 +163,7 @@ export default function StaffPage() {
         open={Boolean(editing) || creating}
         title={creating ? 'New role' : (editing?.name ?? '')}
         subtitle="Tick what this kind of colleague may do"
+        wide
         onClose={closeRole}>
         <Field label="Called" value={name} onChange={setName} />
         {creating ? (

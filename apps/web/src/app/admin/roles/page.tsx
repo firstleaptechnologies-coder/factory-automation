@@ -171,6 +171,7 @@ function Roles() {
         open={Boolean(editing) || creating}
         title={creating ? 'New role' : (editing?.name ?? '')}
         subtitle="Tick what this kind of person may do"
+        wide
         onClose={closeRole}>
         <Field label="Called" value={name} onChange={setName} />
         <PermissionTree

@@ -273,3 +273,27 @@ describe('SheetOption', () => {
     expect(onClick).toHaveBeenCalled();
   });
 });
+
+describe('a wide sheet', () => {
+  // A four-level permission tree in a 560px column is one word per line, which
+  // is a list nobody reads however correct it is.
+  it('takes the room when it is asked for', () => {
+    render(
+      <Sheet open title="Roles" wide onClose={() => {}}>
+        <p>tree</p>
+      </Sheet>,
+    );
+
+    expect(screen.getByRole('dialog')).toHaveClass('sheet-wide');
+  });
+
+  it('stays narrow otherwise', () => {
+    render(
+      <Sheet open title="Plan" onClose={() => {}}>
+        <p>a few fields</p>
+      </Sheet>,
+    );
+
+    expect(screen.getByRole('dialog')).not.toHaveClass('sheet-wide');
+  });
+});

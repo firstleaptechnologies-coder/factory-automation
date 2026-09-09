@@ -416,12 +416,19 @@ export function Sheet({
   title,
   subtitle,
   onClose,
+  wide,
   children,
 }: {
   open: boolean;
   title?: string;
   subtitle?: string;
   onClose: () => void;
+  /**
+   * For a sheet holding something that needs the room — a permission tree,
+   * say. A four-level tree in a 560px column is one word per line, which is a
+   * list nobody reads however correct it is.
+   */
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   useEffect(() => {
@@ -441,7 +448,7 @@ export function Sheet({
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}>
-      <div className="sheet" role="dialog" aria-modal="true">
+      <div className={wide ? 'sheet sheet-wide' : 'sheet'} role="dialog" aria-modal="true">
         <div className="sheet-head">
           <div>
             {title ? (
