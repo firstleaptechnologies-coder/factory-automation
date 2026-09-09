@@ -593,3 +593,79 @@ button.primary:disabled {
   border-radius: 999px;
   background: var(--accent);
 }
+
+/* ---------------------------------------------------------------------------
+   The permission tree
+   ---------------------------------------------------------------------------
+   Four levels have to read as four levels without four boxes inside boxes, so
+   depth is carried by a rail down the left and by weight, not by nesting
+   cards. Two columns of checkboxes at the leaves, because a permission pair
+   like view/edit reads as a pair. */
+
+.perm-tree { display: flex; flex-direction: column; gap: var(--s-lg); }
+
+.perm-section {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+.perm-section[data-locked='true'] { opacity: .5; }
+
+.perm-section-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-md);
+  padding: var(--s-md) var(--s-lg);
+  background: var(--surface-inset);
+  border-bottom: 1px solid var(--line);
+}
+
+.perm-feature { padding: var(--s-md) var(--s-lg) var(--s-sm); }
+.perm-feature + .perm-feature { border-top: 1px dashed var(--line); }
+.perm-feature-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-md);
+}
+.perm-strong { font-weight: 650; }
+
+/* The rail is the nesting: one line down the left, so a group reads as inside
+   a feature without another box around it. */
+.perm-group { margin: var(--s-sm) 0 var(--s-md); padding-left: var(--s-md); border-left: 2px solid var(--line); }
+
+.perm-group-head {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; padding: 2px 0; cursor: pointer;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em;
+}
+.perm-group-head:disabled { cursor: default; }
+
+.perm-checks {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px var(--s-lg); margin-top: 4px;
+}
+@media (max-width: 640px) { .perm-checks { grid-template-columns: minmax(0, 1fr); } }
+
+.perm-check {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; cursor: pointer; font-size: .88rem;
+}
+.perm-check input { position: absolute; opacity: 0; width: 0; height: 0; }
+.perm-check[data-on='true'] { color: var(--text); }
+.perm-check[data-on='false'] { color: var(--text-muted); }
+.perm-check:has(input:disabled) { cursor: default; }
+.perm-check:has(input:focus-visible) .perm-box { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.perm-all {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; cursor: pointer;
+  color: var(--text-muted); font-size: .78rem; white-space: nowrap;
+}
+
+.perm-box {
+  width: 17px; height: 17px; flex: none;
+  border-radius: 5px; border: 1.5px solid var(--line-strong);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1; color: #fff;
+}
+.perm-box[data-state='all'] { background: var(--accent); border-color: var(--accent); }
+/* Part-ticked is its own mark. Rendering it as off is how somebody ticks a
+   branch meaning to fill it in and grants what was already there twice over. */
+.perm-box[data-state='some'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }

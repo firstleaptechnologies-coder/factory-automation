@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import type { WorkspaceRole, WorkspaceUser } from '@fas/shared';
-import { PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
+import { PermissionTree } from './PermissionTree';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
@@ -28,7 +29,7 @@ export default function RolesPage() {
  * than as a list of strings.
  */
 function Roles() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const roles = useApi<WorkspaceRole[]>(() => api.roles(), []);
   const users = useApi<WorkspaceUser[]>(() => api.users(), []);
 
@@ -172,21 +173,11 @@ function Roles() {
         subtitle="Tick what this kind of person may do"
         onClose={closeRole}>
         <Field label="Called" value={name} onChange={setName} />
-        {PERMISSION_GROUPS.map((group) => (
-          <div key={group.label} style={{ marginBottom: 'var(--s-md)' }}>
-            <div className="t-label muted">{group.label}</div>
-            <div className="row" style={{ marginTop: 'var(--s-sm)' }}>
-              {group.permissions.map((permission) => (
-                <Chip
-                  key={permission}
-                  label={PERMISSION_LABELS[permission] ?? permission}
-                  selected={granted.includes(permission)}
-                  onClick={() => toggle(permission)}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+        <PermissionTree
+          granted={granted}
+          modules={user?.workspace?.modules}
+          onChange={setGranted}
+        />
         {error ? (
           <div className="t-small" style={{ color: 'var(--danger)', marginBottom: 'var(--s-md)' }}>
             {error}

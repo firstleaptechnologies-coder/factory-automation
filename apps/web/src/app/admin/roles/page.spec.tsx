@@ -22,7 +22,11 @@ jest.mock('@/lib/api', () => ({
 
 let permissions: string[] = [];
 jest.mock('@/lib/auth', () => ({
-  useAuth: () => ({ can: (p: string) => permissions.includes(p) }),
+  useAuth: () => ({
+    can: (p: string) => permissions.includes(p),
+    // What this workspace bought. The permission tree greys out the rest.
+    user: { workspace: { modules: ['orders', 'clients', 'leads', 'quotes', 'finance'] } },
+  }),
 }));
 
 jest.mock('@/components/Shell', () => ({
@@ -84,8 +88,42 @@ it('lists the roles with how many people are on each', async () => {
 it('groups the permissions the way the product is, in words', async () => {
   await mount();
   fireEvent.click(screen.getByText('Accountant'));
-  expect(await screen.findByText('Money')).toBeInTheDocument();
+
+  // Four levels: the module it was bought under, the feature, the group, and
+  // the permission itself.
+  expect(await screen.findByText('Finances')).toBeInTheDocument();
+  expect(screen.getByText('Money in and out')).toBeInTheDocument();
+  expect(screen.getByText('Payments')).toBeInTheDocument();
   expect(screen.getByText('View payments')).toBeInTheDocument();
+});
+
+// Modules are what a workspace bought; permissions are what somebody inside it
+// may do. Ticking a permission for a module they have not bought grants
+// nothing, so the branch is shown and locked rather than offered.
+it('locks a section the workspace has not bought, rather than hiding it', async () => {
+  await mount();
+  fireEvent.click(screen.getByText('Accountant'));
+
+  // Scoped to the tree: "People" and "Orders" are table headings too.
+  await screen.findByText('Finances');
+  const sections = [...document.querySelectorAll('.perm-section')];
+  const named = (label: string) =>
+    sections.find((one) => one.querySelector('.t-label')?.textContent === label);
+
+  expect(named('People')).toHaveAttribute('data-locked', 'true');
+  expect(named('Orders')).toHaveAttribute('data-locked', 'false');
+  expect(screen.getAllByText(/is not on this workspace’s plan/).length).toBeGreaterThan(0);
+});
+
+// Showing a half-ticked branch as off invites somebody to tick it and silently
+// grant everything else under it.
+it('shows a part-held branch as part-held', async () => {
+  await mount();
+  fireEvent.click(screen.getByText('Accountant'));
+  await screen.findByText('Payments');
+
+  const group = screen.getByText('Payments').closest('.perm-group-head');
+  expect(group?.querySelector('.perm-box')).toHaveAttribute('data-state', 'some');
 });
 
 it('saves what was ticked', async () => {
