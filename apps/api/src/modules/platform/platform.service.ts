@@ -141,15 +141,6 @@ export class PlatformService implements OnModuleInit {
     return health;
   }
 
-  async findOne(id: string) {
-    const tenant = await this.db.tenant.findUnique({ where: { id } });
-    if (!tenant) throw new NotFoundException('Workspace not found');
-    return {
-      ...redact(tenant),
-      counts: await this.countsFor(tenant.id, tenant.databaseUrl),
-    };
-  }
-
   /**
    * One workspace, all the way down.
    *

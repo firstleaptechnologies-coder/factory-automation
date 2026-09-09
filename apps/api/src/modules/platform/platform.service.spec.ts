@@ -45,6 +45,21 @@ function build() {
     decryptToString: jest.fn((value: string) => value.replace(/^enc\(|\)$/g, '')),
   };
   const registry = { invalidate: jest.fn() };
+
+  /*
+   * What `detail` reads beyond the tenant row: the tier it is on, its activity
+   * in our own logs, and its people from its own database. Defaulted to empty
+   * so a test about redaction is about redaction.
+   */
+  db.subscriptionTier = { findUnique: jest.fn(async () => null) };
+  // Added to what prismaMock already provides, not over it: `list` reads the
+  // same logs through groupBy, and replacing the table wholesale takes that
+  // away from a test that has nothing to do with this.
+  db.serverLog.count = jest.fn(async () => 0);
+  db.serverLog.findFirst = jest.fn(async () => null);
+  db.clientLog.count = jest.fn(async () => 0);
+  db.role.findMany = jest.fn(async () => []);
+  db.user.findMany = jest.fn(async () => []);
   const provisioning = {
     seed: jest.fn(async (..._args: unknown[]) => undefined),
     syncSystemRoles: jest.fn(async (..._args: unknown[]) => 0),
@@ -208,10 +223,16 @@ describe('create', () => {
   });
 });
 
+/*
+ * `findOne` used to answer these and was removed once `detail` superseded it —
+ * same redaction, same counts, and everything else the console needs in one
+ * read. The assertions moved rather than going with it: a connection string
+ * reaching the API is the same leak whichever method returns it.
+ */
 describe('reading tenants', () => {
   it('reports a missing workspace', async () => {
     const { service } = build();
-    await expect(service.findOne('ghost')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.detail('ghost')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('redacts the connection string on every read', async () => {
@@ -221,7 +242,7 @@ describe('reading tenants', () => {
       slug: 's',
       databaseUrl: 'enc(postgres://x)',
     }));
-    const result = (await service.findOne('t1')) as Record<string, unknown>;
+    const result = (await service.detail('t1')) as Record<string, unknown>;
     expect(result).not.toHaveProperty('databaseUrl');
     expect(result.hasDedicatedDatabase).toBe(true);
   });
@@ -229,7 +250,7 @@ describe('reading tenants', () => {
   it('says a workspace has no dedicated database when it does not', async () => {
     const { service, db } = build();
     db.tenant.findUnique = jest.fn(async () => ({ id: 't1', slug: 's', databaseUrl: null }));
-    const result = (await service.findOne('t1')) as Record<string, unknown>;
+    const result = (await service.detail('t1')) as Record<string, unknown>;
     expect(result.hasDedicatedDatabase).toBe(false);
   });
 
@@ -239,7 +260,7 @@ describe('reading tenants', () => {
     db.user.count = jest.fn(async () => 4);
     db.order.count = jest.fn(async () => 9);
     db.client.count = jest.fn(async () => 6);
-    const result = await service.findOne('t1');
+    const result = await service.detail('t1');
     expect(result.counts).toEqual({ users: 4, orders: 9, clients: 6 });
     expect(db.user.count.mock.calls[0][0].where).toEqual({ tenantId: 't1' });
   });

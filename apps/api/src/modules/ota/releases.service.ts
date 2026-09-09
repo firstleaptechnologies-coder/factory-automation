@@ -50,30 +50,6 @@ export class ReleasesService {
     });
   }
 
-  async one(id: string) {
-    const release = await this.prisma.platform.otaRelease.findUnique({
-      where: { id },
-      select: {
-        ...SUMMARY,
-        metadata: true,
-        extra: true,
-        commitTime: true,
-        assets: {
-          select: {
-            id: true,
-            isLaunchAsset: true,
-            key: true,
-            contentType: true,
-            fileExtension: true,
-            byteSize: true,
-          },
-        },
-      },
-    });
-    if (!release) throw new NotFoundException('No such release');
-    return release;
-  }
-
   async create(dto: CreateReleaseDto) {
     /*
      * The next build number within this channel, platform and runtime version.

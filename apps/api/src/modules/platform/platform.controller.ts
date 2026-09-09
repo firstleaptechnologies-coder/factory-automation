@@ -58,12 +58,6 @@ export class PlatformController {
     return this.platform.list();
   }
 
-  @RequirePermissions(PERMISSIONS.PLATFORM_TENANT_VIEW)
-  @Get('tenants/:id')
-  findOne(@Param('id') id: string) {
-    return this.platform.findOne(id);
-  }
-
   /**
    * One workspace, all the way down.
    *

@@ -41,12 +41,6 @@ export class ReleasesController {
     return this.releases.list(channel, platform);
   }
 
-  @RequirePermissions(PERMISSIONS.PLATFORM_RELEASE_VIEW)
-  @Get(':id')
-  one(@Param('id') id: string) {
-    return this.releases.one(id);
-  }
-
   @RequirePermissions(PERMISSIONS.PLATFORM_RELEASE_MANAGE)
   @Post()
   create(@Body() dto: CreateReleaseDto) {

@@ -2,7 +2,6 @@ import { PlatformController } from './platform.controller';
 
 const platform = {
   list: jest.fn(async (..._a: unknown[]) => 'list'),
-  findOne: jest.fn(async (..._a: unknown[]) => 'one'),
   create: jest.fn(async (..._a: unknown[]) => 'created'),
   update: jest.fn(async (..._a: unknown[]) => 'updated'),
   changeIsolation: jest.fn(async (..._a: unknown[]) => 'moved'),
@@ -33,10 +32,6 @@ it('lists every workspace on the platform', async () => {
   expect(platform.list).toHaveBeenCalled();
 });
 
-it('reads one workspace', async () => {
-  await controller.findOne('t1');
-  expect(platform.findOne).toHaveBeenCalledWith('t1');
-});
 
 it('provisions a workspace with the owner who will sign in first', async () => {
   const dto = { slug: 'woodcraft', name: 'Woodcraft', ownerName: 'Anil', ownerPassword: 'x' };
