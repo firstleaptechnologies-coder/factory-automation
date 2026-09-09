@@ -1,12 +1,18 @@
 /**
  * Bootstraps the platform and its first workspace.
  *
- * The platform layer sits above every tenant: it holds the super admins who
- * provision workspaces. Decor Bucket is created here as tenant one, seeded the
- * same way any future client will be — through the provisioning service, so the
- * path a real customer takes is the path that is exercised on every reset.
+ * The platform layer sits above every tenant: it holds FirstLeap's own staff,
+ * who provision workspaces. Two workspaces are created here, both through the
+ * provisioning service, so the path a real customer takes is the path that is
+ * exercised on every reset:
+ *
+ *  - **Decor Bucket**, the first paying client, on what they have bought.
+ *  - **FLT**, ours, with every module on — so a change can be seen working
+ *    before a client sees it, and so an unbought module being visible is
+ *    obvious in the one workspace that should show everything.
  */
 import { PrismaClient, TenantIsolation, TenantStatus } from '@prisma/client';
+import { ALL_MODULES } from '@fas/shared';
 import * as bcrypt from 'bcryptjs';
 import { TenantProvisioningService } from '../src/modules/platform/tenant-provisioning.service';
 
@@ -23,6 +29,19 @@ async function main() {
     },
   });
 
+  // FirstLeap's own owner. The seeded platform account above is named after
+  // the first client, which was true when the product was, and is not now.
+  const firstLeapOwner = await prisma.platformUser.upsert({
+    where: { email: 'admin@firstleap.in' },
+    update: {},
+    create: {
+      email: 'admin@firstleap.in',
+      name: 'FirstLeap Owner',
+      role: 'OWNER',
+      passwordHash: await bcrypt.hash('firstleap123', 10),
+    },
+  });
+
   let tenant = await prisma.tenant.findUnique({ where: { slug: 'decorbucket' } });
 
   if (!tenant) {
@@ -32,7 +51,9 @@ async function main() {
         name: 'Decor Bucket',
         isolation: TenantIsolation.SHARED,
         status: TenantStatus.ACTIVE,
-        plan: 'standard',
+        // What Decor Bucket has bought. Not 'standard' — that is not a plan
+        // key, and it only ever worked because planFor() falls back.
+        plan: 'shop',
         contactName: 'Nakul Varshney',
       },
     });
@@ -78,12 +99,40 @@ async function main() {
     users: await prisma.user.count({ where: { tenantId: tenant.id } }),
   };
 
+  // Our own workspace. Every module, including the ones that do not exist
+  // yet, so nothing about it depends on what a plan happens to contain later.
+  let flt = await prisma.tenant.findUnique({ where: { slug: 'flt' } });
+  if (!flt) {
+    flt = await prisma.tenant.create({
+      data: {
+        slug: 'flt',
+        name: 'FirstLeap Technologies (FLT)',
+        isolation: TenantIsolation.SHARED,
+        status: TenantStatus.ACTIVE,
+        plan: 'works',
+        modules: [...ALL_MODULES],
+        contactName: 'FirstLeap Technologies',
+        notes: 'Ours, for testing. Not a client.',
+      },
+    });
+    await new TenantProvisioningService().seed(prisma, flt.id, {
+      name: 'FLT Admin',
+      code: 'ADMIN',
+      password: 'flt12345',
+      email: 'admin@firstleap.in',
+    });
+  }
+
   // eslint-disable-next-line no-console
   console.log('Seed complete:', counts);
   // eslint-disable-next-line no-console
   console.log(`Platform: ${platformAdmin.email} / platform123`);
   // eslint-disable-next-line no-console
   console.log(`Workspace: ${tenant.slug}  ->  ADMIN / admin123`);
+  // eslint-disable-next-line no-console
+  console.log(`Workspace: ${flt.slug}  ->  ADMIN / flt12345  (ours, every module)`);
+  // eslint-disable-next-line no-console
+  console.log(`Platform: ${firstLeapOwner.email} / firstleap123`);
 }
 
 main()
