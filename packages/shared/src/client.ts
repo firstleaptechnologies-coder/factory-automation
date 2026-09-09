@@ -49,7 +49,6 @@ import type {
   TenantIsolation,
   TenantStatus,
   Release,
-  ReleaseAsset,
   ReleaseStatus,
   VersionGate,
   AttendanceDay,
@@ -1603,20 +1602,7 @@ export class ApiClient {
     return this.get<Release[]>('/platform/releases', query);
   }
 
-  release(id: string) {
-    return this.get<Release & { assets: ReleaseAsset[] }>(`/platform/releases/${id}`);
-  }
 
-  createRelease(body: {
-    channel: string;
-    platform: 'ios' | 'android';
-    runtimeVersion: string;
-    kind?: 'UPDATE' | 'ROLLBACK';
-    changelog?: string;
-    extra?: Record<string, unknown>;
-  }) {
-    return this.post<Release>('/platform/releases', body);
-  }
 
   /** Publish it, move the rollout, or retire it. */
   updateRelease(
@@ -1640,9 +1626,6 @@ export class ApiClient {
     return this.request<VersionGate>('PUT', '/platform/releases/gates', body);
   }
 
-  tenant(id: string) {
-    return this.get<Tenant>(`/platform/tenants/${id}`);
-  }
 
   createTenant(body: {
     slug: string;
