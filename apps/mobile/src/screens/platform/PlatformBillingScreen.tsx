@@ -6,7 +6,19 @@ import { useApi } from '../../hooks/useApi';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 import { useAuth } from '../../auth/AuthContext';
-import { Button, Card, Chip, Loader, Pill, Screen, ScreenHeader, Text, haptic } from '../../ui';
+import {
+  Button,
+  Card,
+  Chip,
+  Field,
+  Loader,
+  Pill,
+  Screen,
+  ScreenHeader,
+  Sheet,
+  Text,
+  haptic,
+} from '../../ui';
 import { palette, spacing } from '../../theme';
 import { formatInr } from '../../lib/format';
 
@@ -76,6 +88,8 @@ export function PlatformBillingScreen({ navigation }: { navigation: any }) {
   const invoices = useApi<Invoice[]>(() => api.billingInvoices() as Promise<Invoice[]>, []);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [voiding, setVoiding] = useState<Invoice | null>(null);
+  const [reason, setReason] = useState('');
   const mayBill = can('platform.pricing.manage');
 
   const run = async (key: string, work: () => Promise<unknown>) => {
@@ -264,16 +278,25 @@ export function PlatformBillingScreen({ navigation }: { navigation: any }) {
               small
             />
             {mayBill && invoice.status !== 'PAID' && invoice.status !== 'VOID' ? (
-              <Chip
-                label={invoice.status === 'DRAFT' ? 'Send it' : 'Send it again'}
-                // Without an account behind it, sending would mark a bill
-                // issued with nowhere to pay it.
-                onPress={
-                  gateway.data?.connected
-                    ? () => void run(invoice.id, () => api.issueInvoice(invoice.id))
-                    : undefined
-                }
-              />
+              <>
+                <Chip
+                  label={invoice.status === 'DRAFT' ? 'Send it' : 'Send it again'}
+                  // Without an account behind it, sending would mark a bill
+                  // issued with nowhere to pay it.
+                  onPress={
+                    gateway.data?.connected
+                      ? () => void run(invoice.id, () => api.issueInvoice(invoice.id))
+                      : undefined
+                  }
+                />
+                <Chip
+                  label="Withdraw"
+                  onPress={() => {
+                    setVoiding(invoice);
+                    setReason('');
+                  }}
+                />
+              </>
             ) : null}
           </View>
         </Card>
@@ -286,6 +309,30 @@ export function PlatformBillingScreen({ navigation }: { navigation: any }) {
             : 'Razorpay is connected, but no webhook secret is set — so payments will be collected and never recorded.'
           : 'No payment gateway is connected. Bills can be worked out and read, but not sent.'}
       </Text>
+      <Sheet
+        visible={Boolean(voiding)}
+        title="Withdraw this bill"
+        subtitle="Marked withdrawn, never deleted — a bill that was sent and withdrawn happened"
+        onClose={() => setVoiding(null)}>
+        <Field
+          label="Why"
+          value={reason}
+          onChangeText={setReason}
+          placeholder="Billed the wrong tier"
+        />
+        <Button
+          title="Withdraw it"
+          variant="danger"
+          loading={busy === 'void'}
+          disabled={reason.trim().length < 3}
+          onPress={() =>
+            void (async () => {
+              await run('void', () => api.voidInvoice(voiding!.id, reason.trim()));
+              setVoiding(null);
+            })()
+          }
+        />
+      </Sheet>
     </Screen>
   );
 }

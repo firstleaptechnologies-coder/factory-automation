@@ -12,7 +12,11 @@ jest.mock('../../api/client', () => ({
   },
 }));
 
-jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ signOut: jest.fn() }) }));
+const mockSignOut = jest.fn();
+let mockPermissions: string[] = [];
+jest.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({ signOut: mockSignOut, can: (p: string) => mockPermissions.includes(p) }),
+}));
 
 const navigation = { navigate: jest.fn(), goBack: jest.fn() };
 
@@ -61,6 +65,11 @@ const overview = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPermissions = [
+    'platform.tenant.view',
+    'platform.staff.view',
+    'platform.release.view',
+  ];
   mockOverview.mockResolvedValue(overview());
   mockUpdateTenant.mockResolvedValue({});
   mockJobHealth.mockResolvedValue([]);
@@ -90,11 +99,13 @@ it('warns when a workspace is on a plan key that matches no tier', async () => {
   await waitFor(() => expect(screen.getByText('Money nobody is collecting')).toBeTruthy());
 });
 
+// The label comes from the shared navigation tree now, so it reads the same
+// here as it does in the browser's sidebar.
 it('goes to the price list', async () => {
   render(<PlatformOverviewScreen navigation={navigation} />);
 
-  await waitFor(() => expect(screen.getByText('Plans and prices')).toBeTruthy());
-  fireEvent.press(screen.getByText('Plans and prices'));
+  await waitFor(() => expect(screen.getByText('Tiers and prices')).toBeTruthy());
+  fireEvent.press(screen.getByText('Tiers and prices'));
 
   expect(navigation.navigate).toHaveBeenCalledWith('PlatformPlans');
 });
@@ -167,5 +178,60 @@ describe('work on a clock', () => {
     await waitFor(() =>
       expect(screen.getByText(/Reconcile the ledger is not running/)).toBeTruthy(),
     );
+  });
+});
+
+
+/*
+ * The console's menu, read from the same tree the browser's sidebar reads.
+ *
+ * Hard-coded buttons is how the two clients drifted before: this screen
+ * offered two of the six places the console has, and nothing failed.
+ */
+describe('the console menu', () => {
+  const mount = async () => {
+    await render(<PlatformOverviewScreen navigation={navigation} />);
+    await waitFor(() => expect(mockOverview).toHaveBeenCalled());
+  };
+
+  it('offers every screen the console has', async () => {
+    await mount();
+
+    for (const label of ['Workspaces', 'Tiers and prices', 'Billing', 'Staff and roles', 'Releases']) {
+      expect(await screen.findByText(label)).toBeTruthy();
+    }
+  });
+
+  it('does not offer the screen you are already on', async () => {
+    await mount();
+    await screen.findByText('Workspaces');
+
+    expect(screen.queryByText('Overview')).toBeNull();
+  });
+
+  it('goes where a menu item says', async () => {
+    await mount();
+    await fireEvent.press(await screen.findByText('Staff and roles'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith('PlatformStaff');
+  });
+
+  // The API refuses the route either way, but a menu full of screens that say
+  // no is not a product.
+  it('leaves out what this person may not do', async () => {
+    mockPermissions = ['platform.tenant.view'];
+    await mount();
+    await screen.findByText('Workspaces');
+
+    expect(screen.queryByText('Staff and roles')).toBeNull();
+    expect(screen.queryByText('Releases')).toBeNull();
+  });
+
+  it('drops a whole heading when nothing under it is reachable', async () => {
+    mockPermissions = ['platform.tenant.view'];
+    await mount();
+    await screen.findByText('Workspaces');
+
+    expect(screen.queryByText('Ourselves')).toBeNull();
   });
 });

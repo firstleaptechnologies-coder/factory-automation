@@ -6,6 +6,7 @@ const mockGateway = jest.fn();
 const mockInvoices = jest.fn();
 const mockRun = jest.fn();
 const mockIssue = jest.fn();
+const mockVoid = jest.fn();
 jest.mock('../../api/client', () => ({
   api: {
     platformBilling: () => mockBilling(),
@@ -13,6 +14,7 @@ jest.mock('../../api/client', () => ({
     billingInvoices: () => mockInvoices(),
     runBilling: () => mockRun(),
     issueInvoice: (...a: unknown[]) => mockIssue(...a),
+    voidInvoice: (...a: unknown[]) => mockVoid(...a),
   },
 }));
 
@@ -69,6 +71,7 @@ beforeEach(() => {
   mockInvoices.mockResolvedValue([invoice()]);
   mockRun.mockResolvedValue({ written: 1, skipped: 0 });
   mockIssue.mockResolvedValue(invoice({ status: 'ISSUED' }));
+  mockVoid.mockResolvedValue(invoice({ status: 'VOID' }));
 });
 
 const mount = async () => {
@@ -218,5 +221,30 @@ describe('invoices', () => {
 
     expect(screen.queryByText('Work out this month')).toBeNull();
     expect(screen.queryByText('Send it')).toBeNull();
+  });
+});
+
+
+// Never deleted — a bill that was sent and withdrawn happened.
+describe('withdrawing a bill', () => {
+  it('asks why, and sends it', async () => {
+    await mount();
+    await fireEvent.press(await screen.findByText('Withdraw'));
+    await fireEvent.changeText(
+      await screen.findByPlaceholderText('Billed the wrong tier'),
+      'billed the wrong tier',
+    );
+    await fireEvent.press(screen.getByText('Withdraw it'));
+
+    await waitFor(() => expect(mockVoid).toHaveBeenCalledWith('inv_1', 'billed the wrong tier'));
+  });
+
+  // A paid bill is refunded, not un-billed.
+  it('is not offered on one that is settled', async () => {
+    mockInvoices.mockResolvedValue([invoice({ status: 'PAID' })]);
+    await mount();
+    await screen.findByText('paid');
+
+    expect(screen.queryByText('Withdraw')).toBeNull();
   });
 });

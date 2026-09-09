@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { CORE_MODULES, MODULE_CATALOGUE, billFor, jobsNeedingAttention } from '@fas/shared';
+import {
+  CORE_MODULES,
+  MODULE_CATALOGUE,
+  PLATFORM_NAV,
+  billFor,
+  jobsNeedingAttention,
+} from '@fas/shared';
 import type { JobHealth, ModuleKey, ModulePrices, Tier } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
@@ -32,7 +38,7 @@ import { statusColour, unpricedWarning } from './overview-types';
  * as likely to be standing in a client's workshop as sitting at a desk.
  */
 export function PlatformOverviewScreen({ navigation }: { navigation: any }) {
-  const { signOut } = useAuth();
+  const { signOut, can } = useAuth();
   const overview = useApi<PlatformOverview>(
     () => api.platformOverview() as Promise<PlatformOverview>,
     [],
@@ -132,13 +138,43 @@ export function PlatformOverviewScreen({ navigation }: { navigation: any }) {
         </Card>
       )}
 
-      <Button
-        title="Plans and prices"
-        variant="dark"
-        onPress={() => navigation.navigate('PlatformPlans')}
-        style={{ marginTop: spacing.md }}
-      />
-      <Button title="Workspaces" variant="dark" onPress={() => navigation.navigate('Tenants')} />
+      {/*
+        The console's menu, read from the same tree the browser's sidebar
+        reads.
+        
+        Hard-coded buttons is how the two clients drifted before: this screen
+        offered two of the six places the console has, and nothing failed. A
+        screen added to PLATFORM_NAV now appears here without anybody
+        remembering to add it.
+        
+        The overview is left out — it is this screen — and so is anything
+        reached from another screen rather than from a menu.
+      */}
+      {PLATFORM_NAV.map((group) => {
+        const items = group.items.filter(
+          (item) =>
+            item.app &&
+            item.key !== 'platform-overview' &&
+            (!item.permission || can(item.permission)),
+        );
+        if (!items.length) return null;
+
+        return (
+          <View key={group.key}>
+            <Text variant="label" tone="muted" style={styles.menuHead}>{group.label}</Text>
+            {items.map((item) => (
+              <Button
+                key={item.key}
+                title={item.label}
+                variant="dark"
+                onPress={() => navigation.navigate(item.app as never)}
+                style={{ marginBottom: spacing.sm }}
+              />
+            ))}
+          </View>
+        );
+      })}
+
       <Button title="Sign out" variant="ghost" onPress={signOut} />
 
       {(() => {
@@ -285,6 +321,7 @@ export function PlatformOverviewScreen({ navigation }: { navigation: any }) {
 const styles = StyleSheet.create({
   row: { marginTop: spacing.sm },
   rowTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  menuHead: { marginTop: spacing.lg, marginBottom: spacing.sm },
   warning: { marginTop: spacing.md, borderLeftWidth: 3, borderLeftColor: palette.warning },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.xs },
   billLine: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },

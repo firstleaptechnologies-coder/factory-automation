@@ -5,6 +5,9 @@ const mockRoles = jest.fn();
 const mockStaff = jest.fn();
 const mockSaveRole = jest.fn();
 const mockSaveStaff = jest.fn();
+const mockCreateRole = jest.fn();
+const mockDeleteRole = jest.fn();
+const mockCreateStaff = jest.fn();
 
 jest.mock('../../api/client', () => ({
   api: {
@@ -12,6 +15,9 @@ jest.mock('../../api/client', () => ({
     platformStaff: () => mockStaff(),
     savePlatformRole: (...a: unknown[]) => mockSaveRole(...a),
     savePlatformStaff: (...a: unknown[]) => mockSaveStaff(...a),
+    createPlatformRole: (...a: unknown[]) => mockCreateRole(...a),
+    deletePlatformRole: (...a: unknown[]) => mockDeleteRole(...a),
+    createPlatformStaff: (...a: unknown[]) => mockCreateStaff(...a),
   },
 }));
 
@@ -39,7 +45,8 @@ const SUPPORT = {
   name: 'Support',
   blurb: 'Can open a workspace to help',
   permissions: ['platform.tenant.view'],
-  isSystem: true,
+  // One we wrote, so it can be removed. The seeded four cannot.
+  isSystem: false,
   people: 0,
 };
 
@@ -55,6 +62,9 @@ beforeEach(() => {
   mockStaff.mockResolvedValue([ME, OTHER]);
   mockSaveRole.mockResolvedValue(OWNER);
   mockSaveStaff.mockResolvedValue(OTHER);
+  mockCreateRole.mockResolvedValue({ key: 'ON_CALL' });
+  mockDeleteRole.mockResolvedValue({ key: 'ON_CALL' });
+  mockCreateStaff.mockResolvedValue(OTHER);
 });
 
 const mount = async () => {
@@ -134,4 +144,88 @@ it('offers nothing but looking to somebody who may only look', async () => {
   await fireEvent.press(await screen.findByText('Owner'));
 
   expect(screen.queryByText('Save')).toBeNull();
+});
+
+
+describe('a role we write ourselves', () => {
+  it('makes one, on the platform tree', async () => {
+    await mount();
+    await fireEvent.press(screen.getByText('New role'));
+
+    // The tree that appears is the platform one, not the shop's.
+    expect(await screen.findByText('What we charge')).toBeTruthy();
+    expect(screen.queryByText('Buying and stock')).toBeNull();
+  });
+
+  it('sends the key and what was ticked', async () => {
+    await mount();
+    await fireEvent.press(screen.getByText('New role'));
+    const fields = screen.getAllByDisplayValue('');
+    await fireEvent.changeText(fields[0], 'On call');
+    await fireEvent.changeText(fields[1], 'ON_CALL');
+    await fireEvent.press(await screen.findByText('Clients'));
+    await fireEvent.press(await screen.findByText('View tenants'));
+    await fireEvent.press(screen.getByText('Save'));
+
+    await waitFor(() =>
+      expect(mockCreateRole).toHaveBeenCalledWith({
+        key: 'ON_CALL',
+        name: 'On call',
+        permissions: ['platform.tenant.view'],
+      }),
+    );
+  });
+
+  /*
+   * The seeded four are what a session falls back to when a role row has gone,
+   * so removing one turns a missing row into a guess.
+   */
+  it('offers to remove one we wrote, but never a seeded one', async () => {
+    await mount();
+    await fireEvent.press(screen.getByText('Support'));
+    expect(await screen.findByText('Remove this role')).toBeTruthy();
+
+    await fireEvent.press(screen.getByText('Owner'));
+    await waitFor(() => expect(screen.queryByText('Remove this role')).toBeNull());
+  });
+
+  it('removes one', async () => {
+    await mount();
+    await fireEvent.press(screen.getByText('Support'));
+    await fireEvent.press(await screen.findByText('Remove this role'));
+
+    await waitFor(() => expect(mockDeleteRole).toHaveBeenCalledWith('SUPPORT'));
+  });
+});
+
+describe('adding a colleague', () => {
+  it('sends what was typed', async () => {
+    await mount();
+    await fireEvent.press(screen.getByText('Invite'));
+
+    const fields = screen.getAllByDisplayValue('');
+    await fireEvent.changeText(fields[0], 'Asha');
+    await fireEvent.changeText(fields[1], 'asha@firstleap.in');
+    const options = await screen.findAllByText('Support');
+    await fireEvent.press(options[options.length - 1]);
+    await fireEvent.changeText(screen.getAllByDisplayValue('')[0], 'first-one-please');
+    await fireEvent.press(screen.getByText('Add them'));
+
+    await waitFor(() =>
+      expect(mockCreateStaff).toHaveBeenCalledWith({
+        name: 'Asha',
+        email: 'asha@firstleap.in',
+        role: 'SUPPORT',
+        password: 'first-one-please',
+      }),
+    );
+  });
+});
+
+it('offers no creating or inviting to somebody who may only look', async () => {
+  mockPermissions = ['platform.staff.view'];
+  await mount();
+
+  expect(screen.queryByText('New role')).toBeNull();
+  expect(screen.queryByText('Invite')).toBeNull();
 });

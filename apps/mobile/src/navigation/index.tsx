@@ -78,6 +78,7 @@ import { PlatformOverviewScreen } from '../screens/platform/PlatformOverviewScre
 import { PlatformPlansScreen } from '../screens/platform/PlatformPlansScreen';
 import { PlatformBillingScreen } from '../screens/platform/PlatformBillingScreen';
 import { PlatformStaffScreen } from '../screens/platform/PlatformStaffScreen';
+import { PlatformReleasesScreen } from '../screens/platform/PlatformReleasesScreen';
 import { TenantDetailScreen } from '../screens/platform/TenantDetailScreen';
 
 const Stack = createNativeStackNavigator();
@@ -152,6 +153,9 @@ export function RootNavigator() {
             <Stack.Screen name="TenantDetail" component={TenantDetailScreen} />
             <Stack.Screen name="PlatformBilling" component={PlatformBillingScreen} />
             <Stack.Screen name="PlatformStaff" component={PlatformStaffScreen} />
+            {/* A rollout going wrong is something you find out about away
+                from a desk. */}
+            <Stack.Screen name="PlatformReleases" component={PlatformReleasesScreen} />
           </>
         ) : user ? (
           <>

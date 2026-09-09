@@ -57,9 +57,13 @@ export function PlatformStaffScreen({ navigation }: { navigation: any }) {
   const mayManage = can('platform.staff.manage');
 
   const [editing, setEditing] = useState<PlatformRole | null>(null);
+  const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
+  const [key, setKey] = useState('');
   const [granted, setGranted] = useState<string[]>([]);
   const [person, setPerson] = useState<Staff | null>(null);
+  const [inviting, setInviting] = useState(false);
+  const [invite, setInvite] = useState({ name: '', email: '', role: '', password: '' });
   const [busy, setBusy] = useState(false);
 
   const run = async (work: () => Promise<unknown>) => {
@@ -79,10 +83,17 @@ export function PlatformStaffScreen({ navigation }: { navigation: any }) {
     }
   };
 
-  const openRole = (role: PlatformRole) => {
+  const openRole = (role: PlatformRole | null) => {
     setEditing(role);
-    setName(role.name);
-    setGranted(role.permissions);
+    setCreating(role === null);
+    setName(role?.name ?? '');
+    setKey('');
+    setGranted(role?.permissions ?? []);
+  };
+
+  const closeRole = () => {
+    setEditing(null);
+    setCreating(false);
   };
 
   if (!roles.data) return <Loader label="Loading" />;
@@ -96,6 +107,18 @@ export function PlatformStaffScreen({ navigation }: { navigation: any }) {
         subtitle="Who at FirstLeap may do what"
         onBack={() => navigation.goBack()}
       />
+
+      {mayManage ? (
+        <View style={styles.chips}>
+          <Button title="New role" onPress={() => openRole(null)} style={{ flex: 1 }} />
+          <Button
+            title="Invite"
+            variant="dark"
+            onPress={() => setInviting(true)}
+            style={{ flex: 1 }}
+          />
+        </View>
+      ) : null}
 
       <Text variant="label" tone="muted" style={styles.head}>Roles</Text>
       {roles.data.map((role) => (
@@ -140,11 +163,19 @@ export function PlatformStaffScreen({ navigation }: { navigation: any }) {
       ))}
 
       <Sheet
-        visible={Boolean(editing)}
-        title={editing?.name ?? ''}
+        visible={Boolean(editing) || creating}
+        title={creating ? 'New role' : (editing?.name ?? '')}
         subtitle="Tick what this kind of colleague may do"
-        onClose={() => setEditing(null)}>
+        onClose={closeRole}>
         <Field label="Called" value={name} onChangeText={setName} />
+        {creating ? (
+          <Field
+            label="Key"
+            value={key}
+            onChangeText={setKey}
+            placeholder="ON_CALL"
+          />
+        ) : null}
         <View style={styles.tree}>
           <PermissionTree
             granted={granted}
@@ -158,12 +189,83 @@ export function PlatformStaffScreen({ navigation }: { navigation: any }) {
         <Button
           title="Save"
           loading={busy}
-          disabled={name.trim().length < 2}
+          disabled={name.trim().length < 2 || (creating && key.trim().length < 2)}
           onPress={async () => {
             const done = await run(() =>
-              api.savePlatformRole(editing!.key, { name: name.trim(), permissions: granted }),
+              creating
+                ? api.createPlatformRole({ key, name: name.trim(), permissions: granted })
+                : api.savePlatformRole(editing!.key, { name: name.trim(), permissions: granted }),
             );
-            if (done) setEditing(null);
+            if (done) closeRole();
+          }}
+        />
+        {/*
+          Only a role we wrote. The seeded four are what a session falls back
+          to when a row has gone, so removing one turns a missing row into a
+          guess — the API refuses it either way.
+        */}
+        {editing && !editing.isSystem ? (
+          <Button
+            title="Remove this role"
+            variant="danger"
+            loading={busy}
+            onPress={async () => {
+              const done = await run(() => api.deletePlatformRole(editing.key));
+              if (done) closeRole();
+            }}
+          />
+        ) : null}
+      </Sheet>
+
+      <Sheet
+        visible={inviting}
+        title="Invite a colleague"
+        subtitle="They sign in above every workspace, not inside one"
+        onClose={() => setInviting(false)}>
+        <Field
+          label="Name"
+          value={invite.name}
+          onChangeText={(value) => setInvite({ ...invite, name: value })}
+        />
+        <Field
+          label="Email"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={invite.email}
+          onChangeText={(value) => setInvite({ ...invite, email: value })}
+        />
+        <Text variant="label" tone="muted">Role</Text>
+        <View style={styles.chips}>
+          {roles.data.map((role) => (
+            <Chip
+              key={role.key}
+              label={role.name}
+              selected={invite.role === role.key}
+              onPress={() => setInvite({ ...invite, role: role.key })}
+            />
+          ))}
+        </View>
+        <Field
+          label="First password"
+          secureTextEntry
+          value={invite.password}
+          onChangeText={(value) => setInvite({ ...invite, password: value })}
+        />
+        <Button
+          title="Add them"
+          loading={busy}
+          disabled={
+            invite.name.trim().length < 2 ||
+            !invite.email.includes('@') ||
+            !invite.role ||
+            invite.password.length < 8
+          }
+          onPress={async () => {
+            const done = await run(() => api.createPlatformStaff(invite));
+            if (done) {
+              setInviting(false);
+              setInvite({ name: '', email: '', role: '', password: '' });
+            }
           }}
         />
       </Sheet>

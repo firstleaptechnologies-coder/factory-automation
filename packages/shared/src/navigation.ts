@@ -705,6 +705,7 @@ export const PLATFORM_NAV: NavGroup[] = [
         icon: 'box',
         permission: PERMISSIONS.PLATFORM_RELEASE_VIEW,
         web: '/platform/releases',
+        app: 'PlatformReleases',
       },
     ],
   },
