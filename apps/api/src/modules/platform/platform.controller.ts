@@ -106,4 +106,17 @@ export class PlatformController {
     return this.subscriptions.setModulePrice(moduleKey, body.monthlyPrice);
   }
 
+  /**
+   * Did last night's work run?
+   *
+   * Its own route rather than part of the overview: it answers a different
+   * question, it is looked at on a different rhythm, and a slow read of the
+   * job log should not make the money figures slow.
+   */
+  @Get('job-health')
+  @RequirePermissions(PERMISSIONS.PLATFORM_TENANT_VIEW)
+  jobHealth() {
+    return this.subscriptions.jobHealth();
+  }
+
 }

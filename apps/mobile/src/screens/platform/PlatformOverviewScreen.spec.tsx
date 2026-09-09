@@ -3,10 +3,12 @@ import { PlatformOverviewScreen } from './PlatformOverviewScreen';
 
 const mockOverview = jest.fn();
 const mockUpdateTenant = jest.fn();
+const mockJobHealth = jest.fn();
 jest.mock('../../api/client', () => ({
   api: {
     platformOverview: (...a: unknown[]) => mockOverview(...a),
     updateTenant: (...a: unknown[]) => mockUpdateTenant(...a),
+    platformJobHealth: (...a: unknown[]) => mockJobHealth(...a),
   },
 }));
 
@@ -61,6 +63,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockOverview.mockResolvedValue(overview());
   mockUpdateTenant.mockResolvedValue({});
+  mockJobHealth.mockResolvedValue([]);
 });
 
 it('leads with what the book is worth', async () => {
@@ -134,6 +137,35 @@ describe('editing what a client is on', () => {
 
     await waitFor(() =>
       expect(mockUpdateTenant).toHaveBeenCalledWith('w1', { plan: 'shop', modules: ['hr'] }),
+    );
+  });
+});
+
+describe('work on a clock', () => {
+  const health = (over: Record<string, unknown> = {}) => ({
+    job: { name: 'ledger.reconcile', label: 'Reconcile the ledger', blurb: '', cadence: 'daily' },
+    state: 'ok',
+    lastRun: null,
+    sinceMs: 1000,
+    summary: 'Ran 6 hours ago.',
+    ...over,
+  });
+
+  it('lists each job and what it did', async () => {
+    mockJobHealth.mockResolvedValue([health()]);
+    render(<PlatformOverviewScreen navigation={navigation} />);
+
+    await waitFor(() => expect(screen.getByText('Reconcile the ledger')).toBeTruthy());
+    expect(screen.getByText('Ran 6 hours ago.')).toBeTruthy();
+  });
+
+  // The failure nothing else would mention.
+  it('calls out a job that is not running', async () => {
+    mockJobHealth.mockResolvedValue([health({ state: 'overdue', summary: 'Last ran 3 days ago.' })]);
+    render(<PlatformOverviewScreen navigation={navigation} />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Reconcile the ledger is not running/)).toBeTruthy(),
     );
   });
 });

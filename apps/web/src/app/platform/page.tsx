@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CORE_MODULES, MODULE_CATALOGUE, billFor } from '@fas/shared';
+import { CORE_MODULES, MODULE_CATALOGUE, billFor, jobsNeedingAttention } from '@fas/shared';
+import type { JobHealth } from '@fas/shared';
 import type { ModuleKey, ModulePrices, Tier } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
@@ -11,6 +12,7 @@ import { Button, Card, Chip, EmptyState, Loader, PageHead, Pill, SectionHead, Sh
 import { Select } from '@/ui/Select';
 import { formatInr } from '@/lib/format';
 import type { PlatformOverview } from './overview-types';
+import { JOB_STATE_LABELS, jobStateColour, jobWarning } from './job-health';
 import { statusColour, unpricedWarning } from './overview-types';
 
 /**
@@ -27,6 +29,9 @@ export default function PlatformOverviewPage() {
     () => api.platformOverview() as Promise<PlatformOverview>,
     [],
   );
+  // Its own request: it answers a different question on a different rhythm,
+  // and a slow read of the job log should not hold up the money figures.
+  const jobs = useApi<JobHealth[]>(() => api.platformJobHealth() as Promise<JobHealth[]>, []);
 
   const [editing, setEditing] = useState<string | null>(null);
   const [tier, setTier] = useState<string>('');
@@ -152,6 +157,40 @@ export default function PlatformOverviewPage() {
           <p className="t-small" style={{ margin: '4px 0 0' }}>{warning.body}</p>
         </Card>
       )}
+
+      {(() => {
+        const health = jobs.data ?? [];
+        if (!health.length) return null;
+        const needing = jobsNeedingAttention(health);
+        const warning = jobWarning(needing);
+        return (
+          <>
+            <SectionHead title="Work on a clock" />
+            {warning && (
+              <p className="t-small" style={{ color: 'var(--warning)', margin: '0 0 var(--s-sm)' }}>
+                {warning}
+              </p>
+            )}
+            <div className="stack-sm">
+              {health.map((one) => (
+                <Card key={one.job.name} size="sm">
+                  <div className="row-between">
+                    <div style={{ minWidth: 0 }}>
+                      <div className="t-h3 truncate">{one.job.label}</div>
+                      <div className="t-tiny muted">{one.summary}</div>
+                      <div className="t-tiny faint">{one.job.blurb}</div>
+                    </div>
+                    <Pill
+                      label={JOB_STATE_LABELS[one.state]}
+                      color={jobStateColour(one.state)}
+                    />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
       <SectionHead title="Clients" />
       <div className="stack-sm">

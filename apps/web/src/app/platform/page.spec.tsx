@@ -1,7 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import PlatformOverviewPage from './page';
 
-const apiMock = { platformOverview: jest.fn(), updateTenant: jest.fn() };
+const apiMock = {
+  platformOverview: jest.fn(),
+  platformJobHealth: jest.fn(),
+  updateTenant: jest.fn(),
+};
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
     {},
@@ -53,6 +57,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   apiMock.platformOverview.mockResolvedValue(overview());
   apiMock.updateTenant.mockResolvedValue({});
+  apiMock.platformJobHealth.mockResolvedValue([]);
 });
 
 async function draw() {
@@ -171,5 +176,57 @@ describe('editing what a client is on', () => {
       plan: 'shop',
       modules: ['hr'],
     });
+  });
+});
+
+describe('work on a clock', () => {
+  const health = (over: Record<string, unknown> = {}) => ({
+    job: {
+      name: 'ledger.reconcile',
+      label: 'Reconcile the ledger',
+      blurb: 'Posts anything that moved money and never reached the ledger.',
+      cadence: 'daily',
+    },
+    state: 'ok',
+    lastRun: null,
+    sinceMs: 1000,
+    summary: 'Ran 6 hours ago.',
+    ...over,
+  });
+
+  it('says nothing about jobs when there are none to report', async () => {
+    await draw();
+
+    expect(screen.queryByText('Work on a clock')).not.toBeInTheDocument();
+  });
+
+  it('lists each job with what it is for', async () => {
+    apiMock.platformJobHealth.mockResolvedValue([health()]);
+
+    await draw();
+
+    expect(screen.getByText('Reconcile the ledger')).toBeInTheDocument();
+    expect(screen.getByText('Ran 6 hours ago.')).toBeInTheDocument();
+  });
+
+  // A job that stopped is the failure nothing else in the product would
+  // mention, so it is called out above the list rather than left to be found.
+  it('calls out a job that is not running', async () => {
+    apiMock.platformJobHealth.mockResolvedValue([
+      health({ state: 'overdue', summary: 'Last ran 3 days ago, and should have run since.' }),
+    ]);
+
+    await draw();
+
+    expect(screen.getByText(/Reconcile the ledger is not running/)).toBeInTheDocument();
+    expect(screen.getByText('overdue')).toBeInTheDocument();
+  });
+
+  it('says nothing alarming when every job is healthy', async () => {
+    apiMock.platformJobHealth.mockResolvedValue([health()]);
+
+    await draw();
+
+    expect(screen.queryByText(/is not running/)).not.toBeInTheDocument();
   });
 });

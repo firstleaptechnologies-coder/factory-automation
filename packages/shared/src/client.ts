@@ -1148,6 +1148,11 @@ export class ApiClient {
     return this.get<unknown>('/platform/overview');
   }
 
+  /** Whether the work on a clock actually ran. */
+  platformJobHealth() {
+    return this.get<unknown>('/platform/job-health');
+  }
+
   platformTiers() {
     return this.get<unknown>('/platform/tiers');
   }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { CORE_MODULES, MODULE_CATALOGUE, billFor } from '@fas/shared';
-import type { ModuleKey, ModulePrices, Tier } from '@fas/shared';
+import { CORE_MODULES, MODULE_CATALOGUE, billFor, jobsNeedingAttention } from '@fas/shared';
+import type { JobHealth, ModuleKey, ModulePrices, Tier } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../auth/AuthContext';
@@ -21,6 +21,7 @@ import { Select } from '../../ui/Select';
 import { palette, spacing } from '../../theme';
 import { formatInr } from '../../lib/format';
 import type { PlatformOverview } from './overview-types';
+import { JOB_STATE_LABELS, jobStateColour, jobWarning } from './job-health';
 import { statusColour, unpricedWarning } from './overview-types';
 
 /**
@@ -36,6 +37,10 @@ export function PlatformOverviewScreen({ navigation }: { navigation: any }) {
     () => api.platformOverview() as Promise<PlatformOverview>,
     [],
   );
+
+  // Its own request: a different question on a different rhythm, and a slow
+  // read of the job log should not hold up the money figures.
+  const jobs = useApi<JobHealth[]>(() => api.platformJobHealth() as Promise<JobHealth[]>, []);
 
   const [editing, setEditing] = useState<string | null>(null);
   const [tier, setTier] = useState('');
@@ -135,6 +140,37 @@ export function PlatformOverviewScreen({ navigation }: { navigation: any }) {
       />
       <Button title="Workspaces" variant="dark" onPress={() => navigation.navigate('Tenants')} />
       <Button title="Sign out" variant="ghost" onPress={signOut} />
+
+      {(() => {
+        const health = jobs.data ?? [];
+        if (!health.length) return null;
+        const warning = jobWarning(jobsNeedingAttention(health));
+        return (
+          <>
+            <Text variant="label" tone="muted" style={{ marginTop: spacing.lg }}>
+              Work on a clock
+            </Text>
+            {!!warning && (
+              <Text variant="tiny" style={{ color: palette.warning }}>{warning}</Text>
+            )}
+            {health.map((one) => (
+              <Card key={one.job.name} tone="dark" style={styles.row}>
+                <View style={styles.rowTop}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text variant="h3" numberOfLines={1}>{one.job.label}</Text>
+                    <Text variant="tiny" tone="muted">{one.summary}</Text>
+                  </View>
+                  <Pill
+                    label={JOB_STATE_LABELS[one.state]}
+                    color={jobStateColour(one.state)}
+                    small
+                  />
+                </View>
+              </Card>
+            ))}
+          </>
+        );
+      })()}
 
       {workspaces.map((workspace) => (
         <Card

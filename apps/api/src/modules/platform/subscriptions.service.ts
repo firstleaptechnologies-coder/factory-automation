@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { TenantStatus } from '@prisma/client';
 import {
   ALL_MODULES,
+  allJobHealth,
   MODULE_CATALOGUE,
   ModuleKey,
   ModulePrices,
@@ -255,4 +256,38 @@ export class SubscriptionsService {
       },
     };
   }
+
+  /**
+   * Whether the work on a clock actually ran.
+   *
+   * Reads the most recent run of each job. The rows have always been written
+   * and never read, so the one failure that matters — a job that stopped —
+   * has been invisible: a failure leaves a row with an error on it, and a
+   * missed run leaves nothing at all, which looks exactly like a quiet night.
+   *
+   * `JobRun` is platform-wide rather than a tenant's, so this reads the
+   * platform client directly.
+   */
+  async jobHealth() {
+    // A fortnight is enough to date every job on the board; older rows are
+    // pruned nightly anyway.
+    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    const runs = await this.db.jobRun.findMany({
+      where: { startedAt: { gte: since } },
+      orderBy: { startedAt: 'desc' },
+      take: 500,
+      select: {
+        name: true,
+        outcome: true,
+        startedAt: true,
+        finishedAt: true,
+        durationMs: true,
+        detail: true,
+        error: true,
+      },
+    });
+
+    return allJobHealth(runs as never);
+  }
+
 }

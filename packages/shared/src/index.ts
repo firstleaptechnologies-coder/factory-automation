@@ -2,6 +2,7 @@ export * from './units';
 export * from './calendar';
 export * from './letters';
 export * from './permissions';
+export * from './jobs';
 export * from './reports';
 export * from './subscriptions';
 export * from './modules';
