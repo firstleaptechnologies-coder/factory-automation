@@ -159,6 +159,15 @@ export const PERMISSIONS = {
    */
   PLATFORM_IMPERSONATE: 'platform.impersonate',
   PLATFORM_PRICING_MANAGE: 'platform.pricing.manage',
+  /**
+   * Who at FirstLeap may do what.
+   *
+   * Kept apart from tenant management because it is the power that hands out
+   * every other power: somebody who can put a colleague on Owner has, in one
+   * step, given them every workspace we host.
+   */
+  PLATFORM_STAFF_VIEW: 'platform.staff.view',
+  PLATFORM_STAFF_MANAGE: 'platform.staff.manage',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -349,6 +358,8 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.PLATFORM_TENANT_CREATE]: 'Provision workspaces',
   [PERMISSIONS.PLATFORM_PRICING_MANAGE]: 'Set what tiers and modules cost',
   [PERMISSIONS.PLATFORM_IMPERSONATE]: 'Open a workspace to help',
+  [PERMISSIONS.PLATFORM_STAFF_VIEW]: 'See who works here',
+  [PERMISSIONS.PLATFORM_STAFF_MANAGE]: 'Add colleagues and set what they may do',
   [PERMISSIONS.CASH_DEPOSIT]: 'Record bank deposits',
   // The key stays as it is: renaming a permission string would silently strip
   // it from every role a tenant has already saved.

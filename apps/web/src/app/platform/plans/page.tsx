@@ -18,7 +18,6 @@ import type { PlatformOverview } from '../overview-types';
  * once.
  */
 export default function PlansAndPricesPage() {
-  const router = useRouter();
   const overview = useApi<PlatformOverview>(
     () => api.platformOverview() as Promise<PlatformOverview>,
     [],
@@ -141,7 +140,6 @@ export default function PlansAndPricesPage() {
       <PageHead
         title="Plans and prices"
         subtitle="What a tier costs, and what a module costs beyond it"
-        action={<Button title="Back" variant="ghost" onClick={() => router.push('/platform')} />}
       />
 
       {failed && <p className="t-small" style={{ color: 'var(--danger)' }}>{failed}</p>}

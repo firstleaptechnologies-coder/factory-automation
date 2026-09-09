@@ -76,6 +76,9 @@ import { WasteScreen } from '../screens/WasteScreen';
 import { TenantsScreen } from '../screens/platform/TenantsScreen';
 import { PlatformOverviewScreen } from '../screens/platform/PlatformOverviewScreen';
 import { PlatformPlansScreen } from '../screens/platform/PlatformPlansScreen';
+import { PlatformBillingScreen } from '../screens/platform/PlatformBillingScreen';
+import { PlatformStaffScreen } from '../screens/platform/PlatformStaffScreen';
+import { TenantDetailScreen } from '../screens/platform/TenantDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -144,6 +147,11 @@ export function RootNavigator() {
             <Stack.Screen name="PlatformOverview" component={PlatformOverviewScreen} />
             <Stack.Screen name="PlatformPlans" component={PlatformPlansScreen} />
             <Stack.Screen name="Tenants" component={TenantsScreen} />
+            {/* One workspace, all the way down. The list can only say what is
+                true of everybody. */}
+            <Stack.Screen name="TenantDetail" component={TenantDetailScreen} />
+            <Stack.Screen name="PlatformBilling" component={PlatformBillingScreen} />
+            <Stack.Screen name="PlatformStaff" component={PlatformStaffScreen} />
           </>
         ) : user ? (
           <>

@@ -15,10 +15,13 @@ const tenant = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function build(row: unknown = tenant()) {
+function build(row: unknown = tenant(), tier: unknown = null) {
   const db = prismaMock() as never as Db;
   (db as unknown as Record<string, unknown>).platform = db;
   db.tenant.findUnique = jest.fn(async () => row);
+  // What the tier includes today. Null means no such row, which falls back to
+  // the seeded definition rather than to a workspace that can reach nothing.
+  db.subscriptionTier = { findUnique: jest.fn(async () => tier) };
   const encryption = { decryptToString: jest.fn((value: string) => `decrypted:${value}`) };
   return {
     service: new TenantRegistryService(db as never, encryption as never),
@@ -67,6 +70,44 @@ describe('bySlugOrThrow', () => {
     // A shop that wants one thing from the next tier up should not have to buy
     // the tier.
     expect(context.modules).toEqual(['orders', 'clients', 'hr']);
+  });
+
+  /*
+   * The tier is a row the owner edits, so it decides. Reading the compiled
+   * list instead is how a screen comes to look like it controls the product
+   * while changing nothing but the invoice.
+   */
+  it('takes what the tier includes from the tier, not from the compiled list', async () => {
+    const { service } = build(tenant({ plan: 'punch', modules: [] }), {
+      includedModules: ['leads', 'quotes'],
+      isActive: true,
+    });
+
+    const context = await service.bySlugOrThrow('decorbucket');
+
+    expect(context.modules).toEqual(['orders', 'leads', 'quotes', 'clients']);
+  });
+
+  // A tier deleted underneath a workspace must not leave them with nothing.
+  it('falls back to the seeded plan when the tier has no row', async () => {
+    const { service } = build(tenant({ plan: 'shop', modules: [] }), null);
+    const context = await service.bySlugOrThrow('decorbucket');
+
+    expect(context.modules).toContain('finance');
+  });
+
+  // And the core is in whatever the tier says: a workspace that cannot take an
+  // order is not a product anybody sold.
+  it('keeps the core modules even when the tier leaves them out', async () => {
+    const { service } = build(tenant({ plan: 'punch', modules: [] }), {
+      includedModules: [],
+      isActive: true,
+    });
+
+    const context = await service.bySlugOrThrow('decorbucket');
+
+    expect(context.modules).toContain('orders');
+    expect(context.modules).toContain('clients');
   });
 });
 

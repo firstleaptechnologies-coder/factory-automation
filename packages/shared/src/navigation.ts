@@ -596,50 +596,117 @@ export const NAV_GROUPS: NavGroup[] = [
  */
 export const NAV_OUTSIDE: NavItem[] = [
   { key: 'login', label: 'Sign in', icon: 'user', web: '/login', app: 'Login' },
+];
+
+/**
+ * FirstLeap's own console, which is a product in its own right.
+ *
+ * A separate tree from `NAV_GROUPS` because it answers to nothing a tenant
+ * has: no module gates it — a workspace's plan cannot decide what we may see
+ * about them — and its permissions are the platform ones a tenant role can
+ * never hold. It is grouped rather than flat for the same reason the shop's
+ * menu is: this is where every commercial decision about the business gets
+ * made, and a flat list of fifteen links is a list nobody reads.
+ */
+export const PLATFORM_NAV: NavGroup[] = [
   {
-    /*
-     * FirstLeap's own dashboard: every client, what they are on, and what they
-     * pay. The landing screen behind the platform sign-in, which is why it is
-     * first here.
-     */
-    key: 'platform-overview',
-    label: 'FirstLeap',
-    icon: 'trend',
-    permission: PERMISSIONS.PLATFORM_TENANT_VIEW,
-    web: '/platform',
-    app: 'PlatformOverview',
-    children: [
+    key: 'platform-business',
+    label: 'The business',
+    blurb: 'Who is on the platform and what they are worth',
+    items: [
       {
-        key: 'platform-plans',
-        label: 'Plans and prices',
-        icon: 'card',
-        permission: PERMISSIONS.PLATFORM_PRICING_MANAGE,
-        web: '/platform/plans',
-        app: 'PlatformPlans',
+        key: 'platform-overview',
+        label: 'Overview',
+        icon: 'trend',
+        permission: PERMISSIONS.PLATFORM_TENANT_VIEW,
+        web: '/platform',
+        app: 'PlatformOverview',
+      },
+      {
+        key: 'platform-tenants',
+        label: 'Workspaces',
+        icon: 'box',
+        permission: PERMISSIONS.PLATFORM_TENANT_VIEW,
+        web: '/platform/tenants',
+        app: 'Tenants',
+        children: [
+          {
+            /*
+             * One workspace, all the way down: what they have, who is in it,
+             * what they are billed and where their data lives. The list can
+             * only ever say what is true of everybody.
+             */
+            key: 'platform-tenant',
+            label: 'One workspace',
+            icon: 'box',
+            permission: PERMISSIONS.PLATFORM_TENANT_VIEW,
+            web: '/platform/tenants/[id]',
+            app: 'TenantDetail',
+          },
+        ],
       },
     ],
   },
   {
-    key: 'platform-tenants',
-    label: 'Workspaces',
-    icon: 'box',
-    permission: PERMISSIONS.PLATFORM_TENANT_VIEW,
-    web: '/platform/tenants',
-    app: 'Tenants',
+    key: 'platform-commercial',
+    label: 'What we sell',
+    blurb: 'Tiers, module prices and what each workspace pays',
+    items: [
+      {
+        key: 'platform-plans',
+        label: 'Tiers and prices',
+        icon: 'card',
+        permission: PERMISSIONS.PLATFORM_TENANT_VIEW,
+        web: '/platform/plans',
+        app: 'PlatformPlans',
+      },
+      {
+        /*
+         * Subscriptions, trials and what has been collected.
+         *
+         * Its own section rather than a column on the workspace list: a trial
+         * ending on Friday is a thing somebody must act on this week, and it
+         * is invisible in a list sorted by name.
+         */
+        key: 'platform-billing',
+        label: 'Billing',
+        icon: 'receipt',
+        permission: PERMISSIONS.PLATFORM_TENANT_VIEW,
+        web: '/platform/billing',
+        app: 'PlatformBilling',
+      },
+    ],
   },
   {
-    /*
-     * What the app is running, and who has it yet.
-     *
-     * There is one app in the stores for every workspace, so this belongs to
-     * whoever owns the product — a shop's admin decides how their shop works,
-     * not what code the phone in their hand is running.
-     */
-    key: 'platform-releases',
-    label: 'Releases',
-    icon: 'box',
-    permission: PERMISSIONS.PLATFORM_RELEASE_VIEW,
-    web: '/platform/releases',
+    key: 'platform-us',
+    // Not "FirstLeap": that is the console's own name, at the top of the
+    // sidebar, and a group heading that repeats it says nothing.
+    label: 'Ourselves',
+    blurb: 'Our own people, and the app they ship',
+    items: [
+      {
+        key: 'platform-staff',
+        label: 'Staff and roles',
+        icon: 'users',
+        permission: PERMISSIONS.PLATFORM_STAFF_VIEW,
+        web: '/platform/staff',
+        app: 'PlatformStaff',
+      },
+      {
+        /*
+         * What the app is running, and who has it yet.
+         *
+         * There is one app in the stores for every workspace, so this belongs
+         * to whoever owns the product — a shop's admin decides how their shop
+         * works, not what code the phone in their hand is running.
+         */
+        key: 'platform-releases',
+        label: 'Releases',
+        icon: 'box',
+        permission: PERMISSIONS.PLATFORM_RELEASE_VIEW,
+        web: '/platform/releases',
+      },
+    ],
   },
 ];
 
@@ -659,6 +726,7 @@ export function allNavItems(): NavItem[] {
 
   walk([NAV_HOME]);
   NAV_GROUPS.forEach(walkGroup);
+  PLATFORM_NAV.forEach(walkGroup);
   walk(NAV_OUTSIDE);
   return out;
 }

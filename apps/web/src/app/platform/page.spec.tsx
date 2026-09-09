@@ -119,11 +119,8 @@ it('says nothing alarming when everything is priced', async () => {
   expect(screen.queryByText('Money nobody is collecting')).not.toBeInTheDocument();
 });
 
-it('goes to the price list', async () => {
-  await draw();
-
-  expect(screen.getByText('Plans and prices')).toBeInTheDocument();
-});
+// Getting to the price list is the sidebar's job now — PlatformShell renders
+// it beside every platform screen, so the overview no longer carries its own.
 
 describe('editing what a client is on', () => {
   async function openEditor() {

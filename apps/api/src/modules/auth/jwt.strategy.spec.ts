@@ -18,13 +18,23 @@ const platformUser = jest.fn(async (..._args: unknown[]) => ({
   isActive: true,
 }) as unknown);
 
+/*
+ * What the role holds today. The platform roles are rows now and are edited,
+ * so this is read on every request the same way a tenant's role is. Null here
+ * means the row is missing, which falls back to the seeded definition.
+ */
+const platformRole = jest.fn(async (..._args: unknown[]) => null as unknown);
+
 const strategy = () =>
   new JwtStrategy(
     { get: () => 'test-secret' } as never,
     { byIdOrThrow } as never,
     {
       user: { findFirst },
-      platform: { platformUser: { findUnique: platformUser } },
+      platform: {
+        platformUser: { findUnique: platformUser },
+        platformRole: { findUnique: platformRole },
+      },
     } as never,
   );
 
@@ -123,6 +133,40 @@ describe('a platform administrator', () => {
     })) as { permissions: string[] };
 
     // They are support now, and support ships nothing.
+    expect(user.permissions).toContain('platform.impersonate');
+    expect(user.permissions).not.toContain('platform.release.manage');
+  });
+
+  /*
+   * The whole reason the platform roles became rows. A role edited this
+   * morning has to bind this afternoon, not at the colleague's next sign-in —
+   * otherwise taking a power away from somebody is a request they can keep
+   * making until their token expires.
+   */
+  it('takes what the role holds from the row, not from the seeded list', async () => {
+    platformRole.mockResolvedValue({ permissions: ['platform.tenant.view'] });
+
+    const user = (await strategy().validate({
+      sub: 'p1',
+      isPlatform: true,
+      permissions: ['platform.impersonate'],
+    })) as { permissions: string[] };
+
+    expect(user.permissions).toEqual(['platform.tenant.view']);
+  });
+
+  // A role row deleted underneath a live session must not turn a colleague
+  // into somebody who can do nothing — and certainly not into somebody who can
+  // do everything.
+  it('falls back to the seeded definition when the row has gone', async () => {
+    platformRole.mockResolvedValue(null);
+
+    const user = (await strategy().validate({
+      sub: 'p1',
+      isPlatform: true,
+      permissions: [],
+    })) as { permissions: string[] };
+
     expect(user.permissions).toContain('platform.impersonate');
     expect(user.permissions).not.toContain('platform.release.manage');
   });

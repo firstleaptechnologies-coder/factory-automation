@@ -22,6 +22,7 @@ export function Card({
   className = '',
   onClick,
   style,
+  testId,
 }: {
   children: React.ReactNode;
   tone?: 'raised' | 'accent' | 'well';
@@ -29,6 +30,8 @@ export function Card({
   className?: string;
   onClick?: () => void;
   style?: React.CSSProperties;
+  /** For when several cards on one screen say the same words. */
+  testId?: string;
 }) {
   const classes = [
     tone === 'well' ? 'well' : 'card',
@@ -42,13 +45,18 @@ export function Card({
 
   if (onClick) {
     return (
-      <button type="button" className={classes} onClick={onClick} style={style}>
+      <button
+        type="button"
+        className={classes}
+        onClick={onClick}
+        style={style}
+        data-testid={testId}>
         {children}
       </button>
     );
   }
   return (
-    <div className={classes} style={style}>
+    <div className={classes} style={style} data-testid={testId}>
       {children}
     </div>
   );

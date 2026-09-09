@@ -18,13 +18,12 @@ import { statusColour, unpricedWarning } from './overview-types';
 /**
  * FirstLeap's own dashboard: every client, what they are on, and what they pay.
  *
- * Not behind Shell — the platform screens belong to us rather than to any
+ * Behind PlatformShell rather than the shop's Shell — the platform screens
+ * belong to us rather than to any
  * workspace, and wrapping them in a tenant's chrome is how somebody ends up
  * looking at one shop's menu while reading another's figures.
  */
 export default function PlatformOverviewPage() {
-  const router = useRouter();
-  const { signOut } = useAuth();
   const overview = useApi<PlatformOverview>(
     () => api.platformOverview() as Promise<PlatformOverview>,
     [],
@@ -107,17 +106,10 @@ export default function PlatformOverviewPage() {
   const warning = totals ? unpricedWarning(totals) : null;
 
   return (
-    <div className="shell-page" style={{ maxWidth: 1100, margin: '0 auto', padding: 'var(--s-lg)' }}>
+    <div className="shell-page">
       <PageHead
         title="FirstLeap"
         subtitle="Every client, what they are on, and what they pay"
-        action={
-          <div className="row">
-            <Button title="Workspaces" variant="dark" onClick={() => router.push('/platform/tenants')} />
-            <Button title="Plans and prices" variant="dark" onClick={() => router.push('/platform/plans')} />
-            <Button title="Sign out" variant="ghost" onClick={signOut} />
-          </div>
-        }
       />
 
       <div className="grid-3">

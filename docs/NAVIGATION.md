@@ -252,15 +252,44 @@ flowchart LR
 | Roles and people | `/admin/roles` | `AdminRoles` | `user.view` |
 | Settings | — | `Settings` | — |
 
+## FirstLeap’s own console
+
+*Where the product is run rather than used. Nothing here is gated by a
+module — a client’s plan cannot decide what we may see about them — and
+every screen needs a platform permission, which no tenant role can hold.*
+
+### The business
+
+*Who is on the platform and what they are worth*
+
+| Screen | Web | App route | Permission |
+| --- | --- | --- | --- |
+| Overview | `/platform` | `PlatformOverview` | `platform.tenant.view` |
+| Workspaces | `/platform/tenants` | `Tenants` | `platform.tenant.view` |
+|   ↳ One workspace | `/platform/tenants/[id]` | `TenantDetail` | `platform.tenant.view` |
+
+### What we sell
+
+*Tiers, module prices and what each workspace pays*
+
+| Screen | Web | App route | Permission |
+| --- | --- | --- | --- |
+| Tiers and prices | `/platform/plans` | `PlatformPlans` | `platform.tenant.view` |
+| Billing | `/platform/billing` | `PlatformBilling` | `platform.tenant.view` |
+
+### Ourselves
+
+*Our own people, and the app they ship*
+
+| Screen | Web | App route | Permission |
+| --- | --- | --- | --- |
+| Staff and roles | `/platform/staff` | `PlatformStaff` | `platform.staff.view` |
+| Releases | `/platform/releases` | — | `platform.release.view` |
+
 ## Outside the menu
 
-*Signing in happens before there is a menu; the platform screens belong to
-whoever runs the product rather than to a shop.*
+*Signing in happens before there is a menu at all.*
 
 | Screen | Web | App route | Permission |
 | --- | --- | --- | --- |
 | Sign in | `/login` | `Login` | — |
-| FirstLeap | `/platform` | `PlatformOverview` | `platform.tenant.view` |
-|   ↳ Plans and prices | `/platform/plans` | `PlatformPlans` | `platform.pricing.manage` |
-| Workspaces | `/platform/tenants` | `Tenants` | `platform.tenant.view` |
-| Releases | `/platform/releases` | — | `platform.release.view` |

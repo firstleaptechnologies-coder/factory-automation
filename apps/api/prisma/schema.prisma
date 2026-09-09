@@ -76,6 +76,27 @@ model Tenant {
   /// is a conversation, not a checkbox.
   modules String[]     @default([])
 
+  /// When their trial runs out.
+  ///
+  /// A date rather than a status alone, because `TRIAL` says nothing about
+  /// when: a trial that ended in March and a trial ending on Friday are the
+  /// same row, and only one of them is somebody's week.
+  trialEndsAt DateTime?
+
+  /// The day of the month they are billed on. Null until they start paying.
+  ///
+  /// Kept here rather than derived from `createdAt` so moving somebody's
+  /// billing date is a change to one field instead of a lie about when they
+  /// signed up.
+  billingDay Int?
+
+  /// What a payment gateway calls this workspace, once there is one.
+  ///
+  /// Nullable and unused today. It is here so that adding a gateway is a
+  /// migration nobody has to think about rather than one that touches every
+  /// row in the table.
+  billingRef String?
+
   contactName  String?
   contactEmail String?
   contactPhone String?
@@ -85,6 +106,7 @@ model Tenant {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+  @@index([trialEndsAt])
 }
 
 /// The people who own the product. They belong to no tenant.
@@ -93,15 +115,36 @@ model PlatformUser {
   email        String   @unique
   name         String
   passwordHash String
-  /// OWNER | SUPPORT | BILLING | ENGINEER — the list lives in @fas/shared.
+  /// The key of a PlatformRole. Seeded from the list in @fas/shared.
   ///
-  /// A fixed set rather than the composable roles a tenant gets: there are a
-  /// few of us, not a few hundred, and the blast radius here is every
-  /// workspace.
+  /// A key rather than a foreign key so that a session issued before a role was
+  /// renamed still resolves, and so a role row that has gone missing falls back
+  /// to the shared definition rather than handing somebody nothing — or,
+  /// worse, everything.
   role         String   @default("OWNER")
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+/// What somebody at FirstLeap may do, across every workspace we host.
+///
+/// Editable, like a tenant's own roles, and for the same reason: the shape of
+/// the company changes and nobody should have to ship a release to say so.
+/// Two things it is not allowed to do, enforced in the service rather than
+/// here, because a database cannot see them: leave nobody able to manage
+/// staff, and let somebody strip their own ability to undo what they just did.
+model PlatformRole {
+  id          String   @id @default(cuid())
+  /// Stable. Sessions and PlatformUser.role point at it by name.
+  key         String   @unique
+  name        String
+  blurb       String   @default("")
+  permissions String[]
+  /// Seeded by us. Its permissions may be changed; it may not be deleted.
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 /// A scheduled job's claim on being the one running it.

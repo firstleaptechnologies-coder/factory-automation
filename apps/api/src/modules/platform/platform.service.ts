@@ -7,7 +7,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { PrismaClient, TenantIsolation, TenantStatus } from '@prisma/client';
-import { modulesFor } from '@fas/shared';
+import { PLAN_KEYS, modulesFor, modulesForTier } from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';
@@ -151,6 +151,116 @@ export class PlatformService implements OnModuleInit {
   }
 
   /**
+   * One workspace, all the way down.
+   *
+   * Everything the console needs to answer a question about a single shop —
+   * what they have, who is in it, how it is going and what it is worth — read
+   * in one go rather than by a screen that fires six requests and shows six
+   * spinners.
+   *
+   * Their people and their roles are read from *their* database, which is the
+   * only place those live. Their activity is read from ours, because a
+   * workspace nobody has opened in three weeks looks identical from inside.
+   */
+  async detail(id: string) {
+    const tenant = await this.db.tenant.findUnique({ where: { id } });
+    if (!tenant) throw new NotFoundException('Workspace not found');
+
+    const [counts, health, tier, people] = await Promise.all([
+      this.countsFor(tenant.id, tenant.databaseUrl),
+      this.healthFor(tenant.id),
+      this.db.subscriptionTier.findUnique({ where: { key: tenant.plan ?? '' } }),
+      this.peopleIn(tenant.id, tenant.databaseUrl),
+    ]);
+
+    return {
+      ...redact(tenant),
+      counts,
+      health,
+      tier: tier ? { ...tier, monthlyPrice: Number(tier.monthlyPrice) } : null,
+      // What they can actually reach, from the tier row rather than the
+      // compiled list — the same answer the guards give them.
+      effectiveModules: tier
+        ? modulesForTier(tier.includedModules, tenant.modules ?? [])
+        : modulesFor(tenant.plan ?? null, tenant.modules ?? []),
+      ...people,
+    };
+  }
+
+  /** The activity figures for one workspace, on the same window as the list. */
+  private async healthFor(tenantId: string): Promise<TenantHealth> {
+    const since = new Date(Date.now() - HEALTH_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    const [writes, failures, clientErrors, last] = await Promise.all([
+      this.db.serverLog.count({ where: { tenantId, at: { gte: since } } }),
+      this.db.serverLog.count({ where: { tenantId, at: { gte: since }, outcome: 'failed' } }),
+      this.db.clientLog.count({ where: { tenantId, at: { gte: since }, level: 'error' } }),
+      this.db.serverLog.findFirst({
+        where: { tenantId },
+        orderBy: { at: 'desc' },
+        select: { at: true },
+      }),
+    ]);
+
+    return {
+      lastSeenAt: last?.at.toISOString() ?? null,
+      writes,
+      failures,
+      clientErrors,
+    };
+  }
+
+  /**
+   * Who is in the workspace and what their roles allow.
+   *
+   * Read, never written. Changing somebody's role inside a shop is theirs to
+   * do — we open their workspace and do it under our own name, in their audit
+   * trail, rather than reaching into their tables from out here.
+   */
+  private async peopleIn(tenantId: string, encryptedUrl: string | null) {
+    const db = encryptedUrl
+      ? new PrismaClient({
+          datasources: { db: { url: this.encryption.decryptToString(encryptedUrl) } },
+        })
+      : this.db;
+
+    try {
+      const [users, roles] = await Promise.all([
+        db.user.findMany({
+          where: { tenantId },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            isActive: true,
+            createdAt: true,
+            roleRef: { select: { name: true } },
+          },
+        }),
+        db.role.findMany({
+          where: { tenantId },
+          orderBy: { name: 'asc' },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            permissions: true,
+            isSystem: true,
+            _count: { select: { users: true } },
+          },
+        }),
+      ]);
+      return { users, roles };
+    } catch {
+      // A dedicated database that is unreachable should not take the page down.
+      return { users: [], roles: [], unreachable: true };
+    } finally {
+      if (encryptedUrl) await (db as PrismaClient).$disconnect();
+    }
+  }
+
+  /**
    * Create a workspace and stand it up ready to use.
    *
    * A dedicated tenant's schema must already exist at the supplied connection
@@ -216,7 +326,38 @@ export class PlatformService implements OnModuleInit {
   }
 
   async update(id: string, dto: UpdateTenantDto) {
-    const tenant = await this.db.tenant.update({ where: { id }, data: dto });
+    /*
+     * The tier is checked here rather than by a decorator, because the tiers
+     * are rows the owner writes. A validator holding the three keys we shipped
+     * with would refuse every tier they made — a price list nobody can sell
+     * from — and one holding nothing would let a typo sit on the row for ever,
+     * granting the default plan and billing for no tier at all.
+     */
+    if (dto.plan !== undefined) {
+      const tier = await this.db.subscriptionTier.findUnique({ where: { key: dto.plan } });
+      // A seeded tier whose row has not been written yet is still real — the
+      // rows are created lazily, and a fresh database must not refuse the
+      // three tiers the product ships with.
+      const seeded = PLAN_KEYS.includes(dto.plan);
+      if (!tier && !seeded) throw new BadRequestException(`There is no tier called "${dto.plan}"`);
+      if (tier && !tier.isActive) {
+        throw new BadRequestException(`${tier.label} is switched off and cannot be sold`);
+      }
+    }
+
+    const tenant = await this.db.tenant.update({
+      where: { id },
+      data: {
+        ...dto,
+        // A date arrives as a string over HTTP; null clears it.
+        trialEndsAt:
+          dto.trialEndsAt === undefined
+            ? undefined
+            : dto.trialEndsAt === null
+              ? null
+              : new Date(dto.trialEndsAt),
+      },
+    });
     this.registry.invalidate(tenant);
     return redact(tenant);
   }

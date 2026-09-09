@@ -10,10 +10,20 @@ const platform = {
 
 const impersonation = { start: jest.fn(async (..._a: unknown[]) => ({ accessToken: 'tok' })) };
 const subscriptions = {};
+const staff = {
+  roles: jest.fn(async (..._a: unknown[]) => 'roles'),
+  saveRole: jest.fn(async (..._a: unknown[]) => 'role saved'),
+  createRole: jest.fn(async (..._a: unknown[]) => 'role made'),
+  deleteRole: jest.fn(async (..._a: unknown[]) => 'role gone'),
+  staff: jest.fn(async (..._a: unknown[]) => 'staff'),
+  createStaff: jest.fn(async (..._a: unknown[]) => 'person made'),
+  saveStaff: jest.fn(async (..._a: unknown[]) => 'person saved'),
+};
 const controller = new PlatformController(
   platform as never,
   subscriptions as never,
   impersonation as never,
+  staff as never,
 );
 
 beforeEach(() => jest.clearAllMocks());

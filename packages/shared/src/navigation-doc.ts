@@ -1,4 +1,11 @@
-import { NAV_GROUPS, NAV_HOME, NAV_OUTSIDE, type NavGroup, type NavItem } from './navigation';
+import {
+  NAV_GROUPS,
+  NAV_HOME,
+  NAV_OUTSIDE,
+  PLATFORM_NAV,
+  type NavGroup,
+  type NavItem,
+} from './navigation';
 
 /**
  * docs/NAVIGATION.md, written out from the navigation tree.
@@ -92,10 +99,16 @@ export function navigationMarkdown(): string {
     '## Categories',
     ...NAV_GROUPS.flatMap((group) => groupSection(group)),
     '',
+    '## FirstLeap’s own console',
+    '',
+    '*Where the product is run rather than used. Nothing here is gated by a',
+    'module — a client’s plan cannot decide what we may see about them — and',
+    'every screen needs a platform permission, which no tenant role can hold.*',
+    ...PLATFORM_NAV.flatMap((group) => groupSection(group)),
+    '',
     '## Outside the menu',
     '',
-    '*Signing in happens before there is a menu; the platform screens belong to',
-    'whoever runs the product rather than to a shop.*',
+    '*Signing in happens before there is a menu at all.*',
     '',
     '| Screen | Web | App route | Permission |',
     '| --- | --- | --- | --- |',

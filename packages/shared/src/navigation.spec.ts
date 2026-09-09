@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { ALL_MODULES, MODULES } from './modules';
 import {
   NAV_GROUPS,
+  PLATFORM_NAV,
   NAV_HOME,
   NAV_OUTSIDE,
   allNavItems,
@@ -53,14 +54,31 @@ describe('the navigation tree', () => {
     expect(orders.groups?.map((inner) => inner.label)).toEqual(['Order settings']);
   });
 
-  it('leaves signing in and the platform outside every category', () => {
-    expect(NAV_OUTSIDE.map((item) => item.key)).toEqual([
-      'login',
-      'platform-overview',
-      'platform-tenants',
-      // The app in the stores is one product for every workspace, so a release
-      // belongs to whoever owns it rather than to any shop's menu.
-      'platform-releases',
+  // Only the screen you reach before there is a menu at all.
+  it('leaves signing in outside every category', () => {
+    expect(NAV_OUTSIDE.map((item) => item.key)).toEqual(['login']);
+  });
+
+  /*
+   * FirstLeap's console is its own tree, not a corner of the shop's menu.
+   * Nothing in it is gated by a module — a client's plan cannot decide what we
+   * may see about them — and every screen in it needs a platform permission,
+   * which no tenant role can hold.
+   */
+  it('gates the whole platform console on a platform permission', () => {
+    for (const group of PLATFORM_NAV) {
+      for (const item of group.items) {
+        expect(item.permission).toMatch(/^platform\./);
+        expect(item.module).toBeUndefined();
+      }
+    }
+  });
+
+  it('groups the console by what a question is about', () => {
+    expect(PLATFORM_NAV.map((group) => group.key)).toEqual([
+      'platform-business',
+      'platform-commercial',
+      'platform-us',
     ]);
   });
 });

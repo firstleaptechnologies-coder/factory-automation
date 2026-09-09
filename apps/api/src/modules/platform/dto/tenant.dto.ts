@@ -1,13 +1,16 @@
-import { PLAN_KEYS } from '@fas/shared';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   Matches,
+  Max,
+  Min,
   MinLength,
 } from 'class-validator';
 import { ALL_MODULES } from '@fas/shared';
@@ -31,10 +34,21 @@ export class CreateTenantDto {
    */
   @IsOptional() @IsString() databaseUrl?: string;
 
-  /** Refused unless it is a real plan. An unknown key resolves to the
-   * default for entitlements and to no tier at all for money. */
-  @IsOptional() @IsIn(PLAN_KEYS, { message: `plan must be one of ${PLAN_KEYS.join(', ')}` })
-  plan?: string;
+  /**
+   * Which tier they are on.
+   *
+   * Checked against the tier *rows* in the service, not against a list
+   * compiled into this file: the owner writes tiers now, and a validator that
+   * only knows the three we shipped with would refuse every tier they made —
+   * which is a price list that cannot be sold from.
+   */
+  @IsOptional() @IsString() plan?: string;
+  /** When their trial runs out. Null clears it. */
+  @IsOptional() @IsDateString() trialEndsAt?: string | null;
+
+  /** The day of the month they are billed on. */
+  @IsOptional() @IsInt() @Min(1) @Max(28) billingDay?: number | null;
+
   @IsOptional() @IsString() contactName?: string;
   @IsOptional() @IsEmail() contactEmail?: string;
   @IsOptional() @IsString() contactPhone?: string;
@@ -50,10 +64,15 @@ export class CreateTenantDto {
 export class UpdateTenantDto {
   @IsOptional() @IsString() name?: string;
   @IsOptional() @IsEnum(TenantStatus) status?: TenantStatus;
-  /** Refused unless it is a real plan. An unknown key resolves to the
-   * default for entitlements and to no tier at all for money. */
-  @IsOptional() @IsIn(PLAN_KEYS, { message: `plan must be one of ${PLAN_KEYS.join(', ')}` })
-  plan?: string;
+  /**
+   * Which tier they are on.
+   *
+   * Checked against the tier *rows* in the service, not against a list
+   * compiled into this file: the owner writes tiers now, and a validator that
+   * only knows the three we shipped with would refuse every tier they made —
+   * which is a price list that cannot be sold from.
+   */
+  @IsOptional() @IsString() plan?: string;
   /**
    * Modules granted on top of the plan.
    *
@@ -65,6 +84,12 @@ export class UpdateTenantDto {
   @IsArray()
   @IsIn(ALL_MODULES, { each: true })
   modules?: string[];
+  /** When their trial runs out. Null clears it. */
+  @IsOptional() @IsDateString() trialEndsAt?: string | null;
+
+  /** The day of the month they are billed on. */
+  @IsOptional() @IsInt() @Min(1) @Max(28) billingDay?: number | null;
+
   @IsOptional() @IsString() contactName?: string;
   @IsOptional() @IsEmail() contactEmail?: string;
   @IsOptional() @IsString() contactPhone?: string;

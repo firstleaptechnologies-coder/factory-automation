@@ -172,16 +172,22 @@ function Section({
 export function PermissionTree({
   granted,
   has,
+  sections = PERMISSION_TREE,
   onChange,
 }: {
   granted: string[];
   /** Whether the workspace bought a module. */
   has: (module: ModuleKey) => boolean;
+  /**
+   * Which tree to draw. The shop's by default; FirstLeap's own roles pass the
+   * platform tree, which is the same shape and gated by nothing a client has.
+   */
+  sections?: readonly PermissionSection[];
   onChange: (next: string[]) => void;
 }) {
   return (
     <View>
-      {PERMISSION_TREE.map((section) => (
+      {sections.map((section) => (
         <Section
           key={section.key}
           section={section}

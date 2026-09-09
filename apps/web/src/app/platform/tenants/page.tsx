@@ -134,7 +134,6 @@ export default function TenantsPage() {
         action={
           <div className="row">
             <Button title="New workspace" icon="plus" onClick={() => setSheet(true)} />
-            <Button title="Sign out" variant="ghost" onClick={signOut} />
           </div>
         }
       />
@@ -196,6 +195,12 @@ export default function TenantsPage() {
                   <span className="t-tiny muted" data-testid="tenant-plan">
                     {planFor(tenant.plan).label} · {tenant.effectiveModules?.length ?? 0} modules
                   </span>
+                  {/* The list says what is true of everybody; the workspace's
+                      own page is where a question about one shop is answered. */}
+                  <Chip
+                    label="Manage"
+                    onClick={() => router.push(`/platform/tenants/${tenant.id}`)}
+                  />
                   <Chip label="Plan" onClick={() => openPlan(tenant)} />
                   {can(PERMISSIONS.PLATFORM_IMPERSONATE) ? (
                     <Chip

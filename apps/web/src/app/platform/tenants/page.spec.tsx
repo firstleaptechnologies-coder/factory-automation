@@ -82,11 +82,6 @@ describe('who may be here', () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
   });
 
-  it('signs out', async () => {
-    await mount();
-    fireEvent.click(screen.getByText('Sign out'));
-    expect(signOut).toHaveBeenCalled();
-  });
 });
 
 describe('the workspaces', () => {

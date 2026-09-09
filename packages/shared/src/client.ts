@@ -1169,6 +1169,79 @@ export class ApiClient {
     return this.patch<unknown>(`/platform/module-prices/${moduleKey}`, { monthlyPrice });
   }
 
+  createTier(body: {
+    key: string;
+    label: string;
+    blurb?: string;
+    monthlyPrice?: number;
+    includedModules?: string[];
+  }) {
+    return this.post<unknown>('/platform/tiers', body);
+  }
+
+  deleteTier(key: string) {
+    return this.del<unknown>(`/platform/tiers/${key}`);
+  }
+
+  /** Who would lose what, asked before the tier is saved rather than after. */
+  tierEffect(key: string, includedModules: string[]) {
+    return this.post<{
+      gaining: string[];
+      losing: { module: string; label: string; workspaces: { id: string; name: string }[] }[];
+      workspacesOnTier: number;
+    }>(`/platform/tiers/${key}/effect`, { includedModules });
+  }
+
+  /** The book of business: what everybody pays and what needs doing this week. */
+  platformBilling() {
+    return this.get<unknown>('/platform/billing');
+  }
+
+  /** One workspace, all the way down: what they have, who is in it, how it goes. */
+  tenantDetail(id: string) {
+    return this.get<unknown>(`/platform/tenants/${id}/detail`);
+  }
+
+  // -- FirstLeap's own people ---------------------------------------------------
+
+  platformRoles() {
+    return this.get<unknown>('/platform/roles');
+  }
+
+  createPlatformRole(body: {
+    key: string;
+    name: string;
+    blurb?: string;
+    permissions: string[];
+  }) {
+    return this.post<unknown>('/platform/roles', body);
+  }
+
+  savePlatformRole(key: string, body: { name?: string; blurb?: string; permissions: string[] }) {
+    return this.patch<unknown>(`/platform/roles/${key}`, body);
+  }
+
+  deletePlatformRole(key: string) {
+    return this.del<unknown>(`/platform/roles/${key}`);
+  }
+
+  platformStaff() {
+    return this.get<unknown>('/platform/staff');
+  }
+
+  createPlatformStaff(body: {
+    email: string;
+    name: string;
+    role: string;
+    password: string;
+  }) {
+    return this.post<unknown>('/platform/staff', body);
+  }
+
+  savePlatformStaff(id: string, body: { name?: string; role?: string; isActive?: boolean }) {
+    return this.patch<unknown>(`/platform/staff/${id}`, body);
+  }
+
   // -- reports -----------------------------------------------------------------
 
   reports(query?: { kind?: string; status?: string; take?: number }) {

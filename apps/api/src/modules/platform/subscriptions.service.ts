@@ -12,6 +12,7 @@ import {
   monthlyRecurring,
 } from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';
 
 /** A tier row, with its price as a number rather than a Prisma Decimal. */
 export interface TierRow {
@@ -42,7 +43,10 @@ export interface TierRow {
  */
 @Injectable()
 export class SubscriptionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenants: TenantRegistryService,
+  ) {}
 
   private get db() {
     return this.prisma.platform;
@@ -82,6 +86,215 @@ export class SubscriptionsService {
       // start identical; the row is what somebody edits.
       planModules: PLANS.find((plan) => plan.key === row.key)?.modules ?? [],
     }));
+  }
+
+  /**
+   * A tier the owner wrote, rather than one the code shipped with.
+   *
+   * The three seeded tiers were what existed before there was anywhere to keep
+   * them. What we sell changes faster than we ship, so a new bundle is a row.
+   */
+  async createTier(input: {
+    key: string;
+    label: string;
+    blurb?: string;
+    monthlyPrice?: number;
+    includedModules?: string[];
+  }) {
+    const key = input.key.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    if (key.length < 2) throw new BadRequestException('A tier needs a key');
+    if ((input.monthlyPrice ?? 0) < 0) {
+      throw new BadRequestException('A tier cannot cost less than nothing');
+    }
+
+    const clash = await this.db.subscriptionTier.findUnique({ where: { key } });
+    if (clash) throw new BadRequestException(`There is already a tier called "${key}"`);
+
+    const modules = input.includedModules ?? [];
+    const unknown = modules.filter((one) => !(ALL_MODULES as string[]).includes(one));
+    if (unknown.length) throw new BadRequestException(`There is no module called "${unknown[0]}"`);
+
+    const last = await this.db.subscriptionTier.findFirst({ orderBy: { sortOrder: 'desc' } });
+
+    const row = await this.db.subscriptionTier.create({
+      data: {
+        key,
+        label: input.label.trim(),
+        blurb: input.blurb ?? '',
+        monthlyPrice: input.monthlyPrice ?? 0,
+        includedModules: modules,
+        sortOrder: (last?.sortOrder ?? 0) + 10,
+      },
+    });
+
+    return { ...row, monthlyPrice: Number(row.monthlyPrice) };
+  }
+
+  /**
+   * Remove a tier.
+   *
+   * Refused while anybody is on it, and refused for the seeded three — those
+   * are what a workspace with an unrecognised key falls back to, so deleting
+   * one turns a bad key into no product at all rather than a default one.
+   */
+  async deleteTier(key: string) {
+    const tier = await this.db.subscriptionTier.findUnique({ where: { key } });
+    if (!tier) throw new NotFoundException(`There is no tier called "${key}"`);
+    if (PLANS.some((plan) => plan.key === key)) {
+      throw new BadRequestException('A seeded tier cannot be removed, only switched off');
+    }
+
+    const on = await this.db.tenant.count({ where: { plan: key } });
+    if (on > 0) {
+      throw new BadRequestException(
+        `${on} ${on === 1 ? 'workspace is' : 'workspaces are'} on this tier. Move them first`,
+      );
+    }
+
+    return this.db.subscriptionTier.delete({ where: { key } });
+  }
+
+  /**
+   * What changing a tier would do to the workspaces already on it.
+   *
+   * Asked before the save, not discovered after it. Editing a tier is the one
+   * screen on the platform where a careless tick takes a module away from a
+   * shop that is using it today — so the screen has to be able to say whose,
+   * and what.
+   */
+  async effectOfTierChange(key: string, includedModules: string[]) {
+    const tier = await this.db.subscriptionTier.findUnique({ where: { key } });
+    if (!tier) throw new NotFoundException(`There is no tier called "${key}"`);
+
+    const on = await this.db.tenant.findMany({
+      where: { plan: key },
+      select: { id: true, name: true, slug: true, modules: true },
+    });
+
+    const before = new Set(tier.includedModules);
+    const after = new Set(includedModules);
+    const losing = [...before].filter((one) => !after.has(one));
+    const gaining = [...after].filter((one) => !before.has(one));
+
+    return {
+      gaining,
+      // A workspace granted the module directly keeps it, so it is not a loss
+      // for them. Counting them in would make the warning cry wolf.
+      losing: losing.map((module) => ({
+        module,
+        label: MODULE_CATALOGUE.find((one) => one.key === module)?.label ?? module,
+        workspaces: on
+          .filter((workspace) => !(workspace.modules ?? []).includes(module))
+          .map((workspace) => ({ id: workspace.id, name: workspace.name })),
+      })),
+      workspacesOnTier: on.length,
+    };
+  }
+
+  /**
+   * The book of business: what everybody is on, what they pay, and what needs
+   * attention this week.
+   *
+   * Trials are the reason this is a screen of its own. A trial ending on
+   * Friday and one that ended in March are the same `TRIAL` row, and neither
+   * is visible in a list sorted by name — which is how a client quietly stops
+   * paying and nobody notices for a quarter.
+   */
+  async billing() {
+    const [tenants, tiers, prices] = await Promise.all([
+      this.db.tenant.findMany({
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          status: true,
+          plan: true,
+          modules: true,
+          trialEndsAt: true,
+          billingDay: true,
+          createdAt: true,
+        },
+      }),
+      this.tiers(),
+      this.modulePrices(),
+    ]);
+
+    const priceMap = Object.fromEntries(prices.map((one) => [one.moduleKey, one.monthlyPrice]));
+    const tierMap = new Map(tiers.map((one) => [one.key, one]));
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+
+    const rows = tenants.map((tenant) => {
+      const tier = tenant.plan ? tierMap.get(tenant.plan) : undefined;
+      const bill = billFor(
+        tier
+          ? {
+              key: tier.key,
+              label: tier.label,
+              blurb: tier.blurb ?? '',
+              monthlyPrice: tier.monthlyPrice,
+              includedModules: tier.includedModules as never,
+            }
+          : undefined,
+        tenant.modules ?? [],
+        priceMap,
+      );
+
+      const daysLeft = tenant.trialEndsAt
+        ? Math.ceil((tenant.trialEndsAt.getTime() - now) / DAY)
+        : null;
+
+      return {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        status: tenant.status,
+        plan: tenant.plan,
+        tierLabel: tier?.label ?? null,
+        monthlyTotal: bill.monthlyTotal,
+        // Never dropped quietly: an add-on granted with no price is revenue
+        // nobody is collecting, and it looks identical to one given away.
+        unpriced: bill.unpriced,
+        trialEndsAt: tenant.trialEndsAt?.toISOString() ?? null,
+        trialDaysLeft: daysLeft,
+        billingDay: tenant.billingDay,
+      };
+    });
+
+    const paying = rows.filter((row) => row.status === TenantStatus.ACTIVE);
+
+    return {
+      rows,
+      totals: {
+        monthlyRecurring: paying.reduce((sum, row) => sum + row.monthlyTotal, 0),
+        paying: paying.length,
+        onTrial: rows.filter((row) => row.status === TenantStatus.TRIAL).length,
+        suspended: rows.filter((row) => row.status === TenantStatus.SUSPENDED).length,
+      },
+      /*
+       * What somebody has to do something about, rather than what is merely
+       * true. A trial that ran out is first: every day it stays open is a day
+       * of the product given away by accident rather than on purpose.
+       */
+      needsAttention: {
+        trialsExpired: rows.filter(
+          (row) => row.status === TenantStatus.TRIAL && row.trialDaysLeft !== null && row.trialDaysLeft < 0,
+        ),
+        trialsEndingSoon: rows.filter(
+          (row) =>
+            row.status === TenantStatus.TRIAL &&
+            row.trialDaysLeft !== null &&
+            row.trialDaysLeft >= 0 &&
+            row.trialDaysLeft <= 7,
+        ),
+        trialsWithNoEnd: rows.filter(
+          (row) => row.status === TenantStatus.TRIAL && row.trialEndsAt === null,
+        ),
+        unpriced: rows.filter((row) => row.unpriced.length > 0),
+        payingNothing: paying.filter((row) => row.monthlyTotal === 0),
+      },
+    };
   }
 
   /** Every module's price, including the ones nobody has priced yet. */
@@ -129,6 +342,15 @@ export class SubscriptionsService {
         isActive: input.isActive ?? undefined,
       },
     });
+
+    /*
+     * What a tier includes is cached per workspace, so moving a module into a
+     * tier has to reach the workspaces already on it. Without this the price
+     * list changes and the product does not, until somebody restarts the API —
+     * which is indistinguishable from a screen that does not work.
+     */
+    if (input.includedModules) this.tenants.invalidateAll();
+
     return { ...row, monthlyPrice: Number(row.monthlyPrice) };
   }
 

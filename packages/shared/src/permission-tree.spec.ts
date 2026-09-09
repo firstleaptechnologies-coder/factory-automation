@@ -2,7 +2,9 @@ import { ALL_MODULES } from './modules';
 import { PERMISSIONS, PLATFORM_PERMISSIONS, Permission } from './permissions';
 import {
   PERMISSION_TREE,
+  PLATFORM_PERMISSION_TREE,
   permissionsInTree,
+  platformPermissionsInTree,
   permissionsUnder,
   tickState,
   toggleBranch,
@@ -141,5 +143,47 @@ describe('ticking a branch', () => {
     const next = toggleBranch(three, [PERMISSIONS.SALARY_PAY]);
 
     expect(next).toContain(PERMISSIONS.SALARY_PAY);
+  });
+});
+
+describe('the platform tree', () => {
+  // The same rail, for the tree above the tenants. A platform permission
+  // nobody can tick is a job nobody can be given.
+  it('shows every platform permission', () => {
+    const shown = new Set(platformPermissionsInTree());
+    const missing = PLATFORM_PERMISSIONS.filter((permission) => !shown.has(permission));
+
+    expect(missing).toEqual([]);
+  });
+
+  it('shows each of them exactly once', () => {
+    const shown = platformPermissionsInTree();
+
+    expect(new Set(shown).size).toBe(shown.length);
+  });
+
+  // And nothing from the shop's side: a tenant permission on a platform role
+  // grants nothing — a platform user is inside nobody's workspace — but it
+  // would read as if it did.
+  it('leaves a tenant permission out', () => {
+    const platform = new Set<string>(PLATFORM_PERMISSIONS);
+    const leaked = platformPermissionsInTree().filter((one) => !platform.has(one));
+
+    expect(leaked).toEqual([]);
+  });
+
+  // No module gates any of it: a client's plan cannot decide what we may do
+  // about them.
+  it('hangs off no module at all', () => {
+    for (const section of PLATFORM_PERMISSION_TREE) {
+      expect(section.module).toBeNull();
+    }
+  });
+
+  it('does not collide with the tenant tree’s keys', () => {
+    const tenant = new Set(PERMISSION_TREE.map((one) => one.key));
+    for (const section of PLATFORM_PERMISSION_TREE) {
+      expect(tenant.has(section.key)).toBe(false);
+    }
   });
 });

@@ -9,7 +9,7 @@ import {
   tickState,
   toggleBranch,
 } from '@fas/shared';
-import type { Permission, TickState } from '@fas/shared';
+import type { Permission, PermissionSection, TickState } from '@fas/shared';
 
 /**
  * Every permission, as the four-level tree it actually is.
@@ -37,16 +37,22 @@ function Box({ state }: { state: TickState }) {
 export function PermissionTree({
   granted,
   modules,
+  sections = PERMISSION_TREE,
   onChange,
 }: {
   granted: string[];
   /** What the workspace has bought. Undefined means everything is reachable. */
   modules?: string[];
+  /**
+   * Which tree to draw. The shop's by default; FirstLeap's own roles pass the
+   * platform tree, which is the same shape and gated by nothing a client has.
+   */
+  sections?: readonly PermissionSection[];
   onChange: (next: string[]) => void;
 }) {
   return (
     <div className="perm-tree">
-      {PERMISSION_TREE.map((section) => {
+      {sections.map((section) => {
         const all = permissionsUnder(section);
         const bought = section.module === null || hasModule(modules, section.module);
         const state = tickState(all, granted);

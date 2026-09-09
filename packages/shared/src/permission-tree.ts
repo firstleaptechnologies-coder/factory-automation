@@ -470,3 +470,119 @@ export function toggleBranch(
 export function permissionsInTree(): Permission[] {
   return PERMISSION_TREE.flatMap((section) => permissionsUnder(section));
 }
+
+
+/**
+ * The platform's own permissions, as the same tree.
+ *
+ * Separate from `PERMISSION_TREE` because it answers to nothing a workspace
+ * has: no module gates any of it — a client's plan cannot decide what we may
+ * do about them — and a tenant role can never hold one of these keys. Sharing
+ * the shape, though, so the roles screen is one screen and not two that drift.
+ */
+export const PLATFORM_PERMISSION_TREE: readonly PermissionSection[] = [
+  {
+    key: 'platform.clients',
+    label: 'Clients',
+    module: null,
+    features: [
+      {
+        key: 'platform.clients.workspaces',
+        label: 'Workspaces',
+        blurb: 'The businesses we host',
+        groups: [
+          {
+            key: 'platform.clients.see',
+            label: 'Seeing them',
+            permissions: [PERMISSIONS.PLATFORM_TENANT_VIEW],
+          },
+          {
+            key: 'platform.clients.change',
+            label: 'Changing what they have',
+            permissions: [PERMISSIONS.PLATFORM_TENANT_MANAGE, PERMISSIONS.PLATFORM_TENANT_CREATE],
+          },
+          {
+            /*
+             * On its own, because it is the one platform power that reaches
+             * inside a shop's own data. It should be possible to hand somebody
+             * the release console without handing them this.
+             */
+            key: 'platform.clients.inside',
+            label: 'Going inside one',
+            permissions: [PERMISSIONS.PLATFORM_IMPERSONATE],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'platform.money',
+    label: 'What we charge',
+    module: null,
+    features: [
+      {
+        key: 'platform.money.pricing',
+        label: 'Tiers and prices',
+        blurb: 'What a tier costs and what a module costs beyond it',
+        groups: [
+          {
+            key: 'platform.money.set',
+            label: 'Setting prices',
+            permissions: [PERMISSIONS.PLATFORM_PRICING_MANAGE],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'platform.us',
+    label: 'FirstLeap',
+    module: null,
+    features: [
+      {
+        key: 'platform.us.staff',
+        label: 'Our own people',
+        blurb: 'Who works here and what they may do',
+        groups: [
+          {
+            key: 'platform.us.staff.see',
+            label: 'Seeing them',
+            permissions: [PERMISSIONS.PLATFORM_STAFF_VIEW],
+          },
+          {
+            /*
+             * The power that hands out every other power: somebody who can put
+             * a colleague on Owner has, in one step, given them every
+             * workspace we host.
+             */
+            key: 'platform.us.staff.change',
+            label: 'Changing what they may do',
+            permissions: [PERMISSIONS.PLATFORM_STAFF_MANAGE],
+          },
+        ],
+      },
+      {
+        key: 'platform.us.releases',
+        label: 'The app',
+        blurb: 'What the phone in a shop’s hand is running',
+        groups: [
+          {
+            key: 'platform.us.releases.see',
+            label: 'Seeing releases',
+            permissions: [PERMISSIONS.PLATFORM_RELEASE_VIEW],
+          },
+          {
+            key: 'platform.us.releases.ship',
+            label: 'Publishing them',
+            permissions: [PERMISSIONS.PLATFORM_RELEASE_MANAGE],
+          },
+        ],
+      },
+    ],
+  },
+];
+
+/** Every platform permission the tree accounts for, in the order shown. */
+export function platformPermissionsInTree(): Permission[] {
+  return PLATFORM_PERMISSION_TREE.flatMap((section) => permissionsUnder(section));
+}

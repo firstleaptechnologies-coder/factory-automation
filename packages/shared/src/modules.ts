@@ -141,9 +141,29 @@ export function planFor(key?: string | null): Plan {
  * shop that is using it is a conversation, not a checkbox.
  */
 export function modulesFor(plan?: string | null, extras: string[] = []): ModuleKey[] {
-  const granted = new Set<ModuleKey>([...CORE_MODULES, ...planFor(plan).modules]);
-  for (const extra of extras) {
-    if ((ALL_MODULES as string[]).includes(extra)) granted.add(extra as ModuleKey);
+  return modulesForTier(planFor(plan).modules, extras);
+}
+
+/**
+ * The same question, asked of a tier that was written rather than compiled.
+ *
+ * `PLANS` above is the seed — three bundles that existed before there was
+ * anywhere to keep them. The tiers are rows now, and the owner writes them:
+ * new ones, renamed ones, different modules in them. So what a workspace can
+ * reach has to come from the row, or editing a tier changes the invoice and
+ * nothing else, which is exactly the shape of a screen that looks like it
+ * controls the product and does not.
+ *
+ * The core is added whatever the tier says. A tier with no orders in it is a
+ * workspace that cannot take an order, which is not a product anyone sold.
+ */
+export function modulesForTier(
+  includedModules: readonly string[],
+  extras: readonly string[] = [],
+): ModuleKey[] {
+  const granted = new Set<ModuleKey>(CORE_MODULES);
+  for (const one of [...includedModules, ...extras]) {
+    if ((ALL_MODULES as string[]).includes(one)) granted.add(one as ModuleKey);
   }
   return ALL_MODULES.filter((module) => granted.has(module));
 }

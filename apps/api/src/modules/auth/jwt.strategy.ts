@@ -61,12 +61,27 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
       if (!admin?.isActive) throw new UnauthorizedException('This account is no longer active');
 
+      /*
+       * What the role holds now, the same way a tenant's role is read now.
+       *
+       * The platform roles are rows and are edited, so reading them from the
+       * token would mean a colleague whose job changed this morning keeps
+       * yesterday's powers until they sign in again. A role row that has gone
+       * missing falls back to the shared definition — never to everything.
+       */
+      const stored = await runAsPlatform(() =>
+        this.prisma.platform.platformRole.findUnique({
+          where: { key: admin.role },
+          select: { permissions: true },
+        }),
+      );
+
       return {
         id: payload.sub,
         name: admin.name,
         isPlatform: true,
         platformRole: admin.role,
-        permissions: platformPermissionsFor(admin.role),
+        permissions: stored?.permissions ?? platformPermissionsFor(admin.role),
       };
     }
 

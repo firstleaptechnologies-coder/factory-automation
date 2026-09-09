@@ -41,7 +41,7 @@ const STEPS = [0, 5, 10, 25, 50, 100];
  */
 export default function ReleasesPage() {
   const router = useRouter();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -108,7 +108,6 @@ export default function ReleasesPage() {
           <div className="row">
             <Button title="Version floor" variant="ghost" onClick={() => setGateSheet(true)} />
             <Button title="Workspaces" variant="ghost" onClick={() => router.push('/platform/tenants')} />
-            <Button title="Sign out" variant="ghost" onClick={signOut} />
           </div>
         }
       />
