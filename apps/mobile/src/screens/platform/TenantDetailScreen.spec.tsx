@@ -126,3 +126,21 @@ it('offers no change at all to somebody who may only look', async () => {
 
   expect(mockUpdate).not.toHaveBeenCalled();
 });
+
+
+describe('whose workspace it is', () => {
+  it('marks one as ours', async () => {
+    await mount();
+    await fireEvent.press(await screen.findByText('Ours'));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('t1', { isInternal: true }));
+  });
+
+  it('says what ours would be worth, and that nobody pays it', async () => {
+    mockDetail.mockResolvedValue({ ...WORKSPACE, isInternal: true });
+    await mount();
+
+    expect(await screen.findByText(/billed to nobody/)).toBeTruthy();
+    expect(screen.getByText('₹9,500')).toBeTruthy();
+  });
+});

@@ -14,6 +14,8 @@ export interface TenantDetail {
   plan: string | null;
   modules: string[];
   hasDedicatedDatabase: boolean;
+  /** Ours, not a client's. Kept out of every revenue figure. */
+  isInternal?: boolean;
   effectiveModules: string[];
   /** Their database could not be reached, so their people are not shown. */
   unreachable?: boolean;

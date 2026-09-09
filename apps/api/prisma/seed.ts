@@ -12,11 +12,73 @@
  *    obvious in the one workspace that should show everything.
  */
 import { PrismaClient, TenantIsolation, TenantStatus } from '@prisma/client';
-import { ALL_MODULES } from '@fas/shared';
+import { ALL_MODULES, PLANS } from '@fas/shared';
 import * as bcrypt from 'bcryptjs';
 import { TenantProvisioningService } from '../src/modules/platform/tenant-provisioning.service';
 
 const prisma = new PrismaClient();
+
+/**
+ * What we charge, as a starting point rather than a decision.
+ *
+ * A tier row created without a price is created at zero, and zero is
+ * indistinguishable on every screen from "given away on purpose" — so a fresh
+ * database that has never been priced shows a book of business worth nothing
+ * and nobody notices. These are numbers to argue with, and every one of them
+ * is editable on the platform's own price list.
+ *
+ * The add-ons are weighted rather than flat: Purchasing and People are whole
+ * modules with their own workflow, Expenses is a ledger and a form.
+ */
+const TIER_PRICES: Record<string, number> = {
+  punch: 3000,
+  shop: 8000,
+  works: 15000,
+};
+
+const MODULE_PRICES: Record<string, number> = {
+  // In every product, and never charged for separately. Priced at zero
+  // deliberately, which is not the same as never having decided.
+  orders: 0,
+  clients: 0,
+
+  leads: 1500,
+  quotes: 1500,
+  finance: 2500,
+  expenses: 1000,
+  reports: 1000,
+  purchasing: 2500,
+  hr: 2500,
+  analytics: 2000,
+  ai: 2500,
+};
+
+async function seedPrices() {
+  for (const plan of PLANS) {
+    await prisma.subscriptionTier.upsert({
+      where: { key: plan.key },
+      // Left alone if it already exists: these are a starting point, and
+      // overwriting a price somebody set is the one thing a seed must not do.
+      update: {},
+      create: {
+        key: plan.key,
+        label: plan.label,
+        blurb: plan.blurb,
+        monthlyPrice: TIER_PRICES[plan.key] ?? 0,
+        includedModules: [...plan.modules],
+        sortOrder: PLANS.findIndex((one) => one.key === plan.key) * 10,
+      },
+    });
+  }
+
+  for (const [moduleKey, monthlyPrice] of Object.entries(MODULE_PRICES)) {
+    await prisma.modulePrice.upsert({
+      where: { moduleKey },
+      update: {},
+      create: { moduleKey, monthlyPrice, isPriced: true },
+    });
+  }
+}
 
 async function main() {
   const platformAdmin = await prisma.platformUser.upsert({
@@ -111,6 +173,10 @@ async function main() {
         status: TenantStatus.ACTIVE,
         plan: 'works',
         modules: [...ALL_MODULES],
+        // Ours. It is ACTIVE and on every module, which is exactly what a
+        // paying client looks like from the billing screen — so it says so
+        // here rather than being guessed at from the slug.
+        isInternal: true,
         contactName: 'FirstLeap Technologies',
         notes: 'Ours, for testing. Not a client.',
       },
@@ -122,6 +188,8 @@ async function main() {
       email: 'admin@firstleap.in',
     });
   }
+
+  await seedPrices();
 
   // eslint-disable-next-line no-console
   console.log('Seed complete:', counts);

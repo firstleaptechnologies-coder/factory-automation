@@ -211,6 +211,7 @@ export class SubscriptionsService {
           status: true,
           plan: true,
           modules: true,
+          isInternal: true,
           trialEndsAt: true,
           billingDay: true,
           createdAt: true,
@@ -251,7 +252,13 @@ export class SubscriptionsService {
         slug: tenant.slug,
         status: tenant.status,
         plan: tenant.plan,
+        isInternal: tenant.isInternal,
         tierLabel: tier?.label ?? null,
+        /*
+         * What it would cost if it were a client's. Kept on the row even for
+         * ours, because "what would we be charging for this" is a real
+         * question — it just must not be added to what we are owed.
+         */
         monthlyTotal: bill.monthlyTotal,
         // Never dropped quietly: an add-on granted with no price is revenue
         // nobody is collecting, and it looks identical to one given away.
@@ -262,15 +269,20 @@ export class SubscriptionsService {
       };
     });
 
-    const paying = rows.filter((row) => row.status === TenantStatus.ACTIVE);
+    // Ours is not revenue. It is ACTIVE and on every module, which is exactly
+    // what a paying client looks like from here, and that is the trap.
+    const paying = rows.filter((row) => row.status === TenantStatus.ACTIVE && !row.isInternal);
 
     return {
       rows,
       totals: {
         monthlyRecurring: paying.reduce((sum, row) => sum + row.monthlyTotal, 0),
         paying: paying.length,
-        onTrial: rows.filter((row) => row.status === TenantStatus.TRIAL).length,
-        suspended: rows.filter((row) => row.status === TenantStatus.SUSPENDED).length,
+        onTrial: rows.filter((row) => row.status === TenantStatus.TRIAL && !row.isInternal).length,
+        suspended: rows.filter(
+          (row) => row.status === TenantStatus.SUSPENDED && !row.isInternal,
+        ).length,
+        internal: rows.filter((row) => row.isInternal).length,
       },
       /*
        * What somebody has to do something about, rather than what is merely
@@ -279,19 +291,24 @@ export class SubscriptionsService {
        */
       needsAttention: {
         trialsExpired: rows.filter(
-          (row) => row.status === TenantStatus.TRIAL && row.trialDaysLeft !== null && row.trialDaysLeft < 0,
+          (row) =>
+            !row.isInternal &&
+            row.status === TenantStatus.TRIAL &&
+            row.trialDaysLeft !== null &&
+            row.trialDaysLeft < 0,
         ),
         trialsEndingSoon: rows.filter(
           (row) =>
+            !row.isInternal &&
             row.status === TenantStatus.TRIAL &&
             row.trialDaysLeft !== null &&
             row.trialDaysLeft >= 0 &&
             row.trialDaysLeft <= 7,
         ),
         trialsWithNoEnd: rows.filter(
-          (row) => row.status === TenantStatus.TRIAL && row.trialEndsAt === null,
+          (row) => !row.isInternal && row.status === TenantStatus.TRIAL && row.trialEndsAt === null,
         ),
-        unpriced: rows.filter((row) => row.unpriced.length > 0),
+        unpriced: rows.filter((row) => row.unpriced.length > 0 && !row.isInternal),
         payingNothing: paying.filter((row) => row.monthlyTotal === 0),
       },
     };

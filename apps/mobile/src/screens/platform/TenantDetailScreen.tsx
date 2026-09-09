@@ -95,7 +95,11 @@ export function TenantDetailScreen({ navigation, route }: { navigation: any; rou
         <Text variant="label" tone="onAccent">Billed monthly</Text>
         <Text variant="display" tone="onAccent">{formatInr(bill?.monthlyTotal ?? 0)}</Text>
         <Text variant="tiny" tone="onAccent">
-          {tier ? `${tier.label} · ${formatInr(tier.monthlyPrice)}` : 'No tier'}
+          {workspace.isInternal
+            ? 'Ours — what it would be worth, billed to nobody'
+            : tier
+              ? `${tier.label} · ${formatInr(tier.monthlyPrice)}`
+              : 'No tier'}
         </Text>
       </Card>
 
@@ -140,6 +144,20 @@ export function TenantDetailScreen({ navigation, route }: { navigation: any; rou
             onPress={mayManage ? () => void save({ status }) : undefined}
           />
         ))}
+      </View>
+
+      <Text variant="label" tone="muted" style={styles.head}>Whose workspace is this</Text>
+      <View style={styles.chips}>
+        <Chip
+          label="A client's"
+          selected={!workspace.isInternal}
+          onPress={mayManage ? () => void save({ isInternal: false }) : undefined}
+        />
+        <Chip
+          label="Ours"
+          selected={Boolean(workspace.isInternal)}
+          onPress={mayManage ? () => void save({ isInternal: true }) : undefined}
+        />
       </View>
 
       <Text variant="label" tone="muted" style={styles.head}>Modules</Text>

@@ -21,6 +21,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   slug: 'decorbucket',
   status: 'ACTIVE',
   plan: 'shop',
+  isInternal: false,
   tierLabel: 'Shop',
   monthlyTotal: 9500,
   unpriced: [],
@@ -40,7 +41,7 @@ const empty = {
 
 const billing = (over: Record<string, unknown> = {}) => ({
   rows: [row()],
-  totals: { monthlyRecurring: 9500, paying: 1, onTrial: 0, suspended: 0 },
+  totals: { monthlyRecurring: 9500, paying: 1, onTrial: 0, suspended: 0, internal: 0 },
   needsAttention: empty,
   ...over,
 });
@@ -137,4 +138,54 @@ it('says plainly that nothing is collected yet', async () => {
   await mount();
 
   expect(screen.getByText(/no payment gateway attached/)).toBeInTheDocument();
+});
+
+
+/*
+ * Ours is ACTIVE and on every module, which is exactly what a paying client
+ * looks like from here. The revenue figure must not include it, and the row
+ * must not read as money coming in.
+ */
+describe('a workspace of our own', () => {
+  const withOurs = () =>
+    apiMock.platformBilling.mockResolvedValue(
+      billing({
+        rows: [
+          row(),
+          row({ id: 't2', name: 'FirstLeap (FLT)', slug: 'flt', isInternal: true, monthlyTotal: 15000 }),
+        ],
+        totals: { monthlyRecurring: 9500, paying: 1, onTrial: 0, suspended: 0, internal: 1 },
+      }),
+    );
+
+  it('says how many are ours, beside the ones that are not', async () => {
+    withOurs();
+    await mount();
+
+    expect(screen.getByText(/1 of ours, counted nowhere/)).toBeInTheDocument();
+  });
+
+  it('marks the row as ours rather than as active', async () => {
+    withOurs();
+    await mount();
+
+    expect(screen.getByText('internal')).toBeInTheDocument();
+  });
+
+  // Hiding the figure loses the answer to "what would we charge for this", so
+  // it is shown struck through instead.
+  it('still says what it would be worth, struck through', async () => {
+    withOurs();
+    await mount();
+
+    const amount = screen.getByText('₹15,000');
+    expect(amount).toHaveStyle({ textDecoration: 'line-through' });
+  });
+
+  it('leaves the headline as what clients actually pay', async () => {
+    withOurs();
+    await mount();
+
+    expect(screen.getByText(/from 1 paying client/)).toBeInTheDocument();
+  });
 });

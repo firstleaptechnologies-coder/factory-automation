@@ -11,6 +11,8 @@ interface BillingRow {
   id: string;
   name: string;
   status: 'ACTIVE' | 'TRIAL' | 'SUSPENDED';
+  /** Ours. Counted nowhere, shown anyway. */
+  isInternal: boolean;
   tierLabel: string | null;
   monthlyTotal: number;
   unpriced: string[];
@@ -20,7 +22,13 @@ interface BillingRow {
 
 interface Billing {
   rows: BillingRow[];
-  totals: { monthlyRecurring: number; paying: number; onTrial: number; suspended: number };
+  totals: {
+    monthlyRecurring: number;
+    paying: number;
+    onTrial: number;
+    suspended: number;
+    internal: number;
+  };
   needsAttention: {
     trialsExpired: BillingRow[];
     trialsEndingSoon: BillingRow[];
@@ -99,6 +107,7 @@ export function PlatformBillingScreen({ navigation }: { navigation: any }) {
         <Text variant="tiny" tone="onAccent">
           from {totals.paying} paying {totals.paying === 1 ? 'client' : 'clients'} ·{' '}
           {totals.onTrial} on trial
+          {totals.internal ? ` · ${totals.internal} of ours, counted nowhere` : ''}
         </Text>
       </Card>
 
@@ -148,7 +157,16 @@ export function PlatformBillingScreen({ navigation }: { navigation: any }) {
                 {row.billingDay ? ` · billed on the ${row.billingDay}th` : ''}
               </Text>
             </View>
-            <Text variant="small" bold>{formatInr(row.monthlyTotal)}</Text>
+            {/*
+              Ours shows what it would be worth rather than a figure that
+              reads as money coming in — hiding it loses the answer to "what
+              would we charge for this".
+            */}
+            {row.isInternal ? (
+              <Text variant="small" tone="muted">ours</Text>
+            ) : (
+              <Text variant="small" bold>{formatInr(row.monthlyTotal)}</Text>
+            )}
           </View>
         </Card>
       ))}

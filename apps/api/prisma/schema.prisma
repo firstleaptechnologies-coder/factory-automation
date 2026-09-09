@@ -76,6 +76,15 @@ model Tenant {
   /// is a conversation, not a checkbox.
   modules String[]     @default([])
 
+  /// Ours, not a client's.
+  ///
+  /// FLT is a workspace like any other — every module on, so a change can be
+  /// seen working before a client sees it — and it is ACTIVE, which is how it
+  /// came to count as monthly recurring revenue that nobody pays. A revenue
+  /// figure that includes ourselves is a figure that lies, and it lies upward,
+  /// which is the direction nobody checks.
+  isInternal Boolean @default(false)
+
   /// When their trial runs out.
   ///
   /// A date rather than a status alone, because `TRIAL` says nothing about

@@ -188,3 +188,117 @@ describe('what a tier change would do', () => {
     );
   });
 });
+
+
+/*
+ * Ours looks exactly like a paying client from here — ACTIVE, on a tier, every
+ * module — and that is the trap. A revenue figure that includes ourselves is a
+ * figure that lies, and it lies upward, which is the direction nobody checks.
+ */
+describe('a workspace of our own', () => {
+  const withRows = (tenants: Record<string, unknown>[]) => {
+    const { service, db } = build();
+    db.tenant.findMany = jest.fn(async () => tenants);
+    db.subscriptionTier.findMany = jest.fn(async () => [
+      {
+        key: 'shop',
+        label: 'Shop',
+        blurb: '',
+        monthlyPrice: 8000,
+        includedModules: ['orders', 'clients', 'leads', 'quotes', 'finance'],
+        isActive: true,
+        sortOrder: 10,
+      },
+      {
+        key: 'works',
+        label: 'Works',
+        blurb: '',
+        monthlyPrice: 15000,
+        includedModules: ['orders', 'clients'],
+        isActive: true,
+        sortOrder: 20,
+      },
+      {
+        key: 'punch',
+        label: 'Punch',
+        blurb: '',
+        monthlyPrice: 3000,
+        includedModules: ['orders', 'clients'],
+        isActive: true,
+        sortOrder: 0,
+      },
+    ]);
+    return service;
+  };
+
+  const CLIENT = {
+    id: 't1',
+    name: 'Decor Bucket',
+    slug: 'decorbucket',
+    status: 'ACTIVE',
+    plan: 'shop',
+    modules: [],
+    isInternal: false,
+    trialEndsAt: null,
+    billingDay: 5,
+    createdAt: new Date(),
+  };
+
+  const OURS = {
+    ...CLIENT,
+    id: 't2',
+    name: 'FLT',
+    slug: 'flt',
+    plan: 'works',
+    isInternal: true,
+  };
+
+  it('is left out of what is recurring', async () => {
+    const billing = await withRows([CLIENT, OURS]).billing();
+
+    expect(billing.totals.monthlyRecurring).toBe(8000);
+    expect(billing.totals.paying).toBe(1);
+  });
+
+  it('is counted as ours instead', async () => {
+    const billing = await withRows([CLIENT, OURS]).billing();
+
+    expect(billing.totals.internal).toBe(1);
+  });
+
+  // Hiding it entirely loses the answer to "what would we charge for this".
+  it('still says what it would be worth', async () => {
+    const billing = await withRows([CLIENT, OURS]).billing();
+    const ours = billing.rows.find((row) => row.slug === 'flt')!;
+
+    expect(ours.monthlyTotal).toBe(15000);
+    expect(ours.isInternal).toBe(true);
+  });
+
+  // Every one of these is a thing somebody must act on. Ours is not.
+  it('never appears in what needs doing', async () => {
+    const billing = await withRows([
+      { ...OURS, status: 'TRIAL', trialEndsAt: new Date(Date.now() - 86400000) },
+    ]).billing();
+
+    expect(billing.needsAttention.trialsExpired).toEqual([]);
+    expect(billing.needsAttention.trialsEndingSoon).toEqual([]);
+    expect(billing.needsAttention.trialsWithNoEnd).toEqual([]);
+    expect(billing.needsAttention.payingNothing).toEqual([]);
+  });
+
+  it('does not hide a client’s expired trial along with it', async () => {
+    const billing = await withRows([
+      { ...CLIENT, status: 'TRIAL', trialEndsAt: new Date(Date.now() - 86400000) },
+      OURS,
+    ]).billing();
+
+    expect(billing.needsAttention.trialsExpired.map((one) => one.name)).toEqual(['Decor Bucket']);
+  });
+
+  it('bills a client on a priced tier what the tier says', async () => {
+    const billing = await withRows([CLIENT]).billing();
+
+    expect(billing.rows[0].monthlyTotal).toBe(8000);
+  });
+});

@@ -8,6 +8,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   id: 't1',
   name: 'Decor Bucket',
   status: 'ACTIVE',
+  isInternal: false,
   tierLabel: 'Shop',
   monthlyTotal: 9500,
   unpriced: [],
@@ -18,7 +19,7 @@ const row = (over: Record<string, unknown> = {}) => ({
 
 const billing = (over: Record<string, unknown> = {}) => ({
   rows: [row()],
-  totals: { monthlyRecurring: 9500, paying: 1, onTrial: 0, suspended: 0 },
+  totals: { monthlyRecurring: 9500, paying: 1, onTrial: 0, suspended: 0, internal: 0 },
   needsAttention: {
     trialsExpired: [],
     trialsEndingSoon: [],
@@ -107,4 +108,32 @@ it('says plainly that nothing is collected yet', async () => {
   await mount();
 
   expect(await screen.findByText(/no payment gateway attached/)).toBeTruthy();
+});
+
+
+// Ours is ACTIVE and on every module, which is exactly what a paying client
+// looks like from here.
+describe('a workspace of our own', () => {
+  beforeEach(() => {
+    mockBilling.mockResolvedValue(
+      billing({
+        rows: [row(), row({ id: 't2', name: 'FirstLeap (FLT)', isInternal: true, monthlyTotal: 15000 })],
+        totals: { monthlyRecurring: 9500, paying: 1, onTrial: 0, suspended: 0, internal: 1 },
+      }),
+    );
+  });
+
+  it('says how many are ours, beside the ones that are not', async () => {
+    await mount();
+
+    expect(await screen.findByText(/1 of ours, counted nowhere/)).toBeTruthy();
+  });
+
+  it('does not show ours as an amount coming in', async () => {
+    await mount();
+    await screen.findByText('FirstLeap (FLT)');
+
+    expect(screen.getByText('ours')).toBeTruthy();
+    expect(screen.queryByText('₹15,000')).toBeNull();
+  });
 });

@@ -13,6 +13,8 @@ interface BillingRow {
   slug: string;
   status: 'ACTIVE' | 'TRIAL' | 'SUSPENDED';
   plan: string | null;
+  /** Ours. Counted nowhere, shown anyway. */
+  isInternal: boolean;
   tierLabel: string | null;
   monthlyTotal: number;
   unpriced: string[];
@@ -23,7 +25,13 @@ interface BillingRow {
 
 interface Billing {
   rows: BillingRow[];
-  totals: { monthlyRecurring: number; paying: number; onTrial: number; suspended: number };
+  totals: {
+    monthlyRecurring: number;
+    paying: number;
+    onTrial: number;
+    suspended: number;
+    internal: number;
+  };
   needsAttention: {
     trialsExpired: BillingRow[];
     trialsEndingSoon: BillingRow[];
@@ -118,7 +126,12 @@ export default function BillingPage() {
         <Card>
           <span className="t-label faint">Suspended</span>
           <div className="t-h1">{totals.suspended}</div>
-          <div className="t-tiny faint">shut out, still on the books</div>
+          <div className="t-tiny faint">
+            shut out, still on the books
+            {totals.internal
+              ? ` · ${totals.internal} of ours, counted nowhere`
+              : ''}
+          </div>
         </Card>
       </div>
 
@@ -182,16 +195,27 @@ export default function BillingPage() {
               </div>
               <div className="row">
                 <Pill
-                  label={row.status.toLowerCase()}
+                  label={row.isInternal ? 'internal' : row.status.toLowerCase()}
                   color={
-                    row.status === 'ACTIVE'
-                      ? 'var(--success)'
-                      : row.status === 'TRIAL'
-                        ? 'var(--info)'
-                        : 'var(--faint)'
+                    row.isInternal
+                      ? 'var(--faint)'
+                      : row.status === 'ACTIVE'
+                        ? 'var(--success)'
+                        : row.status === 'TRIAL'
+                          ? 'var(--info)'
+                          : 'var(--faint)'
                   }
                 />
-                <span className="t-small bold">{formatInr(row.monthlyTotal)}</span>
+                {/*
+                  Ours shows what it would be worth, struck through, rather
+                  than a figure that reads as money coming in. Hiding it
+                  entirely loses the answer to "what would we charge for this".
+                */}
+                <span
+                  className={row.isInternal ? 't-small faint' : 't-small bold'}
+                  style={row.isInternal ? { textDecoration: 'line-through' } : undefined}>
+                  {formatInr(row.monthlyTotal)}
+                </span>
               </div>
             </div>
           </Card>

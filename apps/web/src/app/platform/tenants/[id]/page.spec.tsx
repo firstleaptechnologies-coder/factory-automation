@@ -155,3 +155,35 @@ it('says so when their database could not be reached', async () => {
 
   expect(screen.getByText(/database could not be reached/)).toBeInTheDocument();
 });
+
+
+describe('whose workspace it is', () => {
+  it('marks one as ours', async () => {
+    await mount();
+    fireEvent.click(screen.getByText('Ours'));
+
+    await waitFor(() =>
+      expect(apiMock.updateTenant).toHaveBeenCalledWith('t1', { isInternal: true }),
+    );
+  });
+
+  it('hands one back to a client', async () => {
+    apiMock.tenantDetail.mockResolvedValue({ ...WORKSPACE, isInternal: true });
+    await mount();
+    fireEvent.click(screen.getByText("A client's"));
+
+    await waitFor(() =>
+      expect(apiMock.updateTenant).toHaveBeenCalledWith('t1', { isInternal: false }),
+    );
+  });
+
+  // The figure stays — "what would we charge for this" is a real question —
+  // but it must not read as money coming in.
+  it('says what ours would be worth, and that nobody pays it', async () => {
+    apiMock.tenantDetail.mockResolvedValue({ ...WORKSPACE, isInternal: true });
+    await mount();
+
+    expect(screen.getByText('₹9,500')).toBeInTheDocument();
+    expect(screen.getByText(/billed to nobody/)).toBeInTheDocument();
+  });
+});

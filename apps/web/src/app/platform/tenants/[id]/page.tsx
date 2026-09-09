@@ -150,8 +150,13 @@ export default function WorkspacePage() {
           </span>
           <div className="t-display on-accent">{formatInr(bill?.monthlyTotal ?? 0)}</div>
           <div className="t-tiny on-accent" style={{ opacity: 0.75 }}>
-            {tier ? `${tier.label} ${formatInr(tier.monthlyPrice)}` : 'No tier'}
-            {addOnTotal ? ` + add-ons ${formatInr(addOnTotal)}` : ''}
+            {workspace.isInternal
+              ? 'Ours — what it would be worth, billed to nobody'
+              : tier
+                ? `${tier.label} ${formatInr(tier.monthlyPrice)}${
+                    addOnTotal ? ` + add-ons ${formatInr(addOnTotal)}` : ''
+                  }`
+                : 'No tier'}
           </div>
         </Card>
         <Card>
@@ -186,7 +191,7 @@ export default function WorkspacePage() {
         </div>
 
         <span className="field-label">Status</span>
-        <div className="wrap">
+        <div className="wrap" style={{ marginBottom: 'var(--s-lg)' }}>
           {(['ACTIVE', 'TRIAL', 'SUSPENDED'] as const).map((status) => (
             <Chip
               key={status}
@@ -196,6 +201,24 @@ export default function WorkspacePage() {
             />
           ))}
         </div>
+
+        <span className="field-label">Whose workspace is this</span>
+        <div className="wrap">
+          <Chip
+            label="A client's"
+            selected={!workspace.isInternal}
+            onClick={mayManage ? () => void save({ isInternal: false }) : undefined}
+          />
+          <Chip
+            label="Ours"
+            selected={Boolean(workspace.isInternal)}
+            onClick={mayManage ? () => void save({ isInternal: true }) : undefined}
+          />
+        </div>
+        <p className="t-tiny faint">
+          One of ours is active and on every module, which is exactly what a paying client looks
+          like from the billing screen. Marked here, it is kept out of every revenue figure.
+        </p>
       </Card>
 
       <SectionHead title="Modules" />

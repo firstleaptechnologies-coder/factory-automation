@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
@@ -43,6 +44,15 @@ export class CreateTenantDto {
    * which is a price list that cannot be sold from.
    */
   @IsOptional() @IsString() plan?: string;
+  /**
+   * Ours, not a client's. Kept out of every revenue figure.
+   *
+   * Settable rather than derived from the slug: which workspaces are ours is a
+   * fact about the business, and a rule that guesses it from a name is one
+   * that guesses wrong the first time we host a client called FLT.
+   */
+  @IsOptional() @IsBoolean() isInternal?: boolean;
+
   /** When their trial runs out. Null clears it. */
   @IsOptional() @IsDateString() trialEndsAt?: string | null;
 
@@ -84,6 +94,15 @@ export class UpdateTenantDto {
   @IsArray()
   @IsIn(ALL_MODULES, { each: true })
   modules?: string[];
+  /**
+   * Ours, not a client's. Kept out of every revenue figure.
+   *
+   * Settable rather than derived from the slug: which workspaces are ours is a
+   * fact about the business, and a rule that guesses it from a name is one
+   * that guesses wrong the first time we host a client called FLT.
+   */
+  @IsOptional() @IsBoolean() isInternal?: boolean;
+
   /** When their trial runs out. Null clears it. */
   @IsOptional() @IsDateString() trialEndsAt?: string | null;
 
