@@ -12,6 +12,7 @@ export type IconName =
   | 'card'
   | 'search'
   | 'history'
+  | 'lock'
   | 'settings'
   | 'tune'
   | 'user'
@@ -58,6 +59,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <circle cx={11} cy={11} r={6.5} />
       <path d="m20 20-3.6-3.6" />
+    </>
+  ),
+  /** A padlock, for a password. */
+  lock: (
+    <>
+      <rect x={4} y={10.5} width={16} height={10.5} rx={2.4} />
+      <path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9" />
     </>
   ),
   settings: (

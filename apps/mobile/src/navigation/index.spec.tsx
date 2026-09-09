@@ -34,12 +34,14 @@ it('says nothing about signing in until the stored session has been read', async
   await render(<RootNavigator />);
   // Flashing the login screen at somebody who is already signed in is worse
   // than a moment of nothing.
-  expect(screen.queryByText('FAS')).toBeNull();
+  expect(screen.queryByLabelText(/Factory Automation Software/)).toBeNull();
 });
 
 it('asks for a sign-in when nobody is signed in', async () => {
   await render(<RootNavigator />);
-  expect(await screen.findByText('FAS')).toBeTruthy();
+  // The brand is artwork now, so this asserts the label it is announced
+  // with rather than a string on screen.
+  expect(await screen.findByLabelText(/Factory Automation Software/)).toBeTruthy();
   // With no workspace remembered, signing in starts by asking which shop.
   expect(screen.getByText('Workspace')).toBeTruthy();
   expect(screen.getByText('Continue')).toBeTruthy();

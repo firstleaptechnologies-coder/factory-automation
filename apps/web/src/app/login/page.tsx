@@ -83,15 +83,15 @@ export default function LoginPage() {
       }}>
       <div style={{ width: 'min(400px, 100%)' }} className="enter">
         <div style={{ textAlign: 'center', marginBottom: 'var(--s-xxl)' }}>
-          <span
-            className="brand-mark"
-            style={{ width: 76, height: 76, borderRadius: 30, margin: '0 auto' }}>
-            <Icon name="scan" size={34} color="#fff" strokeWidth={2.1} />
-          </span>
-          <h1 className="t-h1" style={{ margin: 'var(--s-lg) 0 2px' }}>
-            FAS
-          </h1>
-          <p className="t-small muted" style={{ margin: 0 }}>
+          {/* The lockup carries the name and the tagline, so neither is
+              repeated under it. Light artwork: the sign-in ground is dark and
+              the brand teal all but disappears on it. */}
+          <img
+            src="/fas-lockup-light.png"
+            alt="FAS — Factory Automation Software, by FirstLeap Technologies"
+            style={{ width: 190, height: 'auto', margin: '0 auto', display: 'block' }}
+          />
+          <p className="t-small muted" style={{ margin: 'var(--s-lg) 0 0' }}>
             Order punching for the floor
           </p>
         </div>
@@ -151,6 +151,7 @@ export default function LoginPage() {
             <Field
               label="Password"
               type="password"
+              icon="lock"
               value={password}
               onChange={setPassword}
               error={error}

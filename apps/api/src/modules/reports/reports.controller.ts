@@ -10,14 +10,16 @@ import { AuthUser, CurrentUser } from '../../common/decorators/current-user.deco
 /**
  * Asking for a report and fetching it back.
  *
- * Behind the finance module: most of what these export is money, and the ones
- * that are not are read by the same person on the same afternoon.
+ * Behind the reports module, which is sold on its own. It was briefly behind
+ * finance — most of what these export is money — and that was wrong the moment
+ * reports became something a shop pays for separately: it handed every tier
+ * that includes finance the whole export suite for nothing.
  *
  * Running one and reading one are separate permissions. A shop accountant who
  * may download the GST summary is not necessarily somebody who should be able
  * to queue a full-year export of every register at four in the afternoon.
  */
-@RequireModule(MODULES.FINANCE)
+@RequireModule(MODULES.REPORTS)
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}

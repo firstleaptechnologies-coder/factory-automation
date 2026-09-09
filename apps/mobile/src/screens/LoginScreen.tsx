@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   FadeIn,
@@ -13,7 +13,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { AccentSurface, Button, Field, Icon, Text, haptic } from '../ui';
+import { Button, Field, Icon, Text, haptic } from '../ui';
 import { gradients, palette, radius, spacing } from '../theme';
 
 type Mode = 'workspace' | 'credentials' | 'platform';
@@ -100,13 +100,18 @@ export function LoginScreen() {
         style={[styles.container, { paddingTop: insets.top }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Animated.View entering={FadeIn.duration(600)} style={styles.brandBlock}>
+          {/* The lockup carries the name and the tagline, so neither is
+              repeated underneath it. Light artwork, because the brand teal is
+              nearly invisible on this ground. */}
           <Animated.View style={markStyle}>
-            <AccentSurface radius={radius.xxl} contentStyle={styles.mark}>
-              <Icon name="scan" size={34} color={palette.white} strokeWidth={2} />
-            </AccentSurface>
+            <Image
+              source={require('../assets/fas-lockup-light.png')}
+              style={styles.lockup}
+              resizeMode="contain"
+              accessibilityLabel="FAS — Factory Automation Software, by FirstLeap Technologies"
+            />
           </Animated.View>
-          <Text variant="h1" style={styles.brand}>FAS</Text>
-          <Text variant="small" tone="muted">
+          <Text variant="small" tone="muted" style={styles.strap}>
             {mode === 'platform' ? 'Platform administration' : 'Order punching for the floor'}
           </Text>
         </Animated.View>
@@ -161,7 +166,7 @@ export function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
-                icon="settings"
+                icon="lock"
                 onSubmitEditing={submit}
                 error={error}
               />
@@ -190,7 +195,7 @@ export function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
-                icon="settings"
+                icon="lock"
                 onSubmitEditing={submit}
                 error={error}
               />
@@ -225,8 +230,10 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: palette.bg },
   container: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl },
   brandBlock: { alignItems: 'center', marginBottom: spacing.xxl },
-  mark: { width: 82, height: 82, alignItems: 'center', justifyContent: 'center' },
-  brand: { marginTop: spacing.lg },
+  // Sized by width; the lockup is taller than it is wide, so the height
+  // follows from resizeMode contain rather than being fixed twice.
+  lockup: { width: 208, height: 300 },
+  strap: { marginTop: spacing.sm },
   workspaceChip: {
     flexDirection: 'row',
     alignItems: 'center',

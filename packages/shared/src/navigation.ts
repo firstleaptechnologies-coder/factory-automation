@@ -286,7 +286,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         key: 'reports',
-        module: MODULES.FINANCE,
+        module: MODULES.REPORTS,
         label: 'Reports',
         icon: 'clipboard',
         permission: PERMISSIONS.REPORT_VIEW,

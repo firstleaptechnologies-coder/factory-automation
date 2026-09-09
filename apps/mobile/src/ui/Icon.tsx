@@ -20,6 +20,7 @@ export type IconName =
   | 'history'
   | 'search'
   | 'bell'
+  | 'lock'
   | 'settings'
   | 'tune'
   | 'user'
@@ -82,6 +83,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   bell: <Path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9ZM10 18.5a2 2 0 0 0 4 0" />,
+  /** A padlock, for a password. */
+  lock: (
+    <>
+      <Rect x={4} y={10.5} width={16} height={10.5} rx={2.4} />
+      <Path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9" />
+    </>
+  ),
   settings: (
     <>
       <Circle cx={12} cy={12} r={3.2} />
