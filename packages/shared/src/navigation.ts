@@ -607,6 +607,7 @@ export const NAV_OUTSIDE: NavItem[] = [
     icon: 'trend',
     permission: PERMISSIONS.PLATFORM_TENANT_VIEW,
     web: '/platform',
+    app: 'PlatformOverview',
     children: [
       {
         key: 'platform-plans',
@@ -614,6 +615,7 @@ export const NAV_OUTSIDE: NavItem[] = [
         icon: 'card',
         permission: PERMISSIONS.PLATFORM_PRICING_MANAGE,
         web: '/platform/plans',
+        app: 'PlatformPlans',
       },
     ],
   },

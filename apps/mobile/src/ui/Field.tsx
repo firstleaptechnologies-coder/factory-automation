@@ -168,7 +168,12 @@ export function Chip({
 }: {
   label: string;
   selected?: boolean;
-  onPress: () => void;
+  /**
+   * Absent for a chip that shows state without setting it — a module a tier
+   * already covers, say. Matches the web Chip, where it has always been
+   * optional.
+   */
+  onPress?: () => void;
   accent?: string | null;
   /** Marks a chip that goes somewhere, rather than one that sets a value. */
   icon?: IconName;
@@ -186,7 +191,7 @@ export function Chip({
   );
 
   return (
-    <Pressable onPress={onPress} testID={testID}>
+    <Pressable onPress={onPress} disabled={!onPress} testID={testID}>
       {selected ? (
         accent ? (
           <View

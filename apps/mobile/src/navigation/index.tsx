@@ -74,6 +74,8 @@ import { StockScreen } from '../screens/StockScreen';
 import { StockMovesScreen } from '../screens/StockMovesScreen';
 import { WasteScreen } from '../screens/WasteScreen';
 import { TenantsScreen } from '../screens/platform/TenantsScreen';
+import { PlatformOverviewScreen } from '../screens/platform/PlatformOverviewScreen';
+import { PlatformPlansScreen } from '../screens/platform/PlatformPlansScreen';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -136,7 +138,13 @@ export function RootNavigator() {
           animation: 'slide_from_right',
         }}>
         {user && isPlatform ? (
-          <Stack.Screen name="Tenants" component={TenantsScreen} />
+          <>
+            {/* The dashboard first: what every client is on and what they pay
+                is the question somebody signing in here is asking. */}
+            <Stack.Screen name="PlatformOverview" component={PlatformOverviewScreen} />
+            <Stack.Screen name="PlatformPlans" component={PlatformPlansScreen} />
+            <Stack.Screen name="Tenants" component={TenantsScreen} />
+          </>
         ) : user ? (
           <>
             <Stack.Screen name="Main" component={MainTabs} />

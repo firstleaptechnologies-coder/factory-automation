@@ -93,8 +93,13 @@ export default function PlatformOverviewPage() {
   if (overview.loading && !data) return <Loader label="Loading the platform" />;
   if (!data) return <EmptyState title="Nothing to show" message={overview.error ?? undefined} />;
 
-  const { totals, workspaces, tiers, modulePrices } = data;
-  const warning = unpricedWarning(totals);
+  // Defaulted list by list: an unexpected payload renders an empty dashboard
+  // rather than throwing on the first map.
+  const workspaces = data.workspaces ?? [];
+  const tiers = data.tiers ?? [];
+  const modulePrices = data.modulePrices ?? [];
+  const totals = data.totals;
+  const warning = totals ? unpricedWarning(totals) : null;
 
   return (
     <div className="shell-page" style={{ maxWidth: 1100, margin: '0 auto', padding: 'var(--s-lg)' }}>
@@ -113,17 +118,17 @@ export default function PlatformOverviewPage() {
       <div className="grid-3">
         <Card tone="accent">
           <span className="t-label on-accent" style={{ opacity: 0.75 }}>Monthly recurring</span>
-          <div className="t-display on-accent">{formatInr(totals.monthlyRecurring)}</div>
+          <div className="t-display on-accent">{formatInr(totals?.monthlyRecurring ?? 0)}</div>
           <div className="t-tiny on-accent" style={{ opacity: 0.75 }}>
-            from {totals.paying} paying {totals.paying === 1 ? 'client' : 'clients'}
+            from {totals?.paying ?? 0} paying {(totals?.paying ?? 0) === 1 ? 'client' : 'clients'}
           </div>
         </Card>
 
         <Card>
           <span className="t-label muted">Workspaces</span>
-          <div className="t-display">{totals.workspaces}</div>
+          <div className="t-display">{workspaces.length}</div>
           <div className="t-tiny faint">
-            {Object.entries(totals.byStatus)
+            {Object.entries(totals?.byStatus ?? {})
               .filter(([, count]) => count > 0)
               .map(([status, count]) => `${count} ${status.toLowerCase()}`)
               .join(' · ')}

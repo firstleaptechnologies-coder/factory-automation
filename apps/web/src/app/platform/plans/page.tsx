@@ -32,16 +32,14 @@ export default function PlansAndPricesPage() {
 
   useEffect(() => {
     if (!overview.data) return;
-    setTierPrices(
-      Object.fromEntries(overview.data.tiers.map((t) => [t.key, String(t.monthlyPrice)])),
-    );
-    setTierModules(
-      Object.fromEntries(overview.data.tiers.map((t) => [t.key, [...t.includedModules]])),
-    );
+    // Guarded list by list, not just on `data`: a payload arriving without one
+    // of them should show an empty price list rather than throw.
+    const tiers = overview.data.tiers ?? [];
+    const prices = overview.data.modulePrices ?? [];
+    setTierPrices(Object.fromEntries(tiers.map((t) => [t.key, String(t.monthlyPrice)])));
+    setTierModules(Object.fromEntries(tiers.map((t) => [t.key, [...t.includedModules]])));
     setModulePrices(
-      Object.fromEntries(
-        overview.data.modulePrices.map((m) => [m.moduleKey, m.isPriced ? String(m.monthlyPrice) : '']),
-      ),
+      Object.fromEntries(prices.map((m) => [m.moduleKey, m.isPriced ? String(m.monthlyPrice) : ''])),
     );
   }, [overview.data]);
 
@@ -99,7 +97,7 @@ export default function PlansAndPricesPage() {
    */
   function effectOfTierEdit(tierKey: string): string | null {
     if (!overview.data) return null;
-    const tier = overview.data.tiers.find((one) => one.key === tierKey);
+    const tier = (overview.data.tiers ?? []).find((one) => one.key === tierKey);
     if (!tier) return null;
 
     const added = (tierModules[tierKey] ?? []).filter(
@@ -108,13 +106,13 @@ export default function PlansAndPricesPage() {
     if (!added.length) return null;
 
     const prices = Object.fromEntries(
-      overview.data.modulePrices.filter((m) => m.isPriced).map((m) => [m.moduleKey, m.monthlyPrice]),
+      (overview.data.modulePrices ?? []).filter((m) => m.isPriced).map((m) => [m.moduleKey, m.monthlyPrice]),
     );
 
     // Only the clients on *this* tier, and only the add-ons they are actually
     // billed for. A client on another tier is untouched by this change, and a
     // client whose tier already covers the module pays nothing for it.
-    const workspaces = overview.data.workspaces
+    const workspaces = (overview.data.workspaces ?? [])
       .filter((w) => w.tier === tierKey)
       .map((w) => ({
         billedAddOns: w.bill.lines
@@ -150,7 +148,7 @@ export default function PlansAndPricesPage() {
 
       <SectionHead title="Tiers" />
       <div className="stack-sm">
-        {data.tiers.map((tier) => (
+        {(data.tiers ?? []).map((tier) => (
           <Card key={tier.key} size="sm">
             <div className="row-between" style={{ alignItems: 'flex-start', gap: 'var(--s-lg)' }}>
               <div style={{ minWidth: 0, flex: 1 }}>
@@ -214,7 +212,7 @@ export default function PlansAndPricesPage() {
       </p>
 
       <div className="stack-sm">
-        {data.modulePrices.map((module) => {
+        {(data.modulePrices ?? []).map((module) => {
           const isCore = (CORE_MODULES as string[]).includes(module.moduleKey);
           return (
             <Card key={module.moduleKey} size="sm">
