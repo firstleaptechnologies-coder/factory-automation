@@ -59,12 +59,21 @@ export class SubscriptionsService {
    * so a tier that exists in code always exists commercially — and so adding a
    * plan cannot quietly make a tier nobody can price.
    */
-  async tiers(): Promise<TierRow[]> {
+  async tiers(seeded = false): Promise<TierRow[]> {
     const rows = await this.db.subscriptionTier.findMany({ orderBy: { sortOrder: 'asc' } });
     const byKey = new Map(rows.map((row) => [row.key, row]));
 
+    /*
+     * Seed once, then carry on with what is there.
+     *
+     * This used to re-read and recurse without a bound, which is fine while
+     * the write always lands — and a hang that takes the process down when it
+     * does not: a read replica a moment behind, a transaction rolled back, a
+     * permission the migration did not grant. A dashboard that is missing a
+     * tier is a worse screen; one that never answers is a worse outage.
+     */
     const missing = PLANS.filter((plan) => !byKey.has(plan.key));
-    if (missing.length) {
+    if (missing.length && !seeded) {
       await this.db.subscriptionTier.createMany({
         data: missing.map((plan, index) => ({
           key: plan.key,
@@ -76,7 +85,7 @@ export class SubscriptionsService {
         })),
         skipDuplicates: true,
       });
-      return this.tiers();
+      return this.tiers(true);
     }
 
     return rows.map((row) => ({
@@ -269,20 +278,23 @@ export class SubscriptionsService {
       };
     });
 
-    // Ours is not revenue. It is ACTIVE and on every module, which is exactly
-    // what a paying client looks like from here, and that is the trap.
+    /*
+     * The same arithmetic the dashboard does, from the same function. It was
+     * written twice once, and only one copy left ourselves out.
+     */
+    const revenue = monthlyRecurring(rows);
     const paying = rows.filter((row) => row.status === TenantStatus.ACTIVE && !row.isInternal);
 
     return {
       rows,
       totals: {
-        monthlyRecurring: paying.reduce((sum, row) => sum + row.monthlyTotal, 0),
-        paying: paying.length,
+        monthlyRecurring: revenue.total,
+        paying: revenue.active,
         onTrial: rows.filter((row) => row.status === TenantStatus.TRIAL && !row.isInternal).length,
         suspended: rows.filter(
           (row) => row.status === TenantStatus.SUSPENDED && !row.isInternal,
         ).length,
-        internal: rows.filter((row) => row.isInternal).length,
+        internal: revenue.internal,
       },
       /*
        * What somebody has to do something about, rather than what is merely
@@ -412,6 +424,7 @@ export class SubscriptionsService {
           modules: true,
           status: true,
           isolation: true,
+          isInternal: true,
           contactName: true,
           createdAt: true,
         },
@@ -454,6 +467,8 @@ export class SubscriptionsService {
         name: tenant.name,
         status: tenant.status,
         isolation: tenant.isolation,
+        /** Ours, not a client's. Counted nowhere, shown anyway. */
+        isInternal: tenant.isInternal,
         contactName: tenant.contactName,
         createdAt: tenant.createdAt,
         tier: tier?.key ?? null,
@@ -470,7 +485,11 @@ export class SubscriptionsService {
     });
 
     const revenue = monthlyRecurring(
-      workspaces.map((w) => ({ status: w.status, monthlyTotal: w.bill.monthlyTotal })),
+      workspaces.map((w) => ({
+        status: w.status,
+        monthlyTotal: w.bill.monthlyTotal,
+        isInternal: w.isInternal,
+      })),
     );
 
     const byStatus: Record<string, number> = {};
@@ -486,6 +505,8 @@ export class SubscriptionsService {
         byStatus,
         monthlyRecurring: revenue.total,
         paying: revenue.active,
+        /** Ours. Not revenue, and said so rather than silently missing. */
+        internal: revenue.internal,
         /** Granted somewhere and priced nowhere. The number to drive to zero. */
         unpricedModules: [
           ...new Set(workspaces.flatMap((workspace) => workspace.bill.unpriced)),

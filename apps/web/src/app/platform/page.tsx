@@ -118,6 +118,9 @@ export default function PlatformOverviewPage() {
           <div className="t-display on-accent">{formatInr(totals?.monthlyRecurring ?? 0)}</div>
           <div className="t-tiny on-accent" style={{ opacity: 0.75 }}>
             from {totals?.paying ?? 0} paying {(totals?.paying ?? 0) === 1 ? 'client' : 'clients'}
+            {/* Said, rather than silently missing, so nobody wonders why the
+                figure is smaller than the list below it looks. */}
+            {totals?.internal ? ` · ${totals.internal} of ours, counted nowhere` : ''}
           </div>
         </Card>
 

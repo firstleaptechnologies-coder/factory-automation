@@ -101,13 +101,14 @@ describe('what the book is worth', () => {
       { status: 'SUSPENDED', monthlyTotal: 12_000 },
     ]);
 
-    expect(result).toEqual({ active: 2, total: 17_500 });
+    expect(result).toEqual({ active: 2, total: 17_500, internal: 0 });
   });
 
   it('is nothing when nobody is paying', () => {
     expect(monthlyRecurring([{ status: 'TRIAL', monthlyTotal: 8000 }])).toEqual({
       active: 0,
       total: 0,
+      internal: 0,
     });
   });
 });
@@ -152,5 +153,40 @@ describe('moving a module into a tier', () => {
       affected: 0,
       monthlyChange: 0,
     });
+  });
+});
+
+/*
+ * Ours is ACTIVE and on every module, which is exactly what a paying client
+ * looks like from here. This lived at two call sites once and only one of them
+ * excluded it, so the same business had two revenue figures and the bigger one
+ * was on the screen people look at first.
+ */
+describe('what we are actually owed', () => {
+  const bills = [
+    { status: 'ACTIVE', monthlyTotal: 8000 },
+    { status: 'ACTIVE', monthlyTotal: 15000, isInternal: true },
+    { status: 'TRIAL', monthlyTotal: 3000 },
+    { status: 'SUSPENDED', monthlyTotal: 9000 },
+  ];
+
+  it('counts only the clients actually paying', () => {
+    expect(monthlyRecurring(bills)).toEqual({ active: 1, total: 8000, internal: 1 });
+  });
+
+  it('leaves a trial out — they are not paying yet', () => {
+    expect(monthlyRecurring([{ status: 'TRIAL', monthlyTotal: 3000 }]).total).toBe(0);
+  });
+
+  it('leaves a suspended one out — they are shut out', () => {
+    expect(monthlyRecurring([{ status: 'SUSPENDED', monthlyTotal: 9000 }]).total).toBe(0);
+  });
+
+  it('counts ours separately rather than not at all', () => {
+    expect(monthlyRecurring(bills).internal).toBe(1);
+  });
+
+  it('is nothing when there is nobody', () => {
+    expect(monthlyRecurring([])).toEqual({ active: 0, total: 0, internal: 0 });
   });
 });

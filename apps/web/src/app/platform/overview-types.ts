@@ -49,6 +49,8 @@ export interface PlatformOverview {
     byStatus: Record<string, number>;
     monthlyRecurring: number;
     paying: number;
+    /** Ours. Not revenue, and said so rather than silently missing. */
+    internal: number;
     unpricedModules: string[];
     unknownPlans: number;
   };

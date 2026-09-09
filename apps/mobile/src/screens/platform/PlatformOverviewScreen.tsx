@@ -127,6 +127,9 @@ export function PlatformOverviewScreen({ navigation }: { navigation: any }) {
         <Text variant="tiny" tone="onAccent" style={{ opacity: 0.75 }}>
           from {data.totals?.paying ?? 0} paying{' '}
           {(data.totals?.paying ?? 0) === 1 ? 'client' : 'clients'} · {workspaces.length} workspaces
+          {/* Said, rather than silently missing, so nobody wonders why the
+              figure is smaller than the list below it looks. */}
+          {data.totals?.internal ? ` · ${data.totals.internal} of ours` : ''}
         </Text>
       </Card>
 

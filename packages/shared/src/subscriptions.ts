@@ -140,12 +140,26 @@ export function billFor(
  * figure stops being one.
  */
 export function monthlyRecurring(
-  bills: { status: string; monthlyTotal: number }[],
-): { active: number; total: number } {
-  const paying = bills.filter((bill) => bill.status === 'ACTIVE');
+  bills: { status: string; monthlyTotal: number; isInternal?: boolean }[],
+): { active: number; total: number; internal: number } {
+  /*
+   * Ours is not revenue, and it is the hardest kind of wrong number to spot:
+   * our own workspace is ACTIVE and on every module, which is exactly what a
+   * paying client looks like from here, and leaving it in overstates what we
+   * are owed — the direction nobody checks.
+   *
+   * The exclusion lives here rather than at each call site because it did not,
+   * once. The billing screen filtered it out and the dashboard did not, so the
+   * same business had two revenue figures and the bigger one was on the
+   * screen people look at first.
+   */
+  const ours = bills.filter((bill) => bill.isInternal);
+  const paying = bills.filter((bill) => bill.status === 'ACTIVE' && !bill.isInternal);
+
   return {
     active: paying.length,
     total: rupees(paying.reduce((sum, bill) => sum + bill.monthlyTotal, 0)),
+    internal: ours.length,
   };
 }
 

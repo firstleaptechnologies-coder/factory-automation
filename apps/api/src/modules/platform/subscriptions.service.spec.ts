@@ -302,3 +302,114 @@ describe('a workspace of our own', () => {
     expect(billing.rows[0].monthlyTotal).toBe(8000);
   });
 });
+
+
+/*
+ * The dashboard and the billing screen answer the same question, and once
+ * gave different answers: the billing screen left our own workspace out of
+ * revenue and the dashboard did not. They share one function now, and this is
+ * the rail that says so.
+ */
+describe('the dashboard and the billing screen agree', () => {
+  const TENANTS = [
+    {
+      id: 't1',
+      slug: 'decorbucket',
+      name: 'Decor Bucket',
+      plan: 'shop',
+      modules: [],
+      status: 'ACTIVE',
+      isolation: 'SHARED',
+      isInternal: false,
+      billingDay: 7,
+      trialEndsAt: null,
+      contactName: 'Nakul',
+      createdAt: new Date(),
+    },
+    {
+      id: 't2',
+      slug: 'flt',
+      name: 'FLT',
+      plan: 'shop',
+      modules: [],
+      status: 'ACTIVE',
+      isolation: 'SHARED',
+      isInternal: true,
+      billingDay: 9,
+      trialEndsAt: null,
+      contactName: 'FirstLeap',
+      createdAt: new Date(),
+    },
+  ];
+
+  const both = async () => {
+    const { service, db } = build();
+    db.tenant.findMany = jest.fn(async () => TENANTS);
+    db.subscriptionTier.findMany = jest.fn(async () => [
+      {
+        key: 'shop',
+        label: 'Shop',
+        blurb: '',
+        monthlyPrice: 8000,
+        includedModules: ['orders', 'clients'],
+        isActive: true,
+        sortOrder: 10,
+      },
+    ]);
+    return { overview: await service.overview(), billing: await service.billing() };
+  };
+
+  it('reports the same monthly recurring', async () => {
+    const { overview, billing } = await both();
+
+    expect(overview.totals.monthlyRecurring).toBe(billing.totals.monthlyRecurring);
+    expect(overview.totals.monthlyRecurring).toBe(8000);
+  });
+
+  it('counts the same number of paying clients', async () => {
+    const { overview, billing } = await both();
+
+    expect(overview.totals.paying).toBe(billing.totals.paying);
+    expect(overview.totals.paying).toBe(1);
+  });
+
+  // Not merely missing from the total — said, so nobody wonders where it went.
+  it('says how many are ours on both', async () => {
+    const { overview, billing } = await both();
+
+    expect(overview.totals.internal).toBe(1);
+    expect(billing.totals.internal).toBe(1);
+  });
+
+  it('still lists ours, with what it would be worth', async () => {
+    const { overview } = await both();
+    const ours = overview.workspaces.find((one) => one.slug === 'flt')!;
+
+    expect(ours.isInternal).toBe(true);
+    expect(ours.bill.monthlyTotal).toBe(8000);
+  });
+});
+
+
+/*
+ * The seed used to re-read and recurse without a bound. Fine while the write
+ * always lands, and a process-killing hang when it does not — a read replica a
+ * moment behind, a transaction rolled back.
+ */
+describe('seeding the tiers that ship with the product', () => {
+  it('writes the ones that are missing', async () => {
+    const { service, db } = build();
+    await service.tiers();
+
+    expect(db.subscriptionTier.createMany).toHaveBeenCalled();
+  });
+
+  it('gives up rather than looping when the write does not come back', async () => {
+    const { service, db } = build();
+    // findMany keeps returning nothing, however many times it is asked.
+    db.subscriptionTier.findMany = jest.fn(async () => []);
+
+    await expect(service.tiers()).resolves.toEqual([]);
+    expect(db.subscriptionTier.findMany).toHaveBeenCalledTimes(2);
+  });
+});

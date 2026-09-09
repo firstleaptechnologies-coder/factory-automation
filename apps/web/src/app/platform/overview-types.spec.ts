@@ -5,6 +5,7 @@ const totals = (over: Partial<Parameters<typeof unpricedWarning>[0]> = {}) => ({
   byStatus: { ACTIVE: 2, TRIAL: 1, SUSPENDED: 0 },
   monthlyRecurring: 0,
   paying: 2,
+  internal: 0,
   unpricedModules: [] as string[],
   unknownPlans: 0,
   ...over,
