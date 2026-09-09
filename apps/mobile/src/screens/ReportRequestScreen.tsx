@@ -1,8 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import type { Client } from '@decor/shared';
 import { REPORTS, reportDefinition, reportRequestError } from '@decor/shared';
 import { api } from '../api/client';
-import { Button, Card, Screen, ScreenHeader, Text } from '../ui';
+import { useApi } from '../hooks/useApi';
+import {
+  Button,
+  Card,
+  Field,
+  Screen,
+  ScreenHeader,
+  Sheet,
+  SheetOption,
+  SelectField,
+  Text,
+} from '../ui';
 import { Select } from '../ui/Select';
 import { palette, spacing } from '../theme';
 import { PERIODS, periodDates } from './report-periods';
@@ -25,9 +37,25 @@ export function ReportRequestScreen({ navigation }: { navigation: any }) {
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
+  const [clientId, setClientId] = useState<string | undefined>();
+  const [clientName, setClientName] = useState('');
+  const [clientSheet, setClientSheet] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+
   const definition = reportDefinition(kind);
   const needsPeriod = definition?.period !== 'none';
+  const needsClient = definition?.subject === 'client';
   const dates = useMemo(() => periodDates(period), [period]);
+
+  // Only fetched when a report actually asks for one, so choosing the cash
+  // book does not go looking up the client list on a phone connection.
+  const clients = useApi<{ data: Client[] }>(
+    () =>
+      needsClient
+        ? api.clients({ search: clientSearch || undefined, limit: 20 })
+        : Promise.resolve({ data: [] as Client[] }),
+    [needsClient, clientSearch],
+  );
 
   const complaint = useMemo(
     () =>
@@ -35,16 +63,20 @@ export function ReportRequestScreen({ navigation }: { navigation: any }) {
         kind,
         from: needsPeriod ? dates.from : undefined,
         to: needsPeriod ? dates.to : undefined,
-        clientId: definition?.subject === 'client' ? undefined : null,
+        clientId: needsClient ? clientId ?? null : null,
       }),
-    [kind, dates, needsPeriod, definition],
+    [kind, dates, needsPeriod, needsClient, clientId],
   );
 
   async function submit() {
     setSaving(true);
     setFailed(null);
     try {
-      await api.requestReport({ kind, ...(needsPeriod ? dates : {}) });
+      await api.requestReport({
+        kind,
+        ...(needsPeriod ? dates : {}),
+        ...(needsClient && clientId ? { clientId } : {}),
+      });
       navigation.goBack();
     } catch (error) {
       setFailed(error instanceof Error ? error.message : 'That did not work');
@@ -75,6 +107,18 @@ export function ReportRequestScreen({ navigation }: { navigation: any }) {
         )}
       </Card>
 
+      {needsClient && (
+        <Card style={{ marginTop: spacing.md }}>
+          <SelectField
+            label="Client"
+            placeholder="Choose a client"
+            value={clientName || null}
+            icon="user"
+            onPress={() => setClientSheet(true)}
+          />
+        </Card>
+      )}
+
       {needsPeriod && (
         <Card style={{ marginTop: spacing.md }}>
           <Select
@@ -101,6 +145,33 @@ export function ReportRequestScreen({ navigation }: { navigation: any }) {
           disabled={Boolean(complaint) || saving}
         />
       </View>
+
+      <Sheet
+        visible={clientSheet}
+        title="Pick a client"
+        onClose={() => setClientSheet(false)}
+        fullHeight>
+        <Field
+          placeholder="Name or phone"
+          value={clientSearch}
+          onChangeText={setClientSearch}
+          icon="search"
+          pasteable={false}
+        />
+        {(clients.data?.data ?? []).map((client) => (
+          <SheetOption
+            key={client.id}
+            label={client.name}
+            description={[client.code, client.phone].filter(Boolean).join(' · ')}
+            selected={clientId === client.id}
+            onPress={() => {
+              setClientId(client.id);
+              setClientName(client.name);
+              setClientSheet(false);
+            }}
+          />
+        ))}
+      </Sheet>
     </Screen>
   );
 }

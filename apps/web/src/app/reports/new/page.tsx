@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { Client } from '@decor/shared';
 import { REPORTS, reportDefinition, reportRequestError, thisMonth } from '@decor/shared';
 import { api } from '@/lib/api';
+import { useApi } from '@/lib/useApi';
 import { Shell } from '@/components/Shell';
-import { Button, Card, Field, PageHead, SectionHead } from '@/ui';
+import { Button, Card, Field, PageHead, SectionHead, Sheet, SheetOption } from '@/ui';
 import { Select } from '@/ui/Select';
 
 export default function ReportRequestPage() {
@@ -34,8 +36,24 @@ function ReportRequest() {
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
+  const [clientId, setClientId] = useState<string | undefined>();
+  const [clientName, setClientName] = useState('');
+  const [clientSheet, setClientSheet] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+
   const definition = reportDefinition(kind);
   const needsPeriod = definition?.period !== 'none';
+  const needsClient = definition?.subject === 'client';
+
+  // Only fetched when a report actually asks for one, so choosing the cash
+  // book does not go looking up the client list.
+  const clients = useApi<{ data: Client[] }>(
+    () =>
+      needsClient
+        ? api.clients({ search: clientSearch || undefined, limit: 20 })
+        : Promise.resolve({ data: [] as Client[] }),
+    [needsClient, clientSearch],
+  );
 
   // The same check the API makes, so the button is disabled for the reason the
   // server would have given rather than for a rule invented here.
@@ -45,11 +63,9 @@ function ReportRequest() {
         kind,
         from: needsPeriod ? from : undefined,
         to: needsPeriod ? to : undefined,
-        // A client statement needs one, and choosing a client is not built
-        // yet — the catalogue says so and this says so with it.
-        clientId: definition?.subject === 'client' ? undefined : null,
+        clientId: needsClient ? clientId ?? null : null,
       }),
-    [kind, from, to, needsPeriod, definition],
+    [kind, from, to, needsPeriod, needsClient, clientId],
   );
 
   async function submit() {
@@ -59,6 +75,7 @@ function ReportRequest() {
       await api.requestReport({
         kind,
         ...(needsPeriod ? { from, to } : {}),
+        ...(needsClient && clientId ? { clientId } : {}),
       });
       router.push('/reports');
     } catch (error) {
@@ -82,6 +99,21 @@ function ReportRequest() {
         {definition && <p className="t-tiny muted">{definition.description}</p>}
       </Card>
 
+      {needsClient && (
+        <Card>
+          <SectionHead title="Client" />
+          <p className={clientId ? 't-h3' : 't-tiny muted'}>
+            {clientName || 'Nobody chosen yet'}
+          </p>
+          <Button
+            title={clientId ? 'Choose a different client' : 'Choose a client'}
+            variant="dark"
+            size="sm"
+            onClick={() => setClientSheet(true)}
+          />
+        </Card>
+      )}
+
       {needsPeriod && (
         <Card>
           <SectionHead title="Period" />
@@ -99,6 +131,30 @@ function ReportRequest() {
         loading={saving}
         disabled={Boolean(complaint) || saving}
       />
+
+      <Sheet open={clientSheet} title="Pick a client" onClose={() => setClientSheet(false)}>
+        <Field
+          placeholder="Name or phone"
+          icon="search"
+          value={clientSearch}
+          onChange={setClientSearch}
+          autoFocus
+          pasteable={false}
+        />
+        {(clients.data?.data ?? []).map((client) => (
+          <SheetOption
+            key={client.id}
+            label={client.name}
+            description={[client.code, client.phone].filter(Boolean).join(' · ')}
+            selected={clientId === client.id}
+            onClick={() => {
+              setClientId(client.id);
+              setClientName(client.name);
+              setClientSheet(false);
+            }}
+          />
+        ))}
+      </Sheet>
     </>
   );
 }

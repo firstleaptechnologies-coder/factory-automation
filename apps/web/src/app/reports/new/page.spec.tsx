@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import ReportRequestPage from './page';
 
-const apiMock = { requestReport: jest.fn() };
+const apiMock = { requestReport: jest.fn(), clients: jest.fn() };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
     {},
@@ -22,12 +22,15 @@ jest.mock('@/components/Shell', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   apiMock.requestReport.mockResolvedValue({ id: 'r1' });
+  apiMock.clients.mockResolvedValue({ data: [] });
 });
 
 async function draw() {
+  let view!: ReturnType<typeof render>;
   await act(async () => {
-    render(<ReportRequestPage />);
+    view = render(<ReportRequestPage />);
   });
+  return view;
 }
 
 it('describes the report that is selected', async () => {
@@ -74,4 +77,61 @@ it('shows what the API said when it refuses anyway', async () => {
 
   expect(screen.getByText('Salary register is still to be written.')).toBeInTheDocument();
   expect(push).not.toHaveBeenCalled();
+});
+
+describe('a report about one client', () => {
+  const CLIENTS = {
+    data: [
+      { id: 'c1', name: 'Sharma Interiors', code: 'CL-1', phone: '9876543210' },
+      { id: 'c2', name: 'Bhatia Residence', code: 'CL-2', phone: '9876500000' },
+    ],
+  };
+
+  /** The report Select is the first of the two on the page. */
+  async function chooseStatement() {
+    const view = await draw();
+    const trigger = view.container.querySelectorAll('.select-trigger')[0] as HTMLElement;
+    await act(async () => {
+      fireEvent.click(trigger);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Client statement'));
+    });
+  }
+
+  beforeEach(() => {
+    apiMock.clients.mockResolvedValue(CLIENTS);
+  });
+
+  it('refuses until a client is chosen, in the API’s own words', async () => {
+    await chooseStatement();
+
+    expect(screen.getByText(/is about one client, so it needs one/)).toBeInTheDocument();
+    expect(screen.getByText('Ask for it').closest('button')).toBeDisabled();
+  });
+
+  // Nothing else should go looking up the client list.
+  it('does not fetch clients for a report that has no subject', async () => {
+    await draw();
+
+    expect(apiMock.clients).not.toHaveBeenCalled();
+  });
+
+  it('sends the chosen client with the request', async () => {
+    await chooseStatement();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Choose a client'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Sharma Interiors'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Ask for it'));
+    });
+
+    expect(apiMock.requestReport).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'CLIENT_STATEMENT', clientId: 'c1' }),
+    );
+  });
 });
