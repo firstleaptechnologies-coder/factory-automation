@@ -1226,6 +1226,18 @@ export class ApiClient {
     return this.post<Invoice>(`/invoices/${id}/cancel`, { reason });
   }
 
+  /**
+   * A client's statement, as paper. HTML the browser prints to PDF, like
+   * every other document here.
+   */
+  clientStatementUrl(id: string, period?: { from?: string; to?: string }): string {
+    const query = new URLSearchParams();
+    if (period?.from) query.set('from', period.from);
+    if (period?.to) query.set('to', period.to);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return `${this.baseUrl}/clients/${id}/statement${suffix}`;
+  }
+
   invoiceDocumentUrl(id: string): string {
     return `${this.baseUrl}/invoices/${id}/document`;
   }

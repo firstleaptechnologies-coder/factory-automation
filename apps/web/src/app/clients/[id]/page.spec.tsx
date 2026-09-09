@@ -8,6 +8,7 @@ jest.mock('@/lib/api', () => ({
   api: {
     client: (...a: unknown[]) => clientCall(...a),
     history: (...a: unknown[]) => historyCall(...a),
+    clientStatementUrl: (id: string) => `http://api.test/clients/${id}/statement`,
   },
 }));
 
@@ -159,4 +160,16 @@ describe('the orders', () => {
     await mount({ ...CLIENT, orders: [] });
     expect(screen.getByText('No orders yet')).toBeInTheDocument();
   });
+});
+
+// The statement is paper for the client: opened for the browser to print,
+// not downloaded as a file.
+it('opens the client’s statement in a new tab', async () => {
+  const open = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+  await mount();
+  fireEvent.click(screen.getByText('Statement'));
+
+  expect(open).toHaveBeenCalledWith('http://api.test/clients/c1/statement', '_blank');
+  open.mockRestore();
 });

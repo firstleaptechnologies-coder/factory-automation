@@ -12,7 +12,7 @@ import { inkOn } from '@fas/shared';
 import { api } from './api';
 import { useAuth } from './auth';
 
-const ACCENT_KEY = 'decor.accent';
+const ACCENT_KEY = 'fas.accent';
 const DEFAULT_ACCENT = '#FF6B1A';
 
 interface ThemeState {

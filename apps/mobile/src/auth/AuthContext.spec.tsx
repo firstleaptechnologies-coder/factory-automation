@@ -46,9 +46,9 @@ const mount = () =>
 /** AsyncStorage's multiGet answers in the order the keys were asked for. */
 function stored({ token = null, user = null, workspace = null }: Record<string, unknown>) {
   storage.multiGet.mockResolvedValue([
-    ['decor.token', token],
-    ['decor.user', user],
-    ['decor.workspace', workspace],
+    ['fas.token', token],
+    ['fas.user', user],
+    ['fas.workspace', workspace],
   ]);
 }
 
@@ -82,7 +82,7 @@ it('replaces the cached user with what the server says', async () => {
   await mount();
   expect(await screen.findByText('Nakul')).toBeTruthy();
   expect(storage.setItem).toHaveBeenCalledWith(
-    'decor.user',
+    'fas.user',
     JSON.stringify({ name: 'Nakul', permissions: ['order.view'] }),
   );
 });
@@ -92,7 +92,7 @@ it('signs out when the stored token is no longer accepted', async () => {
   mockMe.mockRejectedValue(new Error('Unauthorized'));
   await mount();
   expect(await screen.findByText('signed out')).toBeTruthy();
-  expect(storage.multiRemove).toHaveBeenCalledWith(['decor.token', 'decor.user']);
+  expect(storage.multiRemove).toHaveBeenCalledWith(['fas.token', 'fas.user']);
 });
 
 it('remembers the workspace between sessions', async () => {
@@ -112,9 +112,9 @@ it('keeps the token, the user and the workspace on sign-in', async () => {
   await act(() => state.signIn('DecorBucket', 'ADMIN', 'admin123'));
 
   expect(storage.multiSet).toHaveBeenCalledWith([
-    ['decor.token', 'tok'],
+    ['fas.token', 'tok'],
     [
-      'decor.user',
+      'fas.user',
       // The workspace is kept with the user: the menu needs what the shop
       // bought as well as what the person may do, and both have to survive the
       // app being closed.
@@ -124,7 +124,7 @@ it('keeps the token, the user and the workspace on sign-in', async () => {
         workspace: { slug: 'decorbucket' },
       }),
     ],
-    ['decor.workspace', 'decorbucket'],
+    ['fas.workspace', 'decorbucket'],
   ]);
   expect(await screen.findByText('Nakul')).toBeTruthy();
 });
@@ -168,7 +168,7 @@ it('keeps the workspace after signing out', async () => {
   await screen.findByText('Nakul');
   await act(() => state.signOut());
   // The next person at this device is almost always from the same shop.
-  expect(storage.multiRemove).toHaveBeenCalledWith(['decor.token', 'decor.user']);
+  expect(storage.multiRemove).toHaveBeenCalledWith(['fas.token', 'fas.user']);
   expect(state.workspace).toBe('decorbucket');
   expect(mockSetToken).toHaveBeenCalledWith(null);
 });
@@ -178,7 +178,7 @@ it('forgetting the workspace signs the person out too', async () => {
   await mount();
   await waitFor(() => expect(state.workspace).toBe('decorbucket'));
   await act(() => state.forgetWorkspace());
-  expect(storage.removeItem).toHaveBeenCalledWith('decor.workspace');
+  expect(storage.removeItem).toHaveBeenCalledWith('fas.workspace');
   expect(state.workspace).toBeNull();
 });
 

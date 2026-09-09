@@ -240,17 +240,17 @@ describe('the categories', () => {
   it('remembers what was folded away', () => {
     mount(all());
     fireEvent.click(screen.getByTestId('nav-group-finances'));
-    expect(JSON.parse(window.localStorage.getItem('decor.nav.closed')!)).toContain('finances');
+    expect(JSON.parse(window.localStorage.getItem('fas.nav.closed')!)).toContain('finances');
   });
 
   it('opens with what was folded away last time still folded', () => {
-    window.localStorage.setItem('decor.nav.closed', JSON.stringify(['finances']));
+    window.localStorage.setItem('fas.nav.closed', JSON.stringify(['finances']));
     mount(all());
     expect(screen.queryByText('Payout ledger')).not.toBeInTheDocument();
   });
 
   it('keeps the category holding the current page open, however it was left', () => {
-    window.localStorage.setItem('decor.nav.closed', JSON.stringify(['finances']));
+    window.localStorage.setItem('fas.nav.closed', JSON.stringify(['finances']));
     pathname = '/disbursements';
     mount(all());
     // Collapsing away the page somebody is looking at is disorienting.
@@ -260,7 +260,7 @@ describe('the categories', () => {
   it('opens a category nobody has ever seen, rather than hiding a new module', () => {
     // What is stored is what is shut, so a group added in a later release is
     // open by default.
-    window.localStorage.setItem('decor.nav.closed', JSON.stringify(['something-old']));
+    window.localStorage.setItem('fas.nav.closed', JSON.stringify(['something-old']));
     mount(all());
     expect(screen.getByText('Payout ledger')).toBeInTheDocument();
   });

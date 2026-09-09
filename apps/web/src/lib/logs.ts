@@ -2,7 +2,7 @@
 
 import { api } from './api';
 
-const KEY = 'decor.logs.pending';
+const KEY = 'fas.logs.pending';
 
 /** Sent in one go. */
 const MAX_BATCH = 50;

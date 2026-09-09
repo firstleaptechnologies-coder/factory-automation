@@ -2,7 +2,7 @@
  * The token store. Everything here is about a page refresh not signing the
  * user out — the failure this module exists to prevent.
  */
-const TOKEN_KEY = 'decor.token';
+const TOKEN_KEY = 'fas.token';
 
 function loadModule() {
   jest.resetModules();

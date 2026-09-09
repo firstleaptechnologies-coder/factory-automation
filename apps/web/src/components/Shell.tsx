@@ -9,7 +9,7 @@ import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
 import { Avatar, Icon, IconName, Loader } from '@/ui';
 
-const CLOSED_KEY = 'decor.nav.closed';
+const CLOSED_KEY = 'fas.nav.closed';
 
 /**
  * The signed-in frame.

@@ -39,11 +39,20 @@ function ClientDetail({ clientId }: { clientId: string }) {
         title={data.name}
         subtitle={[data.code, data.company].filter(Boolean).join(' · ')}
         action={
-          <Button
-            title="Firm details"
-            variant="dark"
-            onClick={() => router.push(`/clients/${clientId}/firm`)}
-          />
+          <div className="row">
+            {/* Opened rather than downloaded: it is HTML laid out for A4, and
+                the browser's own print dialogue is what makes it a PDF. */}
+            <Button
+              title="Statement"
+              variant="dark"
+              onClick={() => window.open(api.clientStatementUrl(clientId), '_blank')}
+            />
+            <Button
+              title="Firm details"
+              variant="dark"
+              onClick={() => router.push(`/clients/${clientId}/firm`)}
+            />
+          </div>
         }
       />
 

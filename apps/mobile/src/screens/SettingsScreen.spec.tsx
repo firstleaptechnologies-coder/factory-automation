@@ -39,7 +39,7 @@ it('says the display unit changes nothing that is stored', async () => {
 it('remembers the unit that was chosen', async () => {
   await mount();
   await fireEvent.press(screen.getByText('mm'));
-  await waitFor(() => expect(storage.setItem).toHaveBeenCalledWith('decor.unit', 'MM'));
+  await waitFor(() => expect(storage.setItem).toHaveBeenCalledWith('fas.unit', 'MM'));
 });
 
 it('says which server the app is talking to', async () => {

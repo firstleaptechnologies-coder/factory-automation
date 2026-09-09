@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../api/client';
 
-const KEY = 'decor.logs.pending';
+const KEY = 'fas.logs.pending';
 
 /** Sent in one go. More than this and the oldest are dropped. */
 const MAX_BATCH = 50;

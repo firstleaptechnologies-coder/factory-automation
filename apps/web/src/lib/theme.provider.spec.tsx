@@ -40,7 +40,7 @@ it('starts on our own orange', async () => {
 });
 
 it('paints the cached colour before the server answers', () => {
-  window.localStorage.setItem('decor.accent', '#2563EB');
+  window.localStorage.setItem('fas.accent', '#2563EB');
   firmTheme.mockReturnValue(new Promise(() => {}));
   mount();
   // A branded workspace must not flash our orange on every navigation.
@@ -50,7 +50,7 @@ it('paints the cached colour before the server answers', () => {
 it('adopts the tenant’s colour from the server and remembers it', async () => {
   mount();
   await waitFor(() => expect(screen.getByText('#2563EB')).toBeInTheDocument());
-  expect(window.localStorage.getItem('decor.accent')).toBe('#2563EB');
+  expect(window.localStorage.getItem('fas.accent')).toBe('#2563EB');
 });
 
 it('does not ask for a theme before anyone has signed in', () => {
@@ -67,7 +67,7 @@ it('does not ask for a tenant theme as a platform admin', () => {
 });
 
 it('keeps the last colour when the server cannot be reached', async () => {
-  window.localStorage.setItem('decor.accent', '#2563EB');
+  window.localStorage.setItem('fas.accent', '#2563EB');
   firmTheme.mockRejectedValue(new Error('offline'));
   mount();
   await waitFor(() => expect(screen.getByText('#2563EB')).toBeInTheDocument());
@@ -124,7 +124,7 @@ describe('setAccent', () => {
     await waitFor(() => expect(screen.getByText('#2563EB')).toBeInTheDocument());
     act(() => theme.setAccent('#0af'));
     expect(screen.getByText('#00AAFF')).toBeInTheDocument();
-    expect(window.localStorage.getItem('decor.accent')).toBe('#00AAFF');
+    expect(window.localStorage.getItem('fas.accent')).toBe('#00AAFF');
   });
 
   it('refuses anything that is not plainly a colour', async () => {
@@ -133,7 +133,7 @@ describe('setAccent', () => {
     act(() => theme.setAccent('red; background: url(x)'));
     // The value is written straight onto a CSS custom property.
     expect(screen.getByText('#2563EB')).toBeInTheDocument();
-    expect(window.localStorage.getItem('decor.accent')).toBe('#2563EB');
+    expect(window.localStorage.getItem('fas.accent')).toBe('#2563EB');
   });
 });
 

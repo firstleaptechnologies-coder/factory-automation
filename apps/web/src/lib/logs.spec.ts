@@ -38,7 +38,7 @@ describe('what the browser saw', () => {
 
   it('picks up what the last page could not send', async () => {
     window.localStorage.setItem(
-      'decor.logs.pending',
+      'fas.logs.pending',
       JSON.stringify([{ level: 'error', message: 'Crashed', at: '2026-09-08T09:00:00.000Z' }]),
     );
 

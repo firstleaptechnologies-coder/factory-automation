@@ -65,7 +65,7 @@ it('drops a token the server no longer accepts', async () => {
 });
 
 it('remembers the workspace between sessions', async () => {
-  window.localStorage.setItem('decor.workspace', 'decorbucket');
+  window.localStorage.setItem('fas.workspace', 'decorbucket');
   mount();
   await waitFor(() => expect(state.workspace).toBe('decorbucket'));
 });
@@ -77,7 +77,7 @@ it('keeps the token and the workspace on sign-in', async () => {
   await act(() => state.signIn('decorbucket', 'ADMIN', 'admin123'));
 
   expect(saveToken).toHaveBeenCalledWith('tok');
-  expect(window.localStorage.getItem('decor.workspace')).toBe('decorbucket');
+  expect(window.localStorage.getItem('fas.workspace')).toBe('decorbucket');
   expect(push).toHaveBeenCalledWith('/');
   await screen.findByText('Nakul');
 });
@@ -94,7 +94,7 @@ it('sends a platform admin to the platform screens', async () => {
 });
 
 it('keeps the workspace after sign-out', async () => {
-  window.localStorage.setItem('decor.workspace', 'decorbucket');
+  window.localStorage.setItem('fas.workspace', 'decorbucket');
   storedToken = 'tok';
   me.mockResolvedValue({ name: 'Nakul', permissions: [] });
   mount();
@@ -103,17 +103,17 @@ it('keeps the workspace after sign-out', async () => {
   act(() => state.signOut());
   // The next person at this desk is almost always from the same shop.
   expect(clearToken).toHaveBeenCalled();
-  expect(window.localStorage.getItem('decor.workspace')).toBe('decorbucket');
+  expect(window.localStorage.getItem('fas.workspace')).toBe('decorbucket');
   expect(push).toHaveBeenCalledWith('/login');
   await screen.findByText('signed out');
 });
 
 it('forgets the workspace when a browser moves between businesses', async () => {
-  window.localStorage.setItem('decor.workspace', 'decorbucket');
+  window.localStorage.setItem('fas.workspace', 'decorbucket');
   mount();
   await waitFor(() => expect(state.workspace).toBe('decorbucket'));
   act(() => state.forgetWorkspace());
-  expect(window.localStorage.getItem('decor.workspace')).toBeNull();
+  expect(window.localStorage.getItem('fas.workspace')).toBeNull();
   expect(state.workspace).toBeNull();
 });
 

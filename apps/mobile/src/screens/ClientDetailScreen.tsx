@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Linking, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Client, HistoryEntry, Order } from '@fas/shared';
 import { api } from '../api/client';
@@ -12,6 +12,7 @@ import {
   Loader,
   Pill,
   Screen,
+  Button,
   ScreenHeader,
   SectionHeader,
   Text,
@@ -96,6 +97,15 @@ export function ClientDetailScreen({ route, navigation }: { route: any; navigati
           ))}
         </>
       ) : null}
+
+      {/* Opened rather than downloaded: it is HTML laid out for A4, and the
+          phone's own share sheet is what turns it into a PDF. */}
+      <Button
+        title="Statement"
+        variant="dark"
+        onPress={() => Linking.openURL(api.clientStatementUrl(clientId))}
+        style={{ marginTop: spacing.lg }}
+      />
 
       <SectionHeader title="Orders" />
       {data.orders?.length ? (

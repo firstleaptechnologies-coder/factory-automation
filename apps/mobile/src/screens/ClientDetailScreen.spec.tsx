@@ -7,6 +7,7 @@ jest.mock('../api/client', () => ({
   api: {
     client: (...a: unknown[]) => mockClient(...a),
     history: (...a: unknown[]) => mockHistory(...a),
+    clientStatementUrl: (id: string) => `http://api.test/clients/${id}/statement`,
   },
 }));
 
@@ -103,4 +104,16 @@ it('shows what has been changed on the client', async () => {
   ]);
   await mount();
   expect(await screen.findByText('Phone changed')).toBeTruthy();
+});
+
+// The statement is paper for the client, so it opens the way every other
+// document does rather than being downloaded as a file.
+it('opens the client’s statement', async () => {
+  const { Linking } = require('react-native');
+  const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true as never);
+
+  await mount();
+  fireEvent.press(screen.getByText('Statement'));
+
+  expect(open).toHaveBeenCalledWith('http://api.test/clients/c1/statement');
 });

@@ -11,7 +11,7 @@ import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { DEFAULT_ACCENT, applyAccent, palette } from '../theme';
 
-const ACCENT_KEY = 'decor.accent';
+const ACCENT_KEY = 'fas.accent';
 
 interface ThemeState {
   accent: string;

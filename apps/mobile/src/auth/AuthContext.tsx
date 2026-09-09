@@ -11,9 +11,9 @@ import type { AuthUser, ModuleKey } from '@fas/shared';
 import { hasModule } from '@fas/shared';
 import { api, setUnauthorizedHandler } from '../api/client';
 
-const TOKEN_KEY = 'decor.token';
-const USER_KEY = 'decor.user';
-const WORKSPACE_KEY = 'decor.workspace';
+const TOKEN_KEY = 'fas.token';
+const USER_KEY = 'fas.user';
+const WORKSPACE_KEY = 'fas.workspace';
 
 interface AuthState {
   user: AuthUser | null;

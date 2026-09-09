@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_UNIT, LengthUnit, isLengthUnit } from '@fas/shared';
 
-const KEY = 'decor.unit';
+const KEY = 'fas.unit';
 
 /**
  * The display unit, remembered across launches.

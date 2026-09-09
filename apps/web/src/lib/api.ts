@@ -2,7 +2,7 @@
 
 import {ApiClient} from '@fas/shared';
 
-const TOKEN_KEY = 'decor.token';
+const TOKEN_KEY = 'fas.token';
 
 /**
  * Where a rejected request should leave the user.

@@ -54,7 +54,7 @@ it('paints the cached colour on launch, before the server is asked', async () =>
 it('refreshes from the server, because an admin may have changed it elsewhere', async () => {
   await mount();
   expect(await screen.findByText('#2563EB')).toBeTruthy();
-  expect(storage.setItem).toHaveBeenCalledWith('decor.accent', '#2563EB');
+  expect(storage.setItem).toHaveBeenCalledWith('fas.accent', '#2563EB');
 });
 
 it('does not ask for a theme before anyone has signed in', async () => {
@@ -111,7 +111,7 @@ it('lets an admin set the colour, remembering it on the device', async () => {
   await mount();
   await screen.findByText('#2563EB');
   await act(() => theme.setAccent('#FF0000'));
-  expect(storage.setItem).toHaveBeenCalledWith('decor.accent', '#FF0000');
+  expect(storage.setItem).toHaveBeenCalledWith('fas.accent', '#FF0000');
   expect(screen.getByText('#FF0000')).toBeTruthy();
 });
 

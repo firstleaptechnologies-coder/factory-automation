@@ -50,7 +50,7 @@ describe('what the device saw', () => {
   });
 
   it('picks up what the last run could not send', async () => {
-    store['decor.logs.pending'] = JSON.stringify([
+    store['fas.logs.pending'] = JSON.stringify([
       { level: 'error', message: 'Crashed on punch', at: '2026-09-08T09:00:00.000Z' },
     ]);
 

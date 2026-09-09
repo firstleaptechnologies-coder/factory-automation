@@ -13,7 +13,7 @@ import type { AuthUser, ModuleKey } from '@fas/shared';
 import { hasModule } from '@fas/shared';
 import { api, clearToken, loadToken, saveToken } from './api';
 
-const WORKSPACE_KEY = 'decor.workspace';
+const WORKSPACE_KEY = 'fas.workspace';
 
 interface AuthState {
   user: AuthUser | null;

@@ -39,5 +39,5 @@ it('changes the unit and remembers it', async () => {
   const { result } = await renderHook(() => useDisplayUnit());
   await act(async () => result.current[1]('CM'));
   expect(result.current[0]).toBe('CM');
-  expect(storage.setItem).toHaveBeenCalledWith('decor.unit', 'CM');
+  expect(storage.setItem).toHaveBeenCalledWith('fas.unit', 'CM');
 });
