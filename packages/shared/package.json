@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "docs:nav": "tsx scripts/docs-nav.ts"
+    "docs:nav": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node --transpile-only scripts/docs-nav.ts"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
