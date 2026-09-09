@@ -1,7 +1,7 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import PlatformOverviewPage from './page';
 
-const apiMock = { platformOverview: jest.fn() };
+const apiMock = { platformOverview: jest.fn(), updateTenant: jest.fn() };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
     {},
@@ -52,6 +52,7 @@ const overview = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   apiMock.platformOverview.mockResolvedValue(overview());
+  apiMock.updateTenant.mockResolvedValue({});
 });
 
 async function draw() {
@@ -117,4 +118,58 @@ it('goes to the price list', async () => {
   await draw();
 
   expect(screen.getByText('Plans and prices')).toBeInTheDocument();
+});
+
+describe('editing what a client is on', () => {
+  async function openEditor() {
+    await draw();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Decor Bucket'));
+    });
+  }
+
+  it('opens on the client that was clicked', async () => {
+    await openEditor();
+
+    expect(screen.getByText('What they are on, and what it comes to')).toBeInTheDocument();
+  });
+
+  // A module the tier already covers is not an add-on, and offering it as one
+  // would read as something the client is being charged for.
+  it('shows a module the tier covers as included rather than as an add-on', async () => {
+    apiMock.platformOverview.mockResolvedValue(
+      overview({
+        tiers: [
+          {
+            key: 'shop',
+            label: 'Shop',
+            blurb: '',
+            monthlyPrice: 8000,
+            includedModules: ['orders', 'clients', 'leads'],
+            planModules: [],
+            isActive: true,
+          },
+        ],
+      }),
+    );
+
+    await openEditor();
+
+    expect(screen.getByText('Leads (in tier)')).toBeInTheDocument();
+  });
+
+  it('sends the tier and the add-ons together', async () => {
+    await openEditor();
+    await act(async () => {
+      fireEvent.click(screen.getByText('People'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save'));
+    });
+
+    expect(apiMock.updateTenant).toHaveBeenCalledWith('w1', {
+      plan: 'shop',
+      modules: ['hr'],
+    });
+  });
 });

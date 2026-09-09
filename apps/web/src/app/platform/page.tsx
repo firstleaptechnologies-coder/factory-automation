@@ -1,11 +1,14 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MODULE_CATALOGUE } from '@fas/shared';
+import { CORE_MODULES, MODULE_CATALOGUE, billFor } from '@fas/shared';
+import type { ModuleKey, ModulePrices, Tier } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
-import { Button, Card, EmptyState, Loader, PageHead, Pill, SectionHead } from '@/ui';
+import { Button, Card, Chip, EmptyState, Loader, PageHead, Pill, SectionHead, Sheet } from '@/ui';
+import { Select } from '@/ui/Select';
 import { formatInr } from '@/lib/format';
 import type { PlatformOverview } from './overview-types';
 import { statusColour, unpricedWarning } from './overview-types';
@@ -24,6 +27,67 @@ export default function PlatformOverviewPage() {
     () => api.platformOverview() as Promise<PlatformOverview>,
     [],
   );
+
+  const [editing, setEditing] = useState<string | null>(null);
+  const [tier, setTier] = useState<string>('');
+  const [extras, setExtras] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const editingWorkspace =
+    overview.data?.workspaces.find((one) => one.id === editing) ?? null;
+
+  useEffect(() => {
+    if (!editingWorkspace) return;
+    setTier(editingWorkspace.tier ?? '');
+    setExtras([...editingWorkspace.extras]);
+    setFailed(null);
+  }, [editingWorkspace]);
+
+  /**
+   * What this client would pay, as the chips are tapped.
+   *
+   * Computed with the same `billFor` the API bills with, so the figure on
+   * screen is the figure that will be charged — a preview that used its own
+   * arithmetic would eventually disagree with the invoice.
+   */
+  function preview() {
+    if (!overview.data || !editingWorkspace) return null;
+    const chosen = overview.data.tiers.find((one) => one.key === tier);
+    const asTier: Tier | undefined = chosen
+      ? {
+          key: chosen.key,
+          label: chosen.label,
+          blurb: chosen.blurb ?? '',
+          monthlyPrice: chosen.monthlyPrice,
+          includedModules: chosen.includedModules as ModuleKey[],
+        }
+      : undefined;
+
+    const prices: ModulePrices = {};
+    for (const price of overview.data.modulePrices) {
+      if (price.isPriced) prices[price.moduleKey as ModuleKey] = price.monthlyPrice;
+    }
+    const labels: Partial<Record<ModuleKey, string>> = {};
+    for (const module of MODULE_CATALOGUE) labels[module.key] = module.label;
+
+    return billFor(asTier, extras, prices, labels);
+  }
+
+  async function saveWorkspace() {
+    if (!editingWorkspace) return;
+    setSaving(true);
+    setFailed(null);
+    try {
+      await api.updateTenant(editingWorkspace.id, { plan: tier || undefined, modules: extras });
+      setEditing(null);
+      overview.reload();
+    } catch (error) {
+      setFailed(error instanceof Error ? error.message : 'That did not save');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const data = overview.data;
   if (overview.loading && !data) return <Loader label="Loading the platform" />;
@@ -87,7 +151,7 @@ export default function PlatformOverviewPage() {
       <SectionHead title="Clients" />
       <div className="stack-sm">
         {workspaces.map((workspace) => (
-          <Card key={workspace.id} size="sm">
+          <Card key={workspace.id} size="sm" onClick={() => setEditing(workspace.id)}>
             <div className="row-between">
               <div style={{ minWidth: 0 }}>
                 <div className="row" style={{ gap: 8 }}>
@@ -120,6 +184,104 @@ export default function PlatformOverviewPage() {
           </Card>
         ))}
       </div>
+
+      <Sheet
+        open={Boolean(editing)}
+        title={editingWorkspace?.name ?? ''}
+        subtitle="What they are on, and what it comes to"
+        onClose={() => setEditing(null)}>
+        {editingWorkspace && (
+          <>
+            <Select
+              label="Tier"
+              value={tier}
+              onChange={setTier}
+              options={(data?.tiers ?? []).map((one) => ({
+                value: one.key,
+                label: one.label,
+              }))}
+            />
+
+            <div className="t-label muted" style={{ marginTop: 'var(--s-lg)' }}>
+              Modules
+            </div>
+            <p className="t-tiny faint" style={{ margin: '2px 0 6px' }}>
+              A module the tier already covers is shown as included and costs nothing extra.
+            </p>
+            <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+              {MODULE_CATALOGUE.map((module) => {
+                const inTier =
+                  (CORE_MODULES as string[]).includes(module.key) ||
+                  ((data?.tiers.find((one) => one.key === tier)?.includedModules ?? []) as string[])
+                    .includes(module.key);
+                return (
+                  <Chip
+                    key={module.key}
+                    label={inTier ? `${module.label} (in tier)` : module.label}
+                    selected={inTier || extras.includes(module.key)}
+                    // Granting a module the tier already covers changes nothing
+                    // and would read as an add-on they are not being charged for.
+                    onClick={
+                      inTier
+                        ? undefined
+                        : () =>
+                            setExtras((current) =>
+                              current.includes(module.key)
+                                ? current.filter((key) => key !== module.key)
+                                : [...current, module.key],
+                            )
+                    }
+                  />
+                );
+              })}
+            </div>
+
+            {(() => {
+              const next = preview();
+              if (!next) return null;
+              const now = editingWorkspace.bill.monthlyTotal;
+              const changed = next.monthlyTotal !== now;
+              return (
+                <Card tone="well" style={{ marginTop: 'var(--s-lg)' }}>
+                  <div className="t-label muted">What they would pay</div>
+                  {next.lines.map((line, index) => (
+                    <div key={`${line.label}-${index}`} className="row-between t-small">
+                      <span>{line.label}{line.unpriced ? ' — unpriced' : ''}</span>
+                      <span>{formatInr(line.amount)}</span>
+                    </div>
+                  ))}
+                  <div className="row-between t-h3" style={{ marginTop: 6 }}>
+                    <span>A month</span>
+                    <span>{formatInr(next.monthlyTotal)}</span>
+                  </div>
+                  {changed && (
+                    <div className="t-tiny" style={{ color: 'var(--warning)', marginTop: 4 }}>
+                      Not saved yet — {formatInr(now)} today.
+                    </div>
+                  )}
+                  {next.unpriced.length > 0 && (
+                    <div className="t-tiny" style={{ color: 'var(--warning)', marginTop: 4 }}>
+                      {next.unpriced.length} of these has no price, so it is billed as nothing.
+                    </div>
+                  )}
+                </Card>
+              );
+            })()}
+
+            {failed && (
+              <p className="t-small" style={{ color: 'var(--danger)' }}>{failed}</p>
+            )}
+
+            <Button
+              title="Save"
+              block
+              loading={saving}
+              onClick={saveWorkspace}
+              style={{ marginTop: 'var(--s-lg)' }}
+            />
+          </>
+        )}
+      </Sheet>
     </div>
   );
 }
