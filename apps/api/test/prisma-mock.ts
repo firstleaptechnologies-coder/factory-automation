@@ -63,6 +63,7 @@ const MODELS = [
   'purchaseItem',
   'stockMove',
   'invoice',
+  'report',
   'invoiceItem',
   'challan',
   'challanItem',

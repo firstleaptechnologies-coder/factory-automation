@@ -111,6 +111,8 @@ export const PERMISSIONS = {
   // The paper the shop gives people. Raising a bill is the sales desk's job;
   // voiding one and crediting one are the accountant's, and are held apart
   // because they are the two acts that make a claim worth less than it says.
+  REPORT_VIEW: 'report.view',
+  REPORT_RUN: 'report.run',
   INVOICE_VIEW: 'invoice.view',
   INVOICE_ISSUE: 'invoice.issue',
   INVOICE_CANCEL: 'invoice.cancel',
@@ -219,6 +221,10 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
     ],
   },
   {
+    label: 'Reports and exports',
+    permissions: [PERMISSIONS.REPORT_VIEW, PERMISSIONS.REPORT_RUN],
+  },
+  {
     label: 'Invoices and credit notes',
     permissions: [
       PERMISSIONS.INVOICE_VIEW,
@@ -293,6 +299,8 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
 
 /** Human labels, so neither client has to invent its own wording. */
 export const PERMISSION_LABELS: Record<string, string> = {
+  [PERMISSIONS.REPORT_VIEW]: 'See reports and download them',
+  [PERMISSIONS.REPORT_RUN]: 'Ask for a new report',
   [PERMISSIONS.ORDER_VIEW]: 'View orders',
   [PERMISSIONS.ORDER_PUNCH]: 'Punch orders',
   [PERMISSIONS.ORDER_EDIT]: 'Edit orders',
