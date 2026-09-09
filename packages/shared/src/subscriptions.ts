@@ -152,16 +152,24 @@ export function monthlyRecurring(
 /**
  * Moving a module into a tier, as a price change rather than a surprise.
  *
- * Answers what every workspace's bill becomes if a module joins the tier's
- * included set — the number worth knowing before doing it, because every
- * client already paying for that add-on stops paying for it.
+ * What it costs is what the clients *on that tier* stop paying, and only the
+ * ones actually being charged for it. Two things this must not do, both of
+ * which overstate the loss:
+ *
+ *  - Count a client whose tier already includes the module. They pay nothing
+ *    extra for it, so including it elsewhere changes nothing for them.
+ *  - Count a client on a different tier. Changing what Shop contains cannot
+ *    affect somebody on Punch.
+ *
+ * So the caller passes the workspaces on the tier being edited, described by
+ * the add-ons they are actually billed for — not by everything they can reach.
  */
 export function effectOfIncluding(
   module: ModuleKey,
-  workspaces: { extras: string[]; monthlyTotal: number }[],
+  workspacesOnThisTier: { billedAddOns: string[] }[],
   prices: ModulePrices,
 ): { affected: number; monthlyChange: number } {
   const price = prices[module] ?? 0;
-  const affected = workspaces.filter((w) => w.extras.includes(module)).length;
+  const affected = workspacesOnThisTier.filter((w) => w.billedAddOns.includes(module)).length;
   return { affected, monthlyChange: rupees(-price * affected) };
 }

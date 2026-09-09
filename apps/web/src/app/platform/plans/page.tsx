@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MODULE_CATALOGUE, CORE_MODULES } from '@fas/shared';
+import { MODULE_CATALOGUE, CORE_MODULES, effectOfIncluding } from '@fas/shared';
+import type { ModuleKey } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
-import { Button, Card, Field, Loader, PageHead, Pill, SectionHead } from '@/ui';
+import { Button, Card, Chip, Field, Loader, PageHead, Pill, SectionHead } from '@/ui';
 import { formatInr } from '@/lib/format';
 import type { PlatformOverview } from '../overview-types';
 
@@ -24,6 +25,7 @@ export default function PlansAndPricesPage() {
   );
 
   const [tierPrices, setTierPrices] = useState<Record<string, string>>({});
+  const [tierModules, setTierModules] = useState<Record<string, string[]>>({});
   const [modulePrices, setModulePrices] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -32,6 +34,9 @@ export default function PlansAndPricesPage() {
     if (!overview.data) return;
     setTierPrices(
       Object.fromEntries(overview.data.tiers.map((t) => [t.key, String(t.monthlyPrice)])),
+    );
+    setTierModules(
+      Object.fromEntries(overview.data.tiers.map((t) => [t.key, [...t.includedModules]])),
     );
     setModulePrices(
       Object.fromEntries(
@@ -44,7 +49,14 @@ export default function PlansAndPricesPage() {
     setSaving(key);
     setFailed(null);
     try {
-      await api.setTierPrice(key, { monthlyPrice: Number(tierPrices[key] || 0) });
+      await api.setTierPrice(key, {
+        monthlyPrice: Number(tierPrices[key] || 0),
+        // The core is always in, whatever the chips say — a tier without
+        // Orders and Clients is not a tier, it is a mistake.
+        includedModules: [
+          ...new Set([...(CORE_MODULES as string[]), ...(tierModules[key] ?? [])]),
+        ],
+      });
       overview.reload();
     } catch (error) {
       setFailed(error instanceof Error ? error.message : 'That did not save');
@@ -64,6 +76,62 @@ export default function PlansAndPricesPage() {
     } finally {
       setSaving(null);
     }
+  }
+
+  function toggleModule(tierKey: string, moduleKey: string) {
+    setTierModules((current) => {
+      const chosen = current[tierKey] ?? [];
+      return {
+        ...current,
+        [tierKey]: chosen.includes(moduleKey)
+          ? chosen.filter((key) => key !== moduleKey)
+          : [...chosen, moduleKey],
+      };
+    });
+  }
+
+  /**
+   * What moving a module into this tier costs, before it is saved.
+   *
+   * Every client already paying for that module as an add-on stops paying for
+   * it the moment it is included — which is the number worth seeing while the
+   * decision is still reversible, not on next month's total.
+   */
+  function effectOfTierEdit(tierKey: string): string | null {
+    if (!overview.data) return null;
+    const tier = overview.data.tiers.find((one) => one.key === tierKey);
+    if (!tier) return null;
+
+    const added = (tierModules[tierKey] ?? []).filter(
+      (key) => !tier.includedModules.includes(key),
+    );
+    if (!added.length) return null;
+
+    const prices = Object.fromEntries(
+      overview.data.modulePrices.filter((m) => m.isPriced).map((m) => [m.moduleKey, m.monthlyPrice]),
+    );
+
+    // Only the clients on *this* tier, and only the add-ons they are actually
+    // billed for. A client on another tier is untouched by this change, and a
+    // client whose tier already covers the module pays nothing for it.
+    const workspaces = overview.data.workspaces
+      .filter((w) => w.tier === tierKey)
+      .map((w) => ({
+        billedAddOns: w.bill.lines
+          .filter((line) => line.kind === 'module' && !line.unpriced)
+          .map((line) => String(line.module)),
+      }));
+
+    let clients = 0;
+    let change = 0;
+    for (const moduleKey of added) {
+      const effect = effectOfIncluding(moduleKey as ModuleKey, workspaces, prices);
+      clients += effect.affected;
+      change += effect.monthlyChange;
+    }
+
+    if (!clients) return 'Not saved yet.';
+    return `Not saved yet — including this stops ${clients} client${clients === 1 ? '' : 's'} paying for it, ${formatInr(Math.abs(change))} a month.`;
   }
 
   const data = overview.data;
@@ -88,12 +156,35 @@ export default function PlansAndPricesPage() {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div className="t-h3">{tier.label}</div>
                 <div className="t-tiny muted">{tier.blurb}</div>
-                <div className="t-tiny faint" style={{ marginTop: 4 }}>
-                  Includes:{' '}
-                  {tier.includedModules
-                    .map((key) => MODULE_CATALOGUE.find((m) => m.key === key)?.label ?? key)
-                    .join(' · ') || 'nothing beyond the core'}
+                <div className="t-label muted" style={{ marginTop: 'var(--s-md)' }}>
+                  Included at this price
                 </div>
+                <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                  {MODULE_CATALOGUE.map((module) => {
+                    const isCore = (CORE_MODULES as string[]).includes(module.key);
+                    const chosen =
+                      isCore || (tierModules[tier.key] ?? []).includes(module.key);
+                    return (
+                      <Chip
+                        key={module.key}
+                        label={isCore ? `${module.label} (core)` : module.label}
+                        selected={chosen}
+                        // The core cannot be taken out: a tier without Orders
+                        // and Clients is not a cheaper tier, it is a broken one.
+                        onClick={isCore ? undefined : () => toggleModule(tier.key, module.key)}
+                      />
+                    );
+                  })}
+                </div>
+                {(() => {
+                  const change = effectOfTierEdit(tier.key);
+                  if (!change) return null;
+                  return (
+                    <div className="t-tiny" style={{ color: 'var(--warning)', marginTop: 6 }}>
+                      {change}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
                 <Field

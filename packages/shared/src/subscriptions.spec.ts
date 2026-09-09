@@ -118,9 +118,9 @@ describe('moving a module into a tier', () => {
     const result = effectOfIncluding(
       MODULES.HR,
       [
-        { extras: [MODULES.HR], monthlyTotal: 9500 },
-        { extras: [MODULES.HR, MODULES.REPORTS], monthlyTotal: 10_400 },
-        { extras: [], monthlyTotal: 8000 },
+        { billedAddOns: [MODULES.HR] },
+        { billedAddOns: [MODULES.HR, MODULES.REPORTS] },
+        { billedAddOns: [] },
       ],
       PRICES,
     );
@@ -128,8 +128,27 @@ describe('moving a module into a tier', () => {
     expect(result).toEqual({ affected: 2, monthlyChange: -3000 });
   });
 
+  // The bug this had: a workspace whose tier already covers the module is not
+  // paying for it, so nothing changes for them — counting it overstated the
+  // loss, on screen, in rupees.
+  it('does not count a client whose tier already includes it', () => {
+    const result = effectOfIncluding(
+      MODULES.HR,
+      [{ billedAddOns: [MODULES.HR] }, { billedAddOns: [] }],
+      PRICES,
+    );
+
+    expect(result).toEqual({ affected: 1, monthlyChange: -1500 });
+  });
+
+  it('does not count an add-on nobody has priced', () => {
+    const result = effectOfIncluding(MODULES.ANALYTICS, [{ billedAddOns: [] }], PRICES);
+
+    expect(result).toEqual({ affected: 0, monthlyChange: 0 });
+  });
+
   it('costs nothing when nobody is on it', () => {
-    expect(effectOfIncluding(MODULES.AI, [{ extras: [], monthlyTotal: 8000 }], PRICES)).toEqual({
+    expect(effectOfIncluding(MODULES.AI, [{ billedAddOns: [] }], PRICES)).toEqual({
       affected: 0,
       monthlyChange: 0,
     });
