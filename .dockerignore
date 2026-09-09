@@ -1,0 +1,29 @@
+# Anything the build installs, compiles or must never see.
+
+# Installed inside the image, for the image's own platform. Copying the host's
+# would ship macOS binaries of sharp and Prisma's engines to a Linux container.
+**/node_modules
+
+# Built inside the image.
+**/dist
+**/.next
+**/*.tsbuildinfo
+
+# Secrets. A .env copied into a layer stays in that layer whatever a later
+# instruction does to the file, and anyone who can pull the image can read it.
+**/.env
+**/.env.*
+!**/.env.example
+
+# The app is built by Xcode and Gradle, not by this.
+apps/mobile
+
+.git
+.github
+coverage
+docs
+**/*.log
+**/*.spec.ts
+**/*.spec.tsx
+Dockerfile
+.dockerignore
