@@ -597,6 +597,27 @@ export const NAV_GROUPS: NavGroup[] = [
 export const NAV_OUTSIDE: NavItem[] = [
   { key: 'login', label: 'Sign in', icon: 'user', web: '/login', app: 'Login' },
   {
+    /*
+     * FirstLeap's own dashboard: every client, what they are on, and what they
+     * pay. The landing screen behind the platform sign-in, which is why it is
+     * first here.
+     */
+    key: 'platform-overview',
+    label: 'FirstLeap',
+    icon: 'trend',
+    permission: PERMISSIONS.PLATFORM_TENANT_VIEW,
+    web: '/platform',
+    children: [
+      {
+        key: 'platform-plans',
+        label: 'Plans and prices',
+        icon: 'card',
+        permission: PERMISSIONS.PLATFORM_PRICING_MANAGE,
+        web: '/platform/plans',
+      },
+    ],
+  },
+  {
     key: 'platform-tenants',
     label: 'Workspaces',
     icon: 'box',

@@ -2868,3 +2868,50 @@ model Report {
   @@index([tenantId, kind, createdAt])
   @@index([tenantId, createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// What we charge
+// ---------------------------------------------------------------------------
+//
+// The commercial layer, and ours rather than any tenant's — these rows live in
+// the platform database and are never scoped to a workspace. What a tier
+// *grants* stays in @fas/shared, because the guards resolve entitlements from
+// it on every request; what it *costs* lives here, because a price changes on
+// a Tuesday and a deploy should not be needed to change it.
+
+/// A named tier, and what it costs a month.
+model SubscriptionTier {
+  id    String  @id @default(cuid())
+  /// Matches a plan key in @fas/shared. That is what decides entitlements.
+  key   String  @unique
+  label String
+  blurb String?
+
+  monthlyPrice Decimal @default(0) @db.Decimal(12, 2)
+
+  /// Included at no extra charge. Seeded from the plan's modules and editable
+  /// afterwards, because moving a module into a tier is a commercial decision.
+  includedModules String[] @default([])
+
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// What one module costs when a workspace has it beyond their tier.
+model ModulePrice {
+  id        String @id @default(cuid())
+  /// A ModuleKey from @fas/shared.
+  moduleKey String @unique
+
+  monthlyPrice Decimal @default(0) @db.Decimal(12, 2)
+
+  /// Priced, as opposed to merely existing at zero. An unset price is a
+  /// decision nobody has made; zero is a decision to give it away.
+  isPriced Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

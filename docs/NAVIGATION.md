@@ -260,5 +260,7 @@ whoever runs the product rather than to a shop.*
 | Screen | Web | App route | Permission |
 | --- | --- | --- | --- |
 | Sign in | `/login` | `Login` | — |
+| FirstLeap | `/platform` | — | `platform.tenant.view` |
+|   ↳ Plans and prices | `/platform/plans` | — | `platform.pricing.manage` |
 | Workspaces | `/platform/tenants` | `Tenants` | `platform.tenant.view` |
 | Releases | `/platform/releases` | — | `platform.release.view` |

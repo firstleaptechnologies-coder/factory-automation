@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PlatformController } from './platform.controller';
 import { PlatformService } from './platform.service';
+import { SubscriptionsService } from './subscriptions.service';
 import { TenantProvisioningService } from './tenant-provisioning.service';
 import { ImpersonationService } from './impersonation.service';
 
@@ -19,7 +20,7 @@ import { ImpersonationService } from './impersonation.service';
     }),
   ],
   controllers: [PlatformController],
-  providers: [PlatformService, TenantProvisioningService, ImpersonationService],
+  providers: [PlatformService, SubscriptionsService, TenantProvisioningService, ImpersonationService],
   exports: [PlatformService, TenantProvisioningService],
 })
 export class PlatformModule {}

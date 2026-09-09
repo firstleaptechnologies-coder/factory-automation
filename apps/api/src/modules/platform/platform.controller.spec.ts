@@ -9,7 +9,12 @@ const platform = {
 };
 
 const impersonation = { start: jest.fn(async (..._a: unknown[]) => ({ accessToken: 'tok' })) };
-const controller = new PlatformController(platform as never, impersonation as never);
+const subscriptions = {};
+const controller = new PlatformController(
+  platform as never,
+  subscriptions as never,
+  impersonation as never,
+);
 
 beforeEach(() => jest.clearAllMocks());
 

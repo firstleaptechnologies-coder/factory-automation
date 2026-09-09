@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { PERMISSIONS } from '@fas/shared';
 import { PlatformService } from './platform.service';
+import { SubscriptionsService } from './subscriptions.service';
+import { SetModulePriceDto, SetTierPriceDto } from './dto/pricing.dto';
 import { ImpersonationService } from './impersonation.service';
 import {
   ChangeIsolationDto,
@@ -16,6 +18,7 @@ import { AuthUser, CurrentUser } from '../../common/decorators/current-user.deco
 export class PlatformController {
   constructor(
     private readonly platform: PlatformService,
+    private readonly subscriptions: SubscriptionsService,
     private readonly impersonation: ImpersonationService,
   ) {}
 
@@ -65,4 +68,42 @@ export class PlatformController {
   changeIsolation(@Param('id') id: string, @Body() dto: ChangeIsolationDto) {
     return this.platform.changeIsolation(id, dto);
   }
+  // -- what we charge ---------------------------------------------------------
+
+  /**
+   * Everything the FirstLeap dashboard shows, in one call.
+   *
+   * A dashboard assembled from three requests arrives in three pieces in front
+   * of whoever opened it.
+   */
+  @Get('overview')
+  @RequirePermissions(PERMISSIONS.PLATFORM_TENANT_VIEW)
+  overview() {
+    return this.subscriptions.overview();
+  }
+
+  @Get('tiers')
+  @RequirePermissions(PERMISSIONS.PLATFORM_TENANT_VIEW)
+  tiers() {
+    return this.subscriptions.tiers();
+  }
+
+  @Patch('tiers/:key')
+  @RequirePermissions(PERMISSIONS.PLATFORM_PRICING_MANAGE)
+  setTierPrice(@Param('key') key: string, @Body() body: SetTierPriceDto) {
+    return this.subscriptions.setTierPrice(key, body);
+  }
+
+  @Get('module-prices')
+  @RequirePermissions(PERMISSIONS.PLATFORM_TENANT_VIEW)
+  modulePrices() {
+    return this.subscriptions.modulePrices();
+  }
+
+  @Patch('module-prices/:moduleKey')
+  @RequirePermissions(PERMISSIONS.PLATFORM_PRICING_MANAGE)
+  setModulePrice(@Param('moduleKey') moduleKey: string, @Body() body: SetModulePriceDto) {
+    return this.subscriptions.setModulePrice(moduleKey, body.monthlyPrice);
+  }
+
 }

@@ -158,6 +158,7 @@ export const PERMISSIONS = {
    * we were there even if nobody told them.
    */
   PLATFORM_IMPERSONATE: 'platform.impersonate',
+  PLATFORM_PRICING_MANAGE: 'platform.pricing.manage',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -346,6 +347,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.PLATFORM_RELEASE_VIEW]: 'See app releases',
   [PERMISSIONS.PLATFORM_RELEASE_MANAGE]: 'Publish app releases',
   [PERMISSIONS.PLATFORM_TENANT_CREATE]: 'Provision workspaces',
+  [PERMISSIONS.PLATFORM_PRICING_MANAGE]: 'Set what tiers and modules cost',
   [PERMISSIONS.PLATFORM_IMPERSONATE]: 'Open a workspace to help',
   [PERMISSIONS.CASH_DEPOSIT]: 'Record bank deposits',
   // The key stays as it is: renaming a permission string would silently strip
@@ -453,7 +455,11 @@ export const PLATFORM_ROLES: {
     key: 'BILLING',
     label: 'Billing',
     blurb: 'Changes what a workspace is on. Never inside their data',
-    permissions: [PERMISSIONS.PLATFORM_TENANT_VIEW, PERMISSIONS.PLATFORM_TENANT_MANAGE],
+    permissions: [
+      PERMISSIONS.PLATFORM_TENANT_VIEW,
+      PERMISSIONS.PLATFORM_TENANT_MANAGE,
+      PERMISSIONS.PLATFORM_PRICING_MANAGE,
+    ],
   },
   {
     key: 'ENGINEER',

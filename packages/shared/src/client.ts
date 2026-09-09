@@ -1141,6 +1141,29 @@ export class ApiClient {
     return this.get<WasteReport>('/stock/waste', query);
   }
 
+  // -- the platform: ours, not a tenant's ---------------------------------------
+
+  /** Everything the FirstLeap dashboard shows, in one call. */
+  platformOverview() {
+    return this.get<unknown>('/platform/overview');
+  }
+
+  platformTiers() {
+    return this.get<unknown>('/platform/tiers');
+  }
+
+  setTierPrice(key: string, body: { monthlyPrice?: number; includedModules?: string[]; isActive?: boolean }) {
+    return this.patch<unknown>(`/platform/tiers/${key}`, body);
+  }
+
+  platformModulePrices() {
+    return this.get<unknown>('/platform/module-prices');
+  }
+
+  setModulePrice(moduleKey: string, monthlyPrice: number) {
+    return this.patch<unknown>(`/platform/module-prices/${moduleKey}`, { monthlyPrice });
+  }
+
   // -- reports -----------------------------------------------------------------
 
   reports(query?: { kind?: string; status?: string; take?: number }) {
