@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { CustomFieldDefinition, CustomFieldType, LeadSource } from '@decor/shared';
+import type { CustomFieldDefinition, CustomFieldType, LeadSource } from '@fas/shared';
 import { Shell } from '@/components/Shell';
 import { api } from '@/lib/api';
 import { Select } from '@/ui';

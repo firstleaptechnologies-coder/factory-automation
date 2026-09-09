@@ -9,7 +9,7 @@
 
 1. Add the screen to `NAV_GROUPS` (or `children`, when it is reached from
    another screen rather than from the menu).
-2. Run `npm --workspace @decor/shared run docs:nav` to rewrite this file.
+2. Run `npm --workspace @fas/shared run docs:nav` to rewrite this file.
 3. The coverage specs — `apps/web/src/app/coverage.spec.ts` and
    `apps/mobile/src/navigation/coverage.spec.ts` — fail until both are done.
 

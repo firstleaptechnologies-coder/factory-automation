@@ -9,7 +9,7 @@ import {
   UpdateMaterialDto,
   UpdateSizePresetDto,
 } from './dto/config.dto';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 
 @Controller('config')

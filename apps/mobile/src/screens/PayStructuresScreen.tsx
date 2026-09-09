@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Employee, PayKind, PayStructure } from '@decor/shared';
+import type { Employee, PayKind, PayStructure } from '@fas/shared';
 import {
   PAY_KINDS,
   PAY_KIND_HINTS,
   PAY_KIND_LABELS,
   PERMISSIONS,
   today,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';

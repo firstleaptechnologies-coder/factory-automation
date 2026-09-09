@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import type { Paginated } from '@decor/shared';
+import type { Paginated } from '@fas/shared';
 
 /**
  * A list that grows as you scroll.

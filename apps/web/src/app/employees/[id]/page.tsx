@@ -2,8 +2,8 @@
 
 import { Suspense, use, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { Employee, EmployeeIdentifiers } from '@decor/shared';
-import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS, today } from '@decor/shared';
+import type { Employee, EmployeeIdentifiers } from '@fas/shared';
+import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS, today } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

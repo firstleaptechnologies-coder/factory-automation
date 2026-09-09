@@ -1,4 +1,4 @@
-# Decor Bucket
+# FAS — Factory Automation Software
 
 Manufacturing ERP for a CNC-based architectural decor unit: four CNC machines
 cutting wood, stone, acrylic, metal and WPC.
@@ -21,7 +21,7 @@ packages/shared  Wire types, API client and formatters used by both clients
 `apps/api`, `apps/web` and `packages/shared` are npm workspaces. `apps/mobile`
 deliberately is **not** — bare React Native needs its own `node_modules` for
 CocoaPods and Gradle autolinking to work. It joins the monorepo through Metro
-(`watchFolders` + an `@decor/shared` alias), so shared code is still shared.
+(`watchFolders` + an `@fas/shared` alias), so shared code is still shared.
 
 ## Running it
 
@@ -30,7 +30,7 @@ Prerequisites: Node 22+, PostgreSQL 17.
 ```bash
 npm install
 cp apps/api/.env.example apps/api/.env    # then set DATABASE_URL
-createdb decor_bucket
+createdb fas
 npm run db:migrate
 npm run db:seed
 ```

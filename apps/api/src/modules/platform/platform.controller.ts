@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { PlatformService } from './platform.service';
 import { ImpersonationService } from './impersonation.service';
 import {

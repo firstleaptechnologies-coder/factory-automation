@@ -5,7 +5,7 @@ import {
   Prisma,
   SalaryRunStatus,
 } from '@prisma/client';
-import { monthBounds } from '@decor/shared';
+import { monthBounds } from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { LedgerService, accountFor } from '../ledger/ledger.service';
 import { AttendanceService } from '../attendance/attendance.service';

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { monthBounds, shiftMonth, thisMonth } from '@decor/shared';
+import { monthBounds, shiftMonth, thisMonth } from '@fas/shared';
 import { WasteScreen } from './WasteScreen';
 
 const mockWaste = jest.fn();

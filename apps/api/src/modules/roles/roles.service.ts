@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { tenantId } from '../../common/tenancy/tenant-context';
 import { AssignRoleDto, RoleDto } from './dto/role.dto';

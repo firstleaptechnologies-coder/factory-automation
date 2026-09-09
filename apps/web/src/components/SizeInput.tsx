@@ -1,6 +1,6 @@
 'use client';
 
-import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, parseLengthToMm } from '@decor/shared';
+import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, parseLengthToMm } from '@fas/shared';
 import { Select } from '@/ui';
 
 /**

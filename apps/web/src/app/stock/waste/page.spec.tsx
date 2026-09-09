@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { monthBounds, shiftMonth, thisMonth } from '@decor/shared';
+import { monthBounds, shiftMonth, thisMonth } from '@fas/shared';
 import WastePage from './page';
 
 const apiMock = { wasteReport: jest.fn() };

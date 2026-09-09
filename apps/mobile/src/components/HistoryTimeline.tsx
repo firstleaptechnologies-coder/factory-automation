@@ -7,7 +7,7 @@ import {
   historyValue,
   shownChanges,
   type HistoryEntry,
-} from '@decor/shared';
+} from '@fas/shared';
 import { Text } from '../ui';
 import { formatDateTime } from '../lib/format';
 import { palette, spacing } from '../theme';

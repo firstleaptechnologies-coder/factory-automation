@@ -51,7 +51,7 @@ COPY apps/api apps/api
 # exist until the client has been generated.
 RUN npm run db:generate \
  && npm run build:shared \
- && npm run build -w @decor/api
+ && npm run build -w @fas/api
 
 # ---------------------------------------------------------------------------
 # Runtime — production dependencies and compiled output, nothing else.
@@ -74,10 +74,10 @@ COPY packages/shared/package.json packages/shared/
 # Only the API and what it imports. The workspace filters keep Next, React and
 # every test framework out of the image: 60 packages rather than the full tree.
 #
-# `@decor/shared` is not a declared dependency of the API — it resolves through
+# `@fas/shared` is not a declared dependency of the API — it resolves through
 # the workspace symlink npm creates in node_modules — so it has to be named
 # here or 61 imports fail at runtime with a module that cannot be found.
-RUN npm ci --omit=dev -w @decor/api -w @decor/shared --include-workspace-root \
+RUN npm ci --omit=dev -w @fas/api -w @fas/shared --include-workspace-root \
  && npm cache clean --force
 
 COPY --from=build /app/packages/shared/dist packages/shared/dist

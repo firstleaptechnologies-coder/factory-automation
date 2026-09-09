@@ -9,7 +9,7 @@ import {
   Matches,
   MinLength,
 } from 'class-validator';
-import { ALL_MODULES } from '@decor/shared';
+import { ALL_MODULES } from '@fas/shared';
 import { TenantIsolation, TenantStatus } from '@prisma/client';
 
 export class CreateTenantDto {

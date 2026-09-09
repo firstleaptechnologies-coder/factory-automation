@@ -11,7 +11,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { LENGTH_UNITS, LengthUnit } from '@decor/shared';
+import { LENGTH_UNITS, LengthUnit } from '@fas/shared';
 
 /**
  * Admin screens let people type sizes in whatever unit they think in, so every

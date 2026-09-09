@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import type { Client } from '@decor/shared';
-import { REPORTS, reportDefinition, reportRequestError } from '@decor/shared';
+import type { Client } from '@fas/shared';
+import { REPORTS, reportDefinition, reportRequestError } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import {
@@ -27,7 +27,7 @@ import { PERIODS, periodDates } from './report-periods';
  * Nobody standing on a shop floor wants to type 2026-04-01 twice, and the GST
  * quarter is the whole reason most of these get run.
  *
- * The catalogue and the refusal both come from `@decor/shared`, so this screen
+ * The catalogue and the refusal both come from `@fas/shared`, so this screen
  * cannot offer a report the API will not build, and cannot disagree with it
  * about what a valid request is.
  */

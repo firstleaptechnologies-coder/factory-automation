@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { shiftMonth, thisMonth } from '@decor/shared';
+import { shiftMonth, thisMonth } from '@fas/shared';
 import { AttendanceMonthScreen, formatMinutes } from './AttendanceMonthScreen';
 
 const mockSummary = jest.fn();

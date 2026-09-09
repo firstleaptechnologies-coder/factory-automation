@@ -20,7 +20,7 @@ import {
   RateUnit,
   TaxTreatment,
 } from '@prisma/client';
-import { LENGTH_UNITS, LengthUnit } from '@decor/shared';
+import { LENGTH_UNITS, LengthUnit } from '@fas/shared';
 import { MeasurementDto } from '../../config/dto/config.dto';
 import { CreateClientDto } from '../../clients/dto/client.dto';
 

@@ -8,7 +8,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { inkOn } from '@decor/shared';
+import { inkOn } from '@fas/shared';
 import { api } from './api';
 import { useAuth } from './auth';
 

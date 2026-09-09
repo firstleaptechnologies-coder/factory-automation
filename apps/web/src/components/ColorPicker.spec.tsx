@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { INK_DARK, INK_LIGHT, hexToHsl } from '@decor/shared';
+import { INK_DARK, INK_LIGHT, hexToHsl } from '@fas/shared';
 import { ColorPicker } from './ColorPicker';
 
 const onChange = jest.fn();

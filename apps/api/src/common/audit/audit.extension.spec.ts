@@ -104,13 +104,13 @@ describe('what the trail records', () => {
 
   it('names a platform admin without pointing at a user that is not there', async () => {
     const { run, written } = build();
-    await runAsActor({ name: 'Nakul (Decor Bucket support)' }, () =>
+    await runAsActor({ name: 'Nakul (FirstLeap support)' }, () =>
       run('create', { data: {} }, { id: 'o1' }),
     );
 
     // Their id belongs to another database entirely.
     expect(written[0].userId).toBeNull();
-    expect(written[0].actorLabel).toBe('Nakul (Decor Bucket support)');
+    expect(written[0].actorLabel).toBe('Nakul (FirstLeap support)');
   });
 
   it('keeps the reason somebody gave', async () => {

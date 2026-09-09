@@ -49,7 +49,7 @@ async function bootstrap() {
   const role = currentRole();
   // eslint-disable-next-line no-console
   console.log(
-    `Decor Bucket API listening on http://localhost:${port}/api ` +
+    `FAS API listening on http://localhost:${port}/api ` +
       `— role "${role}", scheduled work ${runsScheduledWork(role) ? 'armed' : 'off'}`,
   );
 }

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { MODULES, PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@fas/shared';
 import { PaymentsService } from './payments.service';
 import {
   CashPositionQueryDto,

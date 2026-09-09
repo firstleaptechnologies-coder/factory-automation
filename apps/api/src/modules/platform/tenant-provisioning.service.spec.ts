@@ -1,6 +1,6 @@
 import { StatusCategory, WorkflowKind } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import { DEFAULT_ROLES } from '@decor/shared';
+import { DEFAULT_ROLES } from '@fas/shared';
 import { TenantProvisioningService } from './tenant-provisioning.service';
 import { prismaMock } from '../../../test/prisma-mock';
 

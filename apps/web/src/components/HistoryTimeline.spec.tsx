@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import type { HistoryEntry } from '@decor/shared';
+import type { HistoryEntry } from '@fas/shared';
 import { HistoryTimeline } from './HistoryTimeline';
 
 const entry = (over: Partial<HistoryEntry> = {}): HistoryEntry => ({

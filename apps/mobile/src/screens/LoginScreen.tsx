@@ -105,7 +105,7 @@ export function LoginScreen() {
               <Icon name="scan" size={34} color={palette.white} strokeWidth={2} />
             </AccentSurface>
           </Animated.View>
-          <Text variant="h1" style={styles.brand}>Decor Bucket</Text>
+          <Text variant="h1" style={styles.brand}>FAS</Text>
           <Text variant="small" tone="muted">
             {mode === 'platform' ? 'Platform administration' : 'Order punching for the floor'}
           </Text>

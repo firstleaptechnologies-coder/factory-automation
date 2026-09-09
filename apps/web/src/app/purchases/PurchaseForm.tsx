@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Material, Purchase, Vendor } from '@decor/shared';
-import { today } from '@decor/shared';
+import type { Material, Purchase, Vendor } from '@fas/shared';
+import { today } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Button, Card, Field, Loader, PageHead, SectionHead } from '@/ui';

@@ -4,7 +4,7 @@
     // The specs read the filesystem (route names) and use jest globals.
     "types": ["node", "jest"],
     "paths": {
-      "@decor/shared": ["../../packages/shared/src/index.ts"],
+      "@fas/shared": ["../../packages/shared/src/index.ts"],
       "@/*": ["./src/*"]
     }
   },

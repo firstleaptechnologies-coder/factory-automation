@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
-import { INK_DARK, INK_LIGHT, hexToHsl } from '@decor/shared';
+import { INK_DARK, INK_LIGHT, hexToHsl } from '@fas/shared';
 import { ColorPicker } from './ColorPicker';
 
 const onChange = jest.fn();

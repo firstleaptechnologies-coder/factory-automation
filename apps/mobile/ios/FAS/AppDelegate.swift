@@ -27,7 +27,7 @@ class AppDelegate: ExpoAppDelegate {
     window = UIWindow(frame: UIScreen.main.bounds)
 
     factory.startReactNative(
-      withModuleName: "DecorBucket",
+      withModuleName: "FAS",
       in: window,
       launchOptions: launchOptions
     )

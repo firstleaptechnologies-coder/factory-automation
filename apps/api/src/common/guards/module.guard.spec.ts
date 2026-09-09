@@ -1,5 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
-import { MODULES } from '@decor/shared';
+import { MODULES } from '@fas/shared';
 import { ModuleGuard } from './module.guard';
 import { MODULE_KEY } from '../decorators/module.decorator';
 

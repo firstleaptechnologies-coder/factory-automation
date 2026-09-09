@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import type { FirmProfile } from '@decor/shared';
-import { ensureReadable, isReadable } from '@decor/shared';
+import type { FirmProfile } from '@fas/shared';
+import { ensureReadable, isReadable } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import { looksLikeGstin, looksLikePhone } from '../../hooks/useClipboardSuggestion';

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Purchase } from '@decor/shared';
-import { PERMISSIONS, PURCHASE_STATUS_LABELS, today } from '@decor/shared';
+import type { Purchase } from '@fas/shared';
+import { PERMISSIONS, PURCHASE_STATUS_LABELS, today } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';

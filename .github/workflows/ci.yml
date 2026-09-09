@@ -44,7 +44,7 @@ jobs:
 
       - run: npm ci
 
-      # The API and the web app import @decor/shared as a built package, so it
+      # The API and the web app import @fas/shared as a built package, so it
       # has to exist before either of them typechecks.
       - name: Build shared
         run: npm run build:shared
@@ -72,7 +72,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
 
-      # No root install: the app resolves @decor/shared from source through
+      # No root install: the app resolves @fas/shared from source through
       # Metro, tsc paths and a Jest moduleNameMapper, so the shared package
       # needs no build step here either.
       - run: npm ci

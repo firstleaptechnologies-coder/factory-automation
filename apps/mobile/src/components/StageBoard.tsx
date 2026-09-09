@@ -8,7 +8,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import type { WorkflowStatus } from '@decor/shared';
+import type { WorkflowStatus } from '@fas/shared';
 import { motion, palette, radius, spacing } from '../theme';
 import { Text, Icon, EmptyState, haptic } from '../ui';
 

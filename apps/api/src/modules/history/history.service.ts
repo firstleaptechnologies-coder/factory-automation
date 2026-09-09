@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { HistoryEntry, HistoryKind } from '@decor/shared';
+import type { HistoryEntry, HistoryKind } from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 /** How far back one screen looks. Enough for an argument, not a data export. */

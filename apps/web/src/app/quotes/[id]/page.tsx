@@ -2,8 +2,8 @@
 
 import { use, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { Estimate, EstimateStatus, HistoryEntry } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Estimate, EstimateStatus, HistoryEntry } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { HistoryTimeline } from '@/components/HistoryTimeline';

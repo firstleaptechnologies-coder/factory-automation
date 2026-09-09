@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Client } from '@decor/shared';
-import { REPORTS, reportDefinition, reportRequestError, thisMonth } from '@decor/shared';
+import type { Client } from '@fas/shared';
+import { REPORTS, reportDefinition, reportRequestError, thisMonth } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Shell } from '@/components/Shell';
@@ -21,7 +21,7 @@ export default function ReportRequestPage() {
 /**
  * Asking for one.
  *
- * The catalogue comes from `@decor/shared`, so this screen cannot offer a
+ * The catalogue comes from `@fas/shared`, so this screen cannot offer a
  * report the API does not build, and the refusal it shows is the same function
  * the API refuses with — there is no way for the two to disagree about what a
  * valid request is.

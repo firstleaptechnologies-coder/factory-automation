@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { WorkspaceRole, WorkspaceUser } from '@decor/shared';
-import { PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS } from '@decor/shared';
+import type { WorkspaceRole, WorkspaceUser } from '@fas/shared';
+import { PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

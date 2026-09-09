@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import type { Order, OrderBoard } from '@decor/shared';
-import { UNIT_LABEL } from '@decor/shared';
+import type { Order, OrderBoard } from '@fas/shared';
+import { UNIT_LABEL } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { StageBoard } from '../components/StageBoard';

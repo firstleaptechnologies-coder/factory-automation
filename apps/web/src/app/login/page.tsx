@@ -89,7 +89,7 @@ export default function LoginPage() {
             <Icon name="scan" size={34} color="#fff" strokeWidth={2.1} />
           </span>
           <h1 className="t-h1" style={{ margin: 'var(--s-lg) 0 2px' }}>
-            Decor Bucket
+            FAS
           </h1>
           <p className="t-small muted" style={{ margin: 0 }}>
             Order punching for the floor

@@ -277,7 +277,7 @@ The ownership hierarchy, made real. Half of it already existed — `Tenant`,
 
 **Plans and entitlements (D4) — done:**
 
-- A module catalogue and three plans in `@decor/shared`, including the modules
+- A module catalogue and three plans in `@fas/shared`, including the modules
   that do not exist yet, so nothing has to be renamed when they arrive.
 - A tenant is on a plan, plus anything granted on top of it — a shop that wants
   one thing from the next tier up should not have to buy the tier. Additive

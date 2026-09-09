@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { Employee, SalaryAdvance } from '@decor/shared';
-import { PERMISSIONS, today } from '@decor/shared';
+import type { Employee, SalaryAdvance } from '@fas/shared';
+import { PERMISSIONS, today } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

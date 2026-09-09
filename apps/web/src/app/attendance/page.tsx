@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { AttendanceDay, AttendanceMark, MarkInput } from '@decor/shared';
+import type { AttendanceDay, AttendanceMark, MarkInput } from '@fas/shared';
 import {
   ATTENDANCE_LABELS,
   ATTENDANCE_MARKS,
   PERMISSIONS,
   shiftDay,
   today,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

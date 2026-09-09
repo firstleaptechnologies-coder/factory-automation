@@ -7,7 +7,7 @@ import {
   CreateClientDto,
   UpdateClientDto,
 } from './dto/client.dto';
-import { MODULES, PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@fas/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequireModule } from '../../common/decorators/module.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';

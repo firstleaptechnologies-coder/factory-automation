@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ImpersonationService, SESSION } from './impersonation.service';
 import { prismaMock } from '../../../test/prisma-mock';
-import { ALL_MODULES } from '@decor/shared';
+import { ALL_MODULES } from '@fas/shared';
 
 type Db = Record<string, Record<string, jest.Mock>>;
 
@@ -85,7 +85,7 @@ describe('opening a workspace to help', () => {
     expect(entry).toMatchObject({
       action: 'workspace.opened_by_support',
       reason: REASON,
-      actorLabel: 'Nakul (Decor Bucket support)',
+      actorLabel: 'Nakul (FirstLeap support)',
     });
   });
 

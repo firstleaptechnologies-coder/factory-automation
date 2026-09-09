@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { StatusCategory, UserRole, WorkflowKind } from '@prisma/client';
 import { LeadsService } from './leads.service';
 import { CustomFieldsService } from './custom-fields.service';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { inTenant, prismaMock, notificationsMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;

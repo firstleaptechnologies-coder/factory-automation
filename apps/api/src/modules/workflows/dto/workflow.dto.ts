@@ -14,7 +14,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { StatusCategory, UserRole } from '@prisma/client';
-import { HOME_CARD_LIMIT } from '@decor/shared';
+import { HOME_CARD_LIMIT } from '@fas/shared';
 
 export class CreateWorkflowDto {
   @IsString() @MinLength(1) code: string;

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import type { ExpenseOption, ExpenseOptionField } from '@decor/shared';
+import type { ExpenseOption, ExpenseOptionField } from '@fas/shared';
 import {
   EXPENSE_FIELD_HINTS,
   EXPENSE_FIELD_LABELS,
   EXPENSE_OPTION_FIELDS,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import {

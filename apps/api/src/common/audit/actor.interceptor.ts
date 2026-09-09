@@ -56,8 +56,8 @@ function actorName(user: {
   impersonatedBy?: { name: string };
 }): string | undefined {
   if (user.impersonatedBy) {
-    return `${user.impersonatedBy.name} (Decor Bucket support, as ${user.name ?? 'an admin'})`;
+    return `${user.impersonatedBy.name} (FirstLeap support, as ${user.name ?? 'an admin'})`;
   }
-  if (user.isPlatform && user.name) return `${user.name} (Decor Bucket support)`;
+  if (user.isPlatform && user.name) return `${user.name} (FirstLeap support)`;
   return user.name;
 }

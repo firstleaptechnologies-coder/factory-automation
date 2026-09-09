@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { NAV_GROUPS, NAV_HOME, type NavGroup, type NavItem } from '@decor/shared';
+import { NAV_GROUPS, NAV_HOME, type NavGroup, type NavItem } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
@@ -148,7 +148,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       {user.impersonatedBy ? (
         <div className="support-banner" role="status">
           <span>
-            <strong>{user.impersonatedBy.name}</strong> from Decor Bucket support is in this
+            <strong>{user.impersonatedBy.name}</strong> from FirstLeap support is in this
             workspace as {user.name}. Everything done here is recorded under that name.
           </span>
           <button type="button" className="chip" onClick={signOut}>
@@ -163,7 +163,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </span>
           <span>
             <span className="t-h3" style={{ display: 'block', lineHeight: 1.15 }}>
-              Decor Bucket
+              FAS
             </span>
             <span className="t-tiny faint">Order punching</span>
           </span>

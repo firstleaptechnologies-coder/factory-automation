@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { MODULE_CATALOGUE, type ModuleKey } from '@decor/shared';
+import { MODULE_CATALOGUE, type ModuleKey } from '@fas/shared';
 import { MODULE_KEY } from '../decorators/module.decorator';
 
 /**

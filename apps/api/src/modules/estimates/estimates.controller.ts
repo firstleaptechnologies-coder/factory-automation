@@ -12,7 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { MODULES, PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@fas/shared';
 import { EstimatesService } from './estimates.service';
 import { renderEstimateHtml } from './estimate-document';
 import {

@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Purchase, PurchaseStatus } from '@decor/shared';
-import { PERMISSIONS, PURCHASE_STATUS_LABELS } from '@decor/shared';
+import type { Purchase, PurchaseStatus } from '@fas/shared';
+import { PERMISSIONS, PURCHASE_STATUS_LABELS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { usePaginated } from '@/lib/usePaginated';
 import { useAuth } from '@/lib/auth';

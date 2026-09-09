@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import DisbursementsPage from './page';
 
 const apiMock = { disbursementLedger: jest.fn(), setDisbursementLabel: jest.fn() };

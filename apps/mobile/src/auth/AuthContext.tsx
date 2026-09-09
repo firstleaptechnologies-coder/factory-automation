@@ -7,8 +7,8 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AuthUser, ModuleKey } from '@decor/shared';
-import { hasModule } from '@decor/shared';
+import type { AuthUser, ModuleKey } from '@fas/shared';
+import { hasModule } from '@fas/shared';
 import { api, setUnauthorizedHandler } from '../api/client';
 
 const TOKEN_KEY = 'decor.token';

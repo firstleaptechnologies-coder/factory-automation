@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { SizePreset } from '@decor/shared';
-import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, fromMm, parseLengthToMm } from '@decor/shared';
+import type { SizePreset } from '@fas/shared';
+import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, fromMm, parseLengthToMm } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import {

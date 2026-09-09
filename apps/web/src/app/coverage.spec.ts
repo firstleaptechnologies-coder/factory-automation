@@ -1,6 +1,6 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { navWebPaths } from '@decor/shared';
+import { navWebPaths } from '@fas/shared';
 
 /**
  * Every page has a place in the menu.

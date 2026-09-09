@@ -34,12 +34,12 @@ it('says nothing about signing in until the stored session has been read', async
   await render(<RootNavigator />);
   // Flashing the login screen at somebody who is already signed in is worse
   // than a moment of nothing.
-  expect(screen.queryByText('Decor Bucket')).toBeNull();
+  expect(screen.queryByText('FAS')).toBeNull();
 });
 
 it('asks for a sign-in when nobody is signed in', async () => {
   await render(<RootNavigator />);
-  expect(await screen.findByText('Decor Bucket')).toBeTruthy();
+  expect(await screen.findByText('FAS')).toBeTruthy();
   // With no workspace remembered, signing in starts by asking which shop.
   expect(screen.getByText('Workspace')).toBeTruthy();
   expect(screen.getByText('Continue')).toBeTruthy();

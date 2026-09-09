@@ -1,6 +1,6 @@
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Suspense } from 'react';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import StockMovesPage from './page';
 
 const apiMock = { stockMoves: jest.fn(), stockLevels: jest.fn(), recordStockMove: jest.fn() };

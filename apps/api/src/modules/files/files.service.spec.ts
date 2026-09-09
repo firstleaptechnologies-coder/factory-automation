@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { AttachmentKind, StorageBackend } from '@prisma/client';
-import { MAX_UPLOAD_BYTES } from '@decor/shared';
+import { MAX_UPLOAD_BYTES } from '@fas/shared';
 import { FilesService } from './files.service';
 import { inTenant, prismaMock } from '../../../test/prisma-mock';
 

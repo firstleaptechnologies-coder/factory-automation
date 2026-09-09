@@ -2,8 +2,8 @@
 
 import { Suspense, use, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { Expense, ExpenseEdit, HistoryEntry } from '@decor/shared';
-import { PERMISSIONS, describeEdit, editDetail } from '@decor/shared';
+import type { Expense, ExpenseEdit, HistoryEntry } from '@fas/shared';
+import { PERMISSIONS, describeEdit, editDetail } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { optimizeImage } from '@/lib/optimize-image';

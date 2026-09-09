@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { shiftMonth, thisMonth } from '@decor/shared';
+import { shiftMonth, thisMonth } from '@fas/shared';
 import AttendanceMonthPage from './page';
 import { formatMinutes } from './formatMinutes';
 

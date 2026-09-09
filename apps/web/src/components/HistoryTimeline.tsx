@@ -7,7 +7,7 @@ import {
   historyValue,
   shownChanges,
   type HistoryEntry,
-} from '@decor/shared';
+} from '@fas/shared';
 import { formatDateTime } from '@/lib/format';
 
 /**

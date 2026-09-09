@@ -10,7 +10,7 @@ module.exports = {
   // DTOs carry class-validator decorators, which need the metadata polyfill.
   setupFiles: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
-    '^@decor/shared$': '<rootDir>/../../packages/shared/src/index.ts',
+    '^@fas/shared$': '<rootDir>/../../packages/shared/src/index.ts',
   },
   transform: {
     '^.+\\.ts$': [

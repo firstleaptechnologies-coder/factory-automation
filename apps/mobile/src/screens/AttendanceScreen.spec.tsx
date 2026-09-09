@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { PERMISSIONS, shiftDay, today } from '@decor/shared';
+import { PERMISSIONS, shiftDay, today } from '@fas/shared';
 import { AttendanceScreen } from './AttendanceScreen';
 
 const mockDay = jest.fn();

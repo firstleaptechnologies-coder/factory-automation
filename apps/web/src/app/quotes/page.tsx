@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Estimate, EstimateStatus } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Estimate, EstimateStatus } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { usePaginated } from '@/lib/usePaginated';
 import { useAuth } from '@/lib/auth';

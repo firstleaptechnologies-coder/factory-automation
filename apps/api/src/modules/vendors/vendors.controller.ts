@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { MODULES, PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@fas/shared';
 import { VendorsService } from './vendors.service';
 import { VendorDto, VendorQueryDto } from './dto/vendor.dto';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';

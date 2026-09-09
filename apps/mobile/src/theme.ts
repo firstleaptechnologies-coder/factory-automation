@@ -12,7 +12,7 @@
  * few things that should pull the eye.
  */
 
-import { inkOn } from '@decor/shared';
+import { inkOn } from '@fas/shared';
 
 export const palette: Record<string, string> = {
   /** The single ground colour. Every panel is this, or a shade of it. */

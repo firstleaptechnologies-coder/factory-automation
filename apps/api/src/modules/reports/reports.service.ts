@@ -10,7 +10,7 @@ import {
   reportDefinition,
   reportFileName,
   reportRequestError,
-} from '@decor/shared';
+} from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { tenantId } from '../../common/tenancy/tenant-context';
 import { StorageService } from '../../common/storage/storage.service';

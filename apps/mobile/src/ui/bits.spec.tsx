@@ -10,7 +10,7 @@ import {
   SectionHeader,
   ScreenHeader,
 } from './bits';
-import { INK_DARK } from '@decor/shared';
+import { INK_DARK } from '@fas/shared';
 import { palette } from '../theme';
 
 describe('Pill', () => {

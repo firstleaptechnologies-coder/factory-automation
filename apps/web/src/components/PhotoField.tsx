@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { ImagePurpose, formatBytes } from '@decor/shared';
+import { ImagePurpose, formatBytes } from '@fas/shared';
 import { optimizeImage } from '@/lib/optimize-image';
 
 export interface PendingPhoto {

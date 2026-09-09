@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Employee, EmploymentStatus } from '@decor/shared';
-import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS } from '@decor/shared';
+import type { Employee, EmploymentStatus } from '@fas/shared';
+import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { usePaginated } from '@/lib/usePaginated';
 import { useAuth } from '@/lib/auth';

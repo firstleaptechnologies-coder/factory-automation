@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { AttendanceMonth } from '@decor/shared';
-import { monthBounds, shiftMonth, thisMonth } from '@decor/shared';
+import type { AttendanceMonth } from '@fas/shared';
+import { monthBounds, shiftMonth, thisMonth } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Shell } from '@/components/Shell';

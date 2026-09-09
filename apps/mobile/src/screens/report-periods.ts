@@ -1,4 +1,4 @@
-import { monthBounds, shiftMonth, thisMonth } from '@decor/shared';
+import { monthBounds, shiftMonth, thisMonth } from '@fas/shared';
 
 /**
  * The windows a shop actually asks about.

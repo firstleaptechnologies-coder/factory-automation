@@ -6,8 +6,8 @@ import type {
   DisbursementCategory,
   DisbursementSummary,
   PaymentMode,
-} from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+} from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';

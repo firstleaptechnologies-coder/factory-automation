@@ -2,8 +2,8 @@
 
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Challan, Invoice, Receivable } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Challan, Invoice, Receivable } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

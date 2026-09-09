@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { OrderInvoiceScreen } from './OrderInvoiceScreen';
 
 const mockOrderInvoice = jest.fn();

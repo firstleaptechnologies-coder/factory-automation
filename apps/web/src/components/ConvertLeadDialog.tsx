@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { Lead, LengthUnit, Material, Order, PunchItemInput } from '@decor/shared';
-import { LENGTH_UNITS, UNIT_LABEL, parseLengthToMm } from '@decor/shared';
+import type { Lead, LengthUnit, Material, Order, PunchItemInput } from '@fas/shared';
+import { LENGTH_UNITS, UNIT_LABEL, parseLengthToMm } from '@fas/shared';
 import { api } from '@/lib/api';
 import { Select } from '@/ui';
 

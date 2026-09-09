@@ -8,7 +8,7 @@ import type {
   EstimateItemInput,
   GstSlab,
   TaxTreatment,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import {

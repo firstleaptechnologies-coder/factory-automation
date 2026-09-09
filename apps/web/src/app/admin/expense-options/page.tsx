@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import type { ExpenseOption, ExpenseOptionField } from '@decor/shared';
+import type { ExpenseOption, ExpenseOptionField } from '@fas/shared';
 import {
   EXPENSE_FIELD_HINTS,
   EXPENSE_FIELD_LABELS,
   EXPENSE_OPTION_FIELDS,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Shell } from '@/components/Shell';

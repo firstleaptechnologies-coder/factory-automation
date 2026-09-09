@@ -4,7 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { platformPermissionsFor } from '@decor/shared';
+import { platformPermissionsFor } from '@fas/shared';
 import { runAsPlatform, runInTenant } from '../../common/tenancy/tenant-context';
 
 export interface JwtPayload {

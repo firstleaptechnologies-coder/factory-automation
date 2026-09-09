@@ -1,4 +1,4 @@
-import { isoDate } from '@decor/shared';
+import { isoDate } from '@fas/shared';
 
 /** The windows worth asking for, without making anybody type a date. */
 export const WINDOWS = [

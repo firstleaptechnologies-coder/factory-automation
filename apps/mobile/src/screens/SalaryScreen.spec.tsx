@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { PERMISSIONS, shiftMonth, thisMonth } from '@decor/shared';
+import { PERMISSIONS, shiftMonth, thisMonth } from '@fas/shared';
 import { SalaryScreen, monthOf } from './SalaryScreen';
 
 const mockRuns = jest.fn();

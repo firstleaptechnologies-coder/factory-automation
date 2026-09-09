@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import type { Lead, LeadBoard } from '@decor/shared';
+import type { Lead, LeadBoard } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { StageBoard } from '../components/StageBoard';

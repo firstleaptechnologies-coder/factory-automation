@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { CustomFieldDefinition, LeadSource } from '@decor/shared';
+import type { CustomFieldDefinition, LeadSource } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { CustomFieldInputs } from '../components/CustomFieldInputs';

@@ -7,8 +7,8 @@ import type {
   CashPosition,
   Transaction,
   TransactionKind,
-} from '@decor/shared';
-import { TRANSACTION_LABELS } from '@decor/shared';
+} from '@fas/shared';
+import { TRANSACTION_LABELS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { usePaginated } from '@/lib/usePaginated';

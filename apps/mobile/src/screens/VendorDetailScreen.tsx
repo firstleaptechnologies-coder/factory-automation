@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import type { Vendor } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Vendor } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';

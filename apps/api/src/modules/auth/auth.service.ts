@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';
-import { platformPermissionsFor } from '@decor/shared';
+import { platformPermissionsFor } from '@fas/shared';
 import {
   runInTenant,
   runAsPlatform,

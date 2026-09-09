@@ -1,8 +1,8 @@
 'use client';
 
 import { use, useState } from 'react';
-import type { CreditReason, Invoice, Receivable } from '@decor/shared';
-import { CREDIT_REASON_LABELS, PERMISSIONS } from '@decor/shared';
+import type { CreditReason, Invoice, Receivable } from '@fas/shared';
+import { CREDIT_REASON_LABELS, PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

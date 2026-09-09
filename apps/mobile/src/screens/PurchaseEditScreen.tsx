@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import type { Material, Purchase, Vendor } from '@decor/shared';
-import { today } from '@decor/shared';
+import type { Material, Purchase, Vendor } from '@fas/shared';
+import { today } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import {

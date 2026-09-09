@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { hexToHsl, hslToHex, inkOn, normalizeHex } from '@decor/shared';
+import { hexToHsl, hslToHex, inkOn, normalizeHex } from '@fas/shared';
 import { Field } from '@/ui';
 
 /** A few to start from. Any colour at all is a slider away. */

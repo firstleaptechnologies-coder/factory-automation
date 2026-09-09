@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { LetterKind, LetterTemplate } from '@decor/shared';
+import type { LetterKind, LetterTemplate } from '@fas/shared';
 import {
   LETTER_FIELDS,
   LETTER_FIELD_LABELS,
@@ -9,7 +9,7 @@ import {
   LETTER_KINDS,
   LETTER_LABELS,
   unknownPlaceholders,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import {

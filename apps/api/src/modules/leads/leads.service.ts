@@ -26,7 +26,7 @@ import {
   UpdateLeadDto,
 } from './dto/lead.dto';
 import { tenantId } from '../../common/tenancy/tenant-context';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 
 /** How many cards one board column carries before it says "and N more". */
 const BOARD_COLUMN_LIMIT = 20;

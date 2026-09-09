@@ -1,5 +1,5 @@
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import TenantsPage from './page';
 
 const apiMock = { tenants: jest.fn(), createTenant: jest.fn(), updateTenant: jest.fn() };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Client } from '@decor/shared';
+import type { Client } from '@fas/shared';
 import { api } from '../api/client';
 import { usePaginated } from '../hooks/usePaginated';
 import {

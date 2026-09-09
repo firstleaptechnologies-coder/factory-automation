@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Employee, EmploymentStatus } from '@decor/shared';
-import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS } from '@decor/shared';
+import type { Employee, EmploymentStatus } from '@fas/shared';
+import { EMPLOYMENT_STATUS_LABELS, PERMISSIONS } from '@fas/shared';
 import { api } from '../api/client';
 import { usePaginated } from '../hooks/usePaginated';
 import { useAuth } from '../auth/AuthContext';

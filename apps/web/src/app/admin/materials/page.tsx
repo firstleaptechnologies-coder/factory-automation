@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { Material } from '@decor/shared';
-import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, parseLengthToMm } from '@decor/shared';
+import type { Material } from '@fas/shared';
+import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, parseLengthToMm } from '@fas/shared';
 import { Shell } from '@/components/Shell';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';

@@ -56,7 +56,7 @@ function safeSheetName(name: string): string {
 
 export async function writeWorkbook(spec: WorkbookSpec): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = spec.firmName ?? 'Decor Bucket';
+  workbook.creator = spec.firmName ?? 'FAS';
   workbook.created = new Date();
 
   for (const sheet of spec.sheets) {

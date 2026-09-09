@@ -1,5 +1,5 @@
 import { OrdersController } from './orders.controller';
-import { DEFAULT_UNIT } from '@decor/shared';
+import { DEFAULT_UNIT } from '@fas/shared';
 
 const orders = {
   list: jest.fn(async (..._a: unknown[]) => 'list'),

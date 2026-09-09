@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEFAULT_UNIT, LengthUnit, isLengthUnit } from '@decor/shared';
+import { DEFAULT_UNIT, LengthUnit, isLengthUnit } from '@fas/shared';
 
 const KEY = 'decor.unit';
 

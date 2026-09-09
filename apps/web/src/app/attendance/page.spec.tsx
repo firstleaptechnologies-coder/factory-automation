@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PERMISSIONS, shiftDay, today } from '@decor/shared';
+import { PERMISSIONS, shiftDay, today } from '@fas/shared';
 import AttendancePage from './page';
 
 const apiMock = { attendanceDay: jest.fn(), markAttendance: jest.fn() };

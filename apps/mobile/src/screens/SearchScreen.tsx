@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Client, Lead, Order } from '@decor/shared';
+import type { Client, Lead, Order } from '@fas/shared';
 import { api } from '../api/client';
 import {
   Avatar,

@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
-import type { HistoryEntry, Order, WorkflowStatus, WorkflowTransition } from '@decor/shared';
-import { LENGTH_UNITS, PERMISSIONS, UNIT_LABEL } from '@decor/shared';
-import type { TaxTreatment } from '@decor/shared';
+import type { HistoryEntry, Order, WorkflowStatus, WorkflowTransition } from '@fas/shared';
+import { LENGTH_UNITS, PERMISSIONS, UNIT_LABEL } from '@fas/shared';
+import type { TaxTreatment } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useDisplayUnit } from '../hooks/useUnit';

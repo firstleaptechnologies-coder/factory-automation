@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ExpenseOptionField } from '@prisma/client';
-import { MAX_UPLOAD_BYTES, MODULES, PERMISSIONS } from '@decor/shared';
+import { MAX_UPLOAD_BYTES, MODULES, PERMISSIONS } from '@fas/shared';
 import { ExpensesService } from './expenses.service';
 import {
   ExpenseAnalyticsQueryDto,

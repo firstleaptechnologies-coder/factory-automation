@@ -67,7 +67,7 @@ model Tenant {
   databaseUrl String?
 
   status  TenantStatus @default(TRIAL)
-  /// Which bundle they are on. The catalogue lives in @decor/shared.
+  /// Which bundle they are on. The catalogue lives in @fas/shared.
   plan    String?
   /// Modules granted on top of the plan.
   ///
@@ -93,7 +93,7 @@ model PlatformUser {
   email        String   @unique
   name         String
   passwordHash String
-  /// OWNER | SUPPORT | BILLING | ENGINEER — the list lives in @decor/shared.
+  /// OWNER | SUPPORT | BILLING | ENGINEER — the list lives in @fas/shared.
   ///
   /// A fixed set rather than the composable roles a tenant gets: there are a
   /// few of us, not a few hundred, and the blast radius here is every
@@ -350,7 +350,7 @@ model AppVersionGate {
 /// Roles are per-tenant rather than a fixed enum because every shop divides
 /// work differently — one has a separate QC person, another has the owner doing
 /// everything. Permissions are string keys checked by the guard; the canonical
-/// list lives in @decor/shared.
+/// list lives in @fas/shared.
 model Role {
   id       String @id @default(cuid())
   tenantId String
@@ -2833,7 +2833,7 @@ model Report {
   tenantId String
   id       String @id @default(cuid())
 
-  /// A ReportKind from @decor/shared. A string rather than a database enum so
+  /// A ReportKind from @fas/shared. A string rather than a database enum so
   /// that adding a report is a code change and not a migration — the same
   /// choice LedgerEntry.sourceType makes, for the same reason.
   kind   String

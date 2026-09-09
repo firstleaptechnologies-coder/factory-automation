@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import type { StockLevels, StockMove, StockMoveKind } from '@decor/shared';
+import type { StockLevels, StockMove, StockMoveKind } from '@fas/shared';
 import {
   PERMISSIONS,
   RECORDABLE_MOVES,
   STOCK_MOVE_LABELS,
   today,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';

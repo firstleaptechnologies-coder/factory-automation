@@ -18,7 +18,7 @@ import { paginate } from '../../common/dto/pagination.dto';
 import { FilesService, IncomingFile } from '../files/files.service';
 import { ClientsService } from '../clients/clients.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { DEFAULT_UNIT, LengthUnit, PERMISSIONS, fromMm, toMm } from '@decor/shared';
+import { DEFAULT_UNIT, LengthUnit, PERMISSIONS, fromMm, toMm } from '@fas/shared';
 import { lineAmount, round2, splitTax } from '../../common/utils/pricing';
 import { deriveStatus } from '../payments/payments.service';
 import { totalsFor } from './order-totals';

@@ -19,7 +19,7 @@ if linkage != nil
   use_frameworks! :linkage => linkage.to_sym
 end
 
-target 'DecorBucket' do
+target 'FAS' do
   use_expo_modules!
 
   # Expo's autolinking answers for both its own modules and the community

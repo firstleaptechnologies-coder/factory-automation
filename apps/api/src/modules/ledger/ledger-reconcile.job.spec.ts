@@ -1,5 +1,5 @@
 import { LedgerReconcileJob } from './ledger-reconcile.job';
-import { ALL_MODULES } from '@decor/shared';
+import { ALL_MODULES } from '@fas/shared';
 import { prismaMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;

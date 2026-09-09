@@ -2,8 +2,8 @@
 
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Payslip, SalaryRunDetail } from '@decor/shared';
-import { PERMISSIONS, SALARY_RUN_LABELS } from '@decor/shared';
+import type { Payslip, SalaryRunDetail } from '@fas/shared';
+import { PERMISSIONS, SALARY_RUN_LABELS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

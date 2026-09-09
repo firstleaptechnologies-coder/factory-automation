@@ -2,8 +2,8 @@
 
 import { Suspense, use, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { Purchase } from '@decor/shared';
-import { PERMISSIONS, PURCHASE_STATUS_LABELS, today } from '@decor/shared';
+import type { Purchase } from '@fas/shared';
+import { PERMISSIONS, PURCHASE_STATUS_LABELS, today } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import type { CustomFieldDefinition, CustomFieldType, LeadSource } from '@decor/shared';
+import type { CustomFieldDefinition, CustomFieldType, LeadSource } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import {

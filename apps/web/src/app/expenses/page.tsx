@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Expense, ExpenseFormOptions } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Expense, ExpenseFormOptions } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { usePaginated } from '@/lib/usePaginated';
 import { useApi } from '@/lib/useApi';

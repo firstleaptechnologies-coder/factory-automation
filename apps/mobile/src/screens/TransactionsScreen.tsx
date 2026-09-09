@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { CashInHandRow, CashPosition, Transaction, TransactionKind } from '@decor/shared';
-import { TRANSACTION_LABELS } from '@decor/shared';
+import type { CashInHandRow, CashPosition, Transaction, TransactionKind } from '@fas/shared';
+import { TRANSACTION_LABELS } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { usePaginated } from '../hooks/usePaginated';

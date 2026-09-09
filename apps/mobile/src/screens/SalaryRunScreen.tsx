@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Payslip, SalaryRunDetail } from '@decor/shared';
-import { PERMISSIONS, SALARY_RUN_LABELS } from '@decor/shared';
+import type { Payslip, SalaryRunDetail } from '@fas/shared';
+import { PERMISSIONS, SALARY_RUN_LABELS } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';

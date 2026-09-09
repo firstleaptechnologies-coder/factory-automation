@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">DecorBucket</string>
+    <string name="app_name">FAS</string>
     <!--
       The channel the app asks for. A string resource rather than a literal in
       the manifest because expo-updates reads the headers as one JSON value.

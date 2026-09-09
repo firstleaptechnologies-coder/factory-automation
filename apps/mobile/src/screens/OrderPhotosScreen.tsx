@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
-import { IMAGE_TARGETS, formatBytes } from '@decor/shared';
+import { IMAGE_TARGETS, formatBytes } from '@fas/shared';
 import { api } from '../api/client';
 import {
   Button,

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { SizePreset } from '@decor/shared';
-import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, formatLength, parseLengthToMm } from '@decor/shared';
+import type { SizePreset } from '@fas/shared';
+import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, formatLength, parseLengthToMm } from '@fas/shared';
 import { Shell } from '@/components/Shell';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';

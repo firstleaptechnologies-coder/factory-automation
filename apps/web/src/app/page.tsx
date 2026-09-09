@@ -1,8 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import type { Order, Paginated, Workflow } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Order, Paginated, Workflow } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

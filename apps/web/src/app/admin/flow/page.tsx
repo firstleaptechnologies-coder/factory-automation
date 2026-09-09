@@ -17,7 +17,7 @@ import {
   useNodesState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import type { Workflow, WorkflowStatus } from '@decor/shared';
+import type { Workflow, WorkflowStatus } from '@fas/shared';
 import { useRouter } from 'next/navigation';
 import { Shell } from '@/components/Shell';
 import { api } from '@/lib/api';

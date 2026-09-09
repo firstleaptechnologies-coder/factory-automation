@@ -1,4 +1,4 @@
-import type { Report } from '@decor/shared';
+import type { Report } from '@fas/shared';
 
 /**
  * Whether a report is still going to change on its own.

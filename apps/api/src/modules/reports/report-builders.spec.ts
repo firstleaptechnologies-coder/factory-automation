@@ -1,4 +1,4 @@
-import { REPORT_KINDS } from '@decor/shared';
+import { REPORT_KINDS } from '@fas/shared';
 import { BUILDERS, NOT_YET_BUILT, builderFor } from './report-builders';
 
 /**

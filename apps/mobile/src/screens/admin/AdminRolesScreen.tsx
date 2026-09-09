@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import type { WorkspaceRole, WorkspaceUser } from '@decor/shared';
+import type { WorkspaceRole, WorkspaceUser } from '@fas/shared';
 import {
   PERMISSIONS,
   PERMISSION_GROUPS,
   PERMISSION_LABELS,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../auth/AuthContext';

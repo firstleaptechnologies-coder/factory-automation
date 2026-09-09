@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Tenant, TenantStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../crypto/encryption.service';
-import { modulesFor } from '@decor/shared';
+import { modulesFor } from '@fas/shared';
 import { TenantContext } from './tenant-context';
 
 /**

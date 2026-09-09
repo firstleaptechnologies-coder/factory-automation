@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import type { Employee, PayKind, PayStructure } from '@decor/shared';
+import type { Employee, PayKind, PayStructure } from '@fas/shared';
 import {
   PAY_KINDS,
   PAY_KIND_HINTS,
   PAY_KIND_LABELS,
   PERMISSIONS,
   today,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

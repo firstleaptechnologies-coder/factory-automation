@@ -1,6 +1,6 @@
 'use client';
 
-import { IMAGE_TARGETS, ImagePurpose, fitWithin } from '@decor/shared';
+import { IMAGE_TARGETS, ImagePurpose, fitWithin } from '@fas/shared';
 
 /**
  * Client-side image optimisation, run before anything is uploaded.

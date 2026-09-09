@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { AttendanceDay, AttendanceMark, MarkInput } from '@decor/shared';
-import { ATTENDANCE_LABELS, ATTENDANCE_MARKS, PERMISSIONS, shiftDay, today } from '@decor/shared';
+import type { AttendanceDay, AttendanceMark, MarkInput } from '@fas/shared';
+import { ATTENDANCE_LABELS, ATTENDANCE_MARKS, PERMISSIONS, shiftDay, today } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';

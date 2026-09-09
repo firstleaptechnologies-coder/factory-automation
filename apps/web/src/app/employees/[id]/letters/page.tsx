@@ -1,8 +1,8 @@
 'use client';
 
 import { use, useState } from 'react';
-import type { Employee, Letter, LetterTemplate } from '@decor/shared';
-import { LETTER_LABELS, PERMISSIONS, today } from '@decor/shared';
+import type { Employee, Letter, LetterTemplate } from '@fas/shared';
+import { LETTER_LABELS, PERMISSIONS, today } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

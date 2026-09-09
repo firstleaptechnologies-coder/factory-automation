@@ -9,7 +9,7 @@ import {
   formatBytes,
   isAcceptedDocument,
   isAcceptedImage,
-} from '@decor/shared';
+} from '@fas/shared';
 import { tenantId } from '../../common/tenancy/tenant-context';
 
 export interface IncomingFile {

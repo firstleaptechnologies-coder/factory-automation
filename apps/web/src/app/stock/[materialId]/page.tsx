@@ -1,13 +1,13 @@
 'use client';
 
 import { use, useState } from 'react';
-import type { StockLevels, StockMove, StockMoveKind } from '@decor/shared';
+import type { StockLevels, StockMove, StockMoveKind } from '@fas/shared';
 import {
   PERMISSIONS,
   RECORDABLE_MOVES,
   STOCK_MOVE_LABELS,
   today,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

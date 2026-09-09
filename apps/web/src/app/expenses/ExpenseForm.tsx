@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Expense, ExpenseFormOptions, ExpenseOptionField } from '@decor/shared';
-import { EXPENSE_FIELD_HINTS, EXPENSE_FIELD_LABELS, today } from '@decor/shared';
+import type { Expense, ExpenseFormOptions, ExpenseOptionField } from '@fas/shared';
+import { EXPENSE_FIELD_HINTS, EXPENSE_FIELD_LABELS, today } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Button, Card, Chip, Field, Loader, PageHead } from '@/ui';

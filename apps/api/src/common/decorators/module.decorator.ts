@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import type { ModuleKey } from '@decor/shared';
+import type { ModuleKey } from '@fas/shared';
 
 export const MODULE_KEY = 'requiredModule';
 

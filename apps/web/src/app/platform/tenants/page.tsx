@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Tenant, TenantIsolation } from '@decor/shared';
-import { MODULE_CATALOGUE, PERMISSIONS, PLANS, planFor } from '@decor/shared';
+import type { Tenant, TenantIsolation } from '@fas/shared';
+import { MODULE_CATALOGUE, PERMISSIONS, PLANS, planFor } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

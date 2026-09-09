@@ -8,7 +8,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import type { Workflow, WorkflowStatus, WorkflowTransition } from '@decor/shared';
+import type { Workflow, WorkflowStatus, WorkflowTransition } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import {

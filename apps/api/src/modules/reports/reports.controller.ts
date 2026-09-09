@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { MODULES, PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@fas/shared';
 import { ReportsService } from './reports.service';
 import { ReportQueryDto, RequestReportDto } from './dto/report.dto';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';

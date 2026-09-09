@@ -1,6 +1,6 @@
 'use client';
 
-import type { CustomFieldDefinition } from '@decor/shared';
+import type { CustomFieldDefinition } from '@fas/shared';
 import { Select } from '@/ui';
 
 /**

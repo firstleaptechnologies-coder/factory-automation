@@ -11,7 +11,7 @@ import {
 } from './dto/workflow.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 
 @Controller('workflows')
 export class WorkflowsController {

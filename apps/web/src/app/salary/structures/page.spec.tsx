@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import PayStructuresPage from './page';
 
 const apiMock = { payStructures: jest.fn(), employees: jest.fn(), setPayStructure: jest.fn() };

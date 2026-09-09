@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import type { Permission } from '@decor/shared';
+import type { Permission } from '@fas/shared';
 
 export const PERMISSIONS_KEY = 'requiredPermissions';
 

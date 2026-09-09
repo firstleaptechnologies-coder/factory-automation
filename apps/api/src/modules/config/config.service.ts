@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { toMm } from '@decor/shared';
+import { toMm } from '@fas/shared';
 import {
   CreateMaterialDto,
   GstSlabDto,

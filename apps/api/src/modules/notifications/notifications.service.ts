@@ -4,7 +4,7 @@ import {
   renderNotification,
   templateFor,
   type NotificationSetting,
-} from '@decor/shared';
+} from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { tenantId } from '../../common/tenancy/tenant-context';
 

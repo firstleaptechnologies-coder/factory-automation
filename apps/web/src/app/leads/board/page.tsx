@@ -8,8 +8,8 @@ import type {
   LeadBoard,
   LeadSource,
   Material,
-} from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+} from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { formatCurrencyInr } from '@/lib/format';
 import { Shell } from '@/components/Shell';
 import { KanbanBoard } from '@/components/KanbanBoard';

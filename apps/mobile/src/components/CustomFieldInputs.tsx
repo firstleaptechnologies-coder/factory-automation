@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import type { CustomFieldDefinition } from '@decor/shared';
+import type { CustomFieldDefinition } from '@fas/shared';
 import { Chip, Field, Text } from '../ui';
 import { spacing } from '../theme';
 

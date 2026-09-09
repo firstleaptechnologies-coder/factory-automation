@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { CustomFieldDefinition, Material, NavGroup, NavItem, SizePreset, Workflow } from '@decor/shared';
-import { NAV_GROUPS } from '@decor/shared';
+import type { CustomFieldDefinition, Material, NavGroup, NavItem, SizePreset, Workflow } from '@fas/shared';
+import { NAV_GROUPS } from '@fas/shared';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { useApi } from '../../hooks/useApi';

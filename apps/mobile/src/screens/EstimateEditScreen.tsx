@@ -7,7 +7,7 @@ import type {
   EstimateItemInput,
   GstSlab,
   TaxTreatment,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { ContactPickerSheet } from '../components/ContactPickerSheet';

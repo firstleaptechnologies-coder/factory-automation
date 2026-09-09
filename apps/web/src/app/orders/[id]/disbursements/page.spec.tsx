@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import OrderDisbursementsPage from './page';
 
 const apiMock = {

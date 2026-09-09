@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Employee, EmploymentStatus, WorkspaceUser } from '@decor/shared';
-import { EMPLOYMENT_STATUS_LABELS, today } from '@decor/shared';
+import type { Employee, EmploymentStatus, WorkspaceUser } from '@fas/shared';
+import { EMPLOYMENT_STATUS_LABELS, today } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Button, Card, Field, Loader, PageHead, SectionHead } from '@/ui';

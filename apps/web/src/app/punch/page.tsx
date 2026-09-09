@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Material, PunchItemInput, SizePreset } from '@decor/shared';
-import { DEFAULT_UNIT, LengthUnit, parseLengthToMm } from '@decor/shared';
+import type { Material, PunchItemInput, SizePreset } from '@fas/shared';
+import { DEFAULT_UNIT, LengthUnit, parseLengthToMm } from '@fas/shared';
 import { Shell } from '@/components/Shell';
 import { Select } from '@/ui';
 import { ClientPicker, ClientSelection } from '@/components/ClientPicker';

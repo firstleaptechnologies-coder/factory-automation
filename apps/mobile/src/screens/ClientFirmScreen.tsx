@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import type { Client } from '@decor/shared';
+import type { Client } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { ContactPickerSheet } from '../components/ContactPickerSheet';

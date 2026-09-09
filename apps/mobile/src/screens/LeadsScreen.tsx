@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import type { Lead, LeadSource, Workflow } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Lead, LeadSource, Workflow } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../hooks/useApi';

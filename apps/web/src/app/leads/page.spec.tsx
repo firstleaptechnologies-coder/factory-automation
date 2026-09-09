@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import LeadsPage from './page';
 
 const apiMock = { leads: jest.fn(), defaultWorkflow: jest.fn(), leadSources: jest.fn() };

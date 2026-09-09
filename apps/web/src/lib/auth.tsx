@@ -9,8 +9,8 @@ import {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import type { AuthUser, ModuleKey } from '@decor/shared';
-import { hasModule } from '@decor/shared';
+import type { AuthUser, ModuleKey } from '@fas/shared';
+import { hasModule } from '@fas/shared';
 import { api, clearToken, loadToken, saveToken } from './api';
 
 const WORKSPACE_KEY = 'decor.workspace';

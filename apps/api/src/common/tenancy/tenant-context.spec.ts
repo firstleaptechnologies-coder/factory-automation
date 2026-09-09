@@ -1,5 +1,5 @@
 import { TenantIsolation } from '@prisma/client';
-import { ALL_MODULES } from '@decor/shared';
+import { ALL_MODULES } from '@fas/shared';
 import {
   PLATFORM_CONTEXT,
   currentTenant,

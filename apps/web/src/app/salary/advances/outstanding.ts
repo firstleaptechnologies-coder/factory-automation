@@ -1,4 +1,4 @@
-import type { SalaryAdvance } from '@decor/shared';
+import type { SalaryAdvance } from '@fas/shared';
 
 /**
  * What is still owed on one advance.

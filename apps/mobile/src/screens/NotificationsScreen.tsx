@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { AppNotification } from '@decor/shared';
+import type { AppNotification } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { Card, EmptyState, Icon, Loader, Screen, ScreenHeader, Text, haptic } from '../ui';

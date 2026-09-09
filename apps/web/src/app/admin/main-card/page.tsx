@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Workflow, WorkflowStatus } from '@decor/shared';
-import { HOME_CARD_LIMIT } from '@decor/shared';
+import type { Workflow, WorkflowStatus } from '@fas/shared';
+import { HOME_CARD_LIMIT } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Shell } from '@/components/Shell';

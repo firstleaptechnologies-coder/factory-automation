@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { RolesService, codeFor } from './roles.service';
 import { inTenant, prismaMock } from '../../../test/prisma-mock';
 

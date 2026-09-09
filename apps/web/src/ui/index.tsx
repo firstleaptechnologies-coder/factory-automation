@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { inkOn } from '@decor/shared';
+import { inkOn } from '@fas/shared';
 import { Icon, IconName } from './Icon';
 
 export { Icon };

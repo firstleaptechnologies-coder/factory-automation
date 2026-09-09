@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PERMISSIONS, shiftMonth, thisMonth } from '@decor/shared';
+import { PERMISSIONS, shiftMonth, thisMonth } from '@fas/shared';
 import SalaryPage from './page';
 
 const apiMock = { salaryRuns: jest.fn(), openSalaryRun: jest.fn() };

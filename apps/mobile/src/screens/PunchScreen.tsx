@@ -18,8 +18,8 @@ import type {
   RateUnit,
   SizePreset,
   TaxTreatment,
-} from '@decor/shared';
-import { LENGTH_UNITS, UNIT_LABEL, fromMm, parseLengthToMm } from '@decor/shared';
+} from '@fas/shared';
+import { LENGTH_UNITS, UNIT_LABEL, fromMm, parseLengthToMm } from '@fas/shared';
 import { formatInr } from '../lib/format';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';

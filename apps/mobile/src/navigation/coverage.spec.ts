@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { navAppRoutes } from '@decor/shared';
+import { navAppRoutes } from '@fas/shared';
 
 /**
  * Every screen has a place in the menu.

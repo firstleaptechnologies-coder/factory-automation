@@ -7,7 +7,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { PrismaClient, TenantIsolation, TenantStatus } from '@prisma/client';
-import { modulesFor } from '@decor/shared';
+import { modulesFor } from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { TenantRegistryService } from '../../common/tenancy/tenant-registry.service';

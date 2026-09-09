@@ -1,5 +1,5 @@
 import { IsArray, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { TENANT_PERMISSIONS } from '@decor/shared';
+import { TENANT_PERMISSIONS } from '@fas/shared';
 
 export class RoleDto {
   @IsString() @MinLength(2) @MaxLength(60) name!: string;

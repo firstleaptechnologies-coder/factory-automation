@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Client, HistoryEntry, Order } from '@decor/shared';
+import type { Client, HistoryEntry, Order } from '@fas/shared';
 import { api } from '../api/client';
 import { HistoryTimeline } from '../components/HistoryTimeline';
 import { useApi } from '../hooks/useApi';

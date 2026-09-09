@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Order, OrderBoard } from '@decor/shared';
-import { PERMISSIONS, UNIT_LABEL } from '@decor/shared';
+import type { Order, OrderBoard } from '@fas/shared';
+import { PERMISSIONS, UNIT_LABEL } from '@fas/shared';
 import { Shell } from '@/components/Shell';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { api } from '@/lib/api';

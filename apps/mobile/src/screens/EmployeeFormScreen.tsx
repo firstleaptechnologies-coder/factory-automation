@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Employee, EmploymentStatus, WorkspaceUser } from '@decor/shared';
-import { EMPLOYMENT_STATUS_LABELS, today } from '@decor/shared';
+import type { Employee, EmploymentStatus, WorkspaceUser } from '@fas/shared';
+import { EMPLOYMENT_STATUS_LABELS, today } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import {

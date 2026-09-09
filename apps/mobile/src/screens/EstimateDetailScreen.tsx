@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Estimate, EstimateStatus, HistoryEntry } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Estimate, EstimateStatus, HistoryEntry } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '../api/client';
 import { HistoryTimeline } from '../components/HistoryTimeline';
 import { useApi } from '../hooks/useApi';

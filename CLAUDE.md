@@ -1,4 +1,4 @@
-# Decor Bucket
+# FAS — Factory Automation Software
 
 ## Navigation is documented, always
 
@@ -11,7 +11,7 @@ three in the same change:**
 
 1. Add or update it in `NAV_GROUPS` (an `items` entry when it belongs in the
    menu, a `children` entry when it is reached from another screen).
-2. Run `npm --workspace @decor/shared run docs:nav` to rewrite
+2. Run `npm --workspace @fas/shared run docs:nav` to rewrite
    `docs/NAVIGATION.md`.
 3. Check the coverage specs still pass — they fail until 1 and 2 are done:
    - `apps/web/src/app/coverage.spec.ts`

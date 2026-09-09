@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import type { Lead } from '@decor/shared';
+import type { Lead } from '@fas/shared';
 import { api } from '../api/client';
 import { usePaginated } from '../hooks/usePaginated';
 import {

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusCategory, WorkflowKind } from '@prisma/client';
-import { HOME_CARD_LIMIT } from '@decor/shared';
+import { HOME_CARD_LIMIT } from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   CreateWorkflowDto,

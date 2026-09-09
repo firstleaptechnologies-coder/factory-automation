@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
-import { hexToHsl, hslToHex, inkOn, normalizeHex } from '@decor/shared';
+import { hexToHsl, hslToHex, inkOn, normalizeHex } from '@fas/shared';
 import { palette, radius, spacing } from '../theme';
 import { Field } from './Field';
 import { Text } from './Text';

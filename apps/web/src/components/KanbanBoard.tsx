@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { WorkflowStatus } from '@decor/shared';
+import type { WorkflowStatus } from '@fas/shared';
 
 export interface KanbanColumn<T> {
   status: WorkflowStatus;

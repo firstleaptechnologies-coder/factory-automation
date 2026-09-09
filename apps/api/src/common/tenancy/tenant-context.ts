@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TenantIsolation } from '@prisma/client';
-import { CORE_MODULES, type ModuleKey } from '@decor/shared';
+import { CORE_MODULES, type ModuleKey } from '@fas/shared';
 
 export interface TenantContext {
   tenantId: string;

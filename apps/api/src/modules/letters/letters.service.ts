@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { LetterKind } from '@prisma/client';
-import { fillLetter, type LetterField } from '@decor/shared';
+import { fillLetter, type LetterField } from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { tenantId } from '../../common/tenancy/tenant-context';
 import { dateOnly } from '../employees/employees.service';

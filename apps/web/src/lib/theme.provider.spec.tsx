@@ -1,5 +1,5 @@
 import { render, screen, waitFor, act } from '@testing-library/react';
-import { INK_DARK, INK_LIGHT } from '@decor/shared';
+import { INK_DARK, INK_LIGHT } from '@fas/shared';
 import { ThemeProvider, useTheme } from './theme';
 
 const firmTheme = jest.fn();

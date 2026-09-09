@@ -27,7 +27,7 @@
       "@/*": [
         "./src/*"
       ],
-      "@decor/shared": [
+      "@fas/shared": [
         "../../packages/shared/src/index.ts"
       ]
     },

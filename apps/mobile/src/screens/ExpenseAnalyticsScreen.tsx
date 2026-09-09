@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { ExpenseAnalytics, ExpenseSlice } from '@decor/shared';
-import { isoDate } from '@decor/shared';
+import type { ExpenseAnalytics, ExpenseSlice } from '@fas/shared';
+import { isoDate } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { Card, Chip, EmptyState, Loader, Screen, ScreenHeader, Text } from '../ui';

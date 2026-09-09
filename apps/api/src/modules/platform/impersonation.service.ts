@@ -83,7 +83,7 @@ export class ImpersonationService {
       throw new BadRequestException('That workspace has no active administrator to work as');
     }
 
-    const impersonatedBy = { id: actor.id, name: actor.name ?? 'Decor Bucket support' };
+    const impersonatedBy = { id: actor.id, name: actor.name ?? 'FirstLeap support' };
 
     const accessToken = await this.jwt.signAsync(
       {
@@ -133,7 +133,7 @@ export class ImpersonationService {
             action: 'workspace.opened_by_support',
             reason,
             after: { as: userId, by: by.name },
-            actorLabel: `${by.name} (Decor Bucket support)`,
+            actorLabel: `${by.name} (FirstLeap support)`,
           },
         }),
       );

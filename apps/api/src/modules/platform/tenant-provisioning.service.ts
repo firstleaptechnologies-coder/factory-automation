@@ -10,7 +10,7 @@ import {
   WorkflowKind,
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import { DEFAULT_ROLES } from '@decor/shared';
+import { DEFAULT_ROLES } from '@fas/shared';
 
 const FT = 304.8;
 

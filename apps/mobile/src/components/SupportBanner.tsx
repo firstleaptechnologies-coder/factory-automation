@@ -6,7 +6,7 @@ import { Text } from '../ui';
 import { palette, spacing } from '../theme';
 
 /**
- * Somebody from Decor Bucket is inside this workspace.
+ * Somebody from FirstLeap is inside this workspace.
  *
  * Above everything, for as long as it lasts, and not dismissible. A support
  * session that looks like an ordinary one is how a shop ends up believing its
@@ -28,7 +28,7 @@ export function SupportBanner() {
         <Text variant="tiny" bold style={styles.words}>
           {user.impersonatedBy.name}
         </Text>{' '}
-        from Decor Bucket support is in this workspace as {user.name}. Everything done here is
+        from FirstLeap support is in this workspace as {user.name}. Everything done here is
         recorded under that name.
       </Text>
       <Pressable onPress={signOut} accessibilityRole="button" hitSlop={8}>

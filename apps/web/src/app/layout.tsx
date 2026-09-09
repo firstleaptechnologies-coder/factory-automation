@@ -5,7 +5,7 @@ import {ThemeProvider} from '@/lib/theme';
 import {ErrorReporting} from '@/components/ErrorReporting';
 
 export const metadata: Metadata = {
-  title: 'Decor Bucket ERP',
+  title: 'FAS — Factory Automation Software',
   description: 'Production, material and waste management for a CNC decor unit',
 };
 

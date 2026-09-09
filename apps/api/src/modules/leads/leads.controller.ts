@@ -12,7 +12,7 @@ import {
   UpdateCustomFieldDto,
   UpdateLeadDto,
 } from './dto/lead.dto';
-import { MODULES, PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@fas/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { RequireModule } from '../../common/decorators/module.decorator';

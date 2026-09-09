@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { RolesService } from './roles.service';
 import { AssignRoleDto, RoleDto } from './dto/role.dto';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';

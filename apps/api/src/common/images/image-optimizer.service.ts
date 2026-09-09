@@ -6,7 +6,7 @@ import {
   fitWithin,
   formatBytes,
   isAcceptedImage,
-} from '@decor/shared';
+} from '@fas/shared';
 
 export interface OptimizedImage {
   data: Buffer;

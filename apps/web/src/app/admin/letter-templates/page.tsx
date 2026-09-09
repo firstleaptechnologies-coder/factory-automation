@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { LetterKind, LetterTemplate } from '@decor/shared';
+import type { LetterKind, LetterTemplate } from '@fas/shared';
 import {
   LETTER_FIELDS,
   LETTER_FIELD_LABELS,
@@ -9,7 +9,7 @@ import {
   LETTER_KINDS,
   LETTER_LABELS,
   unknownPlaceholders,
-} from '@decor/shared';
+} from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { Shell } from '@/components/Shell';

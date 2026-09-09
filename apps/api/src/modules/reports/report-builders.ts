@@ -1,5 +1,5 @@
 import { DocumentStatus, PrismaClient } from '@prisma/client';
-import type { ReportKind } from '@decor/shared';
+import type { ReportKind } from '@fas/shared';
 import { gstComponents, round2 } from '../../common/utils/pricing';
 import { Sheet } from './report-workbook';
 import {
@@ -21,7 +21,7 @@ import {
  * next year cannot quietly change what "settled" means.
  *
  * Every kind in the catalogue is either here or in `NOT_YET_BUILT` with a
- * reason. `report-builders.spec.ts` reads both against `@decor/shared` and
+ * reason. `report-builders.spec.ts` reads both against `@fas/shared` and
  * fails on a kind that is in neither — the same shape as `NOT_A_TRANSACTION`,
  * and for the same reason: a report that silently produces nothing is worse
  * than one that refuses.

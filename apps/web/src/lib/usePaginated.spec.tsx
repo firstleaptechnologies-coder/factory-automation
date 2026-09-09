@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import type { Paginated } from '@decor/shared';
+import type { Paginated } from '@fas/shared';
 import { usePaginated } from './usePaginated';
 
 /** A stand-in endpoint: `total` rows, served `limit` at a time. */

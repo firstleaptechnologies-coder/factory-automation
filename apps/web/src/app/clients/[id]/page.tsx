@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Client, HistoryEntry } from '@decor/shared';
+import type { Client, HistoryEntry } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { HistoryTimeline } from '@/components/HistoryTimeline';

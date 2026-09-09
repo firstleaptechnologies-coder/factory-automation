@@ -1,8 +1,8 @@
 'use client';
 
 import { use, useState } from 'react';
-import type { PaymentMode, PaymentSummary } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { PaymentMode, PaymentSummary } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';

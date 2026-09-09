@@ -1,6 +1,6 @@
 'use client';
 
-import {ApiClient} from '@decor/shared';
+import {ApiClient} from '@fas/shared';
 
 const TOKEN_KEY = 'decor.token';
 

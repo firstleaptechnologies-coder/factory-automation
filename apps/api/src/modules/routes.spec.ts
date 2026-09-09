@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { PATH_METADATA, METHOD_METADATA, GUARDS_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common';
-import { DEFAULT_ROLES, PLATFORM_ROLES } from '@decor/shared';
+import { DEFAULT_ROLES, PLATFORM_ROLES } from '@fas/shared';
 import { PERMISSIONS_KEY } from '../common/decorators/permissions.decorator';
 import { ROLES_KEY } from '../common/decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';

@@ -12,8 +12,8 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
-import { MODULES, PERMISSIONS } from '@decor/shared';
-import { DEFAULT_UNIT, LengthUnit, isLengthUnit } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@fas/shared';
+import { DEFAULT_UNIT, LengthUnit, isLengthUnit } from '@fas/shared';
 import { OrdersService } from './orders.service';
 import {
   AttachmentMetaDto,
@@ -28,7 +28,7 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { RequireModule } from '../../common/decorators/module.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { IncomingFile } from '../files/files.service';
-import { MAX_UPLOAD_BYTES } from '@decor/shared';
+import { MAX_UPLOAD_BYTES } from '@fas/shared';
 
 @RequireModule(MODULES.ORDERS)
 @Controller('orders')

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { MODULES, PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@fas/shared';
 import { AttendanceService } from './attendance.service';
 import { DayQueryDto, MarkDayDto, RegisterQueryDto } from './dto/attendance.dto';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Tenant, TenantIsolation } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Tenant, TenantIsolation } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../auth/AuthContext';

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { Estimate, EstimateStatus } from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+import type { Estimate, EstimateStatus } from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '../api/client';
 import { usePaginated } from '../hooks/usePaginated';
 import { useAuth } from '../auth/AuthContext';

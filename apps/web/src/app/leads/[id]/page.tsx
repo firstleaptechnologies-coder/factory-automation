@@ -10,8 +10,8 @@ import type {
   Order,
   WorkflowStatus,
   WorkflowTransition,
-} from '@decor/shared';
-import { PERMISSIONS } from '@decor/shared';
+} from '@fas/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { HistoryTimeline } from '@/components/HistoryTimeline';

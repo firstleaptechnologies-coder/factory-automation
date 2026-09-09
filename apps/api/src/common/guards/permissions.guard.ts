@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Permission } from '@decor/shared';
+import type { Permission } from '@fas/shared';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 
 @Injectable()

@@ -1,5 +1,5 @@
 import { Controller, Get, Param } from '@nestjs/common';
-import { PERMISSIONS } from '@decor/shared';
+import { PERMISSIONS } from '@fas/shared';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { HistoryService } from './history.service';
 

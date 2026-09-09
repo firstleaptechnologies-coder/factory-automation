@@ -1,9 +1,9 @@
 {
-  "name": "DecorBucket",
-  "displayName": "DecorBucket",
+  "name": "FAS",
+  "displayName": "FAS",
   "expo": {
-    "name": "DecorBucket",
-    "slug": "decor-bucket",
+    "name": "FAS",
+    "slug": "fas",
     "runtimeVersion": "1",
     "ios": {
       "bundleIdentifier": "com.firstleap.factoryautomation"

@@ -14,7 +14,7 @@ jest.mock('@/lib/theme', () => ({
 }));
 
 it('names the app for the browser tab and for search', () => {
-  expect(metadata.title).toBe('Decor Bucket ERP');
+  expect(metadata.title).toBe('FAS — Factory Automation Software');
   expect(metadata.description).toContain('CNC decor unit');
 });
 

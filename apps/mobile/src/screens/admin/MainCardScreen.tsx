@@ -8,8 +8,8 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import type { Workflow, WorkflowStatus } from '@decor/shared';
-import { HOME_CARD_LIMIT } from '@decor/shared';
+import type { Workflow, WorkflowStatus } from '@fas/shared';
+import { HOME_CARD_LIMIT } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
 import {

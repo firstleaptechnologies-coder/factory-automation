@@ -9,7 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { LetterKind } from '@prisma/client';
-import { MODULES, PERMISSIONS } from '@decor/shared';
+import { MODULES, PERMISSIONS } from '@fas/shared';
 import { LettersService } from './letters.service';
 import { renderLetterHtml } from './letter-document';
 import { IssueLetterDto, LetterQueryDto, LetterTemplateDto } from './dto/letter.dto';

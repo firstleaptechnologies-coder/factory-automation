@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInRight, Layout } from 'react-native-reanimated';
-import type { Lead, Order, Paginated, Workflow } from '@decor/shared';
-import { PERMISSIONS, UNIT_LABEL } from '@decor/shared';
+import type { Lead, Order, Paginated, Workflow } from '@fas/shared';
+import { PERMISSIONS, UNIT_LABEL } from '@fas/shared';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../hooks/useApi';

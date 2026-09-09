@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { AttendanceMonth } from '@decor/shared';
-import { monthBounds, shiftMonth, thisMonth } from '@decor/shared';
+import type { AttendanceMonth } from '@fas/shared';
+import { monthBounds, shiftMonth, thisMonth } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import {

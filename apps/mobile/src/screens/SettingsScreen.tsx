@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { LENGTH_UNITS, UNIT_LABEL } from '@decor/shared';
+import { LENGTH_UNITS, UNIT_LABEL } from '@fas/shared';
 import { useAuth } from '../auth/AuthContext';
 import { useDisplayUnit } from '../hooks/useUnit';
 import { API_BASE_URL } from '../api/client';

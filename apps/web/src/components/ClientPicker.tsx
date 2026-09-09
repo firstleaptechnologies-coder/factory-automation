@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Client } from '@decor/shared';
+import type { Client } from '@fas/shared';
 import { api } from '@/lib/api';
 
 export interface ClientSelection {

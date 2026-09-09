@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
-import type { Report } from '@decor/shared';
-import { PERMISSIONS, REPORT_LABELS, REPORT_STATUS_LABELS } from '@decor/shared';
+import type { Report } from '@fas/shared';
+import { PERMISSIONS, REPORT_LABELS, REPORT_STATUS_LABELS } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';

@@ -1,5 +1,5 @@
 import {Platform} from 'react-native';
-import {ApiClient} from '@decor/shared';
+import {ApiClient} from '@fas/shared';
 
 /**
  * Android emulators reach the host machine on 10.0.2.2, not localhost. On a real

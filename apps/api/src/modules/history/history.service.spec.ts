@@ -112,10 +112,10 @@ describe('an order’s history', () => {
 
   it('names a platform admin who has no user row here', async () => {
     const { service } = build([
-      auditRow({ user: null, actorLabel: 'Nakul (Decor Bucket support)' }),
+      auditRow({ user: null, actorLabel: 'Nakul (FirstLeap support)' }),
     ]);
     const [entry] = await service.forOrder('o1');
-    expect(entry.by).toBe('Nakul (Decor Bucket support)');
+    expect(entry.by).toBe('Nakul (FirstLeap support)');
   });
 
   it('carries the reason somebody gave for an edit', async () => {

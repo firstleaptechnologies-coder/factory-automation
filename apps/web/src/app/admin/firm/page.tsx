@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { FirmProfile } from '@decor/shared';
-import { ensureReadable, isReadable } from '@decor/shared';
+import type { FirmProfile } from '@fas/shared';
+import { ensureReadable, isReadable } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useTheme } from '@/lib/theme';
