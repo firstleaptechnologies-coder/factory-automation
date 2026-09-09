@@ -2,6 +2,7 @@ import { DocumentStatus, PrismaClient } from '@prisma/client';
 import type { ReportKind } from '@fas/shared';
 import { gstComponents, round2 } from '../../common/utils/pricing';
 import { Sheet } from './report-workbook';
+import { statementLines } from '../documents/statement';
 import {
   StockKind,
   cashBookRows,
@@ -654,73 +655,10 @@ const clientStatement: ReportBuilder = async ({ prisma, from, to, params }) => {
   });
   if (!client) throw new Error('That client does not exist');
 
-  const [invoices, payments] = await Promise.all([
-    prisma.invoice.findMany({
-      where: { order: { clientId }, issuedOn: within(from, to) },
-      include: { creditNotes: { where: { status: DocumentStatus.ISSUED } } },
-      orderBy: { issuedOn: 'asc' },
-    }),
-    prisma.payment.findMany({
-      where: { order: { clientId }, receivedAt: within(from, to) },
-      include: { order: { select: { code: true } } },
-      orderBy: { receivedAt: 'asc' },
-    }),
-  ]);
-
-  type Line = {
-    date: string;
-    kind: string;
-    reference: string;
-    charged: number;
-    received: number;
-    balance: number;
-  };
-
-  const lines: Line[] = [];
-
-  for (const invoice of invoices) {
-    // A cancelled invoice claims nothing, so it charges nothing — but it is
-    // listed, because the client may be holding a copy of it.
-    const cancelled = invoice.status !== DocumentStatus.ISSUED;
-    lines.push({
-      date: invoice.issuedOn.toISOString().slice(0, 10),
-      kind: cancelled ? 'Invoice (cancelled)' : 'Invoice',
-      reference: invoice.code,
-      charged: cancelled ? 0 : Number(invoice.total),
-      received: 0,
-      balance: 0,
-    });
-
-    for (const note of invoice.creditNotes) {
-      lines.push({
-        date: note.issuedOn.toISOString().slice(0, 10),
-        kind: 'Credit note',
-        reference: note.code,
-        charged: -Number(note.total),
-        received: 0,
-        balance: 0,
-      });
-    }
-  }
-
-  for (const payment of payments) {
-    lines.push({
-      date: payment.receivedAt.toISOString().slice(0, 10),
-      kind: 'Payment',
-      reference: payment.order?.code ?? '',
-      charged: 0,
-      received: Number(payment.amount),
-      balance: 0,
-    });
-  }
-
-  lines.sort((a, b) => a.date.localeCompare(b.date));
-
-  let balance = 0;
-  for (const line of lines) {
-    balance = round2(balance + line.charged - line.received);
-    line.balance = balance;
-  }
+  // The same lines the printed statement uses. Written separately once, which
+  // is how a workbook and the paper beside it come to disagree about a
+  // balance — and the client is holding the paper.
+  const lines = await statementLines(prisma, clientId, from ?? null, to ?? null);
 
   return {
     rowCount: lines.length,

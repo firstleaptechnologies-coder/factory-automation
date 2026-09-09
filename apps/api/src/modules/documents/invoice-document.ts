@@ -373,7 +373,7 @@ export function reasonLabel(reason: string): string {
 
 // -- the sheet the three of them are drawn on -------------------------------
 
-interface SheetInput {
+export interface SheetInput {
   title: string;
   docType: string;
   accent: string;
@@ -392,7 +392,7 @@ interface SheetInput {
  * over — a challan that looked like a different company's would defeat the
  * point of printing one.
  */
-function sheet(input: SheetInput): string {
+export function sheet(input: SheetInput): string {
   const { accent, firm } = input;
   const ink = '#1F2430';
 

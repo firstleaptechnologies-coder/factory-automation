@@ -151,10 +151,15 @@ export const REPORTS: readonly ReportDefinition[] = [
   {
     kind: 'CLIENT_STATEMENT',
     label: 'Client statement',
-    description: 'One client: everything charged and everything received.',
+    description:
+      'One client: everything charged and everything received. The printable ' +
+      'version is a document, at /clients/:id/statement.',
     group: 'Sales',
     period: 'optional',
-    formats: ['XLSX', 'PDF'],
+    // XLSX only. This listed PDF for a while, which was never true: reports
+    // are workbooks, and the paper a client is handed is a document rendered
+    // like an invoice — same sheet, same letterhead, printed from the browser.
+    formats: ['XLSX'],
     subject: 'client',
   },
   {

@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Header, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { MODULES, PERMISSIONS } from '@fas/shared';
 import { DocumentsService } from './documents.service';
 import {
@@ -6,6 +15,8 @@ import {
   renderCreditNoteHtml,
   renderInvoiceHtml,
 } from './invoice-document';
+import { renderStatementHtml } from './statement-document';
+import { statementLines } from './statement';
 import {
   CancelDto,
   ChallanDto,
@@ -248,4 +259,49 @@ export class DocumentsController {
       return null;
     }
   }
+  /**
+   * A client's statement, as paper.
+   *
+   * Served as HTML for the same reason every other document here is: this
+   * product has no PDF engine, and the browser's own print-to-PDF renders the
+   * A4 sheet these are laid out for. An invoice, a challan and a statement all
+   * reach a client the same way.
+   */
+  @RequirePermissions(PERMISSIONS.INVOICE_VIEW)
+  @Get('clients/:id/statement')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  async clientStatement(
+    @Param('id') id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const [client, firm] = await Promise.all([
+      this.prisma.client.findFirst({
+        where: { id },
+        select: { name: true, gstin: true, billingAddress: true, address: true },
+      }),
+      this.prisma.firmProfile.findFirst(),
+    ]);
+    if (!client) throw new NotFoundException('That client does not exist');
+
+    const lines = await statementLines(
+      this.prisma as never,
+      id,
+      from ? new Date(from) : null,
+      to ? new Date(to) : null,
+    );
+
+    return renderStatementHtml({
+      client: {
+        name: client.name,
+        gstin: client.gstin,
+        address: client.billingAddress ?? client.address,
+      },
+      firm: (firm ?? {}) as Record<string, unknown>,
+      letterheadUrl: await this.dataUri(firm?.letterheadFileId ?? null),
+      period: { from: from ?? null, to: to ?? null },
+      lines,
+    });
+  }
+
 }
