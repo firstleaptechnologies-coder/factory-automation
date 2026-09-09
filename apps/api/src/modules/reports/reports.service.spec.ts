@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ReportsService } from './reports.service';
+import { NOT_YET_BUILT } from './report-builders';
 import { inTenant, prismaMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;
@@ -48,15 +49,26 @@ describe('asking for a report', () => {
 
   // Catalogued but unwritten. Queueing it would produce an empty file and an
   // afternoon spent wondering why the numbers were missing.
+  //
+  // Every report in the catalogue is built today, so the pending list is
+  // empty — the mechanism is exercised by putting something on it rather than
+  // by naming whichever report happens to be unwritten this month, which is a
+  // test that quietly stops testing anything the moment it gets written.
   it('refuses a report that is catalogued but not yet built, and says so', async () => {
     const { service, db } = make();
+    const pending = NOT_YET_BUILT as Record<string, string>;
+    pending.CASH_BOOK = 'still to be written';
 
-    await expect(
-      inTenant(() =>
-        service.request({ kind: 'SALARY_REGISTER', from: '2026-04-01', to: '2026-06-30' }),
-      ),
-    ).rejects.toThrow(/still to be written/);
-    expect(db.report.create).not.toHaveBeenCalled();
+    try {
+      await expect(
+        inTenant(() =>
+          service.request({ kind: 'CASH_BOOK', from: '2026-04-01', to: '2026-06-30' }),
+        ),
+      ).rejects.toThrow(/still to be written/);
+      expect(db.report.create).not.toHaveBeenCalled();
+    } finally {
+      delete pending.CASH_BOOK;
+    }
   });
 
   it('queues a report it can build, against the tenant asking', async () => {

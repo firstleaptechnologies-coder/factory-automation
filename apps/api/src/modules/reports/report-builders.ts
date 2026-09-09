@@ -3,8 +3,10 @@ import type { ReportKind } from '@decor/shared';
 import { gstComponents, round2 } from '../../common/utils/pricing';
 import { Sheet } from './report-workbook';
 import {
+  StockKind,
   cashBookRows,
   gstSummaryRows,
+  materialWasteRows,
   orderRegisterRows,
   payoutRows,
   receivableRows,
@@ -391,6 +393,452 @@ const orderRegister: ReportBuilder = async ({ prisma, from, to }) => {
 
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// The rest of the catalogue
+// ---------------------------------------------------------------------------
+
+/**
+ * What was spent, by category and by person.
+ *
+ * Reversals are listed rather than filtered out. A correction is a row with a
+ * negative amount, so the totals net on their own — and a report that hid them
+ * would disagree with the expense list, the ledger and the cash book, all of
+ * which show both rows.
+ */
+const expenses: ReportBuilder = async ({ prisma, from, to }) => {
+  const rows = await prisma.expense.findMany({
+    where: { date: within(from, to) },
+    orderBy: { date: 'asc' },
+  });
+
+  const detail = rows.map((row) => ({
+    date: row.date.toISOString().slice(0, 10),
+    description: row.description,
+    category: row.spentType,
+    paidBy: row.doneBy,
+    paidTo: row.toName || row.vendor,
+    method: row.paymentType,
+    taxable: row.taxableValue == null ? null : Number(row.taxableValue),
+    tax: row.taxAmount == null ? null : Number(row.taxAmount),
+    itc: row.itcEligible ? 'Yes' : 'No',
+    amount: Number(row.amount),
+    // Named on the row, so a negative figure is never a mystery.
+    correction: row.reversalOfId ? 'Correction' : '',
+  }));
+
+  const by = (key: 'category' | 'paidBy') => {
+    const totals = new Map<string, number>();
+    for (const row of detail) {
+      totals.set(row[key], round2((totals.get(row[key]) ?? 0) + row.amount));
+    }
+    return [...totals.entries()]
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  };
+
+  const columns = [
+    { key: 'name', header: 'Name' },
+    { key: 'amount', header: 'Amount', type: 'money' as const },
+  ];
+
+  return {
+    rowCount: detail.length,
+    sheets: [
+      {
+        name: 'Expenses',
+        note: 'A correction is a row with a negative amount, listed beside the one it takes back. The totals net on their own.',
+        columns: [
+          { key: 'date', header: 'Date', type: 'date' },
+          { key: 'description', header: 'What' },
+          { key: 'category', header: 'Category' },
+          { key: 'paidBy', header: 'Paid by' },
+          { key: 'paidTo', header: 'Paid to' },
+          { key: 'method', header: 'Method' },
+          { key: 'taxable', header: 'Taxable', type: 'money' },
+          { key: 'tax', header: 'Tax', type: 'money' },
+          { key: 'itc', header: 'ITC' },
+          { key: 'amount', header: 'Amount', type: 'money' },
+          { key: 'correction', header: '' },
+        ],
+        rows: detail,
+        total: ['taxable', 'tax', 'amount'],
+      },
+      { name: 'By category', columns, rows: by('category'), total: ['amount'] },
+      { name: 'By person', columns, rows: by('paidBy'), total: ['amount'] },
+    ],
+  };
+};
+
+/**
+ * What was consumed, what was wasted, and what each was worth.
+ *
+ * Offcut is counted apart from waste on purpose: the usable remainder of a
+ * sheet went back on the rack and is not a loss, and folding the two together
+ * would make a shop that saves its offcuts look like one that does not.
+ */
+const materialAndWaste: ReportBuilder = async ({ prisma, from, to }) => {
+  const moves = await prisma.stockMove.findMany({
+    where: { at: within(from, to) },
+    include: {
+      material: { select: { name: true } },
+      thickness: { select: { label: true } },
+    },
+    orderBy: { at: 'asc' },
+  });
+
+  const rows = materialWasteRows(
+    moves.map((move) => ({
+      material: move.material?.name ?? '',
+      thickness: move.thickness?.label ?? '',
+      unit: move.unit,
+      kind: move.kind as StockKind,
+      quantity: Number(move.quantity),
+      rate: move.rate == null ? null : Number(move.rate),
+    })),
+  );
+
+  return {
+    rowCount: rows.length,
+    sheets: [
+      {
+        name: 'Material and waste',
+        note: 'Offcut is the usable remainder that went back on the rack, counted apart from waste. Waste percentage is of what was consumed.',
+        columns: [
+          { key: 'material', header: 'Material' },
+          { key: 'thickness', header: 'Thickness' },
+          { key: 'unit', header: 'Unit' },
+          { key: 'received', header: 'Received', type: 'number' },
+          { key: 'consumed', header: 'Consumed', type: 'number' },
+          { key: 'offcut', header: 'Offcut', type: 'number' },
+          { key: 'wasted', header: 'Wasted', type: 'number' },
+          { key: 'wastePct', header: 'Waste %', type: 'number' },
+          { key: 'wasteValue', header: 'Waste value', type: 'money' },
+        ],
+        rows,
+        total: ['received', 'consumed', 'offcut', 'wasted', 'wasteValue'],
+      },
+    ],
+  };
+};
+
+/** Payslips in the period, with what was recovered against each. */
+const salaryRegister: ReportBuilder = async ({ prisma, from, to }) => {
+  const payslips = await prisma.payslip.findMany({
+    where: { run: { month: within(from, to) } },
+    include: {
+      employee: { select: { code: true, name: true } },
+      run: { select: { month: true, status: true, paidAt: true } },
+    },
+    orderBy: [{ run: { month: 'asc' } }, { employee: { code: 'asc' } }],
+  });
+
+  const rows = payslips.map((slip) => ({
+    month: slip.run.month.toISOString().slice(0, 7),
+    code: slip.employee?.code ?? '',
+    name: slip.employee?.name ?? '',
+    payableDays: Number(slip.payableDays),
+    overtimeHours: round2(slip.overtimeMinutes / 60),
+    pieces: slip.pieces ?? null,
+    gross: Number(slip.gross),
+    advance: Number(slip.advanceDeducted),
+    other: Number(slip.otherDeductions),
+    net: Number(slip.net),
+    status: slip.run.status,
+  }));
+
+  return {
+    rowCount: rows.length,
+    sheets: [
+      {
+        name: 'Salary register',
+        note: 'Advance is what was recovered from an outstanding advance this month, not a new one given.',
+        columns: [
+          { key: 'month', header: 'Month' },
+          { key: 'code', header: 'Code' },
+          { key: 'name', header: 'Employee' },
+          { key: 'payableDays', header: 'Payable days', type: 'number' },
+          { key: 'overtimeHours', header: 'OT hours', type: 'number' },
+          { key: 'pieces', header: 'Pieces', type: 'number' },
+          { key: 'gross', header: 'Gross', type: 'money' },
+          { key: 'advance', header: 'Advance recovered', type: 'money' },
+          { key: 'other', header: 'Other deductions', type: 'money' },
+          { key: 'net', header: 'Net paid', type: 'money' },
+          { key: 'status', header: 'Run' },
+        ],
+        rows,
+        total: ['gross', 'advance', 'other', 'net'],
+      },
+    ],
+  };
+};
+
+/** Purchases raised, received and billed, with vendor and tax. */
+const purchaseRegister: ReportBuilder = async ({ prisma, from, to }) => {
+  const purchases = await prisma.purchase.findMany({
+    where: {
+      OR: [
+        { orderedOn: within(from, to) },
+        { billedOn: within(from, to) },
+        { orderedOn: null, billedOn: null, createdAt: within(from, to) },
+      ],
+    },
+    include: { vendor: { select: { name: true, gstin: true } } },
+    orderBy: [{ orderedOn: 'asc' }, { createdAt: 'asc' }],
+  });
+
+  const rows = purchases.map((purchase) => ({
+    code: purchase.code,
+    vendor: purchase.vendor?.name ?? '',
+    gstin: purchase.vendor?.gstin ?? '',
+    status: purchase.status,
+    orderedOn: purchase.orderedOn?.toISOString().slice(0, 10) ?? '',
+    billNumber: purchase.billNumber ?? '',
+    billedOn: purchase.billedOn?.toISOString().slice(0, 10) ?? '',
+    paidOn: purchase.paidOn?.toISOString().slice(0, 10) ?? '',
+    subtotal: Number(purchase.subtotal),
+    tax: Number(purchase.taxTotal),
+    otherCharges: Number(purchase.otherCharges),
+    total: Number(purchase.total),
+    // Cancelled purchases are listed and marked, never removed: the numbering
+    // has to stay accountable, exactly as it does on the sales register.
+    settled: purchase.paidOn ? 'Paid' : 'Unpaid',
+  }));
+
+  return {
+    rowCount: rows.length,
+    sheets: [
+      {
+        name: 'Purchase register',
+        note: 'Cancelled purchases are listed and marked rather than removed.',
+        columns: [
+          { key: 'code', header: 'Purchase' },
+          { key: 'vendor', header: 'Vendor' },
+          { key: 'gstin', header: 'GSTIN' },
+          { key: 'status', header: 'Status' },
+          { key: 'orderedOn', header: 'Ordered', type: 'date' },
+          { key: 'billNumber', header: 'Bill no.' },
+          { key: 'billedOn', header: 'Billed', type: 'date' },
+          { key: 'paidOn', header: 'Paid', type: 'date' },
+          { key: 'subtotal', header: 'Subtotal', type: 'money' },
+          { key: 'tax', header: 'Tax', type: 'money' },
+          { key: 'otherCharges', header: 'Other', type: 'money' },
+          { key: 'total', header: 'Total', type: 'money' },
+          { key: 'settled', header: 'Settled' },
+        ],
+        rows,
+        total: ['subtotal', 'tax', 'otherCharges', 'total'],
+      },
+    ],
+  };
+};
+
+/**
+ * One client: everything charged and everything received, in order.
+ *
+ * A running balance, because that is what a statement is for — the client
+ * wants to know what they owe today, not to add up a column themselves.
+ *
+ * Payouts recorded against these orders do not appear and are not deducted.
+ * A payout is the shop's money going out; it has nothing to do with what this
+ * client was charged, and putting it here would be the netting-off the books
+ * must not do.
+ */
+const clientStatement: ReportBuilder = async ({ prisma, from, to, params }) => {
+  const clientId = String(params.clientId ?? '');
+  if (!clientId) throw new Error('A client statement needs a client');
+
+  const client = await prisma.client.findFirst({
+    where: { id: clientId },
+    select: { name: true, gstin: true },
+  });
+  if (!client) throw new Error('That client does not exist');
+
+  const [invoices, payments] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { order: { clientId }, issuedOn: within(from, to) },
+      include: { creditNotes: { where: { status: DocumentStatus.ISSUED } } },
+      orderBy: { issuedOn: 'asc' },
+    }),
+    prisma.payment.findMany({
+      where: { order: { clientId }, receivedAt: within(from, to) },
+      include: { order: { select: { code: true } } },
+      orderBy: { receivedAt: 'asc' },
+    }),
+  ]);
+
+  type Line = {
+    date: string;
+    kind: string;
+    reference: string;
+    charged: number;
+    received: number;
+    balance: number;
+  };
+
+  const lines: Line[] = [];
+
+  for (const invoice of invoices) {
+    // A cancelled invoice claims nothing, so it charges nothing — but it is
+    // listed, because the client may be holding a copy of it.
+    const cancelled = invoice.status !== DocumentStatus.ISSUED;
+    lines.push({
+      date: invoice.issuedOn.toISOString().slice(0, 10),
+      kind: cancelled ? 'Invoice (cancelled)' : 'Invoice',
+      reference: invoice.code,
+      charged: cancelled ? 0 : Number(invoice.total),
+      received: 0,
+      balance: 0,
+    });
+
+    for (const note of invoice.creditNotes) {
+      lines.push({
+        date: note.issuedOn.toISOString().slice(0, 10),
+        kind: 'Credit note',
+        reference: note.code,
+        charged: -Number(note.total),
+        received: 0,
+        balance: 0,
+      });
+    }
+  }
+
+  for (const payment of payments) {
+    lines.push({
+      date: payment.receivedAt.toISOString().slice(0, 10),
+      kind: 'Payment',
+      reference: payment.order?.code ?? '',
+      charged: 0,
+      received: Number(payment.amount),
+      balance: 0,
+    });
+  }
+
+  lines.sort((a, b) => a.date.localeCompare(b.date));
+
+  let balance = 0;
+  for (const line of lines) {
+    balance = round2(balance + line.charged - line.received);
+    line.balance = balance;
+  }
+
+  return {
+    rowCount: lines.length,
+    sheets: [
+      {
+        name: 'Statement',
+        note: `${client.name}${client.gstin ? ` · ${client.gstin}` : ''} — balance is what is owed after each row. Payouts are not shown here and are never deducted from what a client was charged.`,
+        columns: [
+          { key: 'date', header: 'Date', type: 'date' },
+          { key: 'kind', header: 'Entry' },
+          { key: 'reference', header: 'Reference' },
+          { key: 'charged', header: 'Charged', type: 'money' },
+          { key: 'received', header: 'Received', type: 'money' },
+          { key: 'balance', header: 'Balance', type: 'money' },
+        ],
+        rows: lines,
+        total: ['charged', 'received'],
+      },
+    ],
+  };
+};
+
+/**
+ * Quotes raised against quotes won, and what was left on the table.
+ *
+ * Converted is the only thing that counts as won: a quote marked accepted that
+ * never became an order is a conversation, not a sale, and counting it would
+ * flatter the number the shop uses to decide how it prices.
+ */
+const quoteConversion: ReportBuilder = async ({ prisma, from, to }) => {
+  const estimates = await prisma.estimate.findMany({
+    where: { issuedOn: within(from, to) },
+    include: { client: { select: { name: true } } },
+    orderBy: { issuedOn: 'asc' },
+  });
+
+  const detail = estimates.map((estimate) => ({
+    date: estimate.issuedOn.toISOString().slice(0, 10),
+    code: estimate.code,
+    client: estimate.client?.name ?? estimate.clientName ?? '',
+    status: estimate.status,
+    won: estimate.status === 'CONVERTED' ? 'Yes' : 'No',
+    value: Number(estimate.grandTotal),
+  }));
+
+  const counts = new Map<string, { status: string; quotes: number; value: number }>();
+  for (const row of detail) {
+    const seen = counts.get(row.status) ?? { status: row.status, quotes: 0, value: 0 };
+    seen.quotes += 1;
+    seen.value = round2(seen.value + row.value);
+    counts.set(row.status, seen);
+  }
+
+  const raised = detail.length;
+  const converted = detail.filter((row) => row.won === 'Yes');
+  const wonValue = round2(converted.reduce((s, r) => s + r.value, 0));
+  const raisedValue = round2(detail.reduce((s, r) => s + r.value, 0));
+
+  // The percentage gets a column of its own. Put in the count column it reads
+  // as forty quotes rather than forty per cent.
+  const summary = [
+    { measure: 'Quotes raised', quotes: raised, value: raisedValue, percent: null },
+    { measure: 'Turned into orders', quotes: converted.length, value: wonValue, percent: null },
+    {
+      measure: 'Conversion',
+      quotes: null,
+      value: null,
+      percent: raised > 0 ? round2((converted.length / raised) * 100) : 0,
+    },
+    {
+      measure: 'Value won',
+      quotes: null,
+      value: null,
+      percent: raisedValue > 0 ? round2((wonValue / raisedValue) * 100) : 0,
+    },
+  ];
+
+  return {
+    rowCount: detail.length,
+    sheets: [
+      {
+        name: 'Conversion',
+        note: 'Only a quote that became an order counts as won. One marked accepted that never converted is a conversation, not a sale.',
+        columns: [
+          { key: 'measure', header: 'Measure' },
+          { key: 'quotes', header: 'Quotes', type: 'number' },
+          { key: 'value', header: 'Value', type: 'money' },
+          { key: 'percent', header: 'Per cent', type: 'number' },
+        ],
+        rows: summary,
+      },
+      {
+        name: 'By status',
+        columns: [
+          { key: 'status', header: 'Status' },
+          { key: 'quotes', header: 'Quotes', type: 'number' },
+          { key: 'value', header: 'Value', type: 'money' },
+        ],
+        rows: [...counts.values()].sort((a, b) => b.value - a.value),
+        total: ['quotes', 'value'],
+      },
+      {
+        name: 'Quotes',
+        columns: [
+          { key: 'date', header: 'Date', type: 'date' },
+          { key: 'code', header: 'Quote' },
+          { key: 'client', header: 'Client' },
+          { key: 'status', header: 'Status' },
+          { key: 'won', header: 'Won' },
+          { key: 'value', header: 'Value', type: 'money' },
+        ],
+        rows: detail,
+        total: ['value'],
+      },
+    ],
+  };
+};
+
 export const BUILDERS: Partial<Record<ReportKind, ReportBuilder>> = {
   CASH_BOOK: cashBook,
   RECEIVABLES: receivables,
@@ -398,6 +846,12 @@ export const BUILDERS: Partial<Record<ReportKind, ReportBuilder>> = {
   GST_SUMMARY: gstSummary,
   SALES_REGISTER: salesRegister,
   ORDER_REGISTER: orderRegister,
+  EXPENSES: expenses,
+  MATERIAL_AND_WASTE: materialAndWaste,
+  SALARY_REGISTER: salaryRegister,
+  PURCHASE_REGISTER: purchaseRegister,
+  CLIENT_STATEMENT: clientStatement,
+  QUOTE_CONVERSION: quoteConversion,
 };
 
 /**
@@ -407,14 +861,7 @@ export const BUILDERS: Partial<Record<ReportKind, ReportBuilder>> = {
  * written from one somebody forgot to wire up. The service refuses these with
  * the same words rather than queueing a job that will produce an empty file.
  */
-export const NOT_YET_BUILT: Partial<Record<ReportKind, string>> = {
-  EXPENSES: 'still to be written',
-  MATERIAL_AND_WASTE: 'still to be written',
-  SALARY_REGISTER: 'still to be written',
-  PURCHASE_REGISTER: 'still to be written',
-  CLIENT_STATEMENT: 'still to be written',
-  QUOTE_CONVERSION: 'still to be written',
-};
+export const NOT_YET_BUILT: Partial<Record<ReportKind, string>> = {};
 
 export function builderFor(kind: string): ReportBuilder | undefined {
   return BUILDERS[kind as ReportKind];

@@ -347,3 +347,100 @@ function startOfLocalDay(value: Date | string): Date {
   }
   return new Date(value.getFullYear(), value.getMonth(), value.getDate());
 }
+
+// ---------------------------------------------------------------------------
+// Material and waste
+// ---------------------------------------------------------------------------
+
+export type StockKind = 'RECEIPT' | 'CONSUMPTION' | 'OFFCUT' | 'WASTE' | 'ADJUSTMENT' | 'RETURN';
+
+export interface StockMoveRow {
+  material: string;
+  thickness: string;
+  unit: string;
+  kind: StockKind;
+  quantity: number;
+  /** Absent on most moves: nobody prices a broken sheet as they sweep it up. */
+  rate: number | null;
+}
+
+export interface MaterialWasteRow {
+  material: string;
+  thickness: string;
+  unit: string;
+  received: number;
+  consumed: number;
+  offcut: number;
+  wasted: number;
+  wastePct: number;
+  wasteValue: number;
+}
+
+/**
+ * What was consumed, what was wasted, and what the waste was worth.
+ *
+ * Two rules, both of which this got wrong first time round:
+ *
+ *  - **Waste is valued at the running average**, the way stock is valued
+ *    everywhere else in the product, because a waste move carries no rate of
+ *    its own. Valuing it at zero reports that waste costs nothing, which is
+ *    the one thing this report exists to disprove.
+ *  - **Offcut is not waste.** The usable remainder went back on the rack.
+ *    Folding the two together makes a shop that saves its offcuts look
+ *    identical to one that bins them.
+ */
+export function materialWasteRows(moves: StockMoveRow[]): MaterialWasteRow[] {
+  interface Running extends MaterialWasteRow {
+    onHand: number;
+    worth: number;
+  }
+
+  const groups = new Map<string, Running>();
+
+  for (const move of moves) {
+    const key = `${move.material}|${move.thickness}`;
+    const row: Running = groups.get(key) ?? {
+      material: move.material,
+      thickness: move.thickness,
+      unit: move.unit,
+      received: 0,
+      consumed: 0,
+      offcut: 0,
+      wasted: 0,
+      wastePct: 0,
+      wasteValue: 0,
+      onHand: 0,
+      worth: 0,
+    };
+
+    const quantity = Math.abs(move.quantity);
+    const average = row.onHand > 0 ? row.worth / row.onHand : 0;
+    const rate = move.rate == null ? average : move.rate;
+
+    if (move.kind === 'RECEIPT') {
+      row.received = money(row.received + quantity);
+      row.onHand = money(row.onHand + quantity);
+      row.worth = money(row.worth + quantity * rate);
+    }
+    if (move.kind === 'CONSUMPTION') {
+      row.consumed = money(row.consumed + quantity);
+      row.onHand = Math.max(0, money(row.onHand - quantity));
+      row.worth = Math.max(0, money(row.worth - quantity * rate));
+    }
+    if (move.kind === 'OFFCUT') row.offcut = money(row.offcut + quantity);
+    if (move.kind === 'WASTE') {
+      row.wasted = money(row.wasted + quantity);
+      row.wasteValue = money(row.wasteValue + quantity * rate);
+    }
+
+    groups.set(key, row);
+  }
+
+  return [...groups.values()]
+    .map(({ onHand: _onHand, worth: _worth, ...row }) => ({
+      ...row,
+      // Of what was cut into, how much was thrown away.
+      wastePct: row.consumed > 0 ? money((row.wasted / row.consumed) * 100) : 0,
+    }))
+    .sort((a, b) => b.wasteValue - a.wasteValue);
+}

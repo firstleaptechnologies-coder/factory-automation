@@ -1,5 +1,6 @@
 import {
   cashBookRows,
+  materialWasteRows,
   gstSummaryRows,
   orderRegisterRows,
   payoutRows,
@@ -233,5 +234,99 @@ describe('totals', () => {
     );
 
     expect(totals).toEqual({ amount: 300.3, tax: 54.06 });
+  });
+});
+
+describe('material and waste', () => {
+  const move = (over: Partial<Parameters<typeof materialWasteRows>[0][number]>) => ({
+    material: 'Plywood',
+    thickness: '18mm',
+    unit: 'sheet',
+    kind: 'RECEIPT' as const,
+    quantity: 1,
+    rate: null,
+    ...over,
+  });
+
+  // The defect this had: a waste move carries no rate, so valuing it at the
+  // rate on the row reports that waste cost nothing.
+  it('values waste at the running average when the move carries no rate', () => {
+    const [row] = materialWasteRows([
+      move({ kind: 'RECEIPT', quantity: 4, rate: 900 }),
+      move({ kind: 'RECEIPT', quantity: 6, rate: 900 }),
+      move({ kind: 'CONSUMPTION', quantity: -4 }),
+      move({ kind: 'WASTE', quantity: -1.5 }),
+    ]);
+
+    expect(row.wasted).toBe(1.5);
+    expect(row.wasteValue).toBe(1350);
+  });
+
+  it('follows the average as it changes with a dearer delivery', () => {
+    const [row] = materialWasteRows([
+      move({ kind: 'RECEIPT', quantity: 1, rate: 100 }),
+      move({ kind: 'RECEIPT', quantity: 1, rate: 300 }),
+      move({ kind: 'WASTE', quantity: -1 }),
+    ]);
+
+    expect(row.wasteValue).toBe(200);
+  });
+
+  it('uses the move’s own rate when it has one', () => {
+    const [row] = materialWasteRows([
+      move({ kind: 'RECEIPT', quantity: 10, rate: 900 }),
+      move({ kind: 'WASTE', quantity: -1, rate: 400 }),
+    ]);
+
+    expect(row.wasteValue).toBe(400);
+  });
+
+  // A shop that saves its offcuts must not look like one that bins them.
+  it('counts an offcut apart from waste', () => {
+    const [row] = materialWasteRows([
+      move({ kind: 'RECEIPT', quantity: 10, rate: 900 }),
+      move({ kind: 'CONSUMPTION', quantity: -4 }),
+      move({ kind: 'OFFCUT', quantity: 1 }),
+      move({ kind: 'WASTE', quantity: -1.5 }),
+    ]);
+
+    expect(row.offcut).toBe(1);
+    expect(row.wasted).toBe(1.5);
+    expect(row.wasteValue).toBe(1350);
+  });
+
+  it('takes waste as a share of what was cut into', () => {
+    const [row] = materialWasteRows([
+      move({ kind: 'RECEIPT', quantity: 10, rate: 900 }),
+      move({ kind: 'CONSUMPTION', quantity: -4 }),
+      move({ kind: 'WASTE', quantity: -1.5 }),
+    ]);
+
+    expect(row.wastePct).toBe(37.5);
+  });
+
+  it('reports no percentage rather than a division by zero', () => {
+    const [row] = materialWasteRows([move({ kind: 'WASTE', quantity: -1, rate: 100 })]);
+
+    expect(row.wastePct).toBe(0);
+  });
+
+  it('keeps materials and thicknesses apart', () => {
+    const rows = materialWasteRows([
+      move({ material: 'Plywood', thickness: '18mm', kind: 'WASTE', quantity: -1, rate: 900 }),
+      move({ material: 'Plywood', thickness: '12mm', kind: 'WASTE', quantity: -1, rate: 500 }),
+      move({ material: 'MDF', thickness: '18mm', kind: 'WASTE', quantity: -1, rate: 700 }),
+    ]);
+
+    expect(rows).toHaveLength(3);
+    // Dearest waste first: that is what somebody opens this to find.
+    expect(rows.map((r) => r.wasteValue)).toEqual([900, 700, 500]);
+  });
+
+  it('does not leak its running totals into the sheet', () => {
+    const [row] = materialWasteRows([move({ kind: 'RECEIPT', quantity: 1, rate: 100 })]);
+
+    expect(row).not.toHaveProperty('onHand');
+    expect(row).not.toHaveProperty('worth');
   });
 });
