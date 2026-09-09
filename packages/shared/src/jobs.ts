@@ -40,6 +40,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
     cadence: 'minutely',
   },
   {
+    /*
+     * Daily rather than monthly: each workspace has its own billing day, so
+     * there is no one day of the month when billing happens. A daily pass also
+     * catches up anything missed while an instance was down.
+     */
+    name: 'billing.invoice',
+    label: 'Write the month’s bills',
+    blurb: 'Drafts an invoice for every workspace due one. Sending them is a decision.',
+    cadence: 'daily',
+    at: '03:45',
+  },
+  {
     name: 'jobs.prune',
     label: 'Prune job history',
     blurb: 'Trims old JobRun rows.',

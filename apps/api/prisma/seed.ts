@@ -116,6 +116,8 @@ async function main() {
         // What Decor Bucket has bought. Not 'standard' — that is not a plan
         // key, and it only ever worked because planFor() falls back.
         plan: 'shop',
+        // The day they started, capped at 28 — see the migration note.
+        billingDay: Math.min(new Date().getUTCDate(), 28),
         contactName: 'Nakul Varshney',
       },
     });
@@ -177,6 +179,7 @@ async function main() {
         // paying client looks like from the billing screen — so it says so
         // here rather than being guessed at from the slug.
         isInternal: true,
+        billingDay: Math.min(new Date().getUTCDate(), 28),
         contactName: 'FirstLeap Technologies',
         notes: 'Ours, for testing. Not a client.',
       },

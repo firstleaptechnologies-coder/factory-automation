@@ -4,6 +4,8 @@ import { RequestMethod } from '@nestjs/common';
 import { DEFAULT_ROLES, PLATFORM_ROLES } from '@fas/shared';
 import { PERMISSIONS_KEY } from '../common/decorators/permissions.decorator';
 import { ROLES_KEY } from '../common/decorators/roles.decorator';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
 import { MODULE_KEY } from '../common/decorators/module.decorator';
 
@@ -23,6 +25,8 @@ import { LeadsController } from './leads/leads.controller';
 import { OrdersController } from './orders/orders.controller';
 import { PaymentsController } from './payments/payments.controller';
 import { PlatformController } from './platform/platform.controller';
+import { PlatformBillingController } from './platform/billing.controller';
+import { ReportsController } from './reports/reports.controller';
 import { UsersController } from './users/users.controller';
 import { WorkflowsController } from './workflows/workflows.controller';
 import { ExpensesController } from './expenses/expenses.controller';
@@ -60,6 +64,8 @@ const CONTROLLERS = [
   OrdersController,
   PaymentsController,
   PlatformController,
+  PlatformBillingController,
+  ReportsController,
   UsersController,
   WorkflowsController,
   ExpensesController,
@@ -168,7 +174,48 @@ it('leaves nothing but signing in reachable without a token', () => {
     'POST /auth/login',
     'POST /auth/platform/login',
     'POST /auth/workspace',
+    /*
+     * Razorpay calling us. It holds no token of ours and never will, so the
+     * route is public and trusted for exactly one reason: it carries a
+     * signature over the raw bytes it sent, checked against a secret only we
+     * and Razorpay have, before the body is read at all. See
+     * RazorpayService.verifyWebhook and the controller's own spec.
+     */
+    'POST /platform/billing/razorpay/webhook',
   ]);
+});
+
+/*
+ * The rail's own rail.
+ *
+ * `CONTROLLERS` is a list somebody maintains, and every check in this file
+ * only sees what is on it — so a controller added and not listed escapes all
+ * of them silently, which is precisely the failure this file exists to catch.
+ * Read off disk instead, so forgetting is a red test rather than a quiet gap.
+ */
+it('knows about every controller in the tree', () => {
+  const root = join(__dirname);
+  const found: string[] = [];
+
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+        continue;
+      }
+      if (!entry.name.endsWith('.controller.ts')) continue;
+      for (const match of readFileSync(path, 'utf8').matchAll(/export class (\w+Controller)/g)) {
+        found.push(match[1]);
+      }
+    }
+  };
+  walk(root);
+
+  const listed = new Set(CONTROLLERS.map((one) => one.name));
+  const missing = found.filter((name) => !listed.has(name));
+
+  expect(missing).toEqual([]);
 });
 
 it('takes what the clients saw behind a token, and slowly', () => {

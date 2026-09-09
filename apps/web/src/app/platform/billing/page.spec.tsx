@@ -1,7 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BillingPage from './page';
 
-const apiMock = { platformBilling: jest.fn() };
+const apiMock = {
+  platformBilling: jest.fn(),
+  billingGateway: jest.fn(),
+  billingInvoices: jest.fn(),
+  runBilling: jest.fn(),
+  issueInvoice: jest.fn(),
+  voidInvoice: jest.fn(),
+};
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
     {},
@@ -14,6 +21,25 @@ jest.mock('@/lib/api', () => ({
 
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+
+let permissions: string[] = [];
+jest.mock('@/lib/auth', () => ({
+  useAuth: () => ({ can: (p: string) => permissions.includes(p) }),
+}));
+
+const invoice = (over: Record<string, unknown> = {}) => ({
+  id: 'inv_1',
+  tenantId: 't1',
+  period: '2026-09-01T00:00:00.000Z',
+  amount: 8000,
+  status: 'DRAFT',
+  lines: [{ kind: 'tier', label: 'Shop', amount: 8000 }],
+  paymentUrl: null,
+  failureReason: null,
+  paidAt: null,
+  workspace: { id: 't1', name: 'Decor Bucket' },
+  ...over,
+});
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: 't1',
@@ -48,7 +74,17 @@ const billing = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  permissions = ['platform.tenant.view', 'platform.pricing.manage'];
   apiMock.platformBilling.mockResolvedValue(billing());
+  apiMock.billingGateway.mockResolvedValue({
+    provider: 'razorpay',
+    connected: true,
+    webhooksVerifiable: true,
+  });
+  apiMock.billingInvoices.mockResolvedValue([invoice()]);
+  apiMock.runBilling.mockResolvedValue({ written: 1, skipped: 0 });
+  apiMock.issueInvoice.mockResolvedValue(invoice({ status: 'ISSUED' }));
+  apiMock.voidInvoice.mockResolvedValue(invoice({ status: 'VOID' }));
 });
 
 const mount = async () => {
@@ -133,12 +169,7 @@ it('goes to the workspace behind a line', async () => {
   expect(push).toHaveBeenCalledWith('/platform/tenants/t1');
 });
 
-// Nothing is collected here, and the screen must not imply otherwise.
-it('says plainly that nothing is collected yet', async () => {
-  await mount();
 
-  expect(screen.getByText(/no payment gateway attached/)).toBeInTheDocument();
-});
 
 
 /*
@@ -187,5 +218,102 @@ describe('a workspace of our own', () => {
     await mount();
 
     expect(screen.getByText(/from 1 paying client/)).toBeInTheDocument();
+  });
+});
+
+
+describe('invoices', () => {
+  it('says what a bill was made of, not just what it comes to', async () => {
+    await mount();
+
+    expect(await screen.findByText(/Decor Bucket · 2026-09/)).toBeInTheDocument();
+    expect(screen.getByText('Shop ₹8,000')).toBeInTheDocument();
+  });
+
+  it('works out the month on request', async () => {
+    await mount();
+    fireEvent.click(screen.getByText('Work out this month'));
+
+    await waitFor(() => expect(apiMock.runBilling).toHaveBeenCalled());
+  });
+
+  it('sends one', async () => {
+    await mount();
+    fireEvent.click(await screen.findByText('Send it'));
+
+    await waitFor(() => expect(apiMock.issueInvoice).toHaveBeenCalledWith('inv_1'));
+  });
+
+  /*
+   * Without an account behind it, sending would mark a bill issued with
+   * nowhere to pay it — an invoice that claims to have been sent and was not.
+   */
+  it('cannot send anything while no gateway is connected', async () => {
+    apiMock.billingGateway.mockResolvedValue({
+      provider: 'razorpay',
+      connected: false,
+      webhooksVerifiable: false,
+    });
+    await mount();
+
+    expect(await screen.findByText('Send it')).toBeDisabled();
+    expect(screen.getByText(/No payment gateway is connected/)).toBeInTheDocument();
+  });
+
+  /*
+   * Keys without a webhook secret is the worst of the three states: money is
+   * collected and never recorded. It must not read as "connected".
+   */
+  it('warns when payments could be collected and never recorded', async () => {
+    apiMock.billingGateway.mockResolvedValue({
+      provider: 'razorpay',
+      connected: true,
+      webhooksVerifiable: false,
+    });
+    await mount();
+
+    expect(await screen.findByText(/collected and never recorded/)).toBeInTheDocument();
+  });
+
+  it('withdraws one, with a reason', async () => {
+    await mount();
+    fireEvent.click(await screen.findByText('Withdraw'));
+    await screen.findByText('Withdraw this bill');
+    fireEvent.change(document.querySelector('.sheet input')!, {
+      target: { value: 'billed the wrong tier' },
+    });
+    fireEvent.click(screen.getByText('Withdraw it'));
+
+    await waitFor(() =>
+      expect(apiMock.voidInvoice).toHaveBeenCalledWith('inv_1', 'billed the wrong tier'),
+    );
+  });
+
+  // A paid bill is refunded, not un-billed, and a withdrawn one is finished.
+  it('offers neither sending nor withdrawing on one that is settled', async () => {
+    apiMock.billingInvoices.mockResolvedValue([invoice({ status: 'PAID' })]);
+    await mount();
+    await screen.findByText('paid');
+
+    expect(screen.queryByText('Send it')).not.toBeInTheDocument();
+    expect(screen.queryByText('Withdraw')).not.toBeInTheDocument();
+  });
+
+  it('says why an attempt failed, where somebody will read it', async () => {
+    apiMock.billingInvoices.mockResolvedValue([
+      invoice({ status: 'FAILED', failureReason: 'Paid ₹5000 against ₹8000. Still owing ₹3000.' }),
+    ]);
+    await mount();
+
+    expect(await screen.findByText(/Still owing ₹3000/)).toBeInTheDocument();
+  });
+
+  it('offers nothing but reading to somebody who may not bill', async () => {
+    permissions = ['platform.tenant.view'];
+    await mount();
+    await screen.findByText(/Decor Bucket · 2026-09/);
+
+    expect(screen.queryByText('Work out this month')).not.toBeInTheDocument();
+    expect(screen.queryByText('Send it')).not.toBeInTheDocument();
   });
 });

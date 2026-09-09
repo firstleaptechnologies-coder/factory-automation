@@ -2,7 +2,36 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { PlatformBillingScreen } from './PlatformBillingScreen';
 
 const mockBilling = jest.fn();
-jest.mock('../../api/client', () => ({ api: { platformBilling: () => mockBilling() } }));
+const mockGateway = jest.fn();
+const mockInvoices = jest.fn();
+const mockRun = jest.fn();
+const mockIssue = jest.fn();
+jest.mock('../../api/client', () => ({
+  api: {
+    platformBilling: () => mockBilling(),
+    billingGateway: () => mockGateway(),
+    billingInvoices: () => mockInvoices(),
+    runBilling: () => mockRun(),
+    issueInvoice: (...a: unknown[]) => mockIssue(...a),
+  },
+}));
+
+let mockPermissions: string[] = [];
+jest.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({ can: (p: string) => mockPermissions.includes(p) }),
+}));
+
+const invoice = (over: Record<string, unknown> = {}) => ({
+  id: 'inv_1',
+  period: '2026-09-01T00:00:00.000Z',
+  amount: 8000,
+  status: 'DRAFT',
+  lines: [{ kind: 'tier', label: 'Shop', amount: 8000 }],
+  paymentUrl: null,
+  failureReason: null,
+  workspace: { id: 't1', name: 'Decor Bucket' },
+  ...over,
+});
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: 't1',
@@ -34,7 +63,12 @@ const navigation = { goBack: jest.fn(), navigate: jest.fn() };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPermissions = ['platform.tenant.view', 'platform.pricing.manage'];
   mockBilling.mockResolvedValue(billing());
+  mockGateway.mockResolvedValue({ provider: 'razorpay', connected: true, webhooksVerifiable: true });
+  mockInvoices.mockResolvedValue([invoice()]);
+  mockRun.mockResolvedValue({ written: 1, skipped: 0 });
+  mockIssue.mockResolvedValue(invoice({ status: 'ISSUED' }));
 });
 
 const mount = async () => {
@@ -103,12 +137,7 @@ it('goes to the workspace behind a line', async () => {
   expect(navigation.navigate).toHaveBeenCalledWith('TenantDetail', { id: 't1' });
 });
 
-// Nothing is collected here, and the screen must not imply otherwise.
-it('says plainly that nothing is collected yet', async () => {
-  await mount();
 
-  expect(await screen.findByText(/no payment gateway attached/)).toBeTruthy();
-});
 
 
 // Ours is ACTIVE and on every module, which is exactly what a paying client
@@ -135,5 +164,59 @@ describe('a workspace of our own', () => {
 
     expect(screen.getByText('ours')).toBeTruthy();
     expect(screen.queryByText('₹15,000')).toBeNull();
+  });
+});
+
+
+describe('invoices', () => {
+  it('says what a bill was made of, not just what it comes to', async () => {
+    await mount();
+
+    expect(await screen.findByText(/Decor Bucket · 2026-09/)).toBeTruthy();
+    expect(screen.getByText('Shop ₹8,000')).toBeTruthy();
+  });
+
+  it('sends one', async () => {
+    await mount();
+    await fireEvent.press(await screen.findByText('Send it'));
+
+    await waitFor(() => expect(mockIssue).toHaveBeenCalledWith('inv_1'));
+  });
+
+  // Without an account behind it, sending would mark a bill issued with
+  // nowhere to pay it.
+  it('cannot send anything while no gateway is connected', async () => {
+    mockGateway.mockResolvedValue({ provider: 'razorpay', connected: false, webhooksVerifiable: false });
+    await mount();
+    await fireEvent.press(await screen.findByText('Send it'));
+
+    expect(mockIssue).not.toHaveBeenCalled();
+    expect(screen.getByText(/No payment gateway is connected/)).toBeTruthy();
+  });
+
+  // Keys without a webhook secret is the worst of the three states: money is
+  // collected and never recorded.
+  it('warns when payments could be collected and never recorded', async () => {
+    mockGateway.mockResolvedValue({ provider: 'razorpay', connected: true, webhooksVerifiable: false });
+    await mount();
+
+    expect(await screen.findByText(/collected and never recorded/)).toBeTruthy();
+  });
+
+  it('offers no sending on one that is settled', async () => {
+    mockInvoices.mockResolvedValue([invoice({ status: 'PAID' })]);
+    await mount();
+    await screen.findByText('paid');
+
+    expect(screen.queryByText('Send it')).toBeNull();
+  });
+
+  it('offers nothing but reading to somebody who may not bill', async () => {
+    mockPermissions = ['platform.tenant.view'];
+    await mount();
+    await screen.findByText(/Decor Bucket · 2026-09/);
+
+    expect(screen.queryByText('Work out this month')).toBeNull();
+    expect(screen.queryByText('Send it')).toBeNull();
   });
 });

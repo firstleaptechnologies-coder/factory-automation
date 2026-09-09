@@ -31,5 +31,15 @@ export const TENANT_SCOPED_MODELS = new Set([
  * would hide exactly the view they exist for. Listed here rather than left out
  * quietly, so the coverage spec can tell a deliberate exception from an
  * omission that leaks one business's rows into another's.
+ *
+ * `PlatformInvoice` is the same shape for a different reason: it is what a
+ * workspace owes *us*. It is written by the platform, read across every
+ * workspace at once to answer what we are owed, and belongs to no tenant's
+ * database — a shop cannot see its own invoice from inside the product, and
+ * scoping it would mean we could not see anybody's.
  */
-export const PLATFORM_MODELS_NAMING_A_TENANT = new Set(['ServerLog', 'ClientLog']);
+export const PLATFORM_MODELS_NAMING_A_TENANT = new Set([
+  'ServerLog',
+  'ClientLog',
+  'PlatformInvoice',
+]);

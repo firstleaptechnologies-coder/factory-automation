@@ -5,7 +5,9 @@ import { MODULE_CATALOGUE } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { formatInr } from '@/lib/format';
-import { Card, Loader, PageHead, Pill, SectionHead } from '@/ui';
+import { Button, Card, Field, Loader, PageHead, Pill, SectionHead, Sheet } from '@/ui';
+import { useAuth } from '@/lib/auth';
+import { useState } from 'react';
 
 interface BillingRow {
   id: string;
@@ -21,6 +23,25 @@ interface BillingRow {
   trialEndsAt: string | null;
   trialDaysLeft: number | null;
   billingDay: number | null;
+}
+
+interface Invoice {
+  id: string;
+  tenantId: string;
+  period: string;
+  amount: number;
+  status: 'DRAFT' | 'ISSUED' | 'PAID' | 'FAILED' | 'VOID';
+  lines: { kind: string; label: string; amount: number }[];
+  paymentUrl: string | null;
+  failureReason: string | null;
+  paidAt: string | null;
+  workspace: { id: string; name: string } | null;
+}
+
+interface Gateway {
+  provider: string;
+  connected: boolean;
+  webhooksVerifiable: boolean;
 }
 
 interface Billing {
@@ -56,7 +77,32 @@ interface Billing {
  */
 export default function BillingPage() {
   const router = useRouter();
+  const { can } = useAuth();
   const billing = useApi<Billing>(() => api.platformBilling() as Promise<Billing>, []);
+  const gateway = useApi<Gateway>(() => api.billingGateway(), []);
+  const invoices = useApi<Invoice[]>(() => api.billingInvoices() as Promise<Invoice[]>, []);
+
+  const [busy, setBusy] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [voiding, setVoiding] = useState<Invoice | null>(null);
+  const [reason, setReason] = useState('');
+
+  const mayBill = can('platform.pricing.manage');
+
+  const run = async (key: string, work: () => Promise<unknown>) => {
+    setBusy(key);
+    setFailed(null);
+    try {
+      await work();
+      invoices.reload();
+      return true;
+    } catch (e) {
+      setFailed(e instanceof Error ? e.message : 'That did not work');
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  };
 
   if (!billing.data) return <Loader label="Loading" />;
 
@@ -225,11 +271,128 @@ export default function BillingPage() {
         ))}
       </div>
 
+      <SectionHead
+        title="Invoices"
+        action={
+          mayBill ? (
+            <Button
+              title="Work out this month"
+              variant="dark"
+              loading={busy === 'run'}
+              onClick={() => void run('run', () => api.runBilling())}
+            />
+          ) : null
+        }
+      />
+      {failed ? <p className="t-small danger">{failed}</p> : null}
+      <div className="stack">
+        {(invoices.data ?? []).length === 0 ? (
+          <Card>
+            <span className="t-small faint">
+              No bills have been written yet. They are drafted on each workspace&rsquo;s billing
+              day, and sending one is a decision you take here.
+            </span>
+          </Card>
+        ) : null}
+
+        {(invoices.data ?? []).map((invoice) => (
+          <Card key={invoice.id} testId={`invoice-${invoice.id}`}>
+            <div className="row-between">
+              <div style={{ minWidth: 0 }}>
+                <div className="t-small bold">
+                  {invoice.workspace?.name ?? 'Unknown workspace'} ·{' '}
+                  {invoice.period.slice(0, 7)}
+                </div>
+                <div className="t-tiny faint">
+                  {invoice.lines.map((line) => `${line.label} ${formatInr(line.amount)}`).join(' + ')}
+                </div>
+                {invoice.failureReason ? (
+                  <div className="t-tiny danger">{invoice.failureReason}</div>
+                ) : null}
+              </div>
+              <div className="row">
+                <Pill
+                  label={invoice.status.toLowerCase()}
+                  color={
+                    invoice.status === 'PAID'
+                      ? 'var(--success)'
+                      : invoice.status === 'FAILED'
+                        ? 'var(--danger)'
+                        : invoice.status === 'ISSUED'
+                          ? 'var(--info)'
+                          : 'var(--faint)'
+                  }
+                />
+                <span className="t-small bold">{formatInr(invoice.amount)}</span>
+              </div>
+            </div>
+
+            {mayBill && invoice.status !== 'PAID' && invoice.status !== 'VOID' ? (
+              <div className="row" style={{ marginTop: 'var(--s-md)' }}>
+                <Button
+                  title={invoice.status === 'DRAFT' ? 'Send it' : 'Send it again'}
+                  size="sm"
+                  loading={busy === invoice.id}
+                  // Without an account behind it, sending would mark a bill
+                  // issued with nowhere to pay it.
+                  disabled={!gateway.data?.connected}
+                  onClick={() => void run(invoice.id, () => api.issueInvoice(invoice.id))}
+                />
+                <Button
+                  title="Withdraw"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setVoiding(invoice);
+                    setReason('');
+                  }}
+                />
+                {invoice.paymentUrl ? (
+                  <a className="chip" href={invoice.paymentUrl} target="_blank" rel="noreferrer">
+                    Where they pay
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+          </Card>
+        ))}
+      </div>
+
+      {/*
+        Said plainly rather than implied. A screen that shows invoices while no
+        gateway is connected reads as if sending one would collect money.
+      */}
       <p className="t-tiny faint" style={{ marginTop: 'var(--s-xl)' }}>
-        Nothing is collected here yet — there is no payment gateway attached. What this screen
-        says is what is owed and on which day, which is the half that has to be right before a
-        gateway is worth wiring in.
+        {gateway.data?.connected
+          ? gateway.data.webhooksVerifiable
+            ? 'Razorpay is connected. A payment is recorded when Razorpay tells us it happened, never from a browser.'
+            : 'Razorpay is connected, but no webhook secret is set — so payments will be collected and never recorded. Set RAZORPAY_WEBHOOK_SECRET.'
+          : 'No payment gateway is connected. Bills can be worked out and read, but not sent. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.'}
       </p>
+
+      <Sheet
+        open={Boolean(voiding)}
+        title="Withdraw this bill"
+        subtitle="It is marked withdrawn, never deleted — a bill that was sent and withdrawn happened"
+        onClose={() => setVoiding(null)}>
+        <Field
+          label="Why"
+          value={reason}
+          onChange={setReason}
+          hint="Kept on the invoice, for whoever reads it later."
+        />
+        <Button
+          title="Withdraw it"
+          variant="danger"
+          block
+          loading={busy === 'void'}
+          disabled={reason.trim().length < 3}
+          onClick={async () => {
+            const done = await run('void', () => api.voidInvoice(voiding!.id, reason.trim()));
+            if (done) setVoiding(null);
+          }}
+        />
+      </Sheet>
     </div>
   );
 }

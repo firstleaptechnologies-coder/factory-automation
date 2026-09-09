@@ -156,6 +156,97 @@ model PlatformRole {
   updatedAt   DateTime @updatedAt
 }
 
+/// What one workspace owes us for one month.
+///
+/// Written once, when the month is billed, and never recalculated. The tier a
+/// workspace is on and the modules they hold both change, so an invoice that
+/// recomputes itself from today's configuration would quietly restate what
+/// somebody was charged in March — which is the one thing a bill must never
+/// do. The lines are frozen into the row as they stood when it was issued.
+model PlatformInvoice {
+  id       String @id @default(cuid())
+  tenantId String
+
+  /// The month being charged for, as its first day, in UTC.
+  ///
+  /// Unique with the tenant, so a job that runs twice — a retry, two
+  /// instances, a clock that steps back an hour — cannot bill the same month
+  /// twice. That is the whole defence, and it is in the database rather than
+  /// in the code that writes it.
+  period DateTime
+
+  /// What the bill was made of, as it stood. `[{ kind, label, amount }]`.
+  lines Json
+
+  amount   Decimal @db.Decimal(12, 2)
+  currency String  @default("INR")
+
+  status PlatformInvoiceStatus @default(DRAFT)
+
+  /// Razorpay's own identifiers, once there are any.
+  ///
+  /// Unique because they are how a webhook finds the invoice it is about, and
+  /// two invoices claiming the same payment is a reconciliation nobody wins.
+  razorpayLinkId    String? @unique
+  razorpayPaymentId String? @unique
+  /// Where the client pays. Razorpay's short link, safe to send.
+  paymentUrl        String?
+
+  /// Why the last attempt failed, in Razorpay's words, for whoever has to ring
+  /// the client about it.
+  failureReason String?
+
+  issuedAt DateTime?
+  paidAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, period])
+  @@index([status])
+  @@index([tenantId])
+}
+
+enum PlatformInvoiceStatus {
+  /// Worked out, not yet sent. Nobody owes anything on a draft.
+  DRAFT
+  /// Sent, with somewhere to pay.
+  ISSUED
+  PAID
+  /// An attempt failed. The invoice still stands; only the attempt did not.
+  FAILED
+  /// Cancelled. Never deleted — a bill that was sent and withdrawn is a thing
+  /// that happened.
+  VOID
+}
+
+/// Every webhook Razorpay sent us, recorded before it is acted on.
+///
+/// Razorpay retries a delivery it did not get a 2xx for, and will happily send
+/// the same event several times. The unique id is what makes acting on it
+/// exactly once a property of the database rather than a hope about ordering.
+/// The payload is kept whole: when a payment and our record disagree, the only
+/// useful evidence is what they actually sent.
+model PlatformBillingEvent {
+  id String @id @default(cuid())
+
+  /// Razorpay's `x-razorpay-event-id` header. Unique, deliberately.
+  eventId String @unique
+  event   String
+
+  payload Json
+
+  /// Null until it has been acted on. A row with a null here after a webhook
+  /// returned 200 is a bug worth finding.
+  handledAt DateTime?
+  /// What went wrong while acting on it, if anything.
+  error     String?
+
+  receivedAt DateTime @default(now())
+
+  @@index([event])
+}
+
 /// A scheduled job's claim on being the one running it.
 ///
 /// The API is one process today and will be several. Two of them waking at

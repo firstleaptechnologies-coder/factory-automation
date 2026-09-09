@@ -6,7 +6,16 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { currentRole, runsScheduledWork } from './common/jobs/role';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  /*
+   * `rawBody` keeps the exact bytes of each request alongside the parsed body.
+   *
+   * Razorpay signs what it sent, not what we can reconstruct from it: JSON
+   * round-trips do not preserve key order or number formatting, so a signature
+   * checked against a re-serialised body is a check that passes today and
+   * fails the day their encoder changes — or, worse, one somebody works out
+   * how to make pass. See RazorpayService.verifyWebhook.
+   */
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.setGlobalPrefix('api');
   // Before the pipes: a validation error is an answer to the caller too.

@@ -3,7 +3,10 @@ import { StyleSheet, View } from 'react-native';
 import { MODULE_CATALOGUE } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
-import { Card, Chip, Loader, Pill, Screen, ScreenHeader, Text } from '../../ui';
+import { useState } from 'react';
+import { Alert } from 'react-native';
+import { useAuth } from '../../auth/AuthContext';
+import { Button, Card, Chip, Loader, Pill, Screen, ScreenHeader, Text, haptic } from '../../ui';
 import { palette, spacing } from '../../theme';
 import { formatInr } from '../../lib/format';
 
@@ -18,6 +21,23 @@ interface BillingRow {
   unpriced: string[];
   trialDaysLeft: number | null;
   billingDay: number | null;
+}
+
+interface Invoice {
+  id: string;
+  period: string;
+  amount: number;
+  status: 'DRAFT' | 'ISSUED' | 'PAID' | 'FAILED' | 'VOID';
+  lines: { kind: string; label: string; amount: number }[];
+  paymentUrl: string | null;
+  failureReason: string | null;
+  workspace: { id: string; name: string } | null;
+}
+
+interface Gateway {
+  provider: string;
+  connected: boolean;
+  webhooksVerifiable: boolean;
 }
 
 interface Billing {
@@ -50,7 +70,27 @@ interface Billing {
  * does not pretend there is.
  */
 export function PlatformBillingScreen({ navigation }: { navigation: any }) {
+  const { can } = useAuth();
   const billing = useApi<Billing>(() => api.platformBilling() as Promise<Billing>, []);
+  const gateway = useApi<Gateway>(() => api.billingGateway(), []);
+  const invoices = useApi<Invoice[]>(() => api.billingInvoices() as Promise<Invoice[]>, []);
+
+  const [busy, setBusy] = useState<string | null>(null);
+  const mayBill = can('platform.pricing.manage');
+
+  const run = async (key: string, work: () => Promise<unknown>) => {
+    setBusy(key);
+    try {
+      await work();
+      haptic('notificationSuccess');
+      invoices.reload();
+    } catch (e) {
+      haptic('notificationError');
+      Alert.alert('That did not work', e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   if (!billing.data) return <Loader label="Loading" />;
 
@@ -171,9 +211,80 @@ export function PlatformBillingScreen({ navigation }: { navigation: any }) {
         </Card>
       ))}
 
+      <Text variant="label" tone="muted" style={styles.head}>Invoices</Text>
+      {mayBill ? (
+        <Button
+          title="Work out this month"
+          variant="dark"
+          loading={busy === 'run'}
+          onPress={() => void run('run', () => api.runBilling())}
+          style={{ marginBottom: spacing.md }}
+        />
+      ) : null}
+
+      {(invoices.data ?? []).length === 0 ? (
+        <Card tone="dark" style={styles.card}>
+          <Text variant="small" tone="muted">
+            No bills have been written yet. They are drafted on each workspace’s billing day.
+          </Text>
+        </Card>
+      ) : null}
+
+      {(invoices.data ?? []).map((invoice) => (
+        <Card key={invoice.id} tone="dark" style={styles.card}>
+          <View style={styles.row}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="h3" numberOfLines={1}>
+                {invoice.workspace?.name ?? 'Unknown workspace'} · {invoice.period.slice(0, 7)}
+              </Text>
+              <Text variant="tiny" tone="muted">
+                {invoice.lines
+                  .map((line) => `${line.label} ${formatInr(line.amount)}`)
+                  .join(' + ')}
+              </Text>
+              {invoice.failureReason ? (
+                <Text variant="tiny" tone="danger">{invoice.failureReason}</Text>
+              ) : null}
+            </View>
+            <Text variant="small" bold>{formatInr(invoice.amount)}</Text>
+          </View>
+
+          <View style={styles.chips}>
+            <Pill
+              label={invoice.status.toLowerCase()}
+              color={
+                invoice.status === 'PAID'
+                  ? palette.success
+                  : invoice.status === 'FAILED'
+                    ? palette.danger
+                    : invoice.status === 'ISSUED'
+                      ? palette.info
+                      : palette.textFaint
+              }
+              small
+            />
+            {mayBill && invoice.status !== 'PAID' && invoice.status !== 'VOID' ? (
+              <Chip
+                label={invoice.status === 'DRAFT' ? 'Send it' : 'Send it again'}
+                // Without an account behind it, sending would mark a bill
+                // issued with nowhere to pay it.
+                onPress={
+                  gateway.data?.connected
+                    ? () => void run(invoice.id, () => api.issueInvoice(invoice.id))
+                    : undefined
+                }
+              />
+            ) : null}
+          </View>
+        </Card>
+      ))}
+
       <Text variant="tiny" tone="muted" style={styles.head}>
-        Nothing is collected here yet — there is no payment gateway attached. What this says is
-        what is owed and on which day.
+        {gateway.data?.connected
+          ? gateway.data.webhooksVerifiable
+            ? 'Razorpay is connected. A payment is recorded when Razorpay tells us it happened, never from a browser.'
+            : 'Razorpay is connected, but no webhook secret is set — so payments will be collected and never recorded.'
+          : 'No payment gateway is connected. Bills can be worked out and read, but not sent.'}
       </Text>
     </Screen>
   );

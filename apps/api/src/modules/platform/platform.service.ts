@@ -284,6 +284,13 @@ export class PlatformService implements OnModuleInit {
       data: {
         slug,
         name: dto.name,
+        /*
+         * The day they start on, which is the day they will expect to be
+         * charged. Capped at 28: February has 28 days, so a workspace billed
+         * on the 30th is skipped twice a year — a bug that only shows up in
+         * February and is therefore found by a client rather than by us.
+         */
+        billingDay: dto.billingDay ?? Math.min(new Date().getUTCDate(), 28),
         isolation,
         databaseUrl: dto.databaseUrl
           ? this.encryption.encrypt(dto.databaseUrl)

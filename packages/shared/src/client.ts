@@ -1192,6 +1192,34 @@ export class ApiClient {
     }>(`/platform/tiers/${key}/effect`, { includedModules });
   }
 
+  /** Whether a payment gateway is connected at all. A screen must not pretend. */
+  billingGateway() {
+    return this.get<{
+      provider: string;
+      connected: boolean;
+      webhooksVerifiable: boolean;
+    }>('/platform/billing/gateway');
+  }
+
+  billingInvoices(query?: { tenantId?: string }) {
+    return this.get<unknown>('/platform/billing/invoices', query);
+  }
+
+  /** Work out this month's bills now, rather than waiting for the morning. */
+  runBilling() {
+    return this.post<{ written: number; skipped: number }>('/platform/billing/run', {});
+  }
+
+  /** Send one: make somewhere to pay it, and record where. */
+  issueInvoice(id: string) {
+    return this.post<unknown>(`/platform/billing/invoices/${id}/issue`, {});
+  }
+
+  /** Withdraw one. Never deleted — a bill sent and withdrawn happened. */
+  voidInvoice(id: string, reason: string) {
+    return this.post<unknown>(`/platform/billing/invoices/${id}/void`, { reason });
+  }
+
   /** The book of business: what everybody pays and what needs doing this week. */
   platformBilling() {
     return this.get<unknown>('/platform/billing');
