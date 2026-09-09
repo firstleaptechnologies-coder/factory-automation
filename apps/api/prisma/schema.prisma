@@ -16,7 +16,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   // What the application connects with. In production this goes through a
   // connection pooler, because a pool per instance against Postgres directly
   // runs out of connections long before it runs out of instances.
@@ -66,15 +66,15 @@ model Tenant {
   /// Only for DEDICATED. Encrypted at rest through EncryptionService.
   databaseUrl String?
 
-  status TenantStatus @default(TRIAL)
+  status  TenantStatus @default(TRIAL)
   /// Which bundle they are on. The catalogue lives in @decor/shared.
-  plan   String?
+  plan    String?
   /// Modules granted on top of the plan.
   ///
   /// A shop that wants one thing from the next tier up should not have to buy
   /// the tier. Additive only: taking a module away from a shop that is using it
   /// is a conversation, not a checkbox.
-  modules String[] @default([])
+  modules String[]     @default([])
 
   contactName  String?
   contactEmail String?
@@ -128,9 +128,9 @@ model JobLease {
 /// thing it was supposed to do never happened. This is the record that answers
 /// "did it run last night, and what did it do".
 model JobRun {
-  id   String @id @default(cuid())
+  id         String    @id @default(cuid())
   /// Dotted name from the registry, e.g. "tenant.health".
-  name String
+  name       String
   /// RUNNING → OK | FAILED | SKIPPED. SKIPPED means another instance held the
   /// lease, which is a healthy outcome rather than a missed run.
   outcome    String    @default("RUNNING")
@@ -157,7 +157,7 @@ model JobRun {
 /// Successful reads are not recorded. They are most of the traffic and say the
 /// least, and a log nobody can afford to keep is a log nobody keeps.
 model ServerLog {
-  id String @id @default(cuid())
+  id         String   @id @default(cuid())
   /// Whose workspace it was. No FK: the row outlives the tenant.
   tenantId   String?
   tenantSlug String?
@@ -270,11 +270,11 @@ model OtaRelease {
   sequence       Int              @default(0)
 
   /// manifest.metadata and manifest.extra, as the client expects them.
-  metadata   Json      @default("{}")
-  extra      Json      @default("{}")
+  metadata    Json      @default("{}")
+  extra       Json      @default("{}")
   /// For a rollback: the commit time the client compares against.
-  commitTime DateTime?
-  changelog  String?
+  commitTime  DateTime?
+  changelog   String?
   /// The platform user who put it live.
   publishedBy String?
 
@@ -314,7 +314,7 @@ model OtaReleaseAsset {
   data            Bytes?
   byteSize        Int
   checksum        String
-  isEncrypted     Boolean @default(false)
+  isEncrypted     Boolean        @default(false)
   encryptionKeyId String?
 
   createdAt DateTime @default(now())
@@ -430,6 +430,7 @@ model User {
   ordersCreated     Order[]              @relation("OrderCreatedBy")
   statusChanges     OrderStatusHistory[]
   filesUploaded     StoredFile[]
+  reportsRequested  Report[]             @relation("ReportRequestedBy")
   clientsCreated    Client[]             @relation("ClientCreatedBy")
   auditLogs         AuditLog[]
   leadsOwned        Lead[]               @relation("LeadOwner")
@@ -495,11 +496,11 @@ model Client {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  orders    Order[]
-  locations ClientLocation[]
+  orders        Order[]
+  locations     ClientLocation[]
   ledgerEntries LedgerEntry[]
-  leads     Lead[]
-  estimates Estimate[]
+  leads         Lead[]
+  estimates     Estimate[]
 
   @@unique([tenantId, code])
   @@index([name])
@@ -545,10 +546,10 @@ model Material {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  thicknesses    MaterialThickness[]
-  orderItems     OrderItem[]
-  purchaseItems  PurchaseItem[]
-  stockMoves     StockMove[]
+  thicknesses   MaterialThickness[]
+  orderItems    OrderItem[]
+  purchaseItems PurchaseItem[]
+  stockMoves    StockMove[]
 
   /// Order again when the rack falls below this many, in the unit below.
   /// Null means nobody is watching this material.
@@ -653,8 +654,8 @@ model Workflow {
   /// against the enquiry and moves nothing.
   lostStatusId String?
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   statuses    WorkflowStatus[]
   transitions WorkflowTransition[]
@@ -800,6 +801,8 @@ model StoredFile {
   firmLogo       FirmProfile[]     @relation("FirmLogo")
   expenseBills   Expense[]         @relation("ExpenseBill")
   employeePhotos Employee[]        @relation("EmployeePhoto")
+
+  reports Report[]
 
   @@index([checksum])
   @@index([createdAt])
@@ -1315,7 +1318,7 @@ model LedgerEntry {
   /// Who entered it. Nulled rather than removed if that person's account ever
   /// goes: a money row outlives the staff list.
   recordedById String?
-  recordedBy   User?   @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  recordedBy   User?    @relation(fields: [recordedById], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
 
   @@unique([tenantId, sourceType, sourceId])
@@ -1447,11 +1450,11 @@ model Attendance {
 
   /// The clock, where the shop keeps one. Absent is not the same as absent
   /// from work: plenty of shops mark the register and never look at a time.
-  inAt  DateTime?
-  outAt DateTime?
+  inAt            DateTime?
+  outAt           DateTime?
   /// Minutes past the ordinary day, which the pay structure decides what to do
   /// with. Held in minutes because half an hour is a real answer.
-  overtimeMinutes Int @default(0)
+  overtimeMinutes Int       @default(0)
 
   note String?
 
@@ -1493,9 +1496,9 @@ model PayStructure {
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  kind PayKind
+  kind       PayKind
   /// The monthly salary, the day's wage, or the rate for one piece.
-  rate Decimal @db.Decimal(14, 2)
+  rate       Decimal @db.Decimal(14, 2)
   /// PIECE only: what one piece is, in the shop's own word — "panel", "sheet".
   pieceLabel String?
 
@@ -1534,7 +1537,7 @@ model SalaryAdvance {
 
   /// How much of it a payslip has taken back so far. An advance is recovered
   /// in instalments when one month's pay cannot carry all of it.
-  recoveredAmount Decimal @db.Decimal(14, 2) @default(0)
+  recoveredAmount Decimal @default(0) @db.Decimal(14, 2)
 
   givenById String?
   createdAt DateTime @default(now())
@@ -1619,7 +1622,7 @@ model Payslip {
 
   gross           Decimal @db.Decimal(14, 2)
   /// Advances taken back this month.
-  advanceDeducted Decimal @db.Decimal(14, 2) @default(0)
+  advanceDeducted Decimal @default(0) @db.Decimal(14, 2)
   /// Which advance gave back how much: `[{ advanceId, amount }]`.
   ///
   /// The total alone would not do. Crediting every advance an employee holds
@@ -1627,7 +1630,7 @@ model Payslip {
   /// recovery, and the shop would never see the money again.
   recoveries      Json?
   /// Anything else the shop is holding back, with a reason.
-  otherDeductions Decimal @db.Decimal(14, 2) @default(0)
+  otherDeductions Decimal @default(0) @db.Decimal(14, 2)
   deductionNote   String?
   net             Decimal @db.Decimal(14, 2)
 
@@ -1738,8 +1741,8 @@ model Vendor {
   stateCode String?
   stateName String?
 
-  address String?
-  notes   String?
+  address  String?
+  notes    String?
   /// What the shop buys from them, in its own words — "boards", "hardware".
   supplies String?
 
@@ -1779,7 +1782,7 @@ model Purchase {
 
   status PurchaseStatus @default(DRAFT)
 
-  orderedOn DateTime? @db.Date
+  orderedOn  DateTime? @db.Date
   /// When the vendor says it will arrive. Not enforced; it is what the shop
   /// chases against.
   expectedOn DateTime? @db.Date
@@ -1798,12 +1801,12 @@ model Purchase {
   /// A bill from a vendor is a document with figures on it, and those figures
   /// are what the shop owes whatever this system would have calculated. When
   /// they disagree the bill wins, and the difference is somebody's to look at.
-  subtotal Decimal @db.Decimal(14, 2) @default(0)
-  taxTotal Decimal @db.Decimal(14, 2) @default(0)
-  total    Decimal @db.Decimal(14, 2) @default(0)
+  subtotal Decimal @default(0) @db.Decimal(14, 2)
+  taxTotal Decimal @default(0) @db.Decimal(14, 2)
+  total    Decimal @default(0) @db.Decimal(14, 2)
 
   /// Anything on the bill that is not a line: freight, loading, a round-off.
-  otherCharges Decimal @db.Decimal(14, 2) @default(0)
+  otherCharges Decimal @default(0) @db.Decimal(14, 2)
   note         String?
 
   createdById String?
@@ -1836,16 +1839,16 @@ model PurchaseItem {
   /// because a "sheet" of 18mm ply and a "kilo" of brass are both one line.
   unit String @default("sheet")
 
-  quantity Decimal @db.Decimal(14, 3)
-  rate     Decimal @db.Decimal(14, 2)
+  quantity   Decimal @db.Decimal(14, 3)
+  rate       Decimal @db.Decimal(14, 2)
   /// The tax on this line, as a rate and as an amount. Copied off the bill
   /// rather than derived: a vendor's arithmetic is what the shop owes.
-  gstRatePct Decimal @db.Decimal(5, 2) @default(0)
-  taxAmount  Decimal @db.Decimal(14, 2) @default(0)
+  gstRatePct Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount  Decimal @default(0) @db.Decimal(14, 2)
   lineTotal  Decimal @db.Decimal(14, 2)
 
   /// How much of this line has actually turned up.
-  receivedQuantity Decimal @db.Decimal(14, 3) @default(0)
+  receivedQuantity Decimal @default(0) @db.Decimal(14, 3)
 
   note String?
 
@@ -1872,10 +1875,10 @@ model StockMove {
   thicknessId String?
   thickness   MaterialThickness? @relation(fields: [thicknessId], references: [id])
 
-  kind StockMoveKind
+  kind     StockMoveKind
   /// Signed, in the material's own unit. Negative takes stock off the rack.
-  quantity Decimal @db.Decimal(14, 3)
-  unit     String  @default("sheet")
+  quantity Decimal       @db.Decimal(14, 3)
+  unit     String        @default("sheet")
 
   /// What it cost, per unit, when that is known.
   ///
@@ -1898,9 +1901,9 @@ model StockMove {
   reason String?
   note   String?
 
-  at          DateTime @db.Date
+  at           DateTime @db.Date
   recordedById String?
-  recordedBy   User?   @relation("StockMoveBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  recordedBy   User?    @relation("StockMoveBy", fields: [recordedById], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
 
   @@index([tenantId, materialId, thicknessId])
@@ -1980,8 +1983,8 @@ model Invoice {
   /// INV-2627-0001, gapless within the financial year.
   code     String
 
-  orderId String  @unique
-  order   Order   @relation(fields: [orderId], references: [id])
+  orderId String         @unique
+  order   Order          @relation(fields: [orderId], references: [id])
   status  DocumentStatus @default(ISSUED)
 
   issuedOn DateTime  @db.Date
@@ -2003,13 +2006,13 @@ model Invoice {
   interState Boolean @default(false)
 
   /// The money, snapshotted from the order.
-  subtotal Decimal @db.Decimal(14, 2)
-  discount Decimal @db.Decimal(14, 2) @default(0)
-  taxable  Decimal @db.Decimal(14, 2)
-  cgst     Decimal @db.Decimal(14, 2) @default(0)
-  sgst     Decimal @db.Decimal(14, 2) @default(0)
-  igst     Decimal @db.Decimal(14, 2) @default(0)
-  total    Decimal @db.Decimal(14, 2)
+  subtotal     Decimal @db.Decimal(14, 2)
+  discount     Decimal @default(0) @db.Decimal(14, 2)
+  taxable      Decimal @db.Decimal(14, 2)
+  cgst         Decimal @default(0) @db.Decimal(14, 2)
+  sgst         Decimal @default(0) @db.Decimal(14, 2)
+  igst         Decimal @default(0) @db.Decimal(14, 2)
+  total        Decimal @db.Decimal(14, 2)
   /// The total in words, as it has to appear on the paper.
   totalInWords String
 
@@ -2049,8 +2052,8 @@ model InvoiceItem {
   unit        String  @default("nos")
   rate        Decimal @db.Decimal(14, 2)
   amount      Decimal @db.Decimal(14, 2)
-  gstRatePct  Decimal @db.Decimal(5, 2) @default(0)
-  taxAmount   Decimal @db.Decimal(14, 2) @default(0)
+  gstRatePct  Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2)
 
   sortOrder Int @default(0)
 
@@ -2070,12 +2073,12 @@ model Challan {
   code     String
 
   orderId String
-  order   Order  @relation(fields: [orderId], references: [id])
+  order   Order          @relation(fields: [orderId], references: [id])
   status  DocumentStatus @default(ISSUED)
 
-  issuedOn DateTime @db.Date
+  issuedOn  DateTime @db.Date
   /// Where it went, which is not always the client's billing address.
-  shipTo   String?
+  shipTo    String?
   /// Who carried it, and on what.
   transport String?
   vehicle   String?
@@ -2143,7 +2146,7 @@ model CreditNote {
   code     String
 
   invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  invoice   Invoice        @relation(fields: [invoiceId], references: [id])
   status    DocumentStatus @default(ISSUED)
 
   issuedOn DateTime     @db.Date
@@ -2154,11 +2157,11 @@ model CreditNote {
 
   /// The money. The GST is reversed in the same proportion the invoice charged
   /// it, so a credit note against an IGST invoice reverses IGST.
-  taxable Decimal @db.Decimal(14, 2)
-  cgst    Decimal @db.Decimal(14, 2) @default(0)
-  sgst    Decimal @db.Decimal(14, 2) @default(0)
-  igst    Decimal @db.Decimal(14, 2) @default(0)
-  total   Decimal @db.Decimal(14, 2)
+  taxable      Decimal @db.Decimal(14, 2)
+  cgst         Decimal @default(0) @db.Decimal(14, 2)
+  sgst         Decimal @default(0) @db.Decimal(14, 2)
+  igst         Decimal @default(0) @db.Decimal(14, 2)
+  total        Decimal @db.Decimal(14, 2)
   totalInWords String
 
   cancelReason String?
@@ -2585,10 +2588,10 @@ model DocumentSequence {
 
 model AuditLog {
   /// Owning tenant. No FK: a dedicated database holds no Tenant row.
-  tenantId String
-  id       String @id @default(cuid())
-  entity   String
-  entityId String
+  tenantId   String
+  id         String   @id @default(cuid())
+  entity     String
+  entityId   String
   /// Something a person recognises without a join — ORD-2627-0003, a client's
   /// name — so a history reads on its own and survives the row being deleted.
   entityCode String?
@@ -2801,4 +2804,67 @@ model EstimateItem {
 
   @@unique([estimateId, lineNo])
   @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// Reports
+// ---------------------------------------------------------------------------
+
+enum ReportStatus {
+  QUEUED
+  GENERATING
+  READY
+  FAILED
+  EXPIRED
+}
+
+enum ReportFormat {
+  XLSX
+  PDF
+}
+
+/// A report somebody asked for, and what became of it.
+///
+/// Asked for on one request and built on another, because a GST quarter is not
+/// something to hold an HTTP connection open for. The row outlives the file it
+/// produced: retention drops the bytes and keeps the row, so "who exported the
+/// payout ledger, and when" survives the disk space.
+model Report {
+  tenantId String
+  id       String @id @default(cuid())
+
+  /// A ReportKind from @decor/shared. A string rather than a database enum so
+  /// that adding a report is a code change and not a migration — the same
+  /// choice LedgerEntry.sourceType makes, for the same reason.
+  kind   String
+  format ReportFormat
+  status ReportStatus @default(QUEUED)
+
+  /// The window asked for. Both null when the report has no period.
+  fromDate DateTime? @db.Date
+  toDate   DateTime? @db.Date
+  /// Whatever else narrowed it — a client, an employee.
+  params   Json?
+
+  /// Where the bytes went. Nulled by retention; the row stays.
+  fileId   String?
+  file     StoredFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  rowCount Int?
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+  /// Why it failed, in words the person who asked will read.
+  error      String?
+  /// After this the file goes. The row does not.
+  expiresAt  DateTime?
+
+  requestedById String?
+  requestedBy   User?   @relation("ReportRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, kind, createdAt])
+  @@index([tenantId, createdAt])
 }

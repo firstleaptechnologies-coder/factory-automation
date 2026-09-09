@@ -2,6 +2,7 @@ export * from './units';
 export * from './calendar';
 export * from './letters';
 export * from './permissions';
+export * from './reports';
 export * from './modules';
 export * from './image-policy';
 export * from './types';

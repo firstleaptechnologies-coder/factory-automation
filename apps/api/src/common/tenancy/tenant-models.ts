@@ -18,6 +18,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'LetterTemplate', 'Letter',
   'Vendor', 'Purchase', 'PurchaseItem', 'StockMove',
   'Invoice', 'InvoiceItem', 'Challan', 'ChallanItem', 'CreditNote',
+  'Report',
 ]);
 
 
