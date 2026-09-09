@@ -116,6 +116,14 @@ export default function BillingPage() {
           <div className="t-display on-accent">{formatInr(totals.monthlyRecurring)}</div>
           <div className="t-tiny on-accent" style={{ opacity: 0.75 }}>
             from {totals.paying} paying {totals.paying === 1 ? 'client' : 'clients'}
+            {/*
+              Beside the figure it is excluded from, not under some other one:
+              the reason to say it at all is to explain why this number is
+              smaller than the list below it looks.
+            */}
+            {totals.internal
+              ? ` · ${totals.internal} of ours, counted nowhere`
+              : ''}
           </div>
         </Card>
         <Card>
@@ -126,12 +134,7 @@ export default function BillingPage() {
         <Card>
           <span className="t-label faint">Suspended</span>
           <div className="t-h1">{totals.suspended}</div>
-          <div className="t-tiny faint">
-            shut out, still on the books
-            {totals.internal
-              ? ` · ${totals.internal} of ours, counted nowhere`
-              : ''}
-          </div>
+          <div className="t-tiny faint">shut out, still on the books</div>
         </Card>
       </div>
 
