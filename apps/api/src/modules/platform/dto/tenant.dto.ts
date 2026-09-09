@@ -1,3 +1,4 @@
+import { PLAN_KEYS } from '@fas/shared';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -30,7 +31,10 @@ export class CreateTenantDto {
    */
   @IsOptional() @IsString() databaseUrl?: string;
 
-  @IsOptional() @IsString() plan?: string;
+  /** Refused unless it is a real plan. An unknown key resolves to the
+   * default for entitlements and to no tier at all for money. */
+  @IsOptional() @IsIn(PLAN_KEYS, { message: `plan must be one of ${PLAN_KEYS.join(', ')}` })
+  plan?: string;
   @IsOptional() @IsString() contactName?: string;
   @IsOptional() @IsEmail() contactEmail?: string;
   @IsOptional() @IsString() contactPhone?: string;
@@ -46,7 +50,10 @@ export class CreateTenantDto {
 export class UpdateTenantDto {
   @IsOptional() @IsString() name?: string;
   @IsOptional() @IsEnum(TenantStatus) status?: TenantStatus;
-  @IsOptional() @IsString() plan?: string;
+  /** Refused unless it is a real plan. An unknown key resolves to the
+   * default for entitlements and to no tier at all for money. */
+  @IsOptional() @IsIn(PLAN_KEYS, { message: `plan must be one of ${PLAN_KEYS.join(', ')}` })
+  plan?: string;
   /**
    * Modules granted on top of the plan.
    *

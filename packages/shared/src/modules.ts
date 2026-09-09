@@ -111,6 +111,24 @@ export const PLANS: Plan[] = [
 
 export const DEFAULT_PLAN = 'shop';
 
+/**
+ * The keys a plan may actually have.
+ *
+ * Exported so a write can be refused rather than accepted and then quietly
+ * resolved by `planFor` below — which is how `standard` sat on a workspace for
+ * a year, granting the default plan's modules while matching no tier and
+ * therefore costing nothing.
+ */
+export const PLAN_KEYS: string[] = PLANS.map((plan) => plan.key);
+
+/**
+ * The plan for a key, falling back to the default for anything unrecognised.
+ *
+ * Lenient on purpose: this resolves a menu and a set of guards on every
+ * request, and a workspace whose plan key is wrong should see a default
+ * product rather than no product. The strictness belongs on the write —
+ * see `PLAN_KEYS`.
+ */
 export function planFor(key?: string | null): Plan {
   return PLANS.find((plan) => plan.key === key) ?? PLANS.find((plan) => plan.key === DEFAULT_PLAN)!;
 }

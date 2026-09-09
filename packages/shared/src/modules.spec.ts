@@ -5,6 +5,7 @@ import {
   MODULE_CATALOGUE,
   MODULES,
   PLANS,
+  PLAN_KEYS,
   hasModule,
   modulesFor,
   planFor,
@@ -92,5 +93,26 @@ describe('asking whether a workspace has one', () => {
 
   it('says no to an empty list, which is a resolved answer', () => {
     expect(hasModule([], MODULES.HR)).toBe(false);
+  });
+});
+
+describe('the keys a plan may have', () => {
+  it('lists every plan and nothing else', () => {
+    expect(PLAN_KEYS).toEqual(PLANS.map((plan) => plan.key));
+  });
+
+  // The bug this exists for: `standard` sat on a workspace for a year. It is
+  // not a plan, so it matched no tier and cost nothing — while `planFor` below
+  // resolved it to the default and granted that plan's modules. Wrong for
+  // money, right enough for access, and therefore invisible.
+  it('does not contain the key that caused this', () => {
+    expect(PLAN_KEYS).not.toContain('standard');
+  });
+
+  it('resolves an unknown key to the default rather than to nothing', () => {
+    // Lenient on read on purpose: a workspace whose key is wrong should see a
+    // default product, not an empty one. The strictness is on the write.
+    expect(planFor('standard').key).toBe(DEFAULT_PLAN);
+    expect(planFor(null).key).toBe(DEFAULT_PLAN);
   });
 });
