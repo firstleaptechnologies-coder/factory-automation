@@ -285,6 +285,25 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
       },
       {
+        key: 'reports',
+        module: MODULES.FINANCE,
+        label: 'Reports',
+        icon: 'clipboard',
+        permission: PERMISSIONS.REPORT_VIEW,
+        web: '/reports',
+        app: 'Reports',
+        children: [
+          {
+            key: 'report-new',
+            label: 'Ask for a report',
+            icon: 'plus',
+            permission: PERMISSIONS.REPORT_RUN,
+            web: '/reports/new',
+            app: 'ReportRequest',
+          },
+        ],
+      },
+      {
         key: 'expenses',
         module: MODULES.EXPENSES,
         label: 'Expenses',

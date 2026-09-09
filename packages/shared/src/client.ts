@@ -69,6 +69,7 @@ import type {
   StockMoveKind,
   Vendor,
   Invoice,
+  Report,
   Challan,
   CreditNote,
   CreditReason,
@@ -1138,6 +1139,35 @@ export class ApiClient {
   /** What became of the material that left the rack. */
   wasteReport(query: { from: string; to: string; materialId?: string }) {
     return this.get<WasteReport>('/stock/waste', query);
+  }
+
+  // -- reports -----------------------------------------------------------------
+
+  reports(query?: { kind?: string; status?: string; take?: number }) {
+    return this.get<Report[]>('/reports', query);
+  }
+
+  report(id: string) {
+    return this.get<Report>(`/reports/${id}`);
+  }
+
+  /**
+   * Ask for one. Answers as soon as it is queued, not when it is built —
+   * the screen polls the row rather than holding a request open for a quarter
+   * of the ledger.
+   */
+  requestReport(body: {
+    kind: string;
+    format?: 'XLSX' | 'PDF';
+    from?: string;
+    to?: string;
+    clientId?: string;
+  }) {
+    return this.post<Report>('/reports', body);
+  }
+
+  reportDownloadUrl(id: string): string {
+    return `${this.baseUrl}/reports/${id}/download`;
   }
 
   // -- the paper: invoices, challans and credit notes -------------------------

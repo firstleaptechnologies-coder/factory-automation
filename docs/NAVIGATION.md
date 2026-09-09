@@ -70,6 +70,9 @@ flowchart LR
     invoices["Invoices"]
     invoice_detail["One invoice"]
     invoices --> invoice_detail
+    reports["Reports"]
+    report_new["Ask for a report"]
+    reports --> report_new
     expenses["Expenses"]
     expense_form["Record an expense"]
     expenses --> expense_form
@@ -194,6 +197,8 @@ flowchart LR
 | Payout ledger | `/disbursements` | `DisbursementLedger` | `disbursement.view` |
 | Invoices | `/invoices` | `Invoices` | `invoice.view` |
 |   ↳ One invoice | `/invoices/[id]` | `InvoiceDetail` | — |
+| Reports | `/reports` | `Reports` | `report.view` |
+|   ↳ Ask for a report | `/reports/new` | `ReportRequest` | `report.run` |
 | Expenses | `/expenses` | `Expenses` | `expense.view` |
 |   ↳ Record an expense | `/expenses/new` | `ExpenseForm` | — |
 |   ↳ One expense | `/expenses/[id]` | `ExpenseDetail` | — |

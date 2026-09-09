@@ -1679,3 +1679,30 @@ export interface Receivable {
   due: number;
   settled: boolean;
 }
+
+/**
+ * A report somebody asked for, and what became of it.
+ *
+ * Asked for on one request and built on another, so a screen showing these is
+ * showing work in progress: QUEUED and GENERATING become READY or FAILED
+ * without anybody doing anything, and the screen has to expect that.
+ */
+export interface Report {
+  id: string;
+  kind: string;
+  format: 'XLSX' | 'PDF';
+  status: 'QUEUED' | 'GENERATING' | 'READY' | 'FAILED' | 'EXPIRED';
+  fromDate?: string | null;
+  toDate?: string | null;
+  params?: Record<string, unknown> | null;
+  rowCount?: number | null;
+  /** Why it failed, in the words the person who asked will read. */
+  error?: string | null;
+  /** After this the file goes; the row stays. */
+  expiresAt?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  createdAt: string;
+  fileId?: string | null;
+  requestedBy?: { id: string; name: string } | null;
+}
