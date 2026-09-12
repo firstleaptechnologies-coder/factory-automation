@@ -92,7 +92,24 @@ export function invoiceLines(
   order: { code: string; taxable: number; tax: number },
 ): InvoiceLine[] {
   const priced = round2(lines.reduce((sum, line) => sum + line.amount, 0));
-  if (priced > 0) return lines;
+  if (priced > 0) {
+    /*
+     * An order-level discount is taken off the whole job, not off any one
+     * line, and the tax on the order falls with it. The line tax here was
+     * worked out before that happened, so without apportioning it the tax
+     * column adds up to more than the tax the invoice charges — 1,800 against
+     * 1,620 on a 10,000 job discounted by 1,000. Two different tax figures on
+     * one piece of paper is a query from the client's accountant at best.
+     *
+     * Scaled by the same proportion for every line, so a mixed-slab order
+     * stays right line by line.
+     */
+    const lineTax = round2(lines.reduce((sum, line) => sum + line.taxAmount, 0));
+    if (lineTax === 0 || round2(order.tax) === lineTax) return lines;
+
+    const factor = order.tax / lineTax;
+    return lines.map((line) => ({ ...line, taxAmount: round2(line.taxAmount * factor) }));
+  }
 
   const taxable = round2(order.taxable);
   const described = lines.map((line) => line.description).filter(Boolean);

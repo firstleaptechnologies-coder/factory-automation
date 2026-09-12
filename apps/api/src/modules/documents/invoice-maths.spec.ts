@@ -1,3 +1,4 @@
+import { round2 } from '../../common/utils/pricing';
 import {
   creditAmounts,
   invoiceLines,
@@ -195,5 +196,55 @@ describe('what an order still owes', () => {
   it('forgives two paise of rounding, and not two rupees', () => {
     expect(receivable({ invoiced: 10000, credited: 0, received: 9999.99 }).settled).toBe(true);
     expect(receivable({ invoiced: 10000, credited: 0, received: 9998 }).settled).toBe(false);
+  });
+});
+
+/*
+ * Two different tax figures on one piece of paper.
+ *
+ * An order-level discount comes off the whole job and the tax falls with it,
+ * but the line tax was worked out before that happened. Printed unchanged, the
+ * tax column adds to more than the invoice charges — and the client's
+ * accountant is the one who finds it.
+ */
+describe('an itemised invoice with a discount off the whole job', () => {
+  const priced = (amount: number, taxAmount: number) => ({
+    description: `line ${amount}`,
+    hsn: null,
+    quantity: 1,
+    unit: 'job',
+    rate: amount,
+    amount,
+    gstRatePct: round2((taxAmount / amount) * 100),
+    taxAmount,
+  });
+
+  it('scales the line tax to the tax actually charged', () => {
+    // 10,000 at 18% = 1,800, discounted by 1,000 → 9,000 taxable, 1,620 tax.
+    const lines = invoiceLines([priced(10000, 1800)], {
+      code: 'ORD-1',
+      taxable: 9000,
+      tax: 1620,
+    });
+
+    expect(round2(lines.reduce((sum, line) => sum + line.taxAmount, 0))).toBe(1620);
+  });
+
+  it('keeps each slab in proportion across a mixed-rate order', () => {
+    // 1,800 + 500 = 2,300 of tax, halved by a half-price discount.
+    const lines = invoiceLines([priced(10000, 1800), priced(10000, 500)], {
+      code: 'ORD-2',
+      taxable: 10000,
+      tax: 1150,
+    });
+
+    expect(lines.map((line) => line.taxAmount)).toEqual([900, 250]);
+  });
+
+  it('leaves an undiscounted invoice exactly alone', () => {
+    const original = [priced(10000, 1800)];
+    const lines = invoiceLines(original, { code: 'ORD-3', taxable: 10000, tax: 1800 });
+
+    expect(lines).toEqual(original);
   });
 });

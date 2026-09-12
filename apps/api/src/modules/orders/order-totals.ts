@@ -58,7 +58,24 @@ export function totalsFor(
   const subtotal = round2(items.reduce((sum, item) => sum + item.amount, 0));
   const applied = Math.min(round2(discount), subtotal);
   const total = round2(subtotal - applied);
-  const taxAmount = round2(items.reduce((sum, item) => sum + (item.taxAmount ?? 0), 0));
+
+  /*
+   * Tax follows the discount down.
+   *
+   * The line tax that arrives here was worked out on the full line amount,
+   * before any order-level discount existed. Adding those up unchanged bills
+   * GST on money the client is not being charged: ₹10,000 discounted by
+   * ₹1,000 was billing ₹9,000 taxable and ₹1,800 tax — which is 18% of
+   * nothing on the invoice, and remits tax on a taxable value the shop never
+   * invoiced.
+   *
+   * Apportioned rather than recomputed at one rate: lines can sit on different
+   * slabs, and scaling each line's own tax by the proportion its taxable value
+   * fell keeps every one of them right.
+   */
+  const lineTax = items.reduce((sum, item) => sum + (item.taxAmount ?? 0), 0);
+  const taxable = subtotal === 0 ? 1 : subtotal;
+  const taxAmount = round2(applied === 0 ? lineTax : lineTax * (total / taxable));
 
   return {
     pricingMode,

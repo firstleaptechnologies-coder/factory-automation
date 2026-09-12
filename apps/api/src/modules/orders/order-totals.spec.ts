@@ -45,6 +45,68 @@ describe('totalsFor — itemised', () => {
     expect(money.subtotal).toBe(10000);
     expect(money.discount).toBe(1000);
     expect(money.total).toBe(9000);
+
+    /*
+     * The part this test was named for and never checked.
+     *
+     * Tax came to 1,800 — 18% of the undiscounted 10,000 — against a taxable
+     * value of 9,000. An invoice showing 9,000 taxable and 1,800 GST reconciles
+     * to no rate at all, and it remits tax on money the client was never
+     * charged.
+     */
+    expect(money.taxAmount).toBe(1620);
+    expect(money.grandTotal).toBe(10620);
+  });
+
+  // Lines can sit on different slabs, so the discount is apportioned rather
+  // than re-taxed at one rate.
+  it('keeps each slab right when a discount spans two of them', () => {
+    const money = totalsFor(
+      PricingMode.ITEMISED,
+      [
+        line(10000, 18, TaxTreatment.EXCLUSIVE),
+        line(10000, 5, TaxTreatment.EXCLUSIVE),
+      ],
+      // Half the order off: every line's taxable value halves, so every line's
+      // tax should halve too — 1800 + 500 becomes 900 + 250.
+      10000,
+      0,
+      0,
+      TaxTreatment.EXCLUSIVE,
+    );
+
+    expect(money.total).toBe(10000);
+    expect(money.taxAmount).toBe(1150);
+    expect(money.grandTotal).toBe(11150);
+  });
+
+  it('charges no tax at all when the discount takes it to nothing', () => {
+    const money = totalsFor(
+      PricingMode.ITEMISED,
+      [line(5000, 18, TaxTreatment.EXCLUSIVE)],
+      5000,
+      0,
+      0,
+      TaxTreatment.EXCLUSIVE,
+    );
+
+    expect(money.total).toBe(0);
+    expect(money.taxAmount).toBe(0);
+    expect(money.grandTotal).toBe(0);
+  });
+
+  // An undiscounted order must be untouched by the apportioning.
+  it('leaves the tax exactly as the lines computed it when nothing is off', () => {
+    const money = totalsFor(
+      PricingMode.ITEMISED,
+      [line(1234.56, 18, TaxTreatment.EXCLUSIVE)],
+      0,
+      0,
+      0,
+      TaxTreatment.EXCLUSIVE,
+    );
+
+    expect(money.taxAmount).toBe(222.22);
   });
 
   it('never discounts more than the order is worth', () => {

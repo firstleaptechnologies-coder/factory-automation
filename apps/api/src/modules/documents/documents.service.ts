@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DocumentStatus, Prisma } from '@prisma/client';
+import { DocumentStatus, Prisma, RateUnit } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CodeGeneratorService } from '../../common/utils/code-generator.service';
 import { tenantId } from '../../common/tenancy/tenant-context';
-import { amountInWords, round2 } from '../../common/utils/pricing';
+import { amountInWords, billableQuantity, round2 } from '../../common/utils/pricing';
 import { dateOnly } from '../employees/employees.service';
 import {
   CancelDto,
@@ -437,6 +437,8 @@ export function describeItem(item: {
   widthMm: Prisma.Decimal | number;
   quantity: number;
   rate?: Prisma.Decimal | number | null;
+  /** What the rate is per. Decides the quantity and unit the bill shows. */
+  rateUnit?: RateUnit | null;
   amount: Prisma.Decimal | number;
   gstRatePct: Prisma.Decimal | number;
   taxAmount: Prisma.Decimal | number;
@@ -452,13 +454,30 @@ export function describeItem(item: {
       ? `${Number(item.lengthMm)} × ${Number(item.widthMm)} mm`
       : null;
 
+  /*
+   * The quantity the rate is actually charged on, not the piece count.
+   *
+   * A panel quoted at ₹200 per square foot billed "2.00 nos × ₹200.00 =
+   * ₹20,000.00" — a line that does not multiply out, on the one document a
+   * client's accountant reads closely. The billable figure is 100 sq ft, and
+   * `billableQuantity` has existed for exactly this since the rates were
+   * written.
+   */
+  const billable = billableQuantity({
+    rate: Number(item.rate ?? 0),
+    rateUnit: item.rateUnit ?? RateUnit.PER_PIECE,
+    lengthMm: Number(item.lengthMm),
+    widthMm: Number(item.widthMm),
+    quantity: item.quantity,
+  });
+
   return {
     description: [item.material.name, thickness, size, item.notes]
       .filter(Boolean)
       .join(' · '),
     hsn: null,
-    quantity: item.quantity,
-    unit: 'nos',
+    quantity: billable.value,
+    unit: billable.label,
     rate: Number(item.rate ?? 0),
     amount: Number(item.amount),
     gstRatePct: Number(item.gstRatePct),
