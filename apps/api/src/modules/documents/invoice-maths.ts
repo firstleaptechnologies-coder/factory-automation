@@ -15,6 +15,8 @@ export interface InvoiceLine {
   unit: string;
   rate: number;
   amount: number;
+  /** This line's share of an order-level discount. */
+  discount?: number;
   gstRatePct: number;
   taxAmount: number;
 }
@@ -89,26 +91,40 @@ export function invoiceTotals(
  */
 export function invoiceLines(
   lines: InvoiceLine[],
-  order: { code: string; taxable: number; tax: number },
+  order: { code: string; taxable: number; tax: number; discount?: number },
 ): InvoiceLine[] {
   const priced = round2(lines.reduce((sum, line) => sum + line.amount, 0));
   if (priced > 0) {
     /*
-     * An order-level discount is taken off the whole job, not off any one
-     * line, and the tax on the order falls with it. The line tax here was
-     * worked out before that happened, so without apportioning it the tax
-     * column adds up to more than the tax the invoice charges — 1,800 against
-     * 1,620 on a 10,000 job discounted by 1,000. Two different tax figures on
-     * one piece of paper is a query from the client's accountant at best.
+     * An order-level discount comes off the whole job, not off any one line —
+     * but a bill has to show its working per line or the arithmetic on the
+     * page does not hold. Each line carries its share, and the tax is then
+     * that line's own slab applied to what is left of it.
      *
-     * Scaled by the same proportion for every line, so a mixed-slab order
-     * stays right line by line.
+     * Apportioned by amount, and the last line takes whatever the rounding
+     * left over, so the shares add up to the discount the invoice charges to
+     * the paisa. Scaling the tax instead would keep the totals right and
+     * print `₹3,240 (18.0%)` against a ₹20,000 line, which is 16.2% of it —
+     * a number no reader can reconcile.
      */
-    const lineTax = round2(lines.reduce((sum, line) => sum + line.taxAmount, 0));
-    if (lineTax === 0 || round2(order.tax) === lineTax) return lines;
+    const discount = round2(Math.min(order.discount ?? 0, priced));
+    if (discount <= 0) return lines;
 
-    const factor = order.tax / lineTax;
-    return lines.map((line) => ({ ...line, taxAmount: round2(line.taxAmount * factor) }));
+    let given = 0;
+    return lines.map((line, index) => {
+      const last = index === lines.length - 1;
+      const share = last
+        ? round2(discount - given)
+        : round2((line.amount / priced) * discount);
+      given = round2(given + share);
+
+      const taxable = round2(line.amount - share);
+      return {
+        ...line,
+        discount: share,
+        taxAmount: round2(taxable * (line.gstRatePct / 100)),
+      };
+    });
   }
 
   const taxable = round2(order.taxable);

@@ -126,6 +126,7 @@ export class DocumentsService {
       code: order.code,
       taxable: Number(order.total),
       tax: Number(order.taxAmount),
+      discount: Number(order.discount),
     });
     const totals = invoiceTotals(
       {
@@ -174,6 +175,7 @@ export class DocumentsService {
             unit: line.unit,
             rate: line.rate,
             amount: line.amount,
+            discount: line.discount ?? 0,
             gstRatePct: line.gstRatePct,
             taxAmount: line.taxAmount,
             sortOrder: index,

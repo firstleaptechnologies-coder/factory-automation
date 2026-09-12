@@ -2195,6 +2195,13 @@ model InvoiceItem {
   unit        String  @default("nos")
   rate        Decimal @db.Decimal(14, 2)
   amount      Decimal @db.Decimal(14, 2)
+  /// This line's share of an order-level discount.
+  ///
+  /// Snapshotted rather than derived, because it is apportioned: the shares
+  /// must add up to the discount the invoice charges to the paisa, and the
+  /// last line carries whatever the rounding left over. Recomputing that on a
+  /// reprint could land the odd paisa somewhere else.
+  discount    Decimal @default(0) @db.Decimal(14, 2)
   gstRatePct  Decimal @default(0) @db.Decimal(5, 2)
   taxAmount   Decimal @default(0) @db.Decimal(14, 2)
 

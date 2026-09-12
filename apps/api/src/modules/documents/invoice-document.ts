@@ -48,9 +48,21 @@ export function renderInvoiceHtml(input: InvoiceDocumentInput): string {
   const cancelled = invoice.status === 'CANCELLED';
 
   const items: Record<string, any>[] = invoice.items ?? [];
+
+  /*
+   * The discount columns only appear when something was actually taken off.
+   *
+   * Most bills carry no discount, and two columns of zeroes on every line is
+   * noise on a document that is already dense. When there is one, the line has
+   * to show it: without it the row reads as tax at a rate that is not the rate
+   * printed beside it.
+   */
+  const discounted = items.some((item) => Number(item.discount ?? 0) > 0);
+
   const rows = items
-    .map(
-      (item, index) => `
+    .map((item, index) => {
+      const taxable = Number(item.amount ?? 0) - Number(item.discount ?? 0);
+      return `
       <tr>
         <td class="c">${index + 1}</td>
         <td>${esc(item.description)}</td>
@@ -58,13 +70,19 @@ export function renderInvoiceHtml(input: InvoiceDocumentInput): string {
         <td class="r">${num(item.quantity, 2)}</td>
         <td class="c">${esc(item.unit ?? '')}</td>
         <td class="r">${money(item.rate)}</td>
+        <td class="r"><strong>${money(item.amount)}</strong></td>
+        ${
+          discounted
+            ? `<td class="r">− ${money(item.discount ?? 0)}</td>
+        <td class="r">${money(taxable)}</td>`
+            : ''
+        }
         <td class="r">${money(item.taxAmount)} <span class="pct">(${num(
           item.gstRatePct,
           1,
         )}%)</span></td>
-        <td class="r"><strong>${money(item.amount)}</strong></td>
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join('');
 
   const totalQty = items.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0);
@@ -119,14 +137,20 @@ export function renderInvoiceHtml(input: InvoiceDocumentInput): string {
 
     <table class="lines">
       <thead><tr>
-        <th style="width:5%">#</th>
-        <th style="width:33%">Description</th>
-        <th style="width:10%">HSN/ SAC</th>
-        <th style="width:9%">Qty</th>
-        <th style="width:7%">Unit</th>
-        <th style="width:12%">Rate</th>
+        <th style="width:4%">#</th>
+        <th style="width:${discounted ? '25%' : '33%'}">Description</th>
+        <th style="width:9%">HSN/ SAC</th>
+        <th style="width:8%">Qty</th>
+        <th style="width:6%">Unit</th>
+        <th style="width:11%">Rate</th>
+        <th style="width:13%">Amount</th>
+        ${
+          discounted
+            ? `<th style="width:11%">Discount</th>
+        <th style="width:12%">Taxable</th>`
+            : ''
+        }
         <th style="width:12%">GST</th>
-        <th style="width:14%">Amount</th>
       </tr></thead>
       <tbody>
         ${rows}
@@ -134,8 +158,20 @@ export function renderInvoiceHtml(input: InvoiceDocumentInput): string {
           <td></td><td>Total</td><td></td>
           <td class="r">${num(totalQty, 2)}</td>
           <td></td><td></td>
+          <!--
+            Each column foots its own figures. This cell used to carry the
+            grand total under the Amount heading, so the column it sat under
+            never added up to it — the tax was in the number but not in the
+            column. The grand total has its own line in the panel below.
+          -->
+          <td class="r">${money(invoice.subtotal)}</td>
+          ${
+            discounted
+              ? `<td class="r">− ${money(invoice.discount)}</td>
+          <td class="r">${money(invoice.taxable)}</td>`
+              : ''
+          }
           <td class="r">${money(taxTotal)}</td>
-          <td class="r">${money(invoice.total)}</td>
         </tr>
       </tbody>
     </table>

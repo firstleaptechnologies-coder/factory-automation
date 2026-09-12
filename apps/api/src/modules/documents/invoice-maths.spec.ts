@@ -200,51 +200,89 @@ describe('what an order still owes', () => {
 });
 
 /*
- * Two different tax figures on one piece of paper.
+ * A bill has to show its working per line.
  *
- * An order-level discount comes off the whole job and the tax falls with it,
- * but the line tax was worked out before that happened. Printed unchanged, the
- * tax column adds to more than the invoice charges — and the client's
- * accountant is the one who finds it.
+ * An order-level discount comes off the whole job, so the line tax was worked
+ * out before it existed: the tax column added to more than the invoice charged
+ * — 1,800 against 1,620. Scaling the tax fixed the total and printed
+ * `₹3,240 (18.0%)` against a ₹20,000 line, which is 16.2% of it. Each line
+ * carries its own share of the discount instead, and is taxed on what is left.
  */
 describe('an itemised invoice with a discount off the whole job', () => {
-  const priced = (amount: number, taxAmount: number) => ({
+  const priced = (amount: number, gstRatePct: number) => ({
     description: `line ${amount}`,
     hsn: null,
     quantity: 1,
     unit: 'job',
     rate: amount,
     amount,
-    gstRatePct: round2((taxAmount / amount) * 100),
-    taxAmount,
+    gstRatePct,
+    taxAmount: round2(amount * (gstRatePct / 100)),
   });
 
-  it('scales the line tax to the tax actually charged', () => {
-    // 10,000 at 18% = 1,800, discounted by 1,000 → 9,000 taxable, 1,620 tax.
-    const lines = invoiceLines([priced(10000, 1800)], {
+  it('gives each line its share, and taxes what is left of it', () => {
+    // 10,000 at 18%, 1,000 off → 9,000 taxable, 1,620 tax.
+    const [line] = invoiceLines([priced(10000, 18)], {
       code: 'ORD-1',
       taxable: 9000,
       tax: 1620,
+      discount: 1000,
     });
 
-    expect(round2(lines.reduce((sum, line) => sum + line.taxAmount, 0))).toBe(1620);
+    expect(line.discount).toBe(1000);
+    expect(line.taxAmount).toBe(1620);
+    // The row reconciles against its own printed rate.
+    expect(round2((line.amount - line.discount!) * (line.gstRatePct / 100))).toBe(
+      line.taxAmount,
+    );
   });
 
-  it('keeps each slab in proportion across a mixed-rate order', () => {
-    // 1,800 + 500 = 2,300 of tax, halved by a half-price discount.
-    const lines = invoiceLines([priced(10000, 1800), priced(10000, 500)], {
+  it('splits the discount by amount across a mixed-rate order', () => {
+    const lines = invoiceLines([priced(10000, 18), priced(10000, 5)], {
       code: 'ORD-2',
       taxable: 10000,
       tax: 1150,
+      discount: 10000,
     });
 
+    expect(lines.map((line) => line.discount)).toEqual([5000, 5000]);
+    // Each line taxed at its own slab on its own half: 900 and 250.
     expect(lines.map((line) => line.taxAmount)).toEqual([900, 250]);
   });
 
+  /*
+   * The shares have to add up to the discount the invoice charges, to the
+   * paisa. A third of a penny lost per line is a bill that does not foot.
+   */
+  it('lands the rounding on the last line so the shares foot exactly', () => {
+    const lines = invoiceLines([priced(100, 18), priced(100, 18), priced(100, 18)], {
+      code: 'ORD-3',
+      taxable: 290,
+      tax: 52.2,
+      discount: 10,
+    });
+
+    const given = round2(lines.reduce((sum, line) => sum + (line.discount ?? 0), 0));
+    expect(given).toBe(10);
+  });
+
   it('leaves an undiscounted invoice exactly alone', () => {
-    const original = [priced(10000, 1800)];
-    const lines = invoiceLines(original, { code: 'ORD-3', taxable: 10000, tax: 1800 });
+    const original = [priced(10000, 18)];
+    const lines = invoiceLines(original, { code: 'ORD-4', taxable: 10000, tax: 1800 });
 
     expect(lines).toEqual(original);
+  });
+
+  // Never more off than the job is worth.
+  it('never discounts a line past nothing', () => {
+    const [line] = invoiceLines([priced(5000, 18)], {
+      code: 'ORD-5',
+      taxable: 0,
+      tax: 0,
+      discount: 9999,
+    });
+
+    expect(line.discount).toBe(5000);
+    expect(line.taxAmount).toBe(0);
   });
 });
