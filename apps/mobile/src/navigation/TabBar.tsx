@@ -125,7 +125,21 @@ function Tab({
   testID?: string;
 }) {
   const lift = useSharedValue(focused ? 1 : 0);
-  lift.value = withSpring(focused ? 1 : 0, motion.spring);
+
+  /*
+   * Animated in an effect, never during render.
+   *
+   * This was a bare `lift.value = withSpring(...)` in the component body.
+   * Writing a shared value during render is a Reanimated anti-pattern — it
+   * schedules work from a phase that is meant to be pure, and the value is
+   * re-applied on every render rather than when `focused` actually changes.
+   *
+   * It was found while chasing a dead tab bar and is not that bug's cause:
+   * the bar stayed dead with this corrected. Kept because it is right.
+   */
+  React.useEffect(() => {
+    lift.value = withSpring(focused ? 1 : 0, motion.spring);
+  }, [focused, lift]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -lift.value * 3 }],
@@ -214,7 +228,16 @@ const styles = StyleSheet.create({
     height: BAR_HEIGHT,
     paddingHorizontal: spacing.sm,
   },
-  tab: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  /*
+   * Stretched to the bar's full height, not sized to the icon and label.
+   *
+   * A row with `alignItems: 'center'` sizes each child to its content, so the
+   * touch target was about 39pt tall — under Apple's 44pt minimum, and short
+   * of the thing a person is aiming at. Taps on the label or just under the
+   * icon landed on the bar behind and did nothing, which read as a dead tab
+   * bar. `alignSelf: 'stretch'` makes the target the whole slot.
+   */
+  tab: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
   centerSlot: { width: 78 },
   centerWrap: {
     position: 'absolute',

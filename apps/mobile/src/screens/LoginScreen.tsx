@@ -1,5 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   FadeIn,
@@ -29,6 +37,15 @@ type Mode = 'workspace' | 'credentials' | 'platform';
 export function LoginScreen() {
   const { signIn, signInAsPlatform, workspace: savedWorkspace } = useAuth();
   const insets = useSafeAreaInsets();
+
+  /*
+   * Return moves to the password rather than submitting.
+   *
+   * Without this, the return key on the employee-code field submitted a form
+   * with no password in it — a failed sign-in as the first thing a new user
+   * does, on the first screen they ever see.
+   */
+  const passwordRef = useRef<TextInput>(null);
 
   const [mode, setMode] = useState<Mode>('workspace');
   const [workspace, setWorkspace] = useState('');
@@ -159,14 +176,18 @@ export function LoginScreen() {
                 autoCapitalize="characters"
                 autoCorrect={false}
                 icon="user"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
               />
               <Field
+                ref={passwordRef}
                 label="Password"
                 placeholder="••••••••"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
                 icon="lock"
+                returnKeyType="go"
                 onSubmitEditing={submit}
                 error={error}
               />
@@ -188,14 +209,18 @@ export function LoginScreen() {
                 autoCapitalize="none"
                 keyboardType="email-address"
                 icon="user"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
               />
               <Field
+                ref={passwordRef}
                 label="Password"
                 placeholder="••••••••"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
                 icon="lock"
+                returnKeyType="go"
                 onSubmitEditing={submit}
                 error={error}
               />

@@ -1,4 +1,5 @@
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { TabBar } from './TabBar';
 
@@ -160,4 +161,38 @@ it('takes the title a screen gave itself over the route name', async () => {
     />,
   );
   expect(screen.getByText('Today')).toBeTruthy();
+});
+
+/*
+ * The touch target, not the drawing.
+ *
+ * The bar rendered correctly and was completely dead to taps: a row with
+ * `alignItems: 'center'` sizes each child to its content, so the tab's
+ * touchable box was about 39pt tall — under Apple's 44pt minimum and shorter
+ * than the icon-plus-label it appears to be. A tap on the label, or a little
+ * under the icon, landed on the bar behind it and did nothing.
+ *
+ * Only the raised centre button kept working, because it is positioned
+ * absolutely and sizes itself.
+ */
+describe('the tab touch target', () => {
+  it('fills the height of the bar rather than hugging its icon', async () => {
+    await mount();
+
+    const orders = screen.getByLabelText('Orders');
+    expect(StyleSheet.flatten(orders.props.style)).toMatchObject({
+      flex: 1,
+      alignSelf: 'stretch',
+    });
+  });
+
+  // Every tab, not just the one that happened to be checked.
+  it('does the same for all four', async () => {
+    await mount();
+
+    for (const label of ['Home', 'Orders', 'Leads', 'More']) {
+      const tab = screen.getByLabelText(label);
+      expect(StyleSheet.flatten(tab.props.style)).toMatchObject({ alignSelf: 'stretch' });
+    }
+  });
 });

@@ -140,3 +140,52 @@ describe('platform administration', () => {
     expect(screen.getByPlaceholderText('your-shop')).toBeTruthy();
   });
 });
+
+/*
+ * The return key, on the first screen anybody ever sees.
+ *
+ * The employee-code field had no `onSubmitEditing` at all, so Return did
+ * nothing a person expects: no move to the password, and on the platform form
+ * the same. Somebody typing their code and reaching for Return — which is what
+ * every other app has taught them — got a dead key.
+ */
+describe('moving between the fields with the keyboard', () => {
+  const codeField = () => screen.getByPlaceholderText('e.g. ADMIN');
+
+  /** Past the workspace step, which is where the two-field form lives. */
+  const atCredentials = async () => {
+    await mount();
+    // Awaited rather than got: the previous test's focus animation can still be
+    // settling when this one starts rendering.
+    await fireEvent.changeText(await screen.findByPlaceholderText('your-shop'), 'decorbucket');
+    await fireEvent.press(buttonFor('Continue'));
+    await screen.findByPlaceholderText('e.g. ADMIN');
+  };
+
+  it('offers a next key on the code, and go on the password', async () => {
+    await atCredentials();
+
+    expect(codeField().props.returnKeyType).toBe('next');
+    expect(passwordField().props.returnKeyType).toBe('go');
+  });
+
+  it('moves to the password rather than submitting a half-filled form', async () => {
+    await atCredentials();
+
+    await fireEvent.changeText(codeField(), 'ADMIN');
+    await fireEvent(codeField(), 'submitEditing');
+
+    // The half-filled form was not sent.
+    expect(signIn).not.toHaveBeenCalled();
+  });
+
+  it('signs in when the password’s own return key is pressed', async () => {
+    await atCredentials();
+
+    await fireEvent.changeText(codeField(), 'ADMIN');
+    await fireEvent.changeText(passwordField(), 'admin123');
+    await fireEvent(passwordField(), 'submitEditing');
+
+    await waitFor(() => expect(signIn).toHaveBeenCalled());
+  });
+});

@@ -19,21 +19,7 @@ import { AccentSurface, Neumorph } from './Neumorph';
 import { Text } from './Text';
 import { Icon, IconName } from './Icon';
 
-/**
- * Text field. The border lights up lime on focus — on a dark screen a focus
- * ring is the only reliable way to show where typing will land.
- */
-export function Field({
-  label,
-  hint,
-  error,
-  icon,
-  style,
-  containerStyle,
-  pasteAccepts,
-  pasteable = true,
-  ...props
-}: TextInputProps & {
+type FieldProps = TextInputProps & {
   label?: string;
   hint?: string;
   error?: string | null;
@@ -46,7 +32,28 @@ export function Field({
   pasteAccepts?: (text: string) => boolean;
   /** Off for fields where a paste makes no sense, like a password. */
   pasteable?: boolean;
-}) {
+};
+
+/**
+ * Text field. The border lights up lime on focus — on a dark screen a focus
+ * ring is the only reliable way to show where typing will land.
+ *
+ * Forwards its ref to the TextInput underneath, which is what lets a form wire
+ * the return key to the next field. Without that, Return on the first field of
+ * a two-field form does nothing a person expects — and on the sign-in screen
+ * it submitted a half-filled form instead.
+ */
+export const Field = React.forwardRef<TextInput, FieldProps>(function Field({
+  label,
+  hint,
+  error,
+  icon,
+  style,
+  containerStyle,
+  pasteAccepts,
+  pasteable = true,
+  ...props
+}, ref) {
   const focus = useSharedValue(0);
   const clipboard = useClipboardSuggestion(pasteAccepts);
 
@@ -75,6 +82,7 @@ export function Field({
           <Icon name={icon} size={18} color={palette.textMuted} />
         ) : null}
         <TextInput
+          ref={ref}
           // The label is drawn above the well; without this the input itself
           // still reaches a screen reader as an unlabelled text box.
           accessibilityLabel={label}
@@ -119,7 +127,7 @@ export function Field({
       ) : null}
     </View>
   );
-}
+});
 
 /** Horizontal chip picker — used everywhere a short list must be chosen from. */
 export function ChipGroup<T extends { id: string; label: string; color?: string | null }>({
