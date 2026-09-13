@@ -59,6 +59,7 @@ flowchart LR
     flow --> flow_canvas
     main_card["Main card"]
     flow --> main_card
+    gst["GST rates"]
     lead_fields["Lead fields"]
     end
   end
@@ -185,6 +186,7 @@ flowchart LR
 | Status flow | `/admin/flow` | `AdminFlow` | `config.view` |
 |   ↳ Flow builder | — | `FlowCanvas` | — |
 |   ↳ Main card | `/admin/main-card` | `MainCard` | — |
+| GST rates | `/admin/gst` | `AdminGst` | `gst.manage` |
 | Lead fields | `/admin/lead-fields` | `AdminLeadFields` | `config.view` |
 
 ### Finances

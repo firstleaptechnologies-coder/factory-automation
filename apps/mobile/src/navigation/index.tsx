@@ -29,6 +29,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { AdminHomeScreen } from '../screens/admin/AdminHomeScreen';
 import { AdminMaterialsScreen } from '../screens/admin/AdminMaterialsScreen';
+import { AdminGstScreen } from '../screens/admin/AdminGstScreen';
 import { AdminSizesScreen } from '../screens/admin/AdminSizesScreen';
 import { AdminFlowScreen } from '../screens/admin/AdminFlowScreen';
 import { FlowCanvasScreen } from '../screens/admin/FlowCanvasScreen';
@@ -175,6 +176,7 @@ export function RootNavigator() {
             <Stack.Screen name="Admin" component={AdminHomeScreen} />
             <Stack.Screen name="AdminMaterials" component={AdminMaterialsScreen} />
             <Stack.Screen name="AdminSizes" component={AdminSizesScreen} />
+            <Stack.Screen name="AdminGst" component={AdminGstScreen} />
             <Stack.Screen name="AdminFlow" component={AdminFlowScreen} />
             <Stack.Screen name="FlowCanvas" component={FlowCanvasScreen} />
             <Stack.Screen name="MainCard" component={MainCardScreen} />

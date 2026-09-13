@@ -232,6 +232,20 @@ export const NAV_GROUPS: NavGroup[] = [
             ],
           },
           {
+            /*
+             * The rates the shop charges, which nothing could reach before.
+             * The API has always had them; a workspace whose slabs were never
+             * seeded had no way to make one, so every bill left a registered
+             * dealer at 0%.
+             */
+            key: 'gst',
+            label: 'GST rates',
+            icon: 'receipt',
+            permission: PERMISSIONS.GST_MANAGE,
+            web: '/admin/gst',
+            app: 'AdminGst',
+          },
+          {
             key: 'lead-fields',
             label: 'Lead fields',
             icon: 'tune',

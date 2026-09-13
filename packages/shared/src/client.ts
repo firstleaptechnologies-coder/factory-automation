@@ -582,7 +582,16 @@ export class ApiClient {
     return this.post<GstSlab>('/config/gst-slabs', body);
   }
 
-  updateGstSlab(id: string, body: Partial<GstSlab> & { ratePct?: number }) {
+  /*
+   * `ratePct` comes back as a string — it is a Decimal — and goes out as a
+   * number. Intersecting the two made the field `string & number`, which is
+   * `never`: the signature accepted a rate nobody could actually pass, and
+   * because no screen called it until now, nothing noticed.
+   */
+  updateGstSlab(
+    id: string,
+    body: Omit<Partial<GstSlab>, 'ratePct'> & { ratePct?: number },
+  ) {
     return this.patch<GstSlab>(`/config/gst-slabs/${id}`, body);
   }
 
