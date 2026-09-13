@@ -2,12 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Client } from '@fas/shared';
 import { REPORTS, reportDefinition, reportRequestError, thisMonth } from '@fas/shared';
 import { api } from '@/lib/api';
-import { useApi } from '@/lib/useApi';
 import { Shell } from '@/components/Shell';
-import { Button, Card, Field, PageHead, SectionHead, Sheet, SheetOption } from '@/ui';
+import { ClientPicker, NO_CLIENT, type ClientChoice } from '@/components/ClientPicker';
+import { Button, Card, Field, PageHead, SectionHead } from '@/ui';
 import { Select } from '@/ui/Select';
 
 export default function ReportRequestPage() {
@@ -36,24 +35,12 @@ function ReportRequest() {
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
-  const [clientId, setClientId] = useState<string | undefined>();
-  const [clientName, setClientName] = useState('');
-  const [clientSheet, setClientSheet] = useState(false);
-  const [clientSearch, setClientSearch] = useState('');
+  const [client, setClient] = useState<ClientChoice>(NO_CLIENT);
+  const clientId = client.client?.id;
 
   const definition = reportDefinition(kind);
   const needsPeriod = definition?.period !== 'none';
   const needsClient = definition?.subject === 'client';
-
-  // Only fetched when a report actually asks for one, so choosing the cash
-  // book does not go looking up the client list.
-  const clients = useApi<{ data: Client[] }>(
-    () =>
-      needsClient
-        ? api.clients({ search: clientSearch || undefined, limit: 20 })
-        : Promise.resolve({ data: [] as Client[] }),
-    [needsClient, clientSearch],
-  );
 
   // The same check the API makes, so the button is disabled for the reason the
   // server would have given rather than for a rule invented here.
@@ -102,15 +89,12 @@ function ReportRequest() {
       {needsClient && (
         <Card>
           <SectionHead title="Client" />
-          <p className={clientId ? 't-h3' : 't-tiny muted'}>
-            {clientName || 'Nobody chosen yet'}
-          </p>
-          <Button
-            title={clientId ? 'Choose a different client' : 'Choose a client'}
-            variant="dark"
-            size="sm"
-            onClick={() => setClientSheet(true)}
-          />
+          {/*
+            * Search only. A report about somebody the shop has never traded
+            * with has nothing in it, so offering to create one here would only
+            * make an empty client and an empty report.
+            */}
+          <ClientPicker value={client} onChange={setClient} allowCreate={false} />
         </Card>
       )}
 
@@ -131,30 +115,6 @@ function ReportRequest() {
         loading={saving}
         disabled={Boolean(complaint) || saving}
       />
-
-      <Sheet open={clientSheet} title="Pick a client" onClose={() => setClientSheet(false)}>
-        <Field
-          placeholder="Name or phone"
-          icon="search"
-          value={clientSearch}
-          onChange={setClientSearch}
-          autoFocus
-          pasteable={false}
-        />
-        {(clients.data?.data ?? []).map((client) => (
-          <SheetOption
-            key={client.id}
-            label={client.name}
-            description={[client.code, client.phone].filter(Boolean).join(' · ')}
-            selected={clientId === client.id}
-            onClick={() => {
-              setClientId(client.id);
-              setClientName(client.name);
-              setClientSheet(false);
-            }}
-          />
-        ))}
-      </Sheet>
     </>
   );
 }

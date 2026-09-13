@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AttachmentKind, PricingMode, TaxTreatment, UserRole } from '@prisma/client';
 import { OrdersService } from './orders.service';
+import { ClientsService } from '../clients/clients.service';
 import { PERMISSIONS } from '@fas/shared';
 import { inTenant, prismaMock, notificationsMock } from '../../../test/prisma-mock';
 
@@ -10,7 +11,9 @@ function build() {
   const db = prismaMock() as never as Db;
   const codes = { next: jest.fn(async (kind: string) => `${kind.toUpperCase()}-1`) };
   const files = { ingest: jest.fn(async () => ({ id: 'file-1' })) };
-  const clients = {};
+  // The real one, not a stub: punching a new client is the same rule the quote
+  // screen uses, and a stub here would let that rule change under both.
+  const clients = new ClientsService(db as never, codes as never);
 
   // Defaults every punch needs: a workflow with an entry point, a material,
   // and an order row shaped enough for withDisplayUnits to walk.

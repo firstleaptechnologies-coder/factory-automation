@@ -65,7 +65,8 @@ const submit = () => document.querySelector('button.primary') as HTMLButtonEleme
 
 /** The client search is debounced, so the result takes a moment to appear. */
 const pickClient = async () => {
-  fireEvent.change(screen.getByPlaceholderText('Type a name or phone…'), {
+  fireEvent.click(screen.getByLabelText('Search existing clients'));
+  fireEvent.change(await screen.findByPlaceholderText('Type to search…'), {
     target: { value: 'verma' },
   });
   fireEvent.click(await screen.findByText('Verma Interiors', {}, { timeout: 2000 }));
@@ -212,11 +213,10 @@ describe('punching', () => {
 describe('a client who is not on the books yet', () => {
   it('creates one alongside the order', async () => {
     await mount();
-    fireEvent.change(screen.getByPlaceholderText('Type a name or phone…'), {
+    fireEvent.change(screen.getByPlaceholderText('Who is ordering?'), {
       target: { value: 'Sethi Interiors' },
     });
-    fireEvent.click(await screen.findByText(/Create/, {}, { timeout: 2000 }));
-    fireEvent.change(screen.getByPlaceholderText('Phone'), {
+    fireEvent.change(screen.getByPlaceholderText('Optional — matches an existing client'), {
       target: { value: '9820011111' },
     });
     fireEvent.change(byLabel('location'), { target: { value: 'Bandra' } });
@@ -231,12 +231,10 @@ describe('a client who is not on the books yet', () => {
 
   it('warns that a known number attaches to the existing client', async () => {
     await mount();
-    fireEvent.change(screen.getByPlaceholderText('Type a name or phone…'), {
-      target: { value: 'Sethi' },
-    });
-    fireEvent.click(await screen.findByText(/Create/, {}, { timeout: 2000 }));
     // Otherwise the shop ends up with two records for one person.
-    expect(screen.getByText(/instead of creating a duplicate/)).toBeInTheDocument();
+    expect(
+      screen.getByText('If this number is already on file, it attaches to them.'),
+    ).toBeInTheDocument();
   });
 });
 

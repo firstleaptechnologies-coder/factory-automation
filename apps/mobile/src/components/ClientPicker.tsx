@@ -1,9 +1,9 @@
-'use client';
-
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { Client } from '@fas/shared';
-import { api } from '@/lib/api';
-import { Avatar, Card, Field, Icon, Sheet, SheetOption } from '@/ui';
+import { api } from '../api/client';
+import { Avatar, Card, Field, Icon, Sheet, SheetOption, Text, haptic } from '../ui';
+import { palette, spacing } from '../theme';
 
 /**
  * What a screen knows about who the work is for.
@@ -13,15 +13,13 @@ import { Avatar, Card, Field, Icon, Sheet, SheetOption } from '@/ui';
  * a loose `clientId` beside a loose `clientName`, which is how the two drifted
  * apart — typing over a chosen client used to leave the id pointing at a
  * record the name no longer matched.
- *
- * The same shape the app uses, in `apps/mobile/src/components/ClientPicker`.
  */
 export type ClientChoice = {
   /**
    * The client that was picked. Widened from `Client` because a screen opened
    * from an enquiry knows the id and the name and nothing else, and a round
-   * trip to fill in the rest before the screen can draw is one the person is
-   * waiting on.
+   * trip to fill in the rest before the screen can draw is a round trip the
+   * person is waiting on.
    */
   client: (Partial<Client> & { id: string; name: string }) | null;
   /** Typed in for a client who is not on file yet. */
@@ -37,7 +35,7 @@ export function pickedClient(client: ClientChoice['client']): ClientChoice {
   return { client, name: '', phone: '' };
 }
 
-/** A name with nobody behind it — a quote written before this existed. */
+/** A name with nobody behind it — a quote loaded from before this existed. */
 export function typedClient(name: string, phone = ''): ClientChoice {
   return { client: null, name, phone };
 }
@@ -73,9 +71,10 @@ export function clientRef(choice: ClientChoice): {
  * The one way a client is filled in, on every screen that asks for one.
  *
  * Search what the shop already has; add somebody who is not there yet without
- * leaving the screen. The person punching an order is usually on the phone
- * with the client, and sending them to a separate screen to add one loses the
- * call.
+ * leaving the screen. It was three different controls before — one that could
+ * only search, one that could only be typed into, and the punch screen's,
+ * which could do both — so the same customer got entered three ways and the
+ * ledger carried three of them.
  *
  * `allowCreate` is off where the client is a subject rather than a party: a
  * report about a client nobody has traded with has nothing to report.
@@ -96,25 +95,25 @@ export function ClientPicker({
   nameLabel?: string;
   namePlaceholder?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [term, setTerm] = useState('');
+  const [sheet, setSheet] = useState(false);
+  const [search, setSearch] = useState('');
   const [results, setResults] = useState<Client[]>([]);
 
   /*
    * Debounced, and the reply from a search that has been typed past is thrown
    * away: a fast typist firing one request per keystroke used to let "ver"
-   * land after "verma" and put the wrong list under their cursor.
+   * land after "verma" and put the wrong list under their finger.
    */
   useEffect(() => {
-    const wanted = term.trim();
-    if (!wanted) {
+    const term = search.trim();
+    if (!term) {
       setResults([]);
       return;
     }
     let live = true;
     const timer = setTimeout(() => {
       api
-        .searchClients(wanted)
+        .searchClients(term)
         .then((found) => live && setResults(found))
         .catch(() => live && setResults([]));
     }, 200);
@@ -122,62 +121,64 @@ export function ClientPicker({
       live = false;
       clearTimeout(timer);
     };
-  }, [term]);
+  }, [search]);
 
   const close = () => {
-    setOpen(false);
-    setTerm('');
+    setSheet(false);
+    setSearch('');
     setResults([]);
   };
 
   return (
     <>
       {value.client ? (
-        <Card className="row" style={{ alignItems: 'center', gap: 12 }}>
-          <Avatar name={value.client.name} size={42} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="t-h3">{value.client.name}</div>
-            <div className="t-tiny muted">
+        <Card tone="accent" style={styles.picked}>
+          <Avatar name={value.client.name} size={46} tone="dark" />
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text variant="h3" tone="onAccent">{value.client.name}</Text>
+            <Text variant="tiny" tone="onAccent" style={{ opacity: 0.7 }}>
               {[value.client.code, value.client.phone].filter(Boolean).join(' · ') || 'On file'}
-            </div>
-          </div>
-          <button
-            type="button"
-            className="sheet-close"
-            aria-label="Clear the client"
-            onClick={() => onChange(NO_CLIENT)}>
-            <Icon name="close" size={17} />
-          </button>
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => onChange(NO_CLIENT)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Clear the client">
+            <Icon name="close" size={18} color={palette.textOnAccent} />
+          </Pressable>
         </Card>
       ) : (
         <>
-          <button
-            type="button"
-            className="picker-trigger"
-            aria-label="Search existing clients"
-            onClick={() => setOpen(true)}>
-            <Icon name="search" size={17} color="var(--text-muted)" />
-            <span className="t-body muted" style={{ flex: 1, textAlign: 'left' }}>
-              Search existing clients
-            </span>
-            <Icon name="chevronRight" size={15} color="var(--text-muted)" />
-          </button>
+          <Pressable
+            onPress={() => setSheet(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Search existing clients">
+            <Card tone="dark" style={styles.search}>
+              <Icon name="search" size={19} color={palette.textMuted} />
+              <Text variant="body" tone="faint" style={{ flex: 1, marginLeft: spacing.md }}>
+                Search existing clients
+              </Text>
+              <Icon name="chevronRight" size={16} color={palette.textMuted} />
+            </Card>
+          </Pressable>
 
           {allowCreate ? (
             <>
-              <p className="t-tiny muted picker-or">or add a new one</p>
+              <Text variant="label" tone="faint" style={styles.or}>or add a new one</Text>
               <Field
                 label={nameLabel}
                 placeholder={namePlaceholder}
                 value={value.name}
-                onChange={(name) => onChange({ ...value, name })}
+                onChangeText={(name) => onChange({ ...value, name })}
                 icon="user"
               />
               <Field
                 label="Phone"
                 placeholder="Optional — matches an existing client"
                 value={value.phone}
-                onChange={(phone) => onChange({ ...value, phone })}
+                onChangeText={(phone) => onChange({ ...value, phone })}
+                keyboardType="phone-pad"
                 icon="phone"
                 hint="If this number is already on file, it attaches to them."
               />
@@ -187,14 +188,15 @@ export function ClientPicker({
       )}
 
       <Sheet
-        open={open}
+        visible={sheet}
         title="Find a client"
         subtitle="Search by name, phone or code"
-        onClose={close}>
+        onClose={close}
+        fullHeight>
         <Field
           placeholder="Type to search…"
-          value={term}
-          onChange={setTerm}
+          value={search}
+          onChangeText={setSearch}
           icon="search"
           pasteable={false}
           autoFocus
@@ -205,21 +207,29 @@ export function ClientPicker({
             label={result.name}
             description={[result.code, result.phone].filter(Boolean).join(' · ')}
             selected={value.client?.id === result.id}
-            onClick={() => {
+            onPress={() => {
               onChange(pickedClient(result));
               onPick?.(result);
               close();
+              haptic('impactLight');
             }}
           />
         ))}
-        {term.trim() && results.length === 0 ? (
-          <p className="t-small muted" style={{ textAlign: 'center', padding: '20px 0' }}>
+        {search.trim() && results.length === 0 ? (
+          <Text variant="small" tone="faint" style={styles.none}>
             {allowCreate
               ? 'No match. Close this and add them as a new client.'
               : 'No match. Only clients the shop has on file can be reported on.'}
-          </p>
+          </Text>
         ) : null}
       </Sheet>
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  picked: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
+  search: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg },
+  or: { textAlign: 'center', marginVertical: spacing.lg },
+  none: { textAlign: 'center', paddingVertical: 20 },
+});

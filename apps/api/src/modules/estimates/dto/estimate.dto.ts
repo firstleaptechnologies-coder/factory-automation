@@ -19,6 +19,7 @@ import { EstimateStatus, TaxTreatment } from '@prisma/client';
  */
 const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { CreateClientDto } from '../../clients/dto/client.dto';
 
 export class EstimateItemDto {
   @IsString() @MinLength(1) name: string;
@@ -36,6 +37,14 @@ export class EstimateItemDto {
 
 export class CreateEstimateDto {
   @IsOptional() @IsString() clientId?: string;
+  /**
+   * Somebody who is not on file yet, added from the quote screen itself.
+   *
+   * The same shape the punch screen sends, and resolved by the same rule, so a
+   * client added while quoting is the client the order later attaches to
+   * rather than a second row with the same phone number.
+   */
+  @IsOptional() @ValidateNested() @Type(() => CreateClientDto) newClient?: CreateClientDto;
   /** For a quote given before the client is on file. */
   @IsOptional() @IsString() clientName?: string;
   /**

@@ -85,13 +85,55 @@ button.primary:disabled {
 }
 
 /*
+ * The kit's own components opt out of the older pages' bare-markup rules.
+ *
+ * `Field` renders a `<label class="field">` wrapping a well, so the flat
+ * caption rule below — one line, fixed height, overflow hidden — clipped the
+ * whole field away: the client picker's name and phone drew on the punch page
+ * as two labels with nothing underneath them. Nothing in jsdom can see that,
+ * and nothing about either rule on its own is wrong; it is only wrong where a
+ * kit component lands inside a page still written in plain markup.
+ *
+ * Kept above the rules it undoes so the relationship is readable, and matched
+ * on specificity rather than `!important` so a page can still override it.
+ */
+.legacy label.field,
+.modal label.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+  height: auto;
+  line-height: normal;
+  overflow: visible;
+  white-space: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  margin-bottom: var(--s-lg);
+}
+
+/* The well draws the sunken shape; its input must not draw a second one. */
+.legacy .field-well input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.legacy .field-well textarea,
+.modal .field-well input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.modal .field-well textarea {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  min-height: 0;
+  padding: 13px 0;
+}
+
+/*
  * Bare buttons in the older pages get a raised pad — but scoped to those pages
  * only. A blanket `.shell-main button` rule also caught React Flow's canvas
  * controls and every icon button in the kit, squashing them to a fixed height
  * and hiding their glyphs.
  */
-.legacy button:not(.primary):not(.btn):not(.chip):not(.remove):not(.select-trigger):not(.select-option):not(.wheel-row):not(.sheet-close):not(.paste-btn),
-.modal button:not(.primary):not(.btn):not(.chip):not(.remove):not(.select-trigger):not(.select-option):not(.wheel-row):not(.sheet-close):not(.paste-btn) {
+.legacy button:not(.primary):not(.btn):not(.chip):not(.remove):not(.select-trigger):not(.select-option):not(.wheel-row):not(.sheet-close):not(.paste-btn):not(.picker-trigger),
+.modal button:not(.primary):not(.btn):not(.chip):not(.remove):not(.select-trigger):not(.select-option):not(.wheel-row):not(.sheet-close):not(.paste-btn):not(.picker-trigger) {
   border: 0;
   cursor: pointer;
   height: 50px;
@@ -669,3 +711,34 @@ button.primary:disabled {
 /* Part-ticked is its own mark. Rendering it as off is how somebody ticks a
    branch meaning to fill it in and grants what was already there twice over. */
 .perm-box[data-state='some'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* -- the client picker ------------------------------------------------------
+ *
+ * The trigger that opens the search sheet, and the line separating it from the
+ * fields that add somebody who is not on file. Shared by punch, quotes and
+ * reports so the same control looks the same wherever a client is asked for.
+ */
+.picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+  width: 100%;
+  min-height: 50px;
+  padding: 0 var(--s-lg);
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  background: var(--grad-inset);
+  box-shadow: var(--press);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.picker-trigger:hover { border-color: var(--accent); }
+
+.picker-or {
+  text-align: center;
+  margin: var(--s-lg) 0 var(--s-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}

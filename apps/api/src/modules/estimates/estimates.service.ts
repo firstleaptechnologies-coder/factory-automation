@@ -11,6 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CodeGeneratorService } from '../../common/utils/code-generator.service';
 import { tenantId } from '../../common/tenancy/tenant-context';
 import { OrdersService } from '../orders/orders.service';
+import { ClientsService } from '../clients/clients.service';
 import { paginate } from '../../common/dto/pagination.dto';
 import { amountInWords, round2, splitTax } from '../../common/utils/pricing';
 import { estimateTotals } from './estimate-totals';
@@ -64,6 +65,7 @@ export class EstimatesService {
     private readonly prisma: PrismaService,
     private readonly codes: CodeGeneratorService,
     private readonly orders: OrdersService,
+    private readonly clients: ClientsService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -146,22 +148,34 @@ export class EstimatesService {
   }
 
   async create(dto: CreateEstimateDto, userId?: string) {
-    const code = await this.codes.next('estimate');
     const priced = await this.priceLines(dto.items, dto.taxTreatment ?? TaxTreatment.EXCLUSIVE);
-    const client = dto.clientId
-      ? await this.prisma.client.findFirst({ where: { id: dto.clientId } })
-      : null;
     const firm = await this.firmProfile();
+    const leadId = dto.leadId ? (await this.assertLead(dto.leadId)).id : undefined;
 
-    const totals = estimateTotals(priced, firm.stateCode, client?.stateCode);
+    /*
+     * One transaction, because a client added while quoting must not survive a
+     * quote that failed to save. The code is drawn inside it for the same
+     * reason: a rolled-back estimate would otherwise burn a number and leave a
+     * gap in a sequence the shop's books are read from.
+     */
+    const estimate = await this.prisma.$transaction(async (tx) => {
+      const clientId =
+        dto.clientId ??
+        (dto.newClient ? await this.clients.resolveInline(tx, dto.newClient, userId) : undefined);
+      const client = clientId
+        ? await tx.client.findFirst({ where: { id: clientId } })
+        : null;
+      const code = await this.codes.next('estimate', tx);
 
-    const estimate = await this.prisma.estimate.create({
+      const totals = estimateTotals(priced, firm.stateCode, client?.stateCode);
+
+      return tx.estimate.create({
       data: {
         tenantId: tenantId(),
         code,
-        clientId: dto.clientId,
+        clientId,
         clientName: dto.clientName ?? client?.name,
-        leadId: dto.leadId ? (await this.assertLead(dto.leadId)).id : undefined,
+        leadId,
         // Snapshotted: an estimate reprinted next year must show the address it
         // was actually sent to, not wherever the client has moved since.
         billingAddress: dto.billingAddress ?? client?.billingAddress ?? client?.address,
@@ -183,6 +197,7 @@ export class EstimatesService {
         },
       },
       include: INCLUDE,
+      });
     });
 
     // Writing a quote is work on the enquiry: it must not go quiet underneath.
@@ -191,18 +206,28 @@ export class EstimatesService {
     return estimate;
   }
 
-  async update(id: string, dto: UpdateEstimateDto) {
+  async update(id: string, dto: UpdateEstimateDto, userId?: string) {
     const existing = await this.findOne(id);
     const treatment = dto.taxTreatment ?? existing.taxTreatment;
     const priced = await this.priceLines(dto.items, treatment);
-    const client = dto.clientId
-      ? await this.prisma.client.findFirst({ where: { id: dto.clientId } })
-      : existing.client;
     const firm = await this.firmProfile();
 
-    const totals = estimateTotals(priced, firm.stateCode, client?.stateCode);
-
     return this.prisma.$transaction(async (tx) => {
+      // A client typed into the edit screen is added the same way the quote
+      // screen adds one, so revising a quote cannot make a second row for
+      // somebody the shop already has.
+      const clientId =
+        dto.clientId ??
+        (dto.newClient
+          ? await this.clients.resolveInline(tx, dto.newClient, userId)
+          : existing.clientId);
+      const client =
+        clientId === existing.clientId
+          ? existing.client
+          : await tx.client.findFirst({ where: { id: clientId ?? '' } });
+
+      const totals = estimateTotals(priced, firm.stateCode, client?.stateCode);
+
       // Lines are replaced rather than reconciled: a revised quote is a new set
       // of numbers, and matching them up by position would silently mis-edit a
       // line that was deleted from the middle.
@@ -211,8 +236,8 @@ export class EstimatesService {
       return tx.estimate.update({
         where: { id },
         data: {
-          clientId: dto.clientId ?? existing.clientId,
-          clientName: dto.clientName ?? existing.clientName,
+          clientId,
+          clientName: dto.clientName ?? client?.name ?? existing.clientName,
           leadId: dto.leadId ?? existing.leadId,
           billingAddress: dto.billingAddress ?? existing.billingAddress,
           shippingAddress: dto.shippingAddress ?? existing.shippingAddress,

@@ -1,154 +1,195 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { ClientPicker } from './ClientPicker';
+import { useState } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  ClientPicker,
+  NO_CLIENT,
+  clientLabel,
+  clientRef,
+  hasClient,
+  pickedClient,
+  typedClient,
+  type ClientChoice,
+} from './ClientPicker';
 
 const searchClients = jest.fn();
 jest.mock('@/lib/api', () => ({ api: { searchClients: (term: string) => searchClients(term) } }));
 
-const CLIENT = {
+const VERMA = {
   id: 'c1',
   code: 'CLI-1',
   name: 'Verma Interiors',
   phone: '9820012345',
-  company: 'Verma & Sons',
+  billingAddress: 'Andheri',
 };
 
-function mount(value: unknown = null) {
-  const onChange = jest.fn();
-  const view = render(<ClientPicker value={value as never} onChange={onChange} />);
-  return { onChange, view };
+/** A host that holds the choice, the way every page using this does. */
+function Host({ allowCreate = true }: { allowCreate?: boolean }) {
+  const [value, setValue] = useState<ClientChoice>(NO_CLIENT);
+  return <ClientPicker value={value} onChange={setValue} allowCreate={allowCreate} />;
 }
 
-async function type(text: string) {
-  fireEvent.change(screen.getByPlaceholderText('Type a name or phone…'), {
-    target: { value: text },
-  });
-  // The search is debounced so a fast typist does not fire a request per key.
-  await act(async () => {
-    jest.advanceTimersByTime(250);
-  });
-}
+const openSheet = () => {
+  fireEvent.click(screen.getByLabelText('Search existing clients'));
+  return screen.findByPlaceholderText('Type to search…');
+};
+
+const type = async (text: string) => {
+  const box = await openSheet();
+  fireEvent.change(box, { target: { value: text } });
+  return box;
+};
 
 beforeEach(() => {
-  jest.useFakeTimers();
-  searchClients.mockReset().mockResolvedValue([CLIENT]);
+  searchClients.mockReset().mockResolvedValue([VERMA]);
 });
-afterEach(() => jest.useRealTimers());
 
-it('does not search until something is typed', () => {
-  mount();
-  act(() => {
-    jest.advanceTimersByTime(500);
+/*
+ * The same contract the app's picker exports, in
+ * `apps/mobile/src/components/ClientPicker`. Both ends of it are tested on both
+ * clients on purpose: a change to one that the other did not get is exactly how
+ * the same customer ended up entered three different ways.
+ */
+describe('what a page sends to the API', () => {
+  it('is the id when a client was picked', () => {
+    expect(clientRef(pickedClient(VERMA))).toEqual({ clientId: 'c1' });
   });
-  expect(searchClients).not.toHaveBeenCalled();
-});
 
-it('searches once for a burst of typing', async () => {
-  mount();
-  const input = screen.getByPlaceholderText('Type a name or phone…');
-  for (const text of ['v', 've', 'ver', 'verm']) {
-    fireEvent.change(input, { target: { value: text } });
-    act(() => {
-      jest.advanceTimersByTime(50);
+  it('is the new client when a name was typed', () => {
+    expect(clientRef(typedClient(' Passing trade ', ' 98200 12345 '))).toEqual({
+      newClient: { name: 'Passing trade', phone: '98200 12345' },
     });
-  }
-  await act(async () => {
-    jest.advanceTimersByTime(250);
-  });
-  expect(searchClients).toHaveBeenCalledTimes(1);
-  expect(searchClients).toHaveBeenCalledWith('verm');
-});
-
-it('shows a match with everything needed to tell two apart', async () => {
-  mount();
-  await type('verma');
-  expect(screen.getByText('Verma Interiors')).toBeInTheDocument();
-  expect(screen.getByText(/CLI-1 · 9820012345 · Verma & Sons/)).toBeInTheDocument();
-});
-
-it('picks a client from the list', async () => {
-  const { onChange } = mount();
-  await type('verma');
-  fireEvent.click(screen.getByText('Verma Interiors'));
-  expect(onChange).toHaveBeenCalledWith({ client: CLIENT });
-});
-
-it('shows nothing rather than an error when the search fails', async () => {
-  searchClients.mockRejectedValue(new Error('down'));
-  mount();
-  await type('verma');
-  expect(screen.getByText(/Create/)).toBeInTheDocument();
-});
-
-it('always offers to create the name that was typed', async () => {
-  mount();
-  await type('New Shop');
-  expect(screen.getByText('+ Create “New Shop”')).toBeInTheDocument();
-});
-
-it('closes the list when the page is clicked elsewhere', async () => {
-  mount();
-  await type('verma');
-  fireEvent.mouseDown(document.body);
-  await waitFor(() => expect(screen.queryByText('Verma Interiors')).not.toBeInTheDocument());
-});
-
-describe('once a client is chosen', () => {
-  it('shows who it is instead of the search box', () => {
-    mount({ client: CLIENT });
-    expect(screen.getByText('Verma Interiors')).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('Type a name or phone…')).not.toBeInTheDocument();
   });
 
-  it('does not keep searching', () => {
-    mount({ client: CLIENT });
-    act(() => {
-      jest.advanceTimersByTime(500);
+  it('leaves the phone off rather than sending an empty one', () => {
+    expect(clientRef(typedClient('Passing trade'))).toEqual({
+      newClient: { name: 'Passing trade' },
     });
+  });
+
+  it('is nothing at all when neither was filled in', () => {
+    expect(clientRef(NO_CLIENT)).toEqual({});
+    expect(clientRef(typedClient('   '))).toEqual({});
+  });
+
+  it('knows whether there is anybody to attach the work to', () => {
+    expect(hasClient(NO_CLIENT)).toBe(false);
+    expect(hasClient(typedClient('  '))).toBe(false);
+    expect(hasClient(typedClient('Passing trade'))).toBe(true);
+    expect(hasClient(pickedClient(VERMA))).toBe(true);
+  });
+
+  it('names who it is, whichever half was used', () => {
+    expect(clientLabel(pickedClient(VERMA))).toBe('Verma Interiors');
+    expect(clientLabel(typedClient(' Passing trade '))).toBe('Passing trade');
+    expect(clientLabel(NO_CLIENT)).toBe('');
+  });
+});
+
+describe('searching what the shop already has', () => {
+  it('does not go looking until something is typed', async () => {
+    render(<Host />);
+    await openSheet();
+    await new Promise((resolve) => setTimeout(resolve, 250));
     expect(searchClients).not.toHaveBeenCalled();
   });
 
-  it('can be changed back', () => {
-    const { onChange } = mount({ client: CLIENT });
-    fireEvent.click(screen.getByText('Change'));
-    expect(onChange).toHaveBeenCalledWith(null);
+  it('searches by name, phone or code', async () => {
+    render(<Host />);
+    await type('verma');
+    await waitFor(() => expect(searchClients).toHaveBeenCalledWith('verma'));
+  });
+
+  it('searches once for a burst of typing, on the last thing typed', async () => {
+    render(<Host />);
+    const box = await openSheet();
+    for (const text of ['v', 've', 'ver', 'verm']) {
+      fireEvent.change(box, { target: { value: text } });
+    }
+    await waitFor(() => expect(searchClients).toHaveBeenCalledTimes(1));
+    expect(searchClients).toHaveBeenCalledWith('verm');
+  });
+
+  it('shows who was picked, and stops asking for a new one', async () => {
+    render(<Host />);
+    await type('verma');
+    fireEvent.click(await screen.findByText('Verma Interiors'));
+
+    expect(screen.getByText('CLI-1 · 9820012345')).toBeInTheDocument();
+    expect(screen.queryByText('or add a new one')).not.toBeInTheDocument();
+  });
+
+  it('lets the pick be undone', async () => {
+    render(<Host />);
+    await type('verma');
+    fireEvent.click(await screen.findByText('Verma Interiors'));
+    fireEvent.click(screen.getByLabelText('Clear the client'));
+
+    expect(screen.getByLabelText('Search existing clients')).toBeInTheDocument();
+    expect(screen.getByText('or add a new one')).toBeInTheDocument();
+  });
+
+  it('says so when nothing matches, and points at the other half', async () => {
+    searchClients.mockResolvedValue([]);
+    render(<Host />);
+    await type('nobody');
+
+    expect(
+      await screen.findByText('No match. Close this and add them as a new client.'),
+    ).toBeInTheDocument();
+  });
+
+  // A failing lookup must not take the page down mid-order.
+  it('shows no results rather than crashing when the search fails', async () => {
+    searchClients.mockRejectedValue(new Error('offline'));
+    render(<Host />);
+    await type('verma');
+
+    expect(await screen.findByPlaceholderText('Type to search…')).toBeInTheDocument();
+  });
+
+  it('forgets the last search when the sheet is closed', async () => {
+    render(<Host />);
+    await type('verma');
+    await screen.findByText('Verma Interiors');
+    fireEvent.click(screen.getByLabelText('Close'));
+    const box = await openSheet();
+
+    expect(box).toHaveValue('');
   });
 });
 
-describe('creating one inline', () => {
-  async function startCreating() {
-    const view = mount();
-    await type('New Shop');
-    fireEvent.click(screen.getByText('+ Create “New Shop”'));
-    return view;
-  }
-
-  it('carries the typed name straight into the new client', async () => {
-    const { onChange } = await startCreating();
-    // The person punching is usually on the phone with the client.
-    expect(onChange).toHaveBeenLastCalledWith({
-      newClient: { name: 'New Shop', phone: '' },
+describe('adding somebody who is not on file', () => {
+  it('takes a name and a phone', () => {
+    render(<Host />);
+    fireEvent.change(screen.getByPlaceholderText('Who is it for?'), {
+      target: { value: 'Passing trade' },
     });
+    expect(screen.getByDisplayValue('Passing trade')).toBeInTheDocument();
   });
 
-  it('reports the phone as it is typed', async () => {
-    const { onChange } = await startCreating();
-    fireEvent.change(screen.getByPlaceholderText('Phone'), {
-      target: { value: '9820012345' },
-    });
-    expect(onChange).toHaveBeenLastCalledWith({
-      newClient: { name: 'New Shop', phone: '9820012345' },
-    });
+  it('says what the phone number is for', () => {
+    render(<Host />);
+    expect(
+      screen.getByText('If this number is already on file, it attaches to them.'),
+    ).toBeInTheDocument();
   });
 
-  it('says a matching phone number will attach to the existing client', async () => {
-    await startCreating();
-    expect(screen.getByText(/instead of creating a duplicate/)).toBeInTheDocument();
+  it('is not offered at all where the client is a subject rather than a party', () => {
+    render(<Host allowCreate={false} />);
+
+    expect(screen.getByLabelText('Search existing clients')).toBeInTheDocument();
+    expect(screen.queryByText('or add a new one')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Who is it for?')).not.toBeInTheDocument();
   });
 
-  it('can go back to searching, clearing what was half-entered', async () => {
-    const { onChange } = await startCreating();
-    fireEvent.click(screen.getByText('Search instead'));
-    expect(onChange).toHaveBeenLastCalledWith(null);
-    expect(screen.getByPlaceholderText('Type a name or phone…')).toBeInTheDocument();
+  it('does not tell a report to add a client it cannot add', async () => {
+    searchClients.mockResolvedValue([]);
+    render(<Host allowCreate={false} />);
+    await type('nobody');
+
+    expect(
+      screen.queryByText('No match. Close this and add them as a new client.'),
+    ).not.toBeInTheDocument();
+    expect(await screen.findByText(/Only clients the shop has on file/)).toBeInTheDocument();
   });
 });

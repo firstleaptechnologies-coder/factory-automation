@@ -6,7 +6,13 @@ import type { Material, PunchItemInput, SizePreset } from '@fas/shared';
 import { DEFAULT_UNIT, LengthUnit, parseLengthToMm } from '@fas/shared';
 import { Shell } from '@/components/Shell';
 import { Select } from '@/ui';
-import { ClientPicker, ClientSelection } from '@/components/ClientPicker';
+import {
+  ClientPicker,
+  NO_CLIENT,
+  clientRef,
+  hasClient,
+  type ClientChoice,
+} from '@/components/ClientPicker';
 import { PhotoField, PendingPhoto } from '@/components/PhotoField';
 import { SizeInput } from '@/components/SizeInput';
 import { api } from '@/lib/api';
@@ -42,7 +48,7 @@ export default function PunchPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [presets, setPresets] = useState<SizePreset[]>([]);
 
-  const [client, setClient] = useState<ClientSelection | null>(null);
+  const [client, setClient] = useState<ClientChoice>(NO_CLIENT);
   const [location, setLocation] = useState('');
   const [priority, setPriority] = useState('NORMAL');
   const [dueDate, setDueDate] = useState('');
@@ -64,7 +70,7 @@ export default function PunchPage() {
   }, []);
 
   const knownLocations = useMemo(
-    () => client?.client?.locations?.map((l) => l.name) ?? [],
+    () => client.client?.locations?.map((one) => one.name) ?? [],
     [client],
   );
 
@@ -92,7 +98,7 @@ export default function PunchPage() {
   const submit = async () => {
     setError(null);
 
-    if (!client?.client && !client?.newClient?.name) {
+    if (!hasClient(client)) {
       setError('Pick a client or create one.');
       return;
     }
@@ -139,8 +145,7 @@ export default function PunchPage() {
     setBusy(true);
     try {
       const order = await api.punchOrder({
-        clientId: client.client?.id,
-        newClient: client.newClient?.name ? client.newClient : undefined,
+        ...clientRef(client),
         location: location.trim(),
         priority: priority as never,
         dueDate: dueDate || undefined,
@@ -179,7 +184,11 @@ export default function PunchPage() {
         <div className="card">
           <h3>Client &amp; site</h3>
 
-          <ClientPicker value={client} onChange={setClient} />
+          <ClientPicker
+            value={client}
+            onChange={setClient}
+            namePlaceholder="Who is ordering?"
+          />
 
           <div className="field">
             <label htmlFor="location">Location</label>

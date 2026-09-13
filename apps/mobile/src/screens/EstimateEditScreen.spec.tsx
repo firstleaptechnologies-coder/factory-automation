@@ -4,14 +4,14 @@ import { EstimateEditScreen } from './EstimateEditScreen';
 
 const mockEstimate = jest.fn();
 const mockGstSlabs = jest.fn();
-const mockClients = jest.fn();
+const mockSearchClients = jest.fn();
 const mockCreateEstimate = jest.fn();
 const mockUpdateEstimate = jest.fn();
 jest.mock('../api/client', () => ({
   api: {
     estimate: (...a: unknown[]) => mockEstimate(...a),
     gstSlabs: (...a: unknown[]) => mockGstSlabs(...a),
-    clients: (...a: unknown[]) => mockClients(...a),
+    searchClients: (...a: unknown[]) => mockSearchClients(...a),
     createEstimate: (...a: unknown[]) => mockCreateEstimate(...a),
     updateEstimate: (...a: unknown[]) => mockUpdateEstimate(...a),
   },
@@ -34,7 +34,7 @@ const ESTIMATE = {
   id: 'e1',
   code: 'EST-1',
   clientId: 'c1',
-  client: { name: 'Verma Interiors' },
+  client: CLIENT,
   clientName: null,
   billingAddress: 'Bhilwara',
   shippingAddress: null,
@@ -71,7 +71,7 @@ const fill = async (name: string, qty: string, rate: string, discount?: string) 
 beforeEach(() => {
   jest.clearAllMocks();
   mockGstSlabs.mockResolvedValue([SLAB_18, SLAB_5]);
-  mockClients.mockResolvedValue({ data: [CLIENT] });
+  mockSearchClients.mockResolvedValue([CLIENT]);
   mockEstimate.mockResolvedValue(ESTIMATE);
   mockCreateEstimate.mockResolvedValue({ id: 'e9' });
   mockUpdateEstimate.mockResolvedValue({ id: 'e1' });
@@ -95,7 +95,7 @@ it('fills the form from the estimate being edited', async () => {
   await mount({ estimateId: 'e1' });
   expect(screen.getByText('Edit quote')).toBeTruthy();
   expect(screen.getByText('EST-1')).toBeTruthy();
-  expect(screen.getByDisplayValue('Verma Interiors')).toBeTruthy();
+  expect(screen.getByText('Verma Interiors')).toBeTruthy();
   expect(screen.getByDisplayValue('Jali cutting')).toBeTruthy();
   expect(screen.getByDisplayValue('Valid for 15 days')).toBeTruthy();
 });
@@ -230,35 +230,75 @@ describe('the lines', () => {
   });
 });
 
+/*
+ * The same control the punch screen uses, so a quote and the order that comes
+ * out of it land on one client rather than two records with the same phone
+ * number. It used to be a plain name field beside a search-only sheet, which
+ * could not add anybody at all.
+ */
 describe('who the estimate is for', () => {
+  const search = async (term: string) => {
+    await fireEvent.press(screen.getByLabelText('Search existing clients'));
+    await fireEvent.changeText(await screen.findByPlaceholderText('Type to search…'), term);
+  };
+
   it('picks a client and takes their addresses with them', async () => {
     await mount();
-    await fireEvent.press(screen.getByText('From clients'));
+    await search('verma');
     await fireEvent.press(await screen.findByText('Verma Interiors'));
     expect(screen.getByDisplayValue('Bhilwara')).toBeTruthy();
     expect(screen.getByDisplayValue('Site 4, Udaipur')).toBeTruthy();
   });
 
-  it('detaches the client when the name is typed over', async () => {
+  it('sends the id of a client who is already on file', async () => {
     await mount();
-    await fireEvent.press(screen.getByText('From clients'));
+    await search('verma');
     await fireEvent.press(await screen.findByText('Verma Interiors'));
-    await fireEvent.changeText(screen.getByDisplayValue('Verma Interiors'), 'Verma Interiors LLP');
     await fill('Jali', '1', '100');
     await fireEvent.press(screen.getByText('Create quote'));
     await waitFor(() => expect(mockCreateEstimate).toHaveBeenCalled());
-    // Otherwise the estimate points at a record the name no longer matches.
-    expect(mockCreateEstimate.mock.calls[0][0].clientId).toBeUndefined();
-    expect(mockCreateEstimate.mock.calls[0][0].clientName).toBe('Verma Interiors LLP');
+    expect(mockCreateEstimate.mock.calls[0][0]).toMatchObject({ clientId: 'c1' });
+    expect(mockCreateEstimate.mock.calls[0][0].newClient).toBeUndefined();
   });
 
-  it('searches the client list', async () => {
+  it('adds somebody who is not on file yet, without leaving the quote', async () => {
     await mount();
-    await fireEvent.press(screen.getByText('From clients'));
-    await fireEvent.changeText(await screen.findByPlaceholderText('Name or phone'), 'verma');
-    await waitFor(() =>
-      expect(mockClients).toHaveBeenCalledWith({ search: 'verma', limit: 20 }),
+    await fireEvent.changeText(
+      screen.getByPlaceholderText('Who is this quote for?'),
+      'Passing trade',
     );
+    await fireEvent.changeText(
+      screen.getByPlaceholderText('Optional — matches an existing client'),
+      '9820012345',
+    );
+    await fill('Panel', '1', '900');
+    await fireEvent.press(screen.getByText('Create quote'));
+    await waitFor(() => expect(mockCreateEstimate).toHaveBeenCalled());
+    expect(mockCreateEstimate.mock.calls[0][0]).toMatchObject({
+      newClient: { name: 'Passing trade', phone: '9820012345' },
+    });
+    expect(mockCreateEstimate.mock.calls[0][0].clientId).toBeUndefined();
+  });
+
+  it('lets the chosen client be cleared and somebody else typed in', async () => {
+    await mount();
+    await search('verma');
+    await fireEvent.press(await screen.findByText('Verma Interiors'));
+    await fireEvent.press(screen.getByLabelText('Clear the client'));
+    // Back to the two ways of filling it in, with nothing carried over.
+    expect(screen.getByPlaceholderText('Who is this quote for?').props.value).toBe('');
+    expect(screen.getByLabelText('Search existing clients')).toBeTruthy();
+  });
+
+  it('searches by name, phone or code rather than filtering a page of clients', async () => {
+    await mount();
+    await search('verma');
+    await waitFor(() => expect(mockSearchClients).toHaveBeenCalledWith('verma'));
+  });
+
+  it('offers a name from the phone book as a new client, not as a record', async () => {
+    await mount();
+    expect(screen.getByText('From contacts')).toBeTruthy();
   });
 });
 
@@ -272,14 +312,14 @@ describe('saving', () => {
 
   it('cannot be saved with nothing on it', async () => {
     await mount();
-    await fireEvent.changeText(screen.getByPlaceholderText('Type a name'), 'Verma');
+    await fireEvent.changeText(screen.getByPlaceholderText('Who is this quote for?'), 'Verma');
     await fireEvent.press(screen.getByText('Create quote'));
     expect(mockCreateEstimate).not.toHaveBeenCalled();
   });
 
   it('leaves out a line that was started and never filled in', async () => {
     await mount();
-    await fireEvent.changeText(screen.getByPlaceholderText('Type a name'), 'Verma');
+    await fireEvent.changeText(screen.getByPlaceholderText('Who is this quote for?'), 'Verma');
     await fill('Jali', '10', '100');
     await fireEvent.press(screen.getByText('Add a line'));
     await fireEvent.changeText(screen.getAllByPlaceholderText('Hdmr cutting 22mm')[1], 'Half typed');
@@ -290,7 +330,7 @@ describe('saving', () => {
 
   it('sends each line with the default slab when none was chosen', async () => {
     await mount();
-    await fireEvent.changeText(screen.getByPlaceholderText('Type a name'), 'Verma');
+    await fireEvent.changeText(screen.getByPlaceholderText('Who is this quote for?'), 'Verma');
     await fill('  Jali cutting  ', '10', '100');
     await fireEvent.press(screen.getByText('Create quote'));
     await waitFor(() => expect(mockCreateEstimate).toHaveBeenCalled());
@@ -304,7 +344,7 @@ describe('saving', () => {
 
   it('sends the treatment the quote was written under', async () => {
     await mount();
-    await fireEvent.changeText(screen.getByPlaceholderText('Type a name'), 'Verma');
+    await fireEvent.changeText(screen.getByPlaceholderText('Who is this quote for?'), 'Verma');
     await fireEvent.press(screen.getByText('GST absorbed'));
     await fill('Jali', '1', '100');
     await fireEvent.press(screen.getByText('Create quote'));
@@ -314,7 +354,7 @@ describe('saving', () => {
 
   it('leaves empty text out of the body rather than sending blanks', async () => {
     await mount();
-    await fireEvent.changeText(screen.getByPlaceholderText('Type a name'), 'Verma');
+    await fireEvent.changeText(screen.getByPlaceholderText('Who is this quote for?'), 'Verma');
     await fill('Jali', '1', '100');
     await fireEvent.press(screen.getByText('Create quote'));
     await waitFor(() => expect(mockCreateEstimate).toHaveBeenCalled());
@@ -333,7 +373,7 @@ describe('saving', () => {
 
   it('opens what was saved, replacing the form so Back does not reopen it', async () => {
     await mount();
-    await fireEvent.changeText(screen.getByPlaceholderText('Type a name'), 'Verma');
+    await fireEvent.changeText(screen.getByPlaceholderText('Who is this quote for?'), 'Verma');
     await fill('Jali', '1', '100');
     await fireEvent.press(screen.getByText('Create quote'));
     await waitFor(() =>
@@ -344,7 +384,7 @@ describe('saving', () => {
   it('keeps the form on screen when the server refuses it', async () => {
     mockCreateEstimate.mockRejectedValue(new Error('Client is required'));
     await mount();
-    await fireEvent.changeText(screen.getByPlaceholderText('Type a name'), 'Verma');
+    await fireEvent.changeText(screen.getByPlaceholderText('Who is this quote for?'), 'Verma');
     await fill('Jali', '1', '100');
     await fireEvent.press(screen.getByText('Create quote'));
     await waitFor(() =>
@@ -392,9 +432,12 @@ describe('quoting an enquiry', () => {
     expect(mockCreateEstimate.mock.calls[0][0].leadId).toBe('ld1');
   });
 
-  it('leaves a walk-in quote unattached', async () => {
+  it('leaves a walk-in quote unattached to any enquiry', async () => {
     await mount();
-    await fireEvent.changeText(screen.getByPlaceholderText('Type a name'), 'Passing trade');
+    await fireEvent.changeText(
+      screen.getByPlaceholderText('Who is this quote for?'),
+      'Passing trade',
+    );
     await fill('Panel', '1', '900');
     await fireEvent.press(screen.getByText('Create quote'));
     await waitFor(() => expect(mockCreateEstimate).toHaveBeenCalled());

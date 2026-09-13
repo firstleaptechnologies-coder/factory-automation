@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import type {
-  Client,
   Estimate,
   EstimateItemInput,
   GstSlab,
@@ -11,6 +10,14 @@ import type {
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { ContactPickerSheet } from '../components/ContactPickerSheet';
+import {
+  ClientPicker,
+  clientRef,
+  hasClient,
+  pickedClient,
+  typedClient,
+  type ClientChoice,
+} from '../components/ClientPicker';
 import { looksLikeAddress } from '../hooks/useClipboardSuggestion';
 import {
   Button,
@@ -84,8 +91,11 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
   );
   const slabs = useApi<GstSlab[]>(() => api.gstSlabs(), []);
 
-  const [clientId, setClientId] = useState<string | undefined>(lead?.clientId ?? undefined);
-  const [clientName, setClientName] = useState(lead?.clientName ?? '');
+  const [client, setClient] = useState<ClientChoice>(
+    lead?.clientId
+      ? pickedClient({ id: lead.clientId, name: lead.clientName ?? '' })
+      : typedClient(lead?.clientName ?? ''),
+  );
   const [billingAddress, setBillingAddress] = useState(lead?.location ?? '');
   const [shippingAddress, setShippingAddress] = useState('');
   const [treatment, setTreatment] = useState<TaxTreatment>('EXCLUSIVE');
@@ -95,22 +105,18 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
   ]);
 
   const [contactSheet, setContactSheet] = useState(false);
-  const [clientSheet, setClientSheet] = useState(false);
-  const [clientSearch, setClientSearch] = useState('');
   const [slabFor, setSlabFor] = useState<string | null>(null);
   const [unitFor, setUnitFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const clients = useApi<{ data: Client[] }>(
-    () => api.clients({ search: clientSearch || undefined, limit: 20 }),
-    [clientSearch],
-  );
-
   React.useEffect(() => {
     const data = existing.data;
     if (!data) return;
-    setClientId(data.clientId ?? undefined);
-    setClientName(data.client?.name ?? data.clientName ?? '');
+    setClient(
+      data.client
+        ? pickedClient(data.client)
+        : typedClient(data.clientName ?? ''),
+    );
     setBillingAddress(data.billingAddress ?? '');
     setShippingAddress(data.shippingAddress ?? '');
     setTreatment(data.taxTreatment);
@@ -170,9 +176,8 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
     setBusy(true);
     try {
       const body = {
-        clientId,
+        ...clientRef(client),
         leadId: lead?.id,
-        clientName: clientName.trim() || undefined,
         billingAddress: billingAddress.trim() || undefined,
         shippingAddress: shippingAddress.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -213,21 +218,20 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
       />
 
       <Text variant="label" tone="muted" style={styles.block}>Who is it for?</Text>
-      <Field
-        label="Client"
-        placeholder="Type a name"
-        value={clientName}
-        onChangeText={(value) => {
-          setClientName(value);
-          // Typing over a chosen client detaches it: the estimate should not
-          // silently keep pointing at a record the name no longer matches.
-          setClientId(undefined);
+      <ClientPicker
+        value={client}
+        onChange={setClient}
+        namePlaceholder="Who is this quote for?"
+        onPick={(picked) => {
+          setBillingAddress(picked.billingAddress ?? picked.address ?? '');
+          setShippingAddress(picked.shippingAddress ?? '');
         }}
       />
-      <View style={styles.chipWrap}>
-        <Chip label="From contacts" onPress={() => setContactSheet(true)} />
-        <Chip label="From clients" onPress={() => setClientSheet(true)} />
-      </View>
+      {client.client ? null : (
+        <View style={styles.chipWrap}>
+          <Chip label="From contacts" onPress={() => setContactSheet(true)} />
+        </View>
+      )}
 
       <Field
         label="Billing address"
@@ -379,7 +383,7 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
         title={estimateId ? 'Save quote' : 'Create quote'}
         size="lg"
         loading={busy}
-        disabled={!usable || (!clientId && !clientName.trim())}
+        disabled={!usable || !hasClient(client)}
         onPress={save}
         style={{ marginTop: spacing.lg }}
       />
@@ -388,39 +392,11 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
         visible={contactSheet}
         onClose={() => setContactSheet(false)}
         onPick={(contact) => {
-          setClientName(contact.name);
-          setClientId(undefined);
+          // A name off the phone is a client who is not on file yet, so it
+          // fills the new-client half rather than pretending to be a record.
+          setClient(typedClient(contact.name, contact.phone ?? ''));
         }}
       />
-
-      <Sheet
-        visible={clientSheet}
-        title="Pick a client"
-        onClose={() => setClientSheet(false)}
-        fullHeight>
-        <Field
-          placeholder="Name or phone"
-          value={clientSearch}
-          onChangeText={setClientSearch}
-          icon="search"
-          pasteable={false}
-        />
-        {(clients.data?.data ?? []).map((client) => (
-          <SheetOption
-            key={client.id}
-            label={client.name}
-            description={[client.code, client.phone].filter(Boolean).join(' · ')}
-            selected={clientId === client.id}
-            onPress={() => {
-              setClientId(client.id);
-              setClientName(client.name);
-              setBillingAddress(client.billingAddress ?? client.address ?? '');
-              setShippingAddress(client.shippingAddress ?? '');
-              setClientSheet(false);
-            }}
-          />
-        ))}
-      </Sheet>
 
       <Sheet visible={Boolean(unitFor)} title="Unit" onClose={() => setUnitFor(null)}>
         {UNITS.map((unit) => (

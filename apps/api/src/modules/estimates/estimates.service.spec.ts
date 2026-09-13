@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EstimateStatus, PricingMode, TaxTreatment } from '@prisma/client';
 import { EstimatesService } from './estimates.service';
+import { ClientsService } from '../clients/clients.service';
 import { inTenant, prismaMock, notificationsMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;
@@ -17,7 +18,21 @@ function build() {
     stateCode: '27',
     termsAndConditions: 'Firm terms',
   }));
-  return { service: new EstimatesService(db as never, codes as never, orders as never, notificationsMock() as never), db, orders, codes };
+  // The real ClientsService, so a client added while quoting goes through the
+  // same rule punching an order does.
+  const clients = new ClientsService(db as never, codes as never);
+  return {
+    service: new EstimatesService(
+      db as never,
+      codes as never,
+      orders as never,
+      clients as never,
+      notificationsMock() as never,
+    ),
+    db,
+    orders,
+    codes,
+  };
 }
 
 const line = (over: Record<string, unknown> = {}) => ({
@@ -163,6 +178,87 @@ describe('create', () => {
       billingAddress: 'Andheri',
       shippingAddress: 'Site A',
       clientGstin: '27AAAAA0000A1Z5',
+    });
+  });
+
+  /*
+   * A client added while quoting.
+   *
+   * Before this, the quote screen could only search — somebody who had rung up
+   * for the first time was written in as free text, so the quote carried no
+   * GSTIN and no state code (which decides IGST against CGST+SGST), and the
+   * order punched from it made a second, unrelated record.
+   */
+  describe('a client who is not on file yet', () => {
+    it('creates them and attaches the quote to the record', async () => {
+      const { service, db } = build();
+      db.client.create = jest.fn(async () => ({ id: 'new-client' }));
+      db.client.findFirst = jest.fn(async (args: never) =>
+        (args as { where: { id?: string } }).where.id === 'new-client'
+          ? { id: 'new-client', name: 'Verma Interiors', stateCode: '29' }
+          : null,
+      );
+
+      await inTenant(() =>
+        service.create({
+          newClient: { name: 'Verma Interiors', phone: '9820012345' },
+          items: [line()],
+        } as never),
+      );
+
+      expect(created(db)).toMatchObject({ clientId: 'new-client', clientName: 'Verma Interiors' });
+    });
+
+    it('reuses the client the phone number already belongs to', async () => {
+      const { service, db } = build();
+      db.client.findFirst = jest.fn(async () => ({ id: 'c1', name: 'Verma Interiors' }));
+
+      await inTenant(() =>
+        service.create({
+          newClient: { name: 'Verma Interior', phone: '98200 12345' },
+          items: [line()],
+        } as never),
+      );
+
+      // The same rule punching an order uses: one client, not two.
+      expect(db.client.create).not.toHaveBeenCalled();
+      expect(created(db).clientId).toBe('c1');
+    });
+
+    it('is ignored when an existing client was picked instead', async () => {
+      const { service, db } = build();
+      db.client.findFirst = jest.fn(async () => ({ id: 'c1', name: 'Verma Interiors' }));
+
+      await inTenant(() =>
+        service.create({
+          clientId: 'c1',
+          newClient: { name: 'Somebody else' },
+          items: [line()],
+        } as never),
+      );
+
+      expect(db.client.create).not.toHaveBeenCalled();
+      expect(created(db).clientId).toBe('c1');
+    });
+
+    it('takes the state code across, so the quote splits its GST the right way', async () => {
+      const { service, db } = build();
+      db.client.create = jest.fn(async () => ({ id: 'new-client' }));
+      db.client.findFirst = jest.fn(async (args: never) =>
+        (args as { where: { id?: string } }).where.id === 'new-client'
+          ? { id: 'new-client', name: 'Out of state', stateCode: '29' }
+          : null,
+      );
+
+      await inTenant(() =>
+        service.create({
+          newClient: { name: 'Out of state', phone: '9000000001', stateCode: '29' },
+          items: [line()],
+        } as never),
+      );
+
+      // The firm is in 27; a client in 29 is inter-state, so it is IGST.
+      expect(created(db)).toMatchObject({ igst: expect.anything(), cgst: 0, sgst: 0 });
     });
   });
 
@@ -731,6 +827,7 @@ describe('a quote that is turned down', () => {
       service: new EstimatesService(
         db as never,
         { next: jest.fn(async () => 'EST-2') } as never,
+        {} as never,
         {} as never,
         notificationsMock() as never,
       ),

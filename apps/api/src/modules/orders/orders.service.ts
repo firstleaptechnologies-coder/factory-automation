@@ -152,7 +152,8 @@ export class OrdersService {
     const code = await this.codes.next('order');
 
     return this.prisma.$transaction(async (tx) => {
-      const clientId = dto.clientId ?? (await this.resolveNewClient(tx, dto, userId));
+      const clientId =
+        dto.clientId ?? (await this.clients.resolveInline(tx, dto.newClient!, userId));
 
       // Remember the site so the next order to it is a pick, not a retype.
       const location = await tx.clientLocation.upsert({
@@ -206,43 +207,6 @@ export class OrdersService {
 
       return this.withDisplayUnits(order, unit);
     });
-  }
-
-  /**
-   * Create the inline client — unless we already know them.
-   *
-   * Punching lets anyone add a client without leaving the screen, which is the
-   * right trade for speed but will quietly fill the database with duplicate
-   * "Verma Interiors" rows as different people take orders for the same
-   * customer. A phone number is the one thing that is reliably the same person
-   * in this trade, so an exact match reuses the existing client instead of
-   * making another. Name collisions are left alone: two different clients
-   * genuinely can share a name.
-   */
-  private async resolveNewClient(
-    tx: Prisma.TransactionClient,
-    dto: PunchOrderDto,
-    userId?: string,
-  ): Promise<string> {
-    const phone = dto.newClient!.phone?.replace(/\D/g, '');
-
-    if (phone && phone.length >= 7) {
-      const existing = await tx.client.findFirst({
-        where: { isActive: true, phone: { contains: phone.slice(-10) } },
-        select: { id: true },
-      });
-      if (existing) return existing.id;
-    }
-
-    const created = await tx.client.create({
-      data: {
-        ...dto.newClient!,
-        tenantId: tenantId(),
-        code: await this.codes.next('client', tx),
-        createdById: userId,
-      },
-    });
-    return created.id;
   }
 
   /**

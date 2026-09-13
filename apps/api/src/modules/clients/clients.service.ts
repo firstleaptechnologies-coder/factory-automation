@@ -52,6 +52,11 @@ export class ClientsService {
         name: true,
         phone: true,
         company: true,
+        // Enough for a picker to prefill the addresses on a quote without a
+        // second round trip the moment somebody is chosen.
+        address: true,
+        billingAddress: true,
+        shippingAddress: true,
         locations: {
           orderBy: { useCount: 'desc' },
           take: 5,
@@ -59,6 +64,47 @@ export class ClientsService {
         },
       },
     });
+  }
+
+  /**
+   * Create the client somebody typed in — unless we already know them.
+   *
+   * Every screen that captures a client lets you add one without leaving it,
+   * which is the right trade for speed but will quietly fill the database with
+   * duplicate "Verma Interiors" rows as different people take the same
+   * customer's work. A phone number is the one thing that is reliably the same
+   * person in this trade, so an exact match reuses the existing client instead
+   * of making another. Name collisions are left alone: two different clients
+   * genuinely can share a name.
+   *
+   * It lives here rather than on any one caller because punching an order and
+   * writing a quote must land on the same client, and two copies of this rule
+   * would drift into two answers.
+   */
+  async resolveInline(
+    tx: Prisma.TransactionClient,
+    dto: CreateClientDto,
+    userId?: string,
+  ): Promise<string> {
+    const phone = dto.phone?.replace(/\D/g, '');
+
+    if (phone && phone.length >= 7) {
+      const existing = await tx.client.findFirst({
+        where: { isActive: true, phone: { contains: phone.slice(-10) } },
+        select: { id: true },
+      });
+      if (existing) return existing.id;
+    }
+
+    const created = await tx.client.create({
+      data: {
+        ...dto,
+        tenantId: tenantId(),
+        code: await this.codes.next('client', tx),
+        createdById: userId,
+      },
+    });
+    return created.id;
   }
 
   async findOne(id: string) {

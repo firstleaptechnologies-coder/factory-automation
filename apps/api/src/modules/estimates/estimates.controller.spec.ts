@@ -124,11 +124,11 @@ describe('the estimates themselves', () => {
   it('passes the query, the id and the body straight through', async () => {
     await controller.list({ status: 'SENT' } as never);
     await controller.findOne('e1');
-    await controller.update('e1', { notes: 'x' } as never);
+    await controller.update('e1', { notes: 'x' } as never, { id: 'u1' } as never);
     await controller.remove('e1');
     expect(estimates.list).toHaveBeenCalledWith({ status: 'SENT' });
     expect(estimates.findOne).toHaveBeenCalledWith('e1');
-    expect(estimates.update).toHaveBeenCalledWith('e1', { notes: 'x' });
+    expect(estimates.update).toHaveBeenCalledWith('e1', { notes: 'x' }, 'u1');
     expect(estimates.remove).toHaveBeenCalledWith('e1');
   });
 

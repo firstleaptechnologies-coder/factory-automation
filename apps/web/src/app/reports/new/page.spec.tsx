@@ -1,7 +1,7 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReportRequestPage from './page';
 
-const apiMock = { requestReport: jest.fn(), clients: jest.fn() };
+const apiMock = { requestReport: jest.fn(), searchClients: jest.fn() };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
     {},
@@ -22,7 +22,7 @@ jest.mock('@/components/Shell', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   apiMock.requestReport.mockResolvedValue({ id: 'r1' });
-  apiMock.clients.mockResolvedValue({ data: [] });
+  apiMock.searchClients.mockResolvedValue([]);
 });
 
 async function draw() {
@@ -80,12 +80,10 @@ it('shows what the API said when it refuses anyway', async () => {
 });
 
 describe('a report about one client', () => {
-  const CLIENTS = {
-    data: [
-      { id: 'c1', name: 'Sharma Interiors', code: 'CL-1', phone: '9876543210' },
-      { id: 'c2', name: 'Bhatia Residence', code: 'CL-2', phone: '9876500000' },
-    ],
-  };
+  const CLIENTS = [
+    { id: 'c1', name: 'Sharma Interiors', code: 'CL-1', phone: '9876543210' },
+    { id: 'c2', name: 'Bhatia Residence', code: 'CL-2', phone: '9876500000' },
+  ];
 
   /** The report Select is the first of the two on the page. */
   async function chooseStatement() {
@@ -100,7 +98,7 @@ describe('a report about one client', () => {
   }
 
   beforeEach(() => {
-    apiMock.clients.mockResolvedValue(CLIENTS);
+    apiMock.searchClients.mockResolvedValue(CLIENTS);
   });
 
   it('refuses until a client is chosen, in the API’s own words', async () => {
@@ -110,19 +108,38 @@ describe('a report about one client', () => {
     expect(screen.getByText('Ask for it').closest('button')).toBeDisabled();
   });
 
-  // Nothing else should go looking up the client list.
+  // Nothing goes looking up the client list until somebody types in the sheet.
   it('does not fetch clients for a report that has no subject', async () => {
     await draw();
 
-    expect(apiMock.clients).not.toHaveBeenCalled();
+    expect(apiMock.searchClients).not.toHaveBeenCalled();
+  });
+
+  /*
+   * Search, and only search.
+   *
+   * The picker is the one the punch and quote pages use, with its add-a-new
+   * half turned off: a statement for a client the shop has never traded with
+   * would be an empty report about a client created to read it.
+   */
+  it('offers no way to create a client from here', async () => {
+    await chooseStatement();
+
+    expect(screen.getByLabelText('Search existing clients')).toBeInTheDocument();
+    expect(screen.queryByText('or add a new one')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Who is it for?')).not.toBeInTheDocument();
   });
 
   it('sends the chosen client with the request', async () => {
     await chooseStatement();
 
     await act(async () => {
-      fireEvent.click(screen.getByText('Choose a client'));
+      fireEvent.click(screen.getByLabelText('Search existing clients'));
     });
+    fireEvent.change(screen.getByPlaceholderText('Type to search…'), {
+      target: { value: 'sharma' },
+    });
+    await waitFor(() => expect(screen.getByText('Sharma Interiors')).toBeInTheDocument());
     await act(async () => {
       fireEvent.click(screen.getByText('Sharma Interiors'));
     });

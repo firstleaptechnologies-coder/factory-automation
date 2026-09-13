@@ -141,8 +141,12 @@ export class EstimatesController {
   @RequirePermissions(PERMISSIONS.ESTIMATE_MANAGE)
   @RequireModule(MODULES.QUOTES)
   @Patch('estimates/:id')
-  update(@Param('id') id: string, @Body() dto: UpdateEstimateDto) {
-    return this.estimates.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateEstimateDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.estimates.update(id, dto, user?.id);
   }
 
   @RequirePermissions(PERMISSIONS.ESTIMATE_MANAGE)

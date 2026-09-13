@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
-  Client,
   Estimate,
   EstimateItemInput,
   GstSlab,
@@ -11,6 +10,14 @@ import type {
 } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import {
+  ClientPicker,
+  clientRef,
+  hasClient,
+  pickedClient,
+  typedClient,
+  type ClientChoice,
+} from '@/components/ClientPicker';
 import {
   Button,
   Card,
@@ -86,8 +93,11 @@ export function EstimateForm({
   );
   const slabs = useApi<GstSlab[]>(() => api.gstSlabs(), []);
 
-  const [clientId, setClientId] = useState<string | undefined>(lead?.clientId);
-  const [clientName, setClientName] = useState(lead?.clientName ?? '');
+  const [client, setClient] = useState<ClientChoice>(
+    lead?.clientId
+      ? pickedClient({ id: lead.clientId, name: lead.clientName ?? '' })
+      : typedClient(lead?.clientName ?? ''),
+  );
   const [billingAddress, setBillingAddress] = useState(lead?.location ?? '');
   const [shippingAddress, setShippingAddress] = useState('');
   const [treatment, setTreatment] = useState<TaxTreatment>('EXCLUSIVE');
@@ -96,21 +106,13 @@ export function EstimateForm({
     lead?.title ? { ...blankLine(), name: lead.title } : blankLine(),
   ]);
 
-  const [clientSheet, setClientSheet] = useState(false);
-  const [clientSearch, setClientSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const clients = useApi<{ data: Client[] }>(
-    () => api.clients({ search: clientSearch || undefined, limit: 20 }),
-    [clientSearch],
-  );
 
   useEffect(() => {
     const data = existing.data;
     if (!data) return;
-    setClientId(data.clientId ?? undefined);
-    setClientName(data.client?.name ?? data.clientName ?? '');
+    setClient(data.client ? pickedClient(data.client) : typedClient(data.clientName ?? ''));
     setBillingAddress(data.billingAddress ?? '');
     setShippingAddress(data.shippingAddress ?? '');
     setTreatment(data.taxTreatment);
@@ -171,9 +173,8 @@ export function EstimateForm({
     setError(null);
     try {
       const body = {
-        clientId,
+        ...clientRef(client),
         leadId: lead?.id,
-        clientName: clientName.trim() || undefined,
         billingAddress: billingAddress.trim() || undefined,
         shippingAddress: shippingAddress.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -210,7 +211,7 @@ export function EstimateForm({
           <Button
             title={estimateId ? 'Save estimate' : 'Create quote'}
             loading={busy}
-            disabled={!usable || (!clientId && !clientName.trim())}
+            disabled={!usable || !hasClient(client)}
             onClick={save}
           />
         }
@@ -225,22 +226,14 @@ export function EstimateForm({
       <div className="grid-2" style={{ alignItems: 'start' }}>
         <Card>
           <SectionHead title="Who it is for" />
-          <Field
-            label="Client"
-            placeholder="Type a name"
-            value={clientName}
-            onChange={(value) => {
-              setClientName(value);
-              // Typing over a chosen client detaches it: the estimate should not
-              // quietly keep pointing at a record the name no longer matches.
-              setClientId(undefined);
+          <ClientPicker
+            value={client}
+            onChange={setClient}
+            namePlaceholder="Who is this quote for?"
+            onPick={(picked) => {
+              setBillingAddress(picked.billingAddress ?? picked.address ?? '');
+              setShippingAddress(picked.shippingAddress ?? '');
             }}
-          />
-          <Button
-            title="Pick from clients"
-            variant="dark"
-            size="sm"
-            onClick={() => setClientSheet(true)}
           />
           <div style={{ height: 'var(--s-lg)' }} />
           <Field
@@ -400,36 +393,10 @@ export function EstimateForm({
           title={estimateId ? 'Save estimate' : 'Create quote'}
           size="lg"
           loading={busy}
-          disabled={!usable || (!clientId && !clientName.trim())}
+          disabled={!usable || !hasClient(client)}
           onClick={save}
         />
       </div>
-
-      <Sheet open={clientSheet} title="Pick a client" onClose={() => setClientSheet(false)}>
-        <Field
-          placeholder="Name or phone"
-          icon="search"
-          value={clientSearch}
-          onChange={setClientSearch}
-          autoFocus
-          pasteable={false}
-        />
-        {(clients.data?.data ?? []).map((client) => (
-          <SheetOption
-            key={client.id}
-            label={client.name}
-            description={[client.code, client.phone].filter(Boolean).join(' · ')}
-            selected={clientId === client.id}
-            onClick={() => {
-              setClientId(client.id);
-              setClientName(client.name);
-              setBillingAddress(client.billingAddress ?? client.address ?? '');
-              setShippingAddress(client.shippingAddress ?? '');
-              setClientSheet(false);
-            }}
-          />
-        ))}
-      </Sheet>
     </>
   );
 }

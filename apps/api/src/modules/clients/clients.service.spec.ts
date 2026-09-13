@@ -150,3 +150,63 @@ describe('addLocation', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+/*
+ * Adding a client without leaving the screen you are on.
+ *
+ * Punching an order and writing a quote both offer it, and both land here, so
+ * the two cannot disagree about when a typed-in client is somebody the shop
+ * already has.
+ */
+describe('resolveInline', () => {
+  const inline = { name: 'Verma Interiors', phone: '98200 12345' };
+
+  it('reuses an existing client matching on the last ten digits of the phone', async () => {
+    const { service, db } = build();
+    db.client.findFirst = jest.fn(async () => ({ id: 'existing' }));
+
+    const id = await inTenant(() => service.resolveInline(db as never, inline as never));
+
+    expect(id).toBe('existing');
+    expect(db.client.create).not.toHaveBeenCalled();
+    expect(db.client.findFirst.mock.calls[0][0].where).toMatchObject({
+      isActive: true,
+      phone: { contains: '9820012345' },
+    });
+  });
+
+  it('creates the client, with a code and the caller against it, when nothing matches', async () => {
+    const { service, db } = build();
+    db.client.create = jest.fn(async () => ({ id: 'new-client' }));
+
+    const id = await inTenant(() => service.resolveInline(db as never, inline as never, 'u1'));
+
+    expect(id).toBe('new-client');
+    expect(db.client.create.mock.calls[0][0].data).toMatchObject({
+      name: 'Verma Interiors',
+      code: 'CLI-1',
+      createdById: 'u1',
+      tenantId: 'tenant-test',
+    });
+  });
+
+  it('does not match on a phone too short to identify anyone', async () => {
+    const { service, db } = build();
+    db.client.create = jest.fn(async () => ({ id: 'new-client' }));
+
+    await inTenant(() => service.resolveInline(db as never, { name: 'X', phone: '123' } as never));
+
+    expect(db.client.findFirst).not.toHaveBeenCalled();
+    expect(db.client.create).toHaveBeenCalled();
+  });
+
+  it('leaves a name collision alone — two clients can share a name', async () => {
+    const { service, db } = build();
+    db.client.create = jest.fn(async () => ({ id: 'new-client' }));
+
+    await inTenant(() => service.resolveInline(db as never, { name: 'Verma Interiors' } as never));
+
+    expect(db.client.findFirst).not.toHaveBeenCalled();
+    expect(db.client.create).toHaveBeenCalled();
+  });
+});

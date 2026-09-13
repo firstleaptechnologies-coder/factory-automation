@@ -10,7 +10,6 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import type {
-  Client,
   GstSlab,
   LengthUnit,
   Material,
@@ -25,13 +24,19 @@ import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useDisplayUnit } from '../hooks/useUnit';
 import {
-  Avatar,
+  ClientPicker,
+  NO_CLIENT,
+  clientLabel,
+  clientRef,
+  hasClient,
+  type ClientChoice,
+} from '../components/ClientPicker';
+import {
   Button,
   Card,
   Chip,
   Field,
   HoldButton,
-  Icon,
   Keypad,
   Loader,
   Screen,
@@ -127,13 +132,8 @@ export function PunchScreen({ navigation }: { navigation: any }) {
   const gstSlabs = useApi<GstSlab[]>(() => api.gstSlabs(), []);
 
   // client
-  const [client, setClient] = useState<Client | null>(null);
-  const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
+  const [client, setClient] = useState<ClientChoice>(NO_CLIENT);
   const [location, setLocation] = useState('');
-  const [clientSheet, setClientSheet] = useState(false);
-  const [search, setSearch] = useState('');
-  const [results, setResults] = useState<Client[]>([]);
 
   // size
   const [active, setActive] = useState<'length' | 'width'>('length');
@@ -220,7 +220,7 @@ export function PunchScreen({ navigation }: { navigation: any }) {
   const canContinue = useMemo(() => {
     switch (step) {
       case 'client':
-        return Boolean((client || newName.trim()) && location.trim());
+        return hasClient(client) && Boolean(location.trim());
       case 'size':
         return lengthMm !== null && widthMm !== null && lengthMm > 0 && widthMm > 0;
       case 'material':
@@ -231,16 +231,7 @@ export function PunchScreen({ navigation }: { navigation: any }) {
       default:
         return true;
     }
-  }, [step, client, newName, location, lengthMm, widthMm, materialId]);
-
-  const runSearch = (term: string) => {
-    setSearch(term);
-    if (!term.trim()) {
-      setResults([]);
-      return;
-    }
-    api.searchClients(term).then(setResults).catch(() => setResults([]));
-  };
+  }, [step, client, location, lengthMm, widthMm, materialId]);
 
   const type = (key: string) => {
     const setter = active === 'length' ? setLength : setWidth;
@@ -268,8 +259,7 @@ export function PunchScreen({ navigation }: { navigation: any }) {
     try {
       const isLumpSum = pricingMode === 'LUMP_SUM';
       const order = await api.punchOrder({
-        clientId: client?.id,
-        newClient: client ? undefined : { name: newName.trim(), phone: newPhone || undefined },
+        ...clientRef(client),
         location: location.trim(),
         notes: notes || undefined,
         pricingMode,
@@ -302,9 +292,7 @@ export function PunchScreen({ navigation }: { navigation: any }) {
 
   const reset = () => {
     setStep('client');
-    setClient(null);
-    setNewName('');
-    setNewPhone('');
+    setClient(NO_CLIENT);
     setLocation('');
     setLength('');
     setWidth('');
@@ -333,51 +321,15 @@ export function PunchScreen({ navigation }: { navigation: any }) {
 
       {step === 'client' ? (
         <Animated.View entering={FadeInRight.duration(motion.base)} exiting={FadeOut.duration(120)}>
-          {client ? (
-            <Card tone="accent" style={styles.clientCard}>
-              <Avatar name={client.name} size={46} tone="dark" />
-              <View style={{ flex: 1, marginLeft: spacing.md }}>
-                <Text variant="h3" tone="onAccent">{client.name}</Text>
-                <Text variant="tiny" tone="onAccent" style={{ opacity: 0.7 }}>
-                  {client.code}{client.phone ? ` · ${client.phone}` : ''}
-                </Text>
-              </View>
-              <Pressable onPress={() => setClient(null)} hitSlop={8}>
-                <Icon name="close" size={18} color={palette.textOnAccent} />
-              </Pressable>
-            </Card>
-          ) : (
-            <>
-              <Pressable onPress={() => setClientSheet(true)}>
-                <Card tone="dark" style={styles.searchCard}>
-                  <Icon name="search" size={19} color={palette.textMuted} />
-                  <Text variant="body" tone="faint" style={{ flex: 1, marginLeft: spacing.md }}>
-                    Search existing clients
-                  </Text>
-                  <Icon name="chevronRight" size={16} color={palette.textMuted} />
-                </Card>
-              </Pressable>
-
-              <Text variant="label" tone="faint" style={styles.orLabel}>or add a new one</Text>
-
-              <Field
-                label="Client name"
-                placeholder="Who is ordering?"
-                value={newName}
-                onChangeText={setNewName}
-                icon="user"
-              />
-              <Field
-                label="Phone"
-                placeholder="Optional — matches an existing client"
-                value={newPhone}
-                onChangeText={setNewPhone}
-                keyboardType="phone-pad"
-                icon="phone"
-                hint="If this number is already on file, the order attaches to them."
-              />
-            </>
-          )}
+          <ClientPicker
+            value={client}
+            onChange={setClient}
+            namePlaceholder="Who is ordering?"
+            onPick={(picked) => {
+              // Their usual site, so the commonest order is one field shorter.
+              if (picked.locations?.[0] && !location) setLocation(picked.locations[0].name);
+            }}
+          />
 
           <Field
             label="Location"
@@ -637,7 +589,7 @@ export function PunchScreen({ navigation }: { navigation: any }) {
             </Text>
             <View style={styles.confirmMeta}>
               <Text variant="small" tone="onAccent" style={{ opacity: 0.75 }}>
-                {client?.name ?? newName} · {location}
+                {clientLabel(client)} · {location}
               </Text>
               <Text variant="small" tone="onAccent" bold>× {quantity}</Text>
             </View>
@@ -656,7 +608,14 @@ export function PunchScreen({ navigation }: { navigation: any }) {
 
           <Card tone="dark" style={{ marginTop: spacing.md }}>
             <Row label="Stored size" value={`${lengthMm} × ${widthMm} mm`} />
-            <Row label="Client" value={client ? `${client.name} (existing)` : `${newName} (new)`} />
+            <Row
+              label="Client"
+              value={
+                client.client
+                  ? `${client.client.name} (existing)`
+                  : `${client.name.trim()} (new)`
+              }
+            />
             <Row label="Location" value={location} />
             {notes ? <Row label="Notes" value={notes} /> : null}
           </Card>
@@ -679,41 +638,6 @@ export function PunchScreen({ navigation }: { navigation: any }) {
           style={{ marginTop: spacing.xl }}
         />
       ) : null}
-
-      <Sheet
-        visible={clientSheet}
-        title="Find a client"
-        subtitle="Search by name, phone or code"
-        onClose={() => setClientSheet(false)}
-        fullHeight>
-        <Field
-          placeholder="Type to search…"
-          value={search}
-          onChangeText={runSearch}
-          icon="search"
-          autoFocus
-        />
-        {results.map((result) => (
-          <SheetOption
-            key={result.id}
-            label={result.name}
-            description={`${result.code}${result.phone ? ` · ${result.phone}` : ''}`}
-            onPress={() => {
-              setClient(result);
-              setClientSheet(false);
-              setSearch('');
-              setResults([]);
-              if (result.locations?.[0] && !location) setLocation(result.locations[0].name);
-              haptic('impactLight');
-            }}
-          />
-        ))}
-        {search.trim() && results.length === 0 ? (
-          <Text variant="small" tone="faint" style={{ textAlign: 'center', paddingVertical: 20 }}>
-            No match. Close this and add them as a new client.
-          </Text>
-        ) : null}
-      </Sheet>
 
       <Sheet
         visible={presetSheet}
@@ -825,9 +749,6 @@ const styles = StyleSheet.create({
   dot: { width: 22, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.28)' },
   dotActive: { width: 30 },
   dotDone: {},
-  clientCard: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
-  searchCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg },
-  orLabel: { textAlign: 'center', marginVertical: spacing.lg },
   sizeDisplay: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
   slot: {
     borderWidth: 1.5,
