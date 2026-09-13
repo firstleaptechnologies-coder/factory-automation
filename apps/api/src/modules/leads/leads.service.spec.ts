@@ -12,7 +12,10 @@ function build() {
   const codes = { next: jest.fn(async () => 'LEAD-1') };
   const customFields = new CustomFieldsService(db as never);
   const orders = {
-    punch: jest.fn(async (..._args: unknown[]) => ({ id: 'o1', code: 'ORD-1' })),
+    punch: jest.fn(
+      async (..._args: unknown[]) =>
+        ({ id: 'o1', code: 'ORD-1' }) as { id: string; code: string; clientId?: string },
+    ),
   };
 
   db.workflow.findFirst = jest.fn(async () => ({
@@ -420,6 +423,14 @@ describe('convert', () => {
     }));
   }
 
+  const quote = (over: Record<string, unknown> = {}) => ({
+    id: 'e1',
+    code: 'EST-1',
+    orderId: null,
+    clientId: null,
+    ...over,
+  });
+
   const dto = (over: Record<string, unknown> = {}) =>
     ({ location: 'Site A', items: [{ materialId: 'm1' }], ...over }) as never;
 
@@ -708,5 +719,129 @@ describe('enquiries that go quiet', () => {
     db.lead.aggregate = jest.fn(async () => ({ _count: { _all: 0 }, _sum: {} }));
     await service.board();
     expect(db.lead.findMany.mock.calls[0][0].where.NOT).toBeUndefined();
+  });
+});
+
+/*
+ * An enquiry and the quote written for it are two doors into one job.
+ *
+ * Each route guarded only its own row, so a shop that converted the enquiry
+ * and then pressed the button on its quote got two orders for one job — the
+ * books showed ₹86,400 for ₹43,200 of work, and neither order said it was the
+ * other one again. It also got two client records for one person, because the
+ * enquiry went straight to its loose contact details rather than asking who
+ * the quote was already written for.
+ */
+describe('convert — the quote that is already an order', () => {
+  function withLead(db: Db, over: Record<string, unknown> = {}) {
+    db.lead.findUnique = jest.fn(async () => ({
+      id: 'ld1',
+      code: 'LEAD-1',
+      statusId: 'l1',
+      workflowId: 'w1',
+      priority: 'HIGH',
+      clientId: null,
+      contactName: 'Verma',
+      contactPhone: '9820012345',
+      contactEmail: null,
+      company: 'Verma Interiors',
+      title: 'Kitchen',
+      customFields: {},
+      convertedOrderId: null,
+      estimates: [],
+      ...over,
+    }));
+  }
+
+  const quote = (over: Record<string, unknown> = {}) => ({
+    id: 'e1',
+    code: 'EST-1',
+    orderId: null,
+    clientId: null,
+    ...over,
+  });
+
+  const dto = (over: Record<string, unknown> = {}) =>
+    ({ location: 'Site A', items: [{ materialId: 'm1' }], ...over }) as never;
+
+  it('refuses, naming the quote and the order it became', async () => {
+    const { service, db } = build();
+    withLead(db, { estimates: [quote({ orderId: 'o9' })] });
+    db.order.findFirst = jest.fn(async () => ({ code: 'ORD-9' }));
+
+    await expect(service.convert('ld1', dto())).rejects.toThrow(
+      'LEAD-1 is already an order — EST-1 became ORD-9',
+    );
+  });
+
+  it('punches nothing', async () => {
+    const { service, db, orders } = build();
+    withLead(db, { estimates: [quote({ orderId: 'o9' })] });
+    db.order.findFirst = jest.fn(async () => ({ code: 'ORD-9' }));
+
+    await expect(service.convert('ld1', dto())).rejects.toBeInstanceOf(BadRequestException);
+    expect(orders.punch).not.toHaveBeenCalled();
+  });
+
+  it('still converts an enquiry whose quotes are all open', async () => {
+    const { service, db, orders } = build();
+    withLead(db, { estimates: [quote(), quote({ id: 'e2', code: 'EST-2' })] });
+
+    await inTenant(() => service.convert('ld1', dto()));
+
+    expect(orders.punch).toHaveBeenCalled();
+  });
+
+  /*
+   * The second client, which the phone-number match could not prevent: the
+   * record the quote screen made had no phone on it to match against.
+   */
+  describe('who it is for', () => {
+    it('uses the client the quote was already written for', async () => {
+      const { service, db, orders } = build();
+      withLead(db, { estimates: [quote({ clientId: 'c-from-quote' })] });
+
+      await inTenant(() => service.convert('ld1', dto()));
+
+      const sent = orders.punch.mock.calls[0][0] as Record<string, unknown>;
+      expect(sent).toMatchObject({ clientId: 'c-from-quote' });
+      expect(sent.newClient).toBeUndefined();
+    });
+
+    it('prefers the enquiry’s own client over its quote’s', async () => {
+      const { service, db, orders } = build();
+      withLead(db, {
+        clientId: 'c-on-lead',
+        estimates: [quote({ clientId: 'c-from-quote' })],
+      });
+
+      await inTenant(() => service.convert('ld1', dto()));
+
+      expect(orders.punch.mock.calls[0][0]).toMatchObject({ clientId: 'c-on-lead' });
+    });
+
+    it('falls back to the contact details when nobody is on the books yet', async () => {
+      const { service, db, orders } = build();
+      withLead(db, { estimates: [quote()] });
+
+      await inTenant(() => service.convert('ld1', dto()));
+
+      const sent = orders.punch.mock.calls[0][0] as Record<string, unknown>;
+      expect(sent.newClient).toMatchObject({ name: 'Verma', phone: '9820012345' });
+    });
+
+    it('keeps the client on the enquiry afterwards', async () => {
+      const { service, db, orders } = build();
+      withLead(db, { estimates: [] });
+      // Punching a new client hands one back; the enquiry has to keep it.
+      orders.punch.mockResolvedValue({ id: 'o1', code: 'ORD-1', clientId: 'c-new' });
+
+      await inTenant(() => service.convert('ld1', dto()));
+
+      // Otherwise the very act of committing to somebody leaves the enquiry
+      // still not knowing who they are — and a second conversion, or any later
+      // screen, has only the loose contact fields to guess from.
+      expect(db.lead.update.mock.calls[0][0].data).toMatchObject({ clientId: 'c-new' });
+    });
   });
 });

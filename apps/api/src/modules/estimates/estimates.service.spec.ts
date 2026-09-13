@@ -735,7 +735,13 @@ describe('an accepted quote that becomes work', () => {
     db.workflowStatus.findFirst = jest.fn(async () => ({ id: 'won' }));
   }
 
-  const open = { id: 'ld1', statusId: 'quoted', workflowId: 'w1', convertedOrderId: null };
+  const open = {
+    id: 'ld1',
+    code: 'LD-1',
+    statusId: 'quoted',
+    workflowId: 'w1',
+    convertedOrderId: null,
+  };
 
   it('marks the enquiry converted, so the funnel is not wrong', async () => {
     const { service, db } = build();
@@ -761,12 +767,50 @@ describe('an accepted quote that becomes work', () => {
     });
   });
 
-  it('leaves an enquiry that already became work alone', async () => {
-    const { service, db } = build();
-    converting(db, { ...open, convertedOrderId: 'o9' });
-    await inTenant(() => service.convertToOrder('e1', { location: 'Site A' }));
-    // Whatever it became, that is the record.
-    expect(db.lead.update).not.toHaveBeenCalled();
+  /*
+   * The other door into the same job.
+   *
+   * This used to convert the quote anyway and merely leave the lead's record
+   * alone — which is the bug rather than the guard against it. The enquiry had
+   * already become an order; making a second one from its quote billed one job
+   * twice, and nothing on either order said it was the other one again.
+   */
+  describe('an enquiry that is already an order', () => {
+    const converted = {
+      ...open,
+      convertedOrderId: 'o9',
+      convertedOrder: { code: 'ORD-9' },
+    };
+
+    it('refuses, naming the order it already is', async () => {
+      const { service, db } = build();
+      converting(db, converted);
+
+      await expect(
+        inTenant(() => service.convertToOrder('e1', { location: 'Site A' })),
+      ).rejects.toThrow('The enquiry this quote is for (LD-1) is already ORD-9');
+    });
+
+    it('punches nothing', async () => {
+      const { service, db, orders } = build();
+      converting(db, converted);
+
+      await expect(
+        inTenant(() => service.convertToOrder('e1', { location: 'Site A' })),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(orders.punch).not.toHaveBeenCalled();
+      expect(db.lead.update).not.toHaveBeenCalled();
+    });
+
+    it('still converts a quote whose enquiry is open', async () => {
+      const { service, db, orders } = build();
+      converting(db, open);
+
+      await inTenant(() => service.convertToOrder('e1', { location: 'Site A' }));
+
+      expect(orders.punch).toHaveBeenCalled();
+    });
   });
 
   it('converts a quote with no enquiry behind it exactly as before', async () => {

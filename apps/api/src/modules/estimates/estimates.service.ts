@@ -346,6 +346,31 @@ export class EstimatesService {
         `${estimate.code} has already been turned into an order`,
       );
     }
+
+    /*
+     * The other door into the same job.
+     *
+     * An enquiry and the quote written for it are two ways to reach one order,
+     * and each route used to guard only its own row — so doing both made two
+     * orders for one job, the second of them a copy of the first with nothing
+     * saying so. The shop's books showed ₹86,400 for ₹43,200 of work.
+     */
+    if (estimate.leadId) {
+      const lead = await this.prisma.lead.findFirst({
+        where: { id: estimate.leadId },
+        select: {
+          code: true,
+          convertedOrderId: true,
+          convertedOrder: { select: { code: true } },
+        },
+      });
+      if (lead?.convertedOrderId) {
+        throw new BadRequestException(
+          `The enquiry this quote is for (${lead.code}) is already ` +
+            `${lead.convertedOrder?.code ?? 'an order'}`,
+        );
+      }
+    }
     if (!estimate.clientId) {
       throw new BadRequestException(
         'Attach this estimate to a client before turning it into an order',

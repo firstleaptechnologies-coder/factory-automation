@@ -49,6 +49,13 @@ const LEAD_INCLUDE = {
       issuedOn: true,
       validTill: true,
       orderId: true,
+      /*
+       * Who the quote was written for, and what it became. An enquiry and its
+       * quote are two doors into the same job: without these the lead cannot
+       * tell that its own quote has already made the order, or that it already
+       * has a client of its own.
+       */
+      clientId: true,
     },
   },
 };
@@ -377,14 +384,47 @@ export class LeadsService {
         `${lead.code} was already converted into ${lead.convertedOrder?.code}`,
       );
     }
+    /*
+     * The other door into the same job.
+     *
+     * A quote carries its enquiry, and turning the quote into an order is the
+     * same act as turning the enquiry into one. Each route used to guard only
+     * its own row, so doing both made two orders for one job — the shop's
+     * books showed ₹86,400 for ₹43,200 of work, with nothing anywhere saying
+     * the second order was the first one again.
+     */
+    const already = lead.estimates?.find((estimate) => estimate.orderId);
+    if (already) {
+      // Looked up only to refuse, so the shop is told the number to go and
+      // find rather than that something unspecified already happened.
+      const made = await this.prisma.order.findFirst({
+        where: { id: already.orderId ?? '' },
+        select: { code: true },
+      });
+      throw new BadRequestException(
+        `${lead.code} is already an order — ${already.code} became ${made?.code ?? 'an order'}`,
+      );
+    }
     if (!dto.items?.length) {
       throw new BadRequestException('Converting a lead needs at least one item');
     }
 
+    /*
+     * Who this is for, if anybody already knows.
+     *
+     * The enquiry's own client first, then whoever its quote was written for.
+     * Falling straight through to the contact details made a second record for
+     * somebody the quote had already put on the books — and the phone-number
+     * match could not save it, because the client made from the quote screen
+     * had no phone on it to match against.
+     */
+    const knownClientId =
+      lead.clientId ?? lead.estimates?.find((estimate) => estimate.clientId)?.clientId ?? undefined;
+
     const order = await this.orders.punch(
       {
-        clientId: lead.clientId ?? undefined,
-        newClient: lead.clientId
+        clientId: knownClientId,
+        newClient: knownClientId
           ? undefined
           : {
               name: lead.contactName || lead.company || lead.title,
@@ -420,6 +460,14 @@ export class LeadsService {
         data: {
           convertedOrderId: order.id,
           convertedAt: new Date(),
+          /*
+           * The enquiry keeps the client the order landed on, whether it was
+           * already known or has just been created. Without this the lead
+           * stayed client-less after the very act of committing to somebody,
+           * and every later screen had to guess from the loose contact fields
+           * which of two records it meant.
+           */
+          ...(order.clientId ? { clientId: order.clientId } : {}),
           ...(closingStatusId ? { statusId: closingStatusId } : {}),
         },
       });
