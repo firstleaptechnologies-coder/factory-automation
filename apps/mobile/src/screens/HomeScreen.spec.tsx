@@ -101,6 +101,15 @@ it('greets the person who is signed in', async () => {
   expect(screen.getByText('ADMIN · ADMIN')).toBeTruthy();
 });
 
+// A tenant can rename its roles, and this line was showing the enum: a karigar
+// was greeted as PRODUCTION.
+it('calls the role what the shop calls it', async () => {
+  mockUser = { name: 'Priya', code: 'PROD01', role: 'PRODUCTION', roleName: 'Karigar' };
+  await mount();
+
+  expect(screen.getByText('PROD01 · Karigar')).toBeTruthy();
+});
+
 describe('where the work is', () => {
   it('counts only the stages chosen for the card', async () => {
     await mount();

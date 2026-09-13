@@ -1,3 +1,26 @@
+/**
+ * The role in the shop's own words.
+ *
+ * A tenant can rename its roles — "Production" becomes "Karigar" — and the two
+ * places that tell somebody who they are were showing the enum underneath, so
+ * the app called them something nobody in the shop says. The browser already
+ * showed the renamed one.
+ *
+ * Display only: gating reads permissions and never this.
+ */
+export function roleLabel(
+  user: { role?: string | null; roleName?: string | null } | null | undefined,
+): string | undefined {
+  return user?.roleName ?? user?.role ?? undefined;
+}
+
+/** Somebody's code and role, as one line, with neither half faked when absent. */
+export function whoLabel(
+  user: { code?: string | null; role?: string | null; roleName?: string | null } | null | undefined,
+): string {
+  return [user?.code, roleLabel(user)].filter(Boolean).join(' · ');
+}
+
 /** Rupees, shortened so a large figure still fits a phone card. */
 export function formatInr(value: number | string | null | undefined): string {
   const amount = Number(value ?? 0);

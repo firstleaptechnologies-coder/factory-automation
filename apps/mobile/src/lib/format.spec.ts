@@ -1,4 +1,4 @@
-import { formatDateShort, formatDateTime, formatInr, relativeTime } from './format';
+import { formatDateShort, formatDateTime, formatInr, relativeTime, roleLabel, whoLabel } from './format';
 
 describe('formatInr', () => {
   it('groups in lakhs the way the figure is read out loud', () => {
@@ -75,5 +75,45 @@ describe('relativeTime', () => {
 
   it('gives a real date once "Nd ago" stops meaning anything', () => {
     expect(relativeTime(ago(30 * 86_400_000))).toMatch(/[A-Z][a-z]{2}/);
+  });
+});
+
+/*
+ * A tenant can rename its roles. Two screens tell somebody who they are, and
+ * both were showing the enum underneath — so the app called a karigar
+ * "PRODUCTION" while the browser, reading the same field, called them what the
+ * shop calls them.
+ */
+describe('roleLabel', () => {
+  it('is the name the shop gave the role', () => {
+    expect(roleLabel({ role: 'PRODUCTION', roleName: 'Karigar' })).toBe('Karigar');
+  });
+
+  it('falls back to the role underneath when nobody renamed it', () => {
+    expect(roleLabel({ role: 'ADMIN' })).toBe('ADMIN');
+  });
+
+  it('is nothing at all rather than a blank, when there is no user yet', () => {
+    expect(roleLabel(null)).toBeUndefined();
+    expect(roleLabel(undefined)).toBeUndefined();
+    expect(roleLabel({})).toBeUndefined();
+  });
+});
+
+describe('whoLabel', () => {
+  it('puts the code and the role either side of a dot', () => {
+    expect(whoLabel({ code: 'PROD01', role: 'PRODUCTION', roleName: 'Karigar' })).toBe(
+      'PROD01 · Karigar',
+    );
+  });
+
+  // A dot with nothing on one side of it is worse than no dot.
+  it('drops the separator when only one half is known', () => {
+    expect(whoLabel({ code: 'ADMIN' })).toBe('ADMIN');
+    expect(whoLabel({ role: 'ADMIN' })).toBe('ADMIN');
+  });
+
+  it('is empty for a session that has not loaded', () => {
+    expect(whoLabel(null)).toBe('');
   });
 });

@@ -24,7 +24,7 @@ import {
 } from '../ui';
 import { font, palette, spacing } from '../theme';
 import { fitLabels } from '../lib/fitLabels';
-import { formatInr } from '../lib/format';
+import { formatInr, whoLabel } from '../lib/format';
 
 /**
  * The home screen.
@@ -103,7 +103,7 @@ export function HomeScreen({ navigation }: { navigation: any }) {
           <Avatar name={user?.name} size={44} />
           <View style={{ marginLeft: spacing.md }}>
             <Text variant="body" bold>{user?.name}</Text>
-            <Text variant="tiny" tone="muted">{user?.code} · {user?.role}</Text>
+            <Text variant="tiny" tone="muted">{whoLabel(user)}</Text>
           </View>
         </Pressable>
         <View style={styles.topActions}>

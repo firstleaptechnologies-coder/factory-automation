@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useDisplayUnit } from '../hooks/useUnit';
 import { API_BASE_URL } from '../api/client';
 import { runningVersion } from '../lib/ota';
+import { roleLabel, whoLabel } from '../lib/format';
 import {
   Avatar,
   Button,
@@ -30,7 +31,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
         <View style={{ flex: 1, marginLeft: spacing.lg }}>
           <Text variant="h2" tone="onAccent">{user?.name}</Text>
           <Text variant="small" tone="onAccent" style={{ opacity: 0.75 }}>
-            {user?.code} · {user?.role}
+            {whoLabel(user)}
           </Text>
         </View>
       </Card>
@@ -55,9 +56,9 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           describing what they see.
         */}
         <Row label="Version" value={versionLabel()} />
-        <Row label="Server" value={API_BASE_URL.replace('/api', '')} />
+        <Row label="Server" value={serverLabel()} />
         <Row label="Signed in as" value={user?.code ?? '—'} />
-        <Row label="Role" value={user?.role ?? '—'} />
+        <Row label="Role" value={roleLabel(user) ?? '—'} />
       </Card>
 
       <Button
@@ -73,6 +74,18 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
       />
     </Screen>
   );
+}
+
+/**
+ * The API's host, without the path the client appends.
+ *
+ * Anchored to the end: a plain `replace('/api', '')` takes the *first* match
+ * anywhere, so an API served from `https://api.example.com/api` — which is
+ * what it will be called — came out as `https:/.example.com/api`. This row
+ * exists to be read down a phone when a shop asks which server it is on.
+ */
+export function serverLabel(url: string = API_BASE_URL): string {
+  return url.replace(/\/api\/?$/, '');
 }
 
 /** "1 · OTA 7", or just the runtime version where no update has been taken. */
