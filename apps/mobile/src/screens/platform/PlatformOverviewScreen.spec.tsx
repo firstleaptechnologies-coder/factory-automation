@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { PLATFORM_NAV } from '@fas/shared';
 import { PlatformOverviewScreen } from './PlatformOverviewScreen';
 
 const mockOverview = jest.fn();
@@ -207,6 +210,38 @@ describe('the console menu', () => {
     await screen.findByText('Workspaces');
 
     expect(screen.queryByText('Overview')).toBeNull();
+  });
+
+  /*
+   * Every row, against the navigator on disk.
+   *
+   * The console is a stack with no tabs, so nothing here can fail the way the
+   * shop's menu did — but the shape is the same (a row whose route name comes
+   * out of a tree, pressed by nobody), and that is the shape that went wrong.
+   */
+  describe('every row', () => {
+    const registry = readFileSync(join(__dirname, '../../navigation/index.tsx'), 'utf8');
+    const registered = new Set(
+      [...registry.matchAll(/Stack\.Screen\s+name="([A-Za-z]+)"/g)].map((match) => match[1]),
+    );
+
+    const rows = PLATFORM_NAV.flatMap((group) =>
+      (group.items ?? [])
+        .filter((item) => item.app && item.key !== 'platform-overview')
+        .map((item) => [item.label, item.app as string] as const),
+    );
+
+    it('has rows at all, so an empty walk does not pass silently', () => {
+      expect(rows.length).toBeGreaterThan(3);
+    });
+
+    it.each(rows)('%s opens a screen the navigator actually has', async (label, app) => {
+      await mount();
+      await fireEvent.press(await screen.findByText(label));
+
+      expect(navigation.navigate).toHaveBeenCalledWith(app);
+      expect(registered.has(app)).toBe(true);
+    });
   });
 
   it('goes where a menu item says', async () => {

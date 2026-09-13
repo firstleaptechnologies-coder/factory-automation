@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { TAB_ROUTES, TABS_ROUTE } from './routes';
 
 /**
- * A stack screen cannot reach a tab by its name.
+ * Every screen can reach what it navigates to.
  *
  * `navigate` walks up to a parent navigator; it never descends into a sibling.
  * From inside the tabs, `navigate('Leads')` is right. From the menu — a stack
@@ -20,6 +20,26 @@ import { TAB_ROUTES, TABS_ROUTE } from './routes';
  */
 const here = __dirname;
 const registry = readFileSync(join(here, 'index.tsx'), 'utf8');
+
+/*
+ * The stack has two arms and only one of them is ever mounted: a platform
+ * admin belongs to no workspace, so they get the control plane and none of a
+ * shop's screens. A route from the wrong arm fails exactly the way a tab route
+ * from the stack does — refused, with a console line and nothing on screen.
+ */
+const PLATFORM_ARM = registry.slice(
+  registry.indexOf('user && isPlatform ? ('),
+  registry.indexOf(') : user ? ('),
+);
+const TENANT_ARM = registry.slice(registry.indexOf(') : user ? ('), registry.indexOf(') : ('));
+
+const routesIn = (block: string, navigator: 'Stack' | 'Tabs') =>
+  [...block.matchAll(new RegExp(`${navigator}\\.Screen\\s+name="([A-Za-z]+)"`, 'g'))].map(
+    (match) => match[1],
+  );
+
+const PLATFORM_ROUTES = new Set(routesIn(PLATFORM_ARM, 'Stack'));
+const TENANT_ROUTES = new Set([...routesIn(TENANT_ARM, 'Stack'), ...routesIn(registry, 'Tabs')]);
 
 /** Where each screen component is imported from, so its file can be read. */
 const sources = new Map(
@@ -61,6 +81,79 @@ function fileFor(component: string): string | null {
   }
   return null;
 }
+
+/*
+ * A route name written out in a screen has to exist in a navigator that screen
+ * can reach.
+ *
+ * Two ways it cannot: the name belongs to no navigator at all (a screen that
+ * was renamed, a typo), or it belongs to the other arm of the stack. Both fail
+ * the same silent way — react-navigation refuses the action and the tap does
+ * nothing.
+ */
+describe('the routes a screen names', () => {
+  /** `navigate`, `replace` and `push` all take a route name the same way. */
+  const targets = (source: string) => [
+    ...new Set(
+      [...source.matchAll(/navigation\.(?:navigate|replace|push)\(\s*['"`]([A-Za-z]+)['"`]/g)].map(
+        (match) => match[1],
+      ),
+    ),
+  ];
+
+  const screensOf = (arm: Set<string>) =>
+    [...stackScreens, ...tabScreens].filter((component) => {
+      const registered = registry.match(
+        new RegExp(`\\.Screen\\s+name="([A-Za-z]+)"\\s+component=\\{${component}\\}`),
+      );
+      return registered ? arm.has(registered[1]) : false;
+    });
+
+  it('exist somewhere in the app', () => {
+    const everywhere = new Set([...PLATFORM_ROUTES, ...TENANT_ROUTES]);
+    const ghosts: string[] = [];
+
+    for (const component of [...stackScreens, ...tabScreens]) {
+      for (const target of targets(fileFor(component) ?? '')) {
+        if (!everywhere.has(target)) ghosts.push(`${component} -> ${target}`);
+      }
+    }
+
+    expect(ghosts).toEqual([]);
+  });
+
+  it('are not a shop screen reached from the platform console', () => {
+    const crossings: string[] = [];
+
+    for (const component of screensOf(PLATFORM_ROUTES)) {
+      for (const target of targets(fileFor(component) ?? '')) {
+        if (!PLATFORM_ROUTES.has(target)) crossings.push(`${component} -> ${target}`);
+      }
+    }
+
+    expect(crossings).toEqual([]);
+  });
+
+  it('are not a console screen reached from a shop', () => {
+    const crossings: string[] = [];
+
+    for (const component of screensOf(TENANT_ROUTES)) {
+      for (const target of targets(fileFor(component) ?? '')) {
+        if (!TENANT_ROUTES.has(target)) crossings.push(`${component} -> ${target}`);
+      }
+    }
+
+    expect(crossings).toEqual([]);
+  });
+
+  it('reads both arms, so a broken split does not pass silently', () => {
+    expect(PLATFORM_ROUTES.size).toBeGreaterThan(3);
+    expect(TENANT_ROUTES.size).toBeGreaterThan(30);
+    // No route belongs to both, or the two checks above mean nothing.
+    const both = [...PLATFORM_ROUTES].filter((route) => TENANT_ROUTES.has(route));
+    expect(both).toEqual([]);
+  });
+});
 
 /*
  * The form the bug actually took.

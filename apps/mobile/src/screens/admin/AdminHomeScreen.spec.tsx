@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { PERMISSIONS } from '@fas/shared';
+import { NAV_GROUPS, PERMISSIONS } from '@fas/shared';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { AdminHomeScreen } from './AdminHomeScreen';
 
 const mockMaterials = jest.fn();
@@ -117,6 +119,77 @@ describe('the rows that are tabs rather than stack screens', () => {
 
     expect(navigate).toHaveBeenCalledWith('Main', { screen: route });
   });
+});
+
+/*
+ * Every row, not the handful somebody thought to test.
+ *
+ * The menu is the one screen that lists the whole app, so a row that goes
+ * nowhere is the failure that matters most here — and the Orders and Leads
+ * rows went nowhere for as long as the menu has existed, because the route
+ * name comes out of NAV_GROUPS and no test pressed them.
+ *
+ * The target is checked against the navigator on disk rather than an expected
+ * value written here: a list written by hand is a list that agrees with itself.
+ */
+describe('every row in the menu', () => {
+  const registry = readFileSync(
+    join(__dirname, '../../navigation/index.tsx'),
+    'utf8',
+  );
+
+  const registered = new Set(
+    [...registry.matchAll(/(?:Stack|Tabs)\.Screen\s+name="([A-Za-z]+)"/g)].map(
+      (match) => match[1],
+    ),
+  );
+
+  /*
+   * Which of them are tabs matters, and nothing else here can tell.
+   * `navigate('Orders')` from this screen names a route that exists and still
+   * reaches nothing, because it is in a navigator below this one rather than
+   * above it — so "the name is registered" is not the question. "Was it opened
+   * through the navigator it lives in" is.
+   */
+  const tabs = new Set(
+    [...registry.matchAll(/Tabs\.Screen\s+name="([A-Za-z]+)"/g)].map((match) => match[1]),
+  );
+
+  const rows: { label: string; app: string }[] = [];
+  const collect = (group: (typeof NAV_GROUPS)[number]) => {
+    for (const item of group.items ?? []) {
+      if (item.app) rows.push({ label: item.label, app: item.app });
+    }
+    for (const inner of group.groups ?? []) collect(inner);
+  };
+  NAV_GROUPS.forEach(collect);
+
+  beforeEach(() => {
+    // Everything on, so no row is skipped for a reason unrelated to whether it
+    // works: the gating has its own tests.
+    mockGranted = Object.values(PERMISSIONS);
+    mockModules = null;
+  });
+
+  it('has rows at all, so an empty walk does not pass silently', () => {
+    expect(rows.length).toBeGreaterThan(15);
+  });
+
+  it.each(rows.map((row) => [row.label, row.app]))(
+    '%s opens a screen the navigator actually has',
+    async (label, app) => {
+      await mount();
+      await fireEvent.press(screen.getByText(label));
+
+      expect(navigate).toHaveBeenCalled();
+      const [route, params] = navigate.mock.calls[0];
+
+      expect(registered.has(app)).toBe(true);
+      expect(tabs.has(app) ? [route, (params as { screen: string })?.screen] : [route]).toEqual(
+        tabs.has(app) ? ['Main', app] : [app],
+      );
+    },
+  );
 });
 
 it('goes back', async () => {
