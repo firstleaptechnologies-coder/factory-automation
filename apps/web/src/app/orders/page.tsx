@@ -23,6 +23,7 @@ import {
   Pill,
 } from '@/ui';
 import { formatInr, relativeTime } from '@/lib/format';
+import { useDisplayUnit } from '@/lib/useUnit';
 
 export default function OrdersPage() {
   return (
@@ -39,7 +40,8 @@ function Orders() {
   const [statusId, setStatusId] = useState<string | null>(null);
   const [materialId, setMaterialId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [unit, setUnit] = useState<LengthUnit>('FT');
+  // Whatever this person works in, remembered under Settings.
+  const [unit, setUnit] = useDisplayUnit();
 
   const workflow = useApi<Workflow>(() => api.defaultWorkflow(), []);
   const materials = useApi<Material[]>(() => api.materials(), []);

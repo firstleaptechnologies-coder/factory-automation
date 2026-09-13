@@ -583,7 +583,13 @@ export const NAV_GROUPS: NavGroup[] = [
         web: '/admin/roles',
         app: 'AdminRoles',
       },
-      { key: 'settings', label: 'Settings', icon: 'settings', app: 'Settings' },
+      {
+        key: 'settings',
+        label: 'Settings',
+        icon: 'settings',
+        web: '/settings',
+        app: 'Settings',
+      },
     ],
   },
 ];

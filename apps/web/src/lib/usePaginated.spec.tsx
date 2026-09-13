@@ -107,3 +107,133 @@ describe('usePaginated', () => {
     expect(result.current.loading).toBe(false);
   });
 });
+
+/*
+ * A filter that changes while the list is still loading.
+ *
+ * The in-flight guard refused the second request outright, so the change was
+ * dropped: the rows on screen stayed the old filter's while the controls
+ * showed the new one. It surfaced on the orders page, where the display unit
+ * is now a remembered preference adopted in an effect — the page asked in feet,
+ * adopted millimetres a moment later, and the second request never went.
+ *
+ * Common enough without that: typing a search while the first page is still
+ * in the air is the ordinary case on a shop-floor connection.
+ */
+describe('a dependency that changes mid-request', () => {
+  /** A fetcher whose replies are released by hand, newest last. */
+  function controllable() {
+    const resolvers: ((rows: string[]) => void)[] = [];
+    const asked: string[] = [];
+    const fetch = (filter: string) => async (page: number): Promise<Paginated<{ id: string }>> => {
+      asked.push(filter);
+      return new Promise((resolve) => {
+        resolvers.push((rows) =>
+          resolve({
+            data: rows.map((id) => ({ id })),
+            meta: { page, limit: 25, total: rows.length, pages: 1 },
+          }),
+        );
+      });
+    };
+    return { fetch, asked, resolvers };
+  }
+
+  it('asks again rather than dropping the change', async () => {
+    const { fetch, asked, resolvers } = controllable();
+    const { rerender } = renderHook(
+      ({ filter }) => usePaginated<{ id: string }>(fetch(filter), [filter]),
+      { initialProps: { filter: 'ft' } },
+    );
+
+    // Nothing has answered yet, and the filter moves on.
+    rerender({ filter: 'mm' });
+    await act(async () => {});
+
+    expect(asked).toEqual(['ft', 'mm']);
+  });
+
+  it('shows the new filter’s rows, not the old one’s', async () => {
+    const { fetch, resolvers } = controllable();
+    const { result, rerender } = renderHook(
+      ({ filter }) => usePaginated<{ id: string }>(fetch(filter), [filter]),
+      { initialProps: { filter: 'ft' } },
+    );
+
+    rerender({ filter: 'mm' });
+    await act(async () => {});
+
+    // The second reply lands first, then the first arrives late.
+    await act(async () => {
+      resolvers[1](['mm-row']);
+    });
+    await act(async () => {
+      resolvers[0](['ft-row']);
+    });
+
+    expect(ids(result)).toBe('mm-row');
+  });
+
+  it('keeps saying it is loading until the request in charge answers', async () => {
+    const { fetch, resolvers } = controllable();
+    const { result, rerender } = renderHook(
+      ({ filter }) => usePaginated<{ id: string }>(fetch(filter), [filter]),
+      { initialProps: { filter: 'ft' } },
+    );
+
+    rerender({ filter: 'mm' });
+    await act(async () => {});
+
+    // The abandoned request answering must not clear the spinner for the one
+    // the screen is actually waiting on.
+    await act(async () => {
+      resolvers[0](['ft-row']);
+    });
+    expect(result.current.loading).toBe(true);
+
+    await act(async () => {
+      resolvers[1](['mm-row']);
+    });
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('does not show an abandoned request’s failure', async () => {
+    const failures: ((error: Error) => void)[] = [];
+    const fetch = (filter: string) => async (): Promise<Paginated<{ id: string }>> =>
+      new Promise((resolve, reject) => {
+        failures.push(reject);
+        if (filter === 'mm') resolve({ data: [], meta: { page: 1, limit: 25, total: 0, pages: 1 } });
+      });
+
+    const { result, rerender } = renderHook(
+      ({ filter }) => usePaginated<{ id: string }>(fetch(filter), [filter]),
+      { initialProps: { filter: 'ft' } },
+    );
+
+    rerender({ filter: 'mm' });
+    await act(async () => {});
+    await act(async () => {
+      failures[0](new Error('the filter nobody is looking at'));
+    });
+
+    expect(result.current.error).toBeNull();
+  });
+});
+
+/*
+ * The guard that is still worth having: two taps on "load more" must not
+ * append the same page twice.
+ */
+it('ignores a second page asked for while the first is still coming', async () => {
+  const { fetch, calls } = pager(6);
+  const { result } = renderHook(() => usePaginated<{ id: string }>(fetch, []));
+  await act(async () => {});
+
+  await act(async () => {
+    result.current.loadMore();
+    result.current.loadMore();
+  });
+
+  expect(calls).toEqual([1, 2]);
+  expect(ids(result)).toBe('row-0,row-1,row-2,row-3');
+});

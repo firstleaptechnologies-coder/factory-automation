@@ -16,6 +16,7 @@ import {
 import { PhotoField, PendingPhoto } from '@/components/PhotoField';
 import { SizeInput } from '@/components/SizeInput';
 import { api } from '@/lib/api';
+import { useDisplayUnit } from '@/lib/useUnit';
 
 interface ItemDraft {
   key: string;
@@ -53,7 +54,8 @@ export default function PunchPage() {
   const [priority, setPriority] = useState('NORMAL');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [unit, setUnit] = useState<LengthUnit>(DEFAULT_UNIT);
+  // Whatever this person works in, remembered under Settings.
+  const [unit, setUnit] = useDisplayUnit();
   const [items, setItems] = useState<ItemDraft[]>([blankItem(DEFAULT_UNIT)]);
 
   const [referencePhotos, setReferencePhotos] = useState<PendingPhoto[]>([]);

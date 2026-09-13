@@ -124,6 +124,29 @@ describe('searching and filtering', () => {
     await waitFor(() => expect(lastQuery().unit).toBe('MM'));
   });
 
+  /*
+   * The unit is a preference, not a page's own state.
+   *
+   * Every screen used to hold its own, so a shop that works in feet re-picked
+   * feet on each page and lost it on every reload. It is set once under
+   * Settings and read here.
+   */
+  it('opens in the unit chosen under Settings', async () => {
+    window.localStorage.setItem('fas.unit', 'MM');
+
+    await mount();
+
+    await waitFor(() => expect(lastQuery().unit).toBe('MM'));
+  });
+
+  it('remembers a unit picked here, for the next page and the next visit', async () => {
+    await mount();
+
+    fireEvent.click(screen.getByText('cm'));
+
+    await waitFor(() => expect(window.localStorage.getItem('fas.unit')).toBe('CM'));
+  });
+
   it('says how many filters are on', async () => {
     await mount();
     expect(screen.getByText('Filter')).toBeInTheDocument();

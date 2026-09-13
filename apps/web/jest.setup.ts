@@ -12,3 +12,20 @@ Element.prototype.scrollTo = function scrollTo(
   const top = typeof options === 'number' ? options : (options?.top ?? 0);
   Object.defineProperty(this, 'scrollTop', { value: top, writable: true, configurable: true });
 } as never;
+
+/*
+ * jsdom keeps one `localStorage` for a whole file, so a preference written by
+ * one test is still there for the next — which is how a screen that remembers
+ * the display unit made a later test read sizes in the unit an earlier one had
+ * clicked. Preferences that persist are the point; leaking between tests is
+ * not.
+ */
+beforeEach(() => {
+  try {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  } catch {
+    // A test that has deliberately broken storage clears nothing, and that is
+    // the state it wanted.
+  }
+});

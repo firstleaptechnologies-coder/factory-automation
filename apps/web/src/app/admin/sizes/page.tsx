@@ -6,10 +6,12 @@ import { LENGTH_UNITS, LengthUnit, UNIT_LABEL, formatLength, parseLengthToMm } f
 import { Shell } from '@/components/Shell';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { useDisplayUnit } from '@/lib/useUnit';
 
 export default function SizesAdminPage() {
   const { data, error, loading, reload } = useApi<SizePreset[]>(() => api.sizePresets(true));
-  const [unit, setUnit] = useState<LengthUnit>('FT');
+  // Whatever this person works in, remembered under Settings.
+  const [unit, setUnit] = useDisplayUnit();
   const [form, setForm] = useState({ code: '', name: '', length: '', width: '', thickness: '' });
   const [message, setMessage] = useState<string | null>(null);
 

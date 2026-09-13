@@ -125,7 +125,22 @@ it('shows a category with the screens under it', () => {
 it('hides the settings from someone who cannot configure anything', () => {
   mount(withPermissions(PERMISSIONS.ORDER_VIEW));
   expect(screen.queryByText('Order settings')).not.toBeInTheDocument();
-  expect(screen.queryByText('Workspace')).not.toBeInTheDocument();
+  expect(screen.queryByText('Firm details')).not.toBeInTheDocument();
+  expect(screen.queryByText('Roles and people')).not.toBeInTheDocument();
+});
+
+/*
+ * Settings is the exception in that group, deliberately.
+ *
+ * It holds the unit this person works in and the way out — neither of which
+ * is a configuration of the business — so it carries no permission, and the
+ * heading above it stays for everybody.
+ */
+it('leaves Settings for everyone, whatever else they may not touch', () => {
+  mount(withPermissions(PERMISSIONS.ORDER_VIEW));
+
+  expect(screen.getByText('Settings')).toBeInTheDocument();
+  expect(screen.getByText('Workspace')).toBeInTheDocument();
 });
 
 it('shows every settings screen to someone who can configure', () => {
@@ -432,18 +447,24 @@ describe('every row in the sidebar', () => {
   });
 
   /*
-   * A row the sidebar cannot link is dropped rather than drawn.
+   * Nothing is drawn without somewhere to go.
    *
-   * `NavLink` casts `item.web` to a string, so an app-only row would render
-   * `href={undefined}` — a link that looks like every other one and goes
-   * nowhere. Settings is app-only today: the browser signs out from the
-   * footer instead.
+   * `NavLink` casts `item.web` to a string, so a row the web does not serve
+   * would render `href={undefined}` — a link indistinguishable from a working
+   * one. It is safe only because `visible()` requires a web path first, which
+   * is an invariant rather than a happy accident and is checked as one.
    */
-  it('leaves out a row that exists only in the app', () => {
-    const appOnly = rows.filter((item) => !item.web);
-    expect(appOnly.length).toBeGreaterThan(0);
+  it('draws no link without a destination', () => {
+    const links = [...document.querySelectorAll('a.nav-link')];
+    expect(links.length).toBeGreaterThan(15);
 
-    for (const item of appOnly) {
+    for (const link of links) {
+      expect(link.getAttribute('href')).toMatch(/^\//);
+    }
+  });
+
+  it('leaves out a row the web does not serve', () => {
+    for (const item of rows.filter((one) => !one.web)) {
       expect(screen.queryByText(item.label)).toBeNull();
     }
   });

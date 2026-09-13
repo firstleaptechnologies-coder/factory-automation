@@ -250,7 +250,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | Firm details | `/admin/firm` | `FirmProfile` | `config.view` |
 | Roles and people | `/admin/roles` | `AdminRoles` | `user.view` |
-| Settings | — | `Settings` | — |
+| Settings | `/settings` | `Settings` | — |
 
 ## FirstLeap’s own console
 

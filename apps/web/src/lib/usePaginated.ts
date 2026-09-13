@@ -21,8 +21,22 @@ export function usePaginated<T>(
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Guards a second request while one is in flight.
+  // Guards a second *page* while one is in flight, so a double-tap on "load
+  // more" does not append the same rows twice.
   const inFlight = useRef(false);
+
+  /*
+   * Which request the rows on screen are allowed to come from.
+   *
+   * A dependency that changes while a request is in flight used to be dropped
+   * on the floor: the effect called `loadPage`, the in-flight guard refused
+   * it, and nothing ever asked again — so the list showed the *previous*
+   * filter's rows while the controls showed the new one, which is the exact
+   * failure the guard below it was written to prevent. It is now the reply
+   * that is checked rather than the request refused: a newer request always
+   * goes, and an older one's answer is thrown away when it lands late.
+   */
+  const latest = useRef(0);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const run = useCallback(fetcher, deps);
@@ -40,20 +54,31 @@ export function usePaginated<T>(
 
   const loadPage = useCallback(
     async (page: number, mode: 'initial' | 'more') => {
-      if (inFlight.current) return;
+      if (mode === 'more' && inFlight.current) return;
+
+      const ticket = (latest.current += 1);
       inFlight.current = true;
       if (mode === 'more') setLoadingMore(true);
       try {
         const result = await run(page);
+        // Overtaken: these are the old filter's rows, and showing them would
+        // contradict the controls.
+        if (ticket !== latest.current) return;
         setItems((current) => (page === 1 ? result.data : [...current, ...result.data]));
         setMeta(result.meta);
         setError(null);
       } catch (e) {
+        if (ticket !== latest.current) return;
         setError(e instanceof Error ? e.message : 'Could not reach the server');
       } finally {
-        inFlight.current = false;
-        setLoading(false);
-        setLoadingMore(false);
+        // Only the request still in charge may say the list has stopped
+        // loading — otherwise a slow reply from a filter nobody is looking at
+        // clears the spinner for the one they are.
+        if (ticket === latest.current) {
+          inFlight.current = false;
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [run],

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Lead, LengthUnit, Material, Order, PunchItemInput } from '@fas/shared';
 import { LENGTH_UNITS, UNIT_LABEL, parseLengthToMm } from '@fas/shared';
 import { api } from '@/lib/api';
+import { useDisplayUnit } from '@/lib/useUnit';
 import { Select } from '@/ui';
 
 interface ItemDraft {
@@ -44,7 +45,8 @@ export function ConvertLeadDialog({
   onConverted: (order: Order) => void | Promise<void>;
 }) {
   const [location, setLocation] = useState(lead.location ?? '');
-  const [unit, setUnit] = useState<LengthUnit>('FT');
+  // Whatever this person works in, remembered under Settings.
+  const [unit, setUnit] = useDisplayUnit();
   const [items, setItems] = useState<ItemDraft[]>([blank()]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

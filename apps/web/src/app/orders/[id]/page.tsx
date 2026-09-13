@@ -32,6 +32,7 @@ import {
   SheetOption,
 } from '@/ui';
 import { formatDateTime, formatInr } from '@/lib/format';
+import { useDisplayUnit } from '@/lib/useUnit';
 
 type NextMove = WorkflowTransition & { toStatus: WorkflowStatus };
 
@@ -70,7 +71,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 function OrderDetail({ orderId }: { orderId: string }) {
   const router = useRouter();
   const { can } = useAuth();
-  const [unit, setUnit] = useState<LengthUnit>('FT');
+  // Whatever this person works in, remembered under Settings.
+  const [unit, setUnit] = useDisplayUnit();
 
   /*
    * The history is its own request rather than part of the record.
