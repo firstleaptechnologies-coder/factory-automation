@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { CashInHandRow, CashPosition, Transaction, TransactionKind } from '@fas/shared';
+import type { CashPosition, CashToBankRow, Transaction, TransactionKind } from '@fas/shared';
 import { TRANSACTION_LABELS } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
@@ -62,7 +62,7 @@ const KINDS = [
  */
 export function TransactionsScreen({ navigation }: { navigation: any }) {
   const position = useApi<CashPosition>(() => api.cashPosition(), []);
-  const inHand = useApi<CashInHandRow[]>(() => api.cashInHand(), []);
+  const toBank = useApi<CashToBankRow[]>(() => api.cashToBank(), []);
 
   const [kind, setKind] = useState<TransactionKind | null>(null);
   const [filterSheet, setFilterSheet] = useState(false);
@@ -82,7 +82,7 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
     [kind, search],
   );
 
-  const [row, setRow] = useState<CashInHandRow | null>(null);
+  const [row, setRow] = useState<CashToBankRow | null>(null);
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [busy, setBusy] = useState(false);
@@ -100,7 +100,7 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
       setAmount('');
       setReference('');
       position.reload();
-      inHand.reload();
+      toBank.reload();
       feed.reload();
     } catch (e) {
       haptic('notificationError');
@@ -118,7 +118,7 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
       refreshing={position.refreshing}
       onRefresh={() => {
         position.refresh();
-        inHand.refresh();
+        toBank.refresh();
         feed.refresh();
       }}>
       <ScreenHeader
@@ -138,14 +138,36 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
         <Card tone="accent">
           <Text variant="label" tone="onAccent" style={{ opacity: 0.75 }}>In hand</Text>
           <Text variant="display" tone="onAccent">{formatInr(data.cash.inHand)}</Text>
-          <Text variant="small" tone="onAccent" style={{ opacity: 0.8, marginTop: 4 }}>
-            of {formatInr(data.cash.received)} taken in cash
+          {/*
+            Every movement that made the figure, in the order they happened.
+            The banked line used to be missing, so the words under the number
+            did not add up to it: ₹20,000 taken less ₹6,000 paid out is not
+            minus ₹1,000, and the ₹15,000 that explained it was nowhere on the
+            card.
+          */}
+          <Text variant="small" tone="onAccent" style={styles.cashLine}>
+            {formatInr(data.cash.received)} taken in cash
           </Text>
-          {/* Named rather than absorbed: cash handed to a fitter has left the
-              drawer, and a shop counting its notes should be told why. */}
+          {data.cash.deposited > 0 ? (
+            <Text variant="small" tone="onAccent" style={styles.cashLine}>
+              less {formatInr(data.cash.deposited)} banked
+            </Text>
+          ) : null}
           {data.cash.paidOut > 0 ? (
-            <Text variant="small" tone="onAccent" style={{ opacity: 0.8 }}>
+            <Text variant="small" tone="onAccent" style={styles.cashLine}>
               less {formatInr(data.cash.paidOut)} paid out in cash
+            </Text>
+          ) : null}
+          {/*
+            A drawer cannot hold less than nothing, so saying so plainly is the
+            only honest thing to draw. It means a receipt was never entered, or
+            the money came from somewhere the app has not been told about — and
+            either way somebody should go and look.
+          */}
+          {data.cash.inHand < 0 ? (
+            <Text variant="small" tone="onAccent" style={styles.cashWarn} testID="cash-negative">
+              More cash has gone out than came in. A receipt is missing, or this
+              was paid from money the app has not seen.
             </Text>
           ) : null}
         </Card>
@@ -242,14 +264,32 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
         noun="movements"
       />
 
+      {/*
+        Not "in hand": these are receipts, and a payout empties the drawer
+        without touching any of them. Under the old heading the two figures
+        were the same word and a different number.
+      */}
       <Text variant="label" tone="muted" style={styles.blockLabel}>
-        Still in hand, order by order
+        Taken in cash, not yet banked
       </Text>
 
-      {inHand.data?.length === 0 ? (
+      {/*
+        The subtraction spelled out, rather than left for a reader to notice
+        that two numbers on one screen do not agree. They are not meant to:
+        what is here to bank, less what went out of the drawer, is the drawer.
+      */}
+      {data.cash.paidOut > 0 ? (
+        <Text variant="tiny" tone="faint" style={styles.reconcile} testID="cash-reconcile">
+          {formatInr(data.cash.notBanked)} still to bank, less{' '}
+          {formatInr(data.cash.paidOut)} paid out in cash, leaves{' '}
+          {formatInr(data.cash.inHand)} in hand.
+        </Text>
+      ) : null}
+
+      {toBank.data?.length === 0 ? (
         <EmptyState icon="check" title="Nothing outstanding" message="Every rupee is banked." />
       ) : (
-        inHand.data?.map((entry) => (
+        toBank.data?.map((entry) => (
           <Card key={entry.paymentId} tone="dark" style={styles.row}>
             <View style={{ flex: 1 }}>
               <Text variant="body" bold>{entry.client}</Text>
@@ -261,14 +301,14 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text variant="h3" tone="warning">{formatInr(entry.inHand)}</Text>
+              <Text variant="h3" tone="warning">{formatInr(entry.notBanked)}</Text>
               <Button
                 title="Bank it"
                 variant="ghost"
                 size="sm"
                 onPress={() => {
                   setRow(entry);
-                  setAmount(String(entry.inHand));
+                  setAmount(String(entry.notBanked));
                 }}
                 style={{ marginTop: 6 }}
               />
@@ -321,6 +361,9 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
+  cashLine: { opacity: 0.8, marginTop: 2 },
+  cashWarn: { opacity: 0.95, marginTop: spacing.sm, fontWeight: '700' },
+  reconcile: { marginBottom: spacing.sm },
   splitRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
   splitCard: { flex: 1 },
   blockLabel: { marginTop: spacing.xl, marginBottom: spacing.md },

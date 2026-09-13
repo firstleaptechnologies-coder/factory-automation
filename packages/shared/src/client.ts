@@ -35,7 +35,7 @@ import type {
   DisbursementLedger,
   DisbursementStatus,
   DisbursementSummary,
-  CashInHandRow,
+  CashToBankRow,
   CashPosition,
   Transaction,
   TransactionKind,
@@ -646,8 +646,9 @@ export class ApiClient {
     return this.get<CashPosition>('/payments/cash-position', query);
   }
 
-  cashInHand() {
-    return this.get<CashInHandRow[]>('/payments/cash-in-hand');
+  /** The receipts to walk to the bank. Not the drawer — see `cashPosition`. */
+  cashToBank() {
+    return this.get<CashToBankRow[]>('/payments/cash-in-hand');
   }
 
   // -- disbursements --------------------------------------------------------

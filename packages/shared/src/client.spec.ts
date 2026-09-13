@@ -301,7 +301,7 @@ describe('endpoints', () => {
     ['reversePayment', (a) => a.reversePayment('p1', 'why'), 'POST', '/payments/p1/reverse'],
     ['recordDeposit', (a) => a.recordDeposit({ amount: 1 } as never), 'POST', '/payments/deposits'],
     ['cashPosition', (a) => a.cashPosition(), 'GET', '/payments/cash-position'],
-    ['cashInHand', (a) => a.cashInHand(), 'GET', '/payments/cash-in-hand'],
+    ['cashToBank', (a) => a.cashToBank(), 'GET', '/payments/cash-in-hand'],
 
     ['vendors', (a) => a.vendors(), 'GET', '/vendors'],
     ['vendor', (a) => a.vendor('v1'), 'GET', '/vendors/v1'],

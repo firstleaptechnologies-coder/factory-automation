@@ -88,6 +88,6 @@ export class PaymentsController {
   @RequirePermissions(PERMISSIONS.CASH_POSITION_VIEW)
   @Get('payments/cash-in-hand')
   cashInHand() {
-    return this.payments.cashInHandByOrder();
+    return this.payments.cashToBank();
   }
 }

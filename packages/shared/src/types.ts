@@ -227,6 +227,11 @@ export interface CashPosition {
      * expense paid the same way. Shown on its own line: it leaves the drawer,
      * but it never reduces the order it came from. */
     paidOut: number;
+    /** Taken in cash and not yet banked. Differs from `inHand` by `paidOut`. */
+    notBanked: number;
+    /** What is actually in the drawer. Goes negative when more cash has gone
+     * out than the shop has recorded coming in, which is a fact worth seeing
+     * rather than a number to hide. */
     inHand: number;
     receipts: number;
     depositsUnallocated: number;
@@ -235,14 +240,20 @@ export interface CashPosition {
   deposits: number;
 }
 
-export interface CashInHandRow {
+/**
+ * One cash receipt that has not reached the bank.
+ *
+ * Not "in hand": a payout empties the drawer without touching any receipt, so
+ * these sum to more than the shop is holding whenever cash has gone out.
+ */
+export interface CashToBankRow {
   paymentId: string;
   orderId: string;
   orderCode: string;
   client: string;
   received: number;
   deposited: number;
-  inHand: number;
+  notBanked: number;
   receivedAt: string;
 }
 

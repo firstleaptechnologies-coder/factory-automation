@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import TransactionsPage from './page';
 
-const apiMock = { cashPosition: jest.fn(), cashInHand: jest.fn(), transactions: jest.fn() };
+const apiMock = { cashPosition: jest.fn(), cashToBank: jest.fn(), transactions: jest.fn() };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
     {},
@@ -20,7 +20,7 @@ jest.mock('@/components/Shell', () => ({
 }));
 
 const POSITION = {
-  cash: { received: 50000, deposited: 30000, paidOut: 0, inHand: 20000 },
+  cash: { received: 50000, deposited: 30000, paidOut: 0, notBanked: 20000, inHand: 20000 },
   online: { received: 25000 },
 };
 
@@ -31,7 +31,7 @@ const ROW = {
   client: 'Verma Interiors',
   received: 20000,
   deposited: 0,
-  inHand: 20000,
+  notBanked: 20000,
 };
 
 const FEED = [
@@ -66,7 +66,7 @@ const page = (rows: unknown[]) => ({
 
 async function mount(position: unknown = POSITION, rows: unknown[] = [ROW]) {
   apiMock.cashPosition.mockResolvedValue(position);
-  apiMock.cashInHand.mockResolvedValue(rows);
+  apiMock.cashToBank.mockResolvedValue(rows);
   render(<TransactionsPage />);
   await screen.findByText('Transactions');
 }
@@ -78,7 +78,7 @@ beforeEach(() => {
 
 it('says it is counting rather than showing zeroes', async () => {
   apiMock.cashPosition.mockReturnValue(new Promise(() => {}));
-  apiMock.cashInHand.mockResolvedValue([]);
+  apiMock.cashToBank.mockResolvedValue([]);
   render(<TransactionsPage />);
   expect(await screen.findByText('Counting')).toBeInTheDocument();
 });
@@ -86,9 +86,9 @@ it('says it is counting rather than showing zeroes', async () => {
 it('leads with what is still in hand, which is the figure this screen exists for', async () => {
   await mount();
   // The one number that cannot be read off a bank statement.
-  expect(screen.getByText('Still in hand')).toBeInTheDocument();
+  expect(screen.getByText('In hand')).toBeInTheDocument();
   expect(screen.getAllByText('₹20,000').length).toBeGreaterThan(0);
-  expect(screen.getByText('out of ₹50,000 taken in cash')).toBeInTheDocument();
+  expect(screen.getByText('₹50,000 taken in cash')).toBeInTheDocument();
 });
 
 it('adds cash and online together for what has been collected', async () => {
@@ -116,16 +116,16 @@ it('opens the receipt behind a row', async () => {
 });
 
 it('says plainly when everything has been banked', async () => {
-  await mount({ cash: { received: 50000, deposited: 50000, inHand: 0 }, online: { received: 0 } }, []);
+  await mount({ cash: { received: 50000, deposited: 50000, paidOut: 0, notBanked: 0, inHand: 0 }, online: { received: 0 } }, []);
   expect(screen.getByText('Nothing in hand')).toBeInTheDocument();
   expect(screen.getByText('Every rupee taken has been banked.')).toBeInTheDocument();
 });
 
 it('waits for the list without holding up the totals', async () => {
   apiMock.cashPosition.mockResolvedValue(POSITION);
-  apiMock.cashInHand.mockReturnValue(new Promise(() => {}));
+  apiMock.cashToBank.mockReturnValue(new Promise(() => {}));
   render(<TransactionsPage />);
-  await waitFor(() => expect(screen.getByText('Still in hand')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText('In hand')).toBeInTheDocument());
   expect(screen.getByText('Nothing in hand')).toBeInTheDocument();
 });
 
@@ -218,13 +218,74 @@ it('says where the cash went when some of it was paid out', async () => {
   // A payout leaves the drawer, so the drawer figure has to account for it —
   // and say so, rather than quietly showing a smaller number.
   await mount({
-    cash: { received: 50000, deposited: 30000, paidOut: 5000, inHand: 15000 },
+    cash: { received: 50000, deposited: 30000, paidOut: 5000, notBanked: 20000, inHand: 15000 },
     online: { received: 25000 },
   });
-  expect(await screen.findByText(/paid out in cash/)).toBeInTheDocument();
+  expect(await screen.findByText('less ₹5,000 paid out in cash')).toBeInTheDocument();
 });
 
 it('keeps the payout line off a shop that has paid nothing out', async () => {
   await mount();
   expect(screen.queryByText(/paid out in cash/)).toBeNull();
+});
+
+/*
+ * The shop's own trial found the drawer saying two things at once: the card
+ * read "in hand −₹1,000" while the list below it read "still in hand ₹5,000".
+ *
+ * They answer different questions — what is in the drawer, and which receipts
+ * have not been walked to the bank — and a payout separates them, because cash
+ * handed to a fitter empties the drawer without banking anything. So they are
+ * named differently now, and the screen prints the subtraction.
+ */
+describe('the drawer against the receipts waiting for the bank', () => {
+  const short = {
+    cash: { received: 20000, deposited: 15000, paidOut: 6000, notBanked: 5000, inHand: -1000 },
+    online: { received: 0, receipts: 0 },
+    deposits: 1,
+  };
+
+  it('names every movement that made the figure, banked included', async () => {
+    // Without the banked line the words do not produce the number: ₹20,000
+    // taken less ₹6,000 paid out is not −₹1,000.
+    await mount(short, []);
+
+    expect(screen.getByText('₹20,000 taken in cash')).toBeInTheDocument();
+    expect(screen.getByText('less ₹15,000 banked')).toBeInTheDocument();
+    expect(screen.getByText('less ₹6,000 paid out in cash')).toBeInTheDocument();
+  });
+
+  it('does not call the receipts waiting for the bank "in hand"', async () => {
+    await mount();
+
+    expect(screen.getByText('Taken in cash, not yet banked')).toBeInTheDocument();
+    expect(screen.queryByText('Still in hand, order by order')).toBeNull();
+  });
+
+  it('shows the subtraction between the two', async () => {
+    await mount(short, []);
+
+    expect(screen.getByTestId('cash-reconcile')).toHaveTextContent(
+      '₹5,000 still to bank, less ₹6,000 paid out in cash, leaves -₹1,000 in hand.',
+    );
+  });
+
+  it('says plainly that a drawer below nothing is somebody’s mistake', async () => {
+    await mount(short, []);
+
+    expect(screen.getByTestId('cash-negative')).toBeInTheDocument();
+  });
+
+  it('keeps that warning off a drawer that is merely empty', async () => {
+    await mount(
+      {
+        cash: { received: 20000, deposited: 20000, paidOut: 0, notBanked: 0, inHand: 0 },
+        online: { received: 0, receipts: 0 },
+        deposits: 1,
+      },
+      [],
+    );
+
+    expect(screen.queryByTestId('cash-negative')).toBeNull();
+  });
 });

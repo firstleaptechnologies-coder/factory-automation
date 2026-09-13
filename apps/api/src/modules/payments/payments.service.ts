@@ -305,6 +305,14 @@ export class PaymentsService {
         received: received.amount,
         deposited: banked.amount,
         paidOut: paidOut.amount,
+        /*
+         * Taken and not yet walked to the bank. It is not the drawer: a payout
+         * empties the drawer without banking anything, so this sits above
+         * `inHand` and the difference between them is exactly `paidOut`. Both
+         * are given so a screen can show that subtraction instead of printing
+         * two numbers that look like they should agree.
+         */
+        notBanked: round2(received.amount - banked.amount),
         inHand: round2(received.amount - banked.amount - paidOut.amount),
         receipts: received.count,
         depositsUnallocated: unallocated.amount,
@@ -363,8 +371,23 @@ export class PaymentsService {
     });
   }
 
-  /** Cash still in hand, order by order — the list to take to the bank. */
-  async cashInHandByOrder() {
+  /**
+   * Cash taken that has not reached the bank, receipt by receipt.
+   *
+   * Deliberately *not* "in hand", which this used to be called. In hand is
+   * what is in the drawer, and cash handed to a fitter has left the drawer
+   * without touching any of these receipts — so the two figures disagreed by
+   * every payout, both under the same word, on the same screen. One of them
+   * said the shop held ₹5,000 while the other said it held minus ₹1,000.
+   *
+   * This is the list to take to the bank, and it answers only that: which
+   * receipts have not been banked. The payout is not attributed to any of them
+   * — choosing one would be arbitrary, and netting it against an order is the
+   * thing the books must never do. `cashPosition` holds the drawer, and the
+   * screen shows the subtraction between the two rather than leaving a reader
+   * to find it.
+   */
+  async cashToBank() {
     const payments = await this.prisma.payment.findMany({
       where: {
         mode: PaymentMode.CASH,
@@ -396,11 +419,11 @@ export class PaymentsService {
           client: payment.order.client.name,
           received: round2(Number(payment.amount)),
           deposited: round2(deposited),
-          inHand: round2(Number(payment.amount) - deposited),
+          notBanked: round2(Number(payment.amount) - deposited),
           receivedAt: payment.receivedAt,
         };
       })
-      .filter((row) => row.inHand > 0.009);
+      .filter((row) => row.notBanked > 0.009);
   }
 
   /**

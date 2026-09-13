@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
-  CashInHandRow,
+  CashToBankRow,
   CashPosition,
   Transaction,
   TransactionKind,
@@ -61,7 +61,7 @@ const TONE: Record<TransactionKind, string> = {
 function Transactions() {
   const router = useRouter();
   const position = useApi<CashPosition>(() => api.cashPosition(), []);
-  const inHand = useApi<CashInHandRow[]>(() => api.cashInHand(), []);
+  const toBank = useApi<CashToBankRow[]>(() => api.cashToBank(), []);
 
   const [kind, setKind] = useState<TransactionKind | null>(null);
   const [search, setSearch] = useState('');
@@ -102,17 +102,36 @@ function Transactions() {
 
       <Card tone="accent" className="enter">
         <span className="t-label on-accent" style={{ opacity: 0.75 }}>
-          Still in hand
+          In hand
         </span>
         <div className="t-display on-accent">{formatInr(data.cash.inHand)}</div>
+        {/*
+          Every movement that made the figure, in the order they happened. The
+          banked line used to be missing, so the words under the number did not
+          add up to it: ₹20,000 taken less ₹6,000 paid out is not minus ₹1,000,
+          and the ₹15,000 that explained it was nowhere on the card.
+        */}
         <div className="t-small on-accent" style={{ opacity: 0.8, marginTop: 4 }}>
-          out of {formatInr(data.cash.received)} taken in cash
+          {formatInr(data.cash.received)} taken in cash
         </div>
-        {/* Named rather than absorbed: cash handed to a fitter has left the
-            drawer, and a shop counting its notes should be told why. */}
+        {data.cash.deposited > 0 && (
+          <div className="t-small on-accent" style={{ opacity: 0.8 }}>
+            less {formatInr(data.cash.deposited)} banked
+          </div>
+        )}
         {data.cash.paidOut > 0 && (
           <div className="t-small on-accent" style={{ opacity: 0.8 }}>
             less {formatInr(data.cash.paidOut)} paid out in cash
+          </div>
+        )}
+        {/*
+          A drawer cannot hold less than nothing, so saying so plainly is the
+          only honest thing to draw.
+        */}
+        {data.cash.inHand < 0 && (
+          <div className="t-small on-accent bold" style={{ marginTop: 8 }} data-testid="cash-negative">
+            More cash has gone out than came in. A receipt is missing, or this was
+            paid from money the app has not seen.
           </div>
         )}
       </Card>
@@ -223,8 +242,20 @@ function Transactions() {
         onMore={feed.loadMore}
       />
 
-      <SectionHead title="Still in hand, order by order" />
-      {(inHand.data?.length ?? 0) === 0 ? (
+      {/*
+        Not "in hand": these are receipts, and a payout empties the drawer
+        without touching any of them. Under the old heading the two figures
+        were the same word and a different number.
+      */}
+      <SectionHead title="Taken in cash, not yet banked" />
+      {data.cash.paidOut > 0 && (
+        <p className="t-tiny muted" data-testid="cash-reconcile">
+          {formatInr(data.cash.notBanked)} still to bank, less{' '}
+          {formatInr(data.cash.paidOut)} paid out in cash, leaves{' '}
+          {formatInr(data.cash.inHand)} in hand.
+        </p>
+      )}
+      {(toBank.data?.length ?? 0) === 0 ? (
         <EmptyState icon="card" title="Nothing in hand" message="Every rupee taken has been banked." />
       ) : (
         <Card size="sm" className="scroll-x">
@@ -235,11 +266,11 @@ function Transactions() {
                 <th>Client</th>
                 <th className="num">Taken</th>
                 <th className="num">Banked</th>
-                <th className="num">In hand</th>
+                <th className="num">To bank</th>
               </tr>
             </thead>
             <tbody>
-              {inHand.data?.map((row) => (
+              {toBank.data?.map((row) => (
                 <tr
                   key={row.paymentId}
                   style={{ cursor: 'pointer' }}
@@ -248,7 +279,7 @@ function Transactions() {
                   <td className="muted">{row.client}</td>
                   <td className="num muted">{formatInr(row.received)}</td>
                   <td className="num muted">{formatInr(row.deposited)}</td>
-                  <td className="num bold warning">{formatInr(row.inHand)}</td>
+                  <td className="num bold warning">{formatInr(row.notBanked)}</td>
                 </tr>
               ))}
             </tbody>

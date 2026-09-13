@@ -6,7 +6,7 @@ const payments = {
   reverse: jest.fn(async (..._a: unknown[]) => 'reversed'),
   deposit: jest.fn(async (..._a: unknown[]) => 'deposited'),
   cashPosition: jest.fn(async (..._a: unknown[]) => 'position'),
-  cashInHandByOrder: jest.fn(async (..._a: unknown[]) => 'in hand'),
+  cashToBank: jest.fn(async (..._a: unknown[]) => 'in hand'),
 };
 
 const controller = new PaymentsController(payments as never);
@@ -48,7 +48,7 @@ it('passes the date range through to the cash position', async () => {
   expect(payments.cashPosition).toHaveBeenCalledWith(query);
 });
 
-it('lists what is still in hand order by order, so somebody can be asked', async () => {
+it('lists the receipts that have not reached the bank', async () => {
   await controller.cashInHand();
-  expect(payments.cashInHandByOrder).toHaveBeenCalled();
+  expect(payments.cashToBank).toHaveBeenCalled();
 });
