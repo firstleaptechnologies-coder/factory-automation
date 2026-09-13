@@ -96,6 +96,27 @@ it('opens one person, and the form for a new one', async () => {
   expect(navigation.navigate).toHaveBeenCalledWith('EmployeeForm', {});
 });
 
+/*
+ * The templates the letters on a person's page are written from.
+ *
+ * The screen was built, routed and listed in the navigation tree, and nothing
+ * on either client opened it — the only way in was to know the route.
+ */
+it('opens the letter templates', async () => {
+  await mount();
+
+  await fireEvent.press(screen.getByTestId('letter-templates'));
+
+  expect(navigation.navigate).toHaveBeenCalledWith('AdminLetterTemplates');
+});
+
+it('does not offer them to somebody who only reads the list', async () => {
+  mockPermissions = [PERMISSIONS.EMPLOYEE_VIEW];
+  await mount();
+
+  expect(screen.queryByTestId('letter-templates')).toBeNull();
+});
+
 it('says so plainly when nobody has been added', async () => {
   mockEmployees.mockResolvedValue(page([]));
   await mount();

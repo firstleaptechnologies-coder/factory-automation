@@ -8,6 +8,7 @@ import {
   NAV_OUTSIDE,
   allNavItems,
   navAppRoutes,
+  navChildren,
   navWebPaths,
 } from './navigation';
 import { navigationMarkdown } from './navigation-doc';
@@ -127,5 +128,42 @@ describe('what a plan reaches', () => {
     for (const item of allNavItems()) {
       if (item.module) expect(ALL_MODULES).toContain(item.module);
     }
+  });
+});
+
+/*
+ * The pairs both clients check their own source against. If this walks the
+ * tree wrongly, two rails go quiet at once.
+ */
+describe('navChildren', () => {
+  const links = navChildren();
+
+  it('pairs each child with the screen it hangs off', () => {
+    const orders = links.find((link) => link.child.key === 'order-detail');
+    expect(orders?.parent.key).toBe('orders');
+  });
+
+  it('reaches children of children, not just the first level', () => {
+    // Converting an enquiry is reached from one enquiry, which is itself
+    // reached from the list.
+    const convert = links.find((link) => link.child.key === 'lead-convert');
+    expect(convert?.parent.key).toBe('lead-detail');
+  });
+
+  it('covers the platform console and the screens outside the menu too', () => {
+    const parents = new Set(links.map((link) => link.parent.key));
+    expect(parents.has('home')).toBe(true);
+  });
+
+  it('is every child in the tree and nothing else', () => {
+    const expected = allNavItems().flatMap((item) =>
+      (item.children ?? []).map((child) => child.key),
+    );
+
+    expect(links.map((link) => link.child.key).sort()).toEqual(expected.sort());
+  });
+
+  it('names no item as its own parent', () => {
+    expect(links.filter((link) => link.parent.key === link.child.key)).toEqual([]);
   });
 });

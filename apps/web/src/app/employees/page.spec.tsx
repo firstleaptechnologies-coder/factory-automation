@@ -82,6 +82,27 @@ it('can be asked for the people who have gone', async () => {
   );
 });
 
+/*
+ * The templates the letters on a person's page are written from.
+ *
+ * The page was built, routed and listed in the navigation tree, and nothing on
+ * either client linked to it — the only way in was to know the URL.
+ */
+it('links to the letter templates', async () => {
+  await mount();
+
+  fireEvent.click(screen.getByText('Letter templates'));
+
+  expect(push).toHaveBeenCalledWith('/admin/letter-templates');
+});
+
+it('does not offer them to somebody who only reads the list', async () => {
+  permissions = [PERMISSIONS.EMPLOYEE_VIEW];
+  await mount();
+
+  expect(screen.queryByText('Letter templates')).toBeNull();
+});
+
 it('offers to add somebody only to whoever may', async () => {
   permissions = [PERMISSIONS.EMPLOYEE_VIEW];
   await mount();

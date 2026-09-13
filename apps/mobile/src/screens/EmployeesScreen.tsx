@@ -76,6 +76,13 @@ export function EmployeesScreen({ navigation }: { navigation: any }) {
             />
             {canManage ? (
               <RoundButton
+                icon="tune"
+                testID="letter-templates"
+                onPress={() => navigation.navigate('AdminLetterTemplates')}
+              />
+            ) : null}
+            {canManage ? (
+              <RoundButton
                 icon="plus"
                 testID="add-employee"
                 onPress={() => navigation.navigate('EmployeeForm', {})}

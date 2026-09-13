@@ -68,6 +68,7 @@ function Expenses() {
   );
 
   const canManage = can(PERMISSIONS.EXPENSE_MANAGE);
+  const canConfigure = can(PERMISSIONS.EXPENSE_CONFIG);
   const applied = [spentType, paymentType, doneBy].filter(Boolean).length;
   const labels = (values: string[] | undefined) => [
     { id: null, label: 'Any' },
@@ -87,6 +88,14 @@ function Expenses() {
               icon="trend"
               onClick={() => router.push('/expenses/analytics')}
             />
+            {canConfigure ? (
+              <Button
+                title="Dropdowns"
+                variant="dark"
+                icon="tune"
+                onClick={() => router.push('/admin/expense-options')}
+              />
+            ) : null}
             {canManage ? (
               <Button
                 title="Record one"

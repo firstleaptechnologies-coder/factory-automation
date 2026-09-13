@@ -732,6 +732,46 @@ export function allNavItems(): NavItem[] {
   return out;
 }
 
+/** A screen the tree says is reached from another screen, and which one. */
+export interface NavChildLink {
+  parent: NavItem;
+  child: NavItem;
+}
+
+/**
+ * Every screen that is reached from another screen rather than from the menu.
+ *
+ * Being in the tree is what the coverage tests check, and being in the tree is
+ * not the same as having a way in: `children` is a claim that some screen opens
+ * this one, and nothing was checking the claim. Two screens — the expense
+ * dropdowns and the letter templates — were built, routed and listed on both
+ * clients with no button anywhere that opened them.
+ *
+ * So each client walks this and fails when nothing in its own source navigates
+ * to a child. Which screen does the opening is left to the client: the tree
+ * records where a screen belongs, and the app's search, for one, is opened from
+ * the tab bar rather than from the home screen it sits under.
+ */
+export function navChildren(): NavChildLink[] {
+  const out: NavChildLink[] = [];
+  const walk = (items: NavItem[]) => {
+    for (const item of items) {
+      for (const child of item.children ?? []) out.push({ parent: item, child });
+      if (item.children) walk(item.children);
+    }
+  };
+  const walkGroup = (group: NavGroup) => {
+    walk(group.items);
+    group.groups?.forEach(walkGroup);
+  };
+
+  walk([NAV_HOME]);
+  NAV_GROUPS.forEach(walkGroup);
+  PLATFORM_NAV.forEach(walkGroup);
+  walk(NAV_OUTSIDE);
+  return out;
+}
+
 /** Every app route name the tree knows about. */
 export function navAppRoutes(): string[] {
   return allNavItems()

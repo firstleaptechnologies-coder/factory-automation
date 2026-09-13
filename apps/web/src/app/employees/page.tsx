@@ -70,11 +70,19 @@ function Employees() {
         subtitle="Who works here — a person, not a login"
         action={
           canManage ? (
-            <Button
-              title="Add someone"
-              icon="plus"
-              onClick={() => router.push('/employees/new')}
-            />
+            <div className="row">
+              <Button
+                title="Letter templates"
+                variant="dark"
+                icon="tune"
+                onClick={() => router.push('/admin/letter-templates')}
+              />
+              <Button
+                title="Add someone"
+                icon="plus"
+                onClick={() => router.push('/employees/new')}
+              />
+            </div>
           ) : null
         }
       />

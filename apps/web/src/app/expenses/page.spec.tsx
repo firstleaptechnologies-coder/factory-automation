@@ -108,6 +108,30 @@ it('opens the form and one expense', async () => {
   expect(push).toHaveBeenCalledWith('/expenses/e1');
 });
 
+/*
+ * The dropdowns this page's categories come from.
+ *
+ * The page was built, routed and listed in the navigation tree, and nothing on
+ * either client linked to it — the only way in was to know the URL.
+ */
+it('links to the dropdowns it is configured by', async () => {
+  permissions = [PERMISSIONS.EXPENSE_VIEW, PERMISSIONS.EXPENSE_CONFIG];
+  await mount();
+
+  fireEvent.click(screen.getByText('Dropdowns'));
+
+  expect(push).toHaveBeenCalledWith('/admin/expense-options');
+});
+
+it('does not offer them to somebody who may not change them', async () => {
+  permissions = [PERMISSIONS.EXPENSE_VIEW, PERMISSIONS.EXPENSE_MANAGE];
+  await mount();
+
+  // Recording an expense and deciding what the categories are is not the same
+  // job, and the API refuses the second either way.
+  expect(screen.queryByText('Dropdowns')).toBeNull();
+});
+
 it('says so plainly when nothing has been recorded', async () => {
   apiMock.expenses.mockResolvedValue(page([], 0));
   await mount();

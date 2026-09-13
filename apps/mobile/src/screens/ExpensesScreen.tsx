@@ -61,6 +61,7 @@ export function ExpensesScreen({ navigation }: { navigation: any }) {
   );
 
   const canManage = can(PERMISSIONS.EXPENSE_MANAGE);
+  const canConfigure = can(PERMISSIONS.EXPENSE_CONFIG);
   const labels = (values: string[] | undefined) =>
     [{ id: null, label: 'Any' }, ...(values ?? []).map((value) => ({ id: value, label: value }))];
 
@@ -78,6 +79,13 @@ export function ExpensesScreen({ navigation }: { navigation: any }) {
         right={
           <View style={styles.actions}>
             <RoundButton icon="trend" onPress={() => navigation.navigate('ExpenseAnalytics')} />
+            {canConfigure ? (
+              <RoundButton
+                icon="tune"
+                testID="expense-options"
+                onPress={() => navigation.navigate('AdminExpenseOptions')}
+              />
+            ) : null}
             <RoundButton icon="filter" testID="filter-button" onPress={() => setFilterOpen(true)} />
             {canManage ? (
               <RoundButton

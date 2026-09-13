@@ -116,6 +116,30 @@ it('opens the form when there is nothing yet and the person may add one', async 
   expect(navigation.navigate).toHaveBeenCalledWith('ExpenseForm', {});
 });
 
+/*
+ * The dropdowns this screen's categories come from.
+ *
+ * The screen was built, routed and listed in the navigation tree, and nothing
+ * on either client opened it — the only way in was to know the route.
+ */
+it('opens the dropdowns it is configured by', async () => {
+  mockPermissions = [PERMISSIONS.EXPENSE_VIEW, PERMISSIONS.EXPENSE_CONFIG];
+  await mount();
+
+  await fireEvent.press(screen.getByTestId('expense-options'));
+
+  expect(navigation.navigate).toHaveBeenCalledWith('AdminExpenseOptions');
+});
+
+it('does not offer them to somebody who may not change them', async () => {
+  mockPermissions = [PERMISSIONS.EXPENSE_VIEW, PERMISSIONS.EXPENSE_MANAGE];
+  await mount();
+
+  // Recording an expense and deciding what the categories are is not the
+  // same job, and the API refuses the second either way.
+  expect(screen.queryByTestId('expense-options')).toBeNull();
+});
+
 it('opens one expense from the list', async () => {
   await mount();
   await fireEvent.press(screen.getByText('Router bits'));
