@@ -10,6 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useAuth } from '../auth/AuthContext';
+import { hasMenuBeyondSettings } from './menu';
 import { motion, palette, radius, spacing } from '../theme';
 import { AccentSurface, Neumorph } from '../ui/Neumorph';
 import { Icon, IconName } from '../ui/Icon';
@@ -44,8 +45,9 @@ const ROW = ['Home', 'Orders', 'centre', 'Leads', 'settings'] as const;
  */
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const { can, has } = useAuth();
+  // What the menu would actually hold, rather than a guess from the role name.
+  const menu = hasMenuBeyondSettings({ can, has });
 
   const routeFor = (name: string) => state.routes.find((route) => route.name === name);
   const search = routeFor('Search');
@@ -61,13 +63,13 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               <Tab
                 key="settings"
                 testID="tab-settings"
-                icon={isAdmin ? 'tune' : 'settings'}
-                label={isAdmin ? 'More' : 'Settings'}
+                icon={menu ? 'tune' : 'settings'}
+                label={menu ? 'More' : 'Settings'}
                 focused={false}
                 onPress={() => {
                   haptic('impactLight');
                   // Not a tab: it opens the stack, over whichever tab is showing.
-                  navigation.navigate(isAdmin ? 'Admin' : 'Settings');
+                  navigation.navigate(menu ? 'Admin' : 'Settings');
                 }}
               />
             );

@@ -40,7 +40,13 @@ import { formatInr, whoLabel } from '../lib/format';
  */
 export function HomeScreen({ navigation }: { navigation: any }) {
   const { user, can } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  /*
+   * The dial edits which stages this card counts, which is the workflow. The
+   * gate is the permission the API enforces on that write rather than whether
+   * somebody's role happens to be called ADMIN — a shop that renames or splits
+   * its roles got an owner who could save the change and no way to reach it.
+   */
+  const canEditCard = can(PERMISSIONS.WORKFLOW_MANAGE);
   const [unit] = useDisplayUnit();
 
   /* Refetched whenever the screen regains focus, like everything else. */
@@ -141,7 +147,7 @@ export function HomeScreen({ navigation }: { navigation: any }) {
             <Text variant="small" tone="onAccent" style={{ opacity: 0.75 }}>
               Where the work is
             </Text>
-            {isAdmin ? (
+            {canEditCard ? (
               <Pressable
                 testID="edit-home-card"
                 onPress={() => navigation.navigate('MainCard')}
@@ -153,7 +159,7 @@ export function HomeScreen({ navigation }: { navigation: any }) {
 
           {summary.length === 0 ? (
             <Text variant="small" tone="onAccent" style={styles.heroEmpty}>
-              {isAdmin
+              {canEditCard
                 ? 'No stages chosen yet — tap the dial to pick which ones this card counts.'
                 : 'No stages are being counted here yet.'}
             </Text>

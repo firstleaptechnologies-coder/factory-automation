@@ -26,11 +26,11 @@ const SHOP_USER = { id: 'u1', name: 'Nakul', code: 'ADMIN', permissions: [], isP
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockAuth = { user: null, loading: false, can: () => true };
+  mockAuth = { user: null, loading: false, can: () => true, has: () => true };
 });
 
 it('says nothing about signing in until the stored session has been read', async () => {
-  mockAuth = { user: null, loading: true, can: () => true };
+  mockAuth = { user: null, loading: true, can: () => true, has: () => true };
   await render(<RootNavigator />);
   // Flashing the login screen at somebody who is already signed in is worse
   // than a moment of nothing.
@@ -48,7 +48,7 @@ it('asks for a sign-in when nobody is signed in', async () => {
 });
 
 it('opens the shop for somebody signed in to one', async () => {
-  mockAuth = { user: SHOP_USER, loading: false, can: () => true };
+  mockAuth = { user: SHOP_USER, loading: false, can: () => true, has: () => true };
   await render(<RootNavigator />);
   expect(await screen.findByText('Where the work is')).toBeTruthy();
 });
@@ -58,6 +58,7 @@ it('sends a platform admin to the control plane instead of a shop', async () => 
     user: { ...SHOP_USER, isPlatform: true },
     loading: false,
     can: () => true,
+    has: () => true,
   };
   await render(<RootNavigator />);
   // A platform admin belongs to no workspace, so a shop's screens would have

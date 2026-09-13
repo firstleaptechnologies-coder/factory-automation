@@ -1,10 +1,18 @@
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { PERMISSIONS } from '@fas/shared';
 import { TabBar } from './TabBar';
 
-let mockUser: Record<string, unknown> = { name: 'Nakul', code: 'ADMIN', role: 'ADMIN' };
-jest.mock('../auth/AuthContext', () => ({ useAuth: () => ({ user: mockUser }) }));
+let mockGranted: string[] = [];
+let mockModules: string[] | null = null;
+jest.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({
+    can: (permission: string) => mockGranted.includes(permission),
+    // A workspace with everything, unless a test says otherwise.
+    has: (module: string) => mockModules === null || mockModules.includes(module),
+  }),
+}));
 
 const feedback = ReactNativeHapticFeedback as unknown as { trigger: jest.Mock };
 
@@ -36,7 +44,8 @@ async function mount(index = 0, emitReturns = { defaultPrevented: false }) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockUser = { name: 'Nakul', code: 'ADMIN', role: 'ADMIN' };
+  mockGranted = Object.values(PERMISSIONS);
+  mockModules = null;
 });
 
 it('shows the four tabs, the centre and the way into settings', async () => {
@@ -74,20 +83,52 @@ describe('the centre button', () => {
   });
 });
 
+/*
+ * The last slot opens the menu, or Settings when the menu would hold nothing
+ * else.
+ *
+ * It used to ask whether the role was literally called ADMIN, which is the
+ * wrong question twice: a shop that renames its roles — or gives a second
+ * person every permission without calling them ADMIN — got somebody who could
+ * reach nothing, and the answer stopped agreeing with what the menu draws the
+ * moment a row's gating changed.
+ */
 describe('the settings slot', () => {
-  it('opens everything an admin configures', async () => {
+  it('opens the menu for somebody with screens in it', async () => {
     const { navigate } = await mount();
     await fireEvent.press(screen.getByTestId('tab-settings'));
     expect(navigate).toHaveBeenCalledWith('Admin');
     expect(screen.getByText('More')).toBeTruthy();
   });
 
-  it('opens plain settings for everybody else', async () => {
-    mockUser = { name: 'Priya', code: 'PROD01', role: 'PRODUCTION' };
+  it('opens plain settings when the menu would hold only settings', async () => {
+    mockGranted = [];
     const { navigate } = await mount();
     await fireEvent.press(screen.getByTestId('tab-settings'));
     expect(navigate).toHaveBeenCalledWith('Settings');
     expect(screen.getByText('Settings')).toBeTruthy();
+  });
+
+  it('opens the menu for a role nobody called ADMIN', async () => {
+    // One permission is enough: there is now a screen in there for them.
+    mockGranted = [PERMISSIONS.ORDER_VIEW];
+    const { navigate } = await mount();
+
+    await fireEvent.press(screen.getByTestId('tab-settings'));
+
+    expect(navigate).toHaveBeenCalledWith('Admin');
+  });
+
+  it('counts the module as well as the permission', async () => {
+    // Allowed to see orders, in a workspace that has not bought them: the API
+    // refuses it, so the row is not there and the menu holds only Settings.
+    mockGranted = [PERMISSIONS.ORDER_VIEW];
+    mockModules = [];
+    const { navigate } = await mount();
+
+    await fireEvent.press(screen.getByTestId('tab-settings'));
+
+    expect(navigate).toHaveBeenCalledWith('Settings');
   });
 
   it('never reads as the tab you are standing in, since it is not a tab', async () => {

@@ -92,6 +92,7 @@ beforeEach(() => {
     PERMISSIONS.CASH_POSITION_VIEW,
     PERMISSIONS.DISBURSEMENT_VIEW,
     PERMISSIONS.ORDER_PUNCH,
+    PERMISSIONS.WORKFLOW_MANAGE,
   ];
 });
 
@@ -203,19 +204,40 @@ describe('where the work is', () => {
   });
 
   it('says something plainer to somebody who cannot change it', async () => {
-    mockUser = { name: 'Priya', code: 'PROD01', role: 'PRODUCTION', permissions: [] };
+    mockGranted = [];
     await mount([ORDER], [LEAD], { ...FLOW, statuses: [stage({ id: 's0', name: 'Lead' })] });
     expect(screen.getByText('No stages are being counted here yet.')).toBeTruthy();
   });
 
-  it('offers the way to change it only to an admin', async () => {
+  /*
+   * The dial edits which stages the card counts, which is the workflow — so
+   * the gate is the permission the API enforces on that write.
+   *
+   * It used to ask whether the role was called ADMIN, which a shop that
+   * renames or splits its roles fails: somebody the API would have let save
+   * the change had no way to reach it.
+   */
+  it('offers the way to change it to whoever may save the change', async () => {
     await mount();
-    await fireEvent.press(screen.getByTestId('edit-home-card'));
-    expect(navigate).toHaveBeenCalledWith('MainCard');
 
-    mockUser = { name: 'Priya', code: 'PROD01', role: 'PRODUCTION', permissions: [] };
+    await fireEvent.press(screen.getByTestId('edit-home-card'));
+
+    expect(navigate).toHaveBeenCalledWith('MainCard');
+  });
+
+  it('hides it from somebody the API would refuse', async () => {
+    mockGranted = [PERMISSIONS.ORDER_PUNCH];
     await mount();
+
     expect(screen.queryByTestId('edit-home-card')).toBeNull();
+  });
+
+  it('offers it for a role nobody called ADMIN', async () => {
+    mockUser = { name: 'Priya', code: 'PROD01', role: 'PRODUCTION', roleName: 'Karigar' };
+    mockGranted = [PERMISSIONS.WORKFLOW_MANAGE];
+    await mount();
+
+    expect(screen.getByTestId('edit-home-card')).toBeTruthy();
   });
 });
 

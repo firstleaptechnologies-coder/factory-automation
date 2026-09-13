@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type { CustomFieldDefinition, Material, NavGroup, NavItem, SizePreset, Workflow } from '@fas/shared';
+import type { CustomFieldDefinition, Material, NavGroup, SizePreset, Workflow } from '@fas/shared';
 import { NAV_GROUPS } from '@fas/shared';
 import { goTo } from '../../navigation/routes';
+import { navItemVisible } from '../../navigation/menu';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { useApi } from '../../hooks/useApi';
@@ -70,10 +71,9 @@ export function AdminHomeScreen({ navigation }: { navigation: any }) {
    * Two gates, and both have to pass: the plan decides what the business
    * bought, the role decides who inside it may touch it.
    */
-  const visible = (item: NavItem) =>
-    Boolean(item.app) &&
-    (!item.permission || can(item.permission)) &&
-    (!item.module || has(item.module));
+  // The same predicate the bar uses to decide whether this screen is worth
+  // opening at all.
+  const visible = navItemVisible({ can, has });
 
   const groupHas = (group: NavGroup): boolean =>
     group.items.some(visible) || (group.groups ?? []).some(groupHas);
