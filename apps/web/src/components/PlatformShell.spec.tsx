@@ -1,4 +1,7 @@
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
+import { PLATFORM_NAV } from '@fas/shared';
 import { PlatformShell } from './PlatformShell';
 
 const replace = jest.fn();
@@ -109,4 +112,52 @@ it('shows nothing of the console to somebody who is not one of us', () => {
   mount();
 
   expect(screen.queryByText('inside')).not.toBeInTheDocument();
+});
+
+/*
+ * Every row in the console's sidebar, against the pages that exist.
+ *
+ * Same check as the shop's sidebar, for the same reason: the gating is tested
+ * above because it was designed, and the href is the part that is only typed.
+ */
+describe('every row', () => {
+  const pages = (dir: string, prefix = ''): string[] => {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir)) {
+      const path = join(dir, entry);
+      if (statSync(path).isDirectory()) out.push(...pages(path, `${prefix}/${entry}`));
+      else if (entry === 'page.tsx') out.push(prefix || '/');
+    }
+    return out;
+  };
+
+  const served = pages(join(__dirname, '../app')).map(
+    (route) =>
+      new RegExp(`^${route.replace(/\[[^\]]+\]/g, '[^/]+').replace(/\//g, '\\/')}$`),
+  );
+
+  const rows = PLATFORM_NAV.flatMap((group) =>
+    group.items.filter((item) => item.web).map((item) => [item.label, item.web as string] as const),
+  );
+
+  it('has rows at all, so an empty walk does not pass silently', () => {
+    expect(rows.length).toBeGreaterThan(3);
+    expect(served.length).toBeGreaterThan(30);
+  });
+
+  it.each(rows)('%s links to %s, and that page exists', (label, web) => {
+    mount();
+
+    const link = screen.getByText(label).closest('a');
+
+    expect(link).toHaveAttribute('href', web);
+    expect(served.some((page) => page.test(web))).toBe(true);
+  });
+
+  // The console and a shop are never mounted together — a platform admin
+  // belongs to no workspace — so a shop's path here is a link out of the app.
+  it('goes nowhere outside the console', () => {
+    const strays = rows.filter(([, web]) => !web.startsWith('/platform'));
+    expect(strays).toEqual([]);
+  });
 });

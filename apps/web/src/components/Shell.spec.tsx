@@ -1,5 +1,7 @@
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { PERMISSIONS } from '@fas/shared';
+import { NAV_GROUPS, NAV_HOME, PERMISSIONS, type NavGroup, type NavItem } from '@fas/shared';
 import { Shell } from './Shell';
 
 const replace = jest.fn();
@@ -361,5 +363,88 @@ describe('the support banner', () => {
     });
     fireEvent.click(screen.getByText('Leave'));
     expect(signOut).toHaveBeenCalled();
+  });
+});
+
+/*
+ * Every row in the sidebar, against the pages that exist.
+ *
+ * The tests above check the gating — who sees what — which is the part that
+ * was designed. What nobody was checking is the part that is typed: the href.
+ * The app's menu had four rows that rendered perfectly and went nowhere, for
+ * as long as it has existed, because no test pressed them; this is the same
+ * list, rendered by the same tree, and the same thing was true of it.
+ *
+ * Matched against the app directory rather than a list written here, because a
+ * list written here is a list that agrees with itself.
+ */
+describe('every row in the sidebar', () => {
+  const pages = (dir: string, prefix = ''): string[] => {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir)) {
+      const path = join(dir, entry);
+      if (statSync(path).isDirectory()) out.push(...pages(path, `${prefix}/${entry}`));
+      else if (entry === 'page.tsx') out.push(prefix || '/');
+    }
+    return out;
+  };
+
+  /** `/orders/[id]` as something a concrete href can be tested against. */
+  const served = pages(join(__dirname, '../app')).map(
+    (route) =>
+      new RegExp(`^${route.replace(/\[[^\]]+\]/g, '[^/]+').replace(/\//g, '\\/')}$`),
+  );
+
+  const rows: NavItem[] = [];
+  const collect = (group: NavGroup) => {
+    rows.push(...group.items);
+    group.groups?.forEach(collect);
+  };
+  NAV_GROUPS.forEach(collect);
+
+  const shown = rows.filter((item) => item.web);
+
+  beforeEach(() => {
+    // Everything on, so no row is missing for a reason the gating tests own.
+    mount({ ...withPermissions(...Object.values(PERMISSIONS)), has: () => true });
+  });
+
+  it('has rows at all, so an empty walk does not pass silently', () => {
+    expect(shown.length).toBeGreaterThan(15);
+    expect(served.length).toBeGreaterThan(30);
+  });
+
+  it.each(shown.map((item) => [item.label, item.web as string]))(
+    '%s links to %s, and that page exists',
+    (label, web) => {
+      const link = screen.getByText(label).closest('a');
+
+      expect(link).toHaveAttribute('href', web);
+      expect(served.some((page) => page.test(web))).toBe(true);
+    },
+  );
+
+  it('links Home to a page that exists too, since it sits outside the categories', () => {
+    const link = screen.getByText(NAV_HOME.label).closest('a');
+
+    expect(link).toHaveAttribute('href', NAV_HOME.web as string);
+    expect(served.some((page) => page.test(NAV_HOME.web as string))).toBe(true);
+  });
+
+  /*
+   * A row the sidebar cannot link is dropped rather than drawn.
+   *
+   * `NavLink` casts `item.web` to a string, so an app-only row would render
+   * `href={undefined}` — a link that looks like every other one and goes
+   * nowhere. Settings is app-only today: the browser signs out from the
+   * footer instead.
+   */
+  it('leaves out a row that exists only in the app', () => {
+    const appOnly = rows.filter((item) => !item.web);
+    expect(appOnly.length).toBeGreaterThan(0);
+
+    for (const item of appOnly) {
+      expect(screen.queryByText(item.label)).toBeNull();
+    }
   });
 });
