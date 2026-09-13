@@ -88,6 +88,37 @@ it.each([
   expect(navigate).toHaveBeenCalledWith(route);
 });
 
+/*
+ * The rows that are tabs.
+ *
+ * The menu is a stack screen and Orders, Leads, Home, Search and Punch live in
+ * the tab navigator beside it. `navigate` walks up to a parent, never down
+ * into a sibling, so navigating to them by name reached nothing: those rows
+ * did nothing at all, and said so only in a console — "The action 'NAVIGATE'
+ * with payload {"name":"Leads"} was not handled by any navigator".
+ */
+describe('the rows that are tabs rather than stack screens', () => {
+  beforeEach(() => {
+    mockGranted = [
+      PERMISSIONS.CONFIG_VIEW,
+      PERMISSIONS.ORDER_VIEW,
+      PERMISSIONS.LEAD_VIEW,
+      PERMISSIONS.ORDER_PUNCH,
+    ];
+  });
+
+  it.each([
+    ['Orders', 'Orders'],
+    ['Leads', 'Leads'],
+    ['Punch order', 'PunchTab'],
+  ])('opens %s through the tab navigator', async (label, route) => {
+    await mount();
+    await fireEvent.press(screen.getByText(label));
+
+    expect(navigate).toHaveBeenCalledWith('Main', { screen: route });
+  });
+});
+
 it('goes back', async () => {
   await mount();
   await fireEvent.press(screen.getByLabelText('Back'));

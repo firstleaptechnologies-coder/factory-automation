@@ -9,6 +9,7 @@ import {
 } from '@fas/shared';
 import type { JobHealth, ModuleKey, ModulePrices, Tier } from '@fas/shared';
 import { api } from '../../api/client';
+import { goTo } from '../../navigation/routes';
 import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../auth/AuthContext';
 import {
@@ -170,7 +171,7 @@ export function PlatformOverviewScreen({ navigation }: { navigation: any }) {
                 key={item.key}
                 title={item.label}
                 variant="dark"
-                onPress={() => navigation.navigate(item.app as never)}
+                onPress={() => goTo(navigation, item.app as string)}
                 style={{ marginBottom: spacing.sm }}
               />
             ))}

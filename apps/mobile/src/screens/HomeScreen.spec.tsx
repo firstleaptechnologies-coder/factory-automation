@@ -242,11 +242,22 @@ it.each([
   ['Clients', 'Clients'],
   ['Transactions', 'Transactions'],
   ['Payout', 'DisbursementLedger'],
-  ['Punch', 'PunchTab'],
 ])('the %s tile opens %s', async (label, route) => {
   await mount();
   await fireEvent.press(screen.getByText(label));
   expect(navigate).toHaveBeenCalledWith(route);
+});
+
+/*
+ * Punching is a tab, not a stack screen, so it is reached through the tab
+ * navigator it lives in. The tile is the only way into it — the bar does not
+ * draw it — which is why this is asserted rather than left to the helper's
+ * own tests.
+ */
+it('the Punch tile opens the punch tab', async () => {
+  await mount();
+  await fireEvent.press(screen.getByText('Punch'));
+  expect(navigate).toHaveBeenCalledWith('Main', { screen: 'PunchTab' });
 });
 
 it('opens an order from the recent list', async () => {

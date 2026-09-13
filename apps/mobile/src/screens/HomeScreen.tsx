@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeInDown, FadeInRight, Layout } from 'react-native-
 import type { Lead, Order, Paginated, Workflow } from '@fas/shared';
 import { PERMISSIONS, UNIT_LABEL } from '@fas/shared';
 import { api } from '../api/client';
+import { goTo } from '../navigation/routes';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { useDisplayUnit } from '../hooks/useUnit';
@@ -213,7 +214,7 @@ export function HomeScreen({ navigation }: { navigation: any }) {
                 tone="dark"
                 fluid
                 onAccentGround
-                onPress={() => navigation.navigate(tile.to)}
+                onPress={() => goTo(navigation, tile.to)}
               />
             ))}
           </View>

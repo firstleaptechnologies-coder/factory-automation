@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { CustomFieldDefinition, Material, NavGroup, NavItem, SizePreset, Workflow } from '@fas/shared';
 import { NAV_GROUPS } from '@fas/shared';
+import { goTo } from '../../navigation/routes';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { useApi } from '../../hooks/useApi';
@@ -125,7 +126,7 @@ export function AdminHomeScreen({ navigation }: { navigation: any }) {
                     <Card
                       tone="dark"
                       style={styles.row}
-                      onPress={() => navigation.navigate(item.app as string)}>
+                      onPress={() => goTo(navigation, item.app as string)}>
                       <View style={styles.iconWell}>
                         <Icon name={item.icon as IconName} size={20} color={palette.accent} />
                       </View>

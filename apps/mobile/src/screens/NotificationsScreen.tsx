@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { AppNotification } from '@fas/shared';
 import { api } from '../api/client';
+import { goTo } from '../navigation/routes';
 import { useApi } from '../hooks/useApi';
 import { Card, EmptyState, Icon, Loader, Screen, ScreenHeader, Text, haptic } from '../ui';
 import { relativeTime } from '../lib/format';
@@ -38,7 +39,7 @@ export function NotificationsScreen({ navigation }: { navigation: any }) {
     const opens = item.entity ? OPENS[item.entity] : undefined;
     if (opens && item.entityId) {
       const { route, params } = opens(item.entityId);
-      navigation.navigate(route, params);
+      goTo(navigation, route, params);
     } else {
       feed.reload();
     }
