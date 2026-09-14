@@ -14,6 +14,8 @@
 **/.env
 **/.env.*
 !**/.env.example
+# The deployment's own environment file, which does not match either pattern.
+deploy/api.env
 
 # The app is built by Xcode and Gradle, not by this.
 apps/mobile

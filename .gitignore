@@ -32,3 +32,8 @@ apps/api/test/**/*.js.map
 # it to check a signature. The private key is not: it belongs in the API's
 # environment and in a password manager, and nowhere else.
 apps/mobile/keys/
+
+# The deployment's secrets and the one name compose interpolates. Both live
+# only on the box they run on; apps/api/.env.example says what goes in them.
+deploy/api.env
+deploy/.env

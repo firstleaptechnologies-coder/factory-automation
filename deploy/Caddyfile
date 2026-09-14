@@ -1,0 +1,29 @@
+# TLS for the API, and nothing else.
+#
+# Caddy asks Let's Encrypt for a certificate on first start and renews it by
+# itself. That needs port 80 reachable from the internet and the domain's A
+# record already pointing here — a certificate cannot be issued for a name that
+# does not resolve to this box.
+#
+# The app will not talk to plain HTTP: iOS blocks it outright, and Android has
+# since 9. So this is not hardening that can wait — without it there is no app.
+
+{$API_DOMAIN} {
+	# The API sets its own CORS from CORS_ORIGINS; nothing is added here, so
+	# there is one place that decides who may call it.
+	reverse_proxy api:3001
+
+	# Uploads: order photos off a phone camera, and OTA bundles.
+	request_body {
+		max_size 60MB
+	}
+
+	encode gzip
+
+	log {
+		output file /data/access.log {
+			roll_size 10MB
+			roll_keep 5
+		}
+	}
+}

@@ -1,0 +1,230 @@
+# Deployment
+
+Where FAS runs, and how a change gets there. Written for the first real
+deployment — Decor Bucket — and meant to be followed rather than read.
+
+## The shape
+
+| Piece | Where | Why there |
+| --- | --- | --- |
+| API + scheduled work | One EC2 instance, `ap-southeast-1` (Singapore) | It is a long-lived process. |
+| Postgres | Neon, `aws-ap-southeast-1` | Managed backups and point-in-time restore, in the same region as the API. |
+| Files (order photos, OTA bundles) | S3, `ap-southeast-1` | The API already speaks S3; without it every file goes into a Postgres row. |
+| Web app | Vercel | Static and server-rendered Next; it only needs to reach the API. |
+| The phone app | TestFlight / an APK | Its server is chosen by the channel baked into the binary. |
+
+### Why the API is not on Vercel
+
+`apps/api` is a process, not a set of functions. `ReportsJob` runs every minute
+on a lease, the nightly jobs hold leases of their own so two instances cannot
+both run them, and `JobRunnerService` assumes something is alive between ticks.
+Rewriting that against per-invocation functions would mean throwing away
+`apps/api/src/common/jobs` and the Dockerfile that already exists. The web app
+is a different question — it fits Vercel exactly, and goes there.
+
+### Everything in one region
+
+An API in Mumbai talking to a database in Singapore pays ~50 ms per query, and
+a single screen makes several. The API and the database are therefore in the
+same region, and the one hop from an Indian factory to Singapore is paid once
+per request instead of once per query. Neon has no Indian region, which is what
+settles it.
+
+## Before any of this can start
+
+Three things only you can do:
+
+- [ ] **An AWS account**, and an EC2 key pair in `ap-southeast-1`.
+- [ ] **A domain**, with an A record for the API — `api.<yourdomain>` pointing
+      at the instance's elastic IP. The app will not talk to plain HTTP (iOS
+      blocks it outright, Android since 9), so there is no deployment without a
+      name a certificate can be issued for.
+- [ ] **A Neon project** in `aws-ap-southeast-1`. The API key this repository's
+      tooling has can read Neon but not create projects.
+
+### About the free tier
+
+AWS changed it in mid-2025. Accounts opened before then get the old deal — 750
+hours of `t2.micro`/`t3.micro` a month for twelve months. Accounts opened after
+get credits for six months instead, and then pay. A `t3.micro` is around $8/mo
+on demand in Singapore once the credits are gone, which is the same money as a
+managed container host that would not need any of the setup below. Worth
+knowing before the sixth month, not after it.
+
+## 1. The database
+
+In the Neon console, create a project in **AWS Asia Pacific 1 (Singapore)**.
+Take two connection strings from it:
+
+- the **pooled** one (its host contains `-pooler`) → `DATABASE_URL`
+- the **direct** one → `DIRECT_URL`
+
+Both are needed and they are not interchangeable: a pooler in transaction mode
+cannot hold the session a migration wants, so migrations go through
+`DIRECT_URL` while everything else goes through the pooler.
+
+## 2. The instance
+
+`t3.micro`, Amazon Linux 2023, `ap-southeast-1`. Give it an **elastic IP** —
+a stopped instance comes back with a different address otherwise, and the DNS
+record would be pointing at somebody else's machine.
+
+Security group: 22 from your address only, 80 and 443 from anywhere. Nothing
+else. Postgres is not on this box and 5432 has no business being open.
+
+Then, on the instance:
+
+```bash
+# Docker, and the compose plugin, which AL2023 does not package.
+sudo dnf install -y docker git rsync
+sudo systemctl enable --now docker
+sudo usermod -aG docker ec2-user
+sudo mkdir -p /usr/libexec/docker/cli-plugins
+sudo curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-compose \
+  https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
+sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+# Swap. 1 GB is not enough to run `npm ci` and tsc, and the build dies
+# without a word that says so.
+sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+sudo mkdir -p /srv/fas && sudo chown ec2-user:ec2-user /srv/fas
+```
+
+Log out and back in, so the docker group takes effect.
+
+## 3. The environment
+
+Two files on the box, in `/srv/fas/deploy/`, and nowhere else. Neither is in
+the repository and `.gitignore` keeps it that way.
+
+`deploy/.env` — the one name compose itself interpolates:
+
+```
+API_DOMAIN=api.yourdomain.com
+```
+
+`deploy/api.env` — everything the API reads. `apps/api/.env.example` is the
+full list with its reasons; the ones that matter here:
+
+```
+APP_ENV=production
+DATABASE_URL=<Neon pooled>
+DIRECT_URL=<Neon direct>
+JWT_SECRET=<32+ random bytes>
+ENCRYPTION_KEYS=k1:<base64 32-byte key>
+CORS_ORIGINS=https://app.yourdomain.com
+S3_BUCKET=... S3_REGION=ap-southeast-1 S3_ACCESS_KEY_ID=... S3_SECRET_ACCESS_KEY=...
+EXPO_OTA_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+```
+
+Generate the two secrets with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Three of these are worth stopping on:
+
+- **`ENCRYPTION_KEYS`** is the only variable the API refuses to start without
+  in production. Lose it and every dedicated tenant's connection string becomes
+  unreadable.
+- **`EXPO_OTA_PRIVATE_KEY`** must be the same key the app binary was built
+  against. An API without it serves unsigned updates, which every app built
+  with `apps/mobile/certs/certificate.pem` refuses — silently, from the shop's
+  point of view.
+- **`CORS_ORIGINS`** is the only thing deciding who may call this API from a
+  browser. It is not a list to leave wide.
+
+## 4. The first deploy
+
+From this machine:
+
+```bash
+deploy/ship.sh ec2-user@api.yourdomain.com
+```
+
+That copies the working tree, builds the image on the box, migrates the
+platform database and every dedicated tenant, then starts the API and Caddy.
+Caddy asks Let's Encrypt for a certificate on its first start, which needs the
+A record to already resolve here.
+
+The first build takes a long while on a `t3.micro` — it is compiling
+TypeScript on two shared vCPUs against a swapfile. Later builds reuse layers
+and are quick.
+
+Check it:
+
+```bash
+curl https://api.yourdomain.com/api/health
+```
+
+It reports `APP_ENV`, so nobody has to guess whether they are looking at
+staging or at a shop's live data.
+
+## 5. Seeding the first workspace
+
+The platform database starts empty. Create the tenant, its owner and its
+modules through the platform screens — the API's own bootstrap — rather than
+by hand in SQL: a tenant without a `TenantModule` row is a workspace whose
+every screen is gated off, and that is very confusing to debug from the inside.
+
+## 6. The web app
+
+On Vercel, in the `momentumarenas-projects` team, with root directory
+`apps/web`. One environment variable:
+
+```
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
+```
+
+Then add that deployment's URL to `CORS_ORIGINS` on the box and restart the
+API, or the browser will refuse every call it makes.
+
+## 7. The phone app
+
+The app picks its server from the channel baked into the binary — see
+`apps/mobile/src/api/environments.ts`. For a production build:
+
+1. Fill in `production.apiOrigin` in that table with `https://api.yourdomain.com`.
+2. Set the channel to `production` in **both** native files:
+   `ios/Expo.plist` (`expo-channel-name`) and
+   `android/app/src/main/res/values/strings.xml`.
+3. Set the update URL in both to `https://api.yourdomain.com/api/updates/manifest`
+   — `EXUpdatesURL` in the plist, `EXPO_UPDATE_URL` in `AndroidManifest.xml`.
+4. `npm run verify`. `environments.spec.ts` fails if the two platforms disagree,
+   if the channel has no server, or if the update URL is not the same server the
+   app sends its work to.
+
+All four are one commit, and that commit is a store release: the channel, the
+update URL and the certificate are in the binary, and an update cannot change
+any of them.
+
+## Deploying again
+
+```bash
+deploy/ship.sh ec2-user@api.yourdomain.com
+```
+
+Same script, same order: copy, migrate every tenant, restart. It exits non-zero
+if a dedicated tenant could not be reached, and the API is not restarted when
+that happens — a green deploy that skipped a tenant is the dangerous outcome,
+not an error.
+
+## What this does not have yet
+
+Said plainly, so nobody discovers it on the day it matters:
+
+- **No staging.** One box, and it is the shop's. `APP_ENV` exists to tell them
+  apart; there is nothing to tell apart yet.
+- **Nothing watches the box.** If it stops, the first to know is whoever tries
+  to punch an order. A CloudWatch alarm on the instance's status check is the
+  cheapest fix.
+- **No error sink.** Errors go to the container log with a reference the caller
+  was shown. Finding one means `docker compose logs`.
+- **Backups are Neon's.** Which is the right place for them, but nobody has
+  restored one yet, and a backup nobody has restored is a hope.
+- **One instance.** A deploy is a few seconds of downtime, and a reboot is a
+  few minutes of it.
