@@ -9,7 +9,6 @@ const apiMock = {
   letterTemplates: jest.fn(),
   letterDraft: jest.fn(),
   issueLetter: jest.fn(),
-  letterDocumentUrl: jest.fn((id: string) => `http://api.test/letters/${id}/document`),
 };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
@@ -20,6 +19,8 @@ jest.mock('@/lib/api', () => ({
     },
   ),
 }));
+jest.mock('@/lib/documents', () => ({ openDocument: jest.fn() }));
+import { openDocument } from '@/lib/documents';
 
 let permissions: string[] = [];
 jest.mock('@/lib/auth', () => ({
@@ -78,10 +79,10 @@ const mount = async () => {
 it('lists what somebody has been given, with a way to open it', async () => {
   await mount();
   expect(await screen.findByText('Offer — Ramesh Kumar')).toBeInTheDocument();
-  expect(screen.getByText('Open it')).toHaveAttribute(
-    'href',
-    'http://api.test/letters/l1/document',
-  );
+  // A button that fetches it with the session, not a link the browser
+  // follows on its own — which sent no session and came back 401.
+  fireEvent.click(screen.getByText('Open it'));
+  expect(openDocument).toHaveBeenCalledWith('/letters/l1/document');
 });
 
 it('drafts the wording from the server, filled in for this person', async () => {

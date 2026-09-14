@@ -1,15 +1,17 @@
-import React from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Client, HistoryEntry, Order } from '@fas/shared';
 import { api } from '../api/client';
 import { HistoryTimeline } from '../components/HistoryTimeline';
+import { shareDocument } from '../lib/documents';
 import { useApi } from '../hooks/useApi';
 import {
   Avatar,
   Card,
   Icon,
   Loader,
+  haptic,
   Pill,
   Screen,
   Button,
@@ -29,6 +31,23 @@ export function ClientDetailScreen({ route, navigation }: { route: any; navigati
   );
 
   const client = useApi<Client & { orders?: Order[] }>(() => api.client(clientId), [clientId]);
+  const [sharing, setSharing] = useState(false);
+
+  const shareStatement = async () => {
+    setSharing(true);
+    try {
+      await shareDocument({
+        path: `/clients/${clientId}/statement`,
+        fileName: `Statement-${client.data?.code ?? clientId}`,
+        message: `Statement — ${client.data?.name ?? ''}`,
+      });
+    } catch (e) {
+      haptic('notificationError');
+      Alert.alert('Could not build the statement', e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setSharing(false);
+    }
+  };
 
   if (!client.data) return <Loader />;
   const data = client.data;
@@ -98,12 +117,18 @@ export function ClientDetailScreen({ route, navigation }: { route: any; navigati
         </>
       ) : null}
 
-      {/* Opened rather than downloaded: it is HTML laid out for A4, and the
-          phone's own share sheet is what turns it into a PDF. */}
+      {/*
+        Fetched and shared like every other document, not opened as a link.
+
+        Handing the URL to the phone's browser sent it without the session, so
+        the one screen for chasing money threw the shop out of the app and
+        showed them `{"message":"Unauthorized","statusCode":401}` in Safari.
+      */}
       <Button
         title="Statement"
         variant="dark"
-        onPress={() => Linking.openURL(api.clientStatementUrl(clientId))}
+        loading={sharing}
+        onPress={shareStatement}
         style={{ marginTop: spacing.lg }}
       />
 

@@ -3,6 +3,11 @@ import { ClientDetailScreen } from './ClientDetailScreen';
 
 const mockClient = jest.fn();
 const mockHistory = jest.fn();
+const mockShareDocument = jest.fn(async (_options: unknown) => true);
+jest.mock('../lib/documents', () => ({
+  shareDocument: (options: unknown) => mockShareDocument(options),
+}));
+
 jest.mock('../api/client', () => ({
   api: {
     client: (...a: unknown[]) => mockClient(...a),
@@ -106,14 +111,20 @@ it('shows what has been changed on the client', async () => {
   expect(await screen.findByText('Phone changed')).toBeTruthy();
 });
 
-// The statement is paper for the client, so it opens the way every other
-// document does rather than being downloaded as a file.
-it('opens the client’s statement', async () => {
-  const { Linking } = require('react-native');
-  const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true as never);
-
+/*
+ * The statement is paper for the client, so it is fetched and shared the way
+ * every other document is.
+ *
+ * It used to be handed to the phone's browser as a URL, which carries no
+ * session: the one screen for chasing money threw the shop out of the app and
+ * showed them `{"message":"Unauthorized","statusCode":401}` in Safari.
+ */
+it('fetches the client’s statement with the session and shares it', async () => {
   await mount();
-  fireEvent.press(screen.getByText('Statement'));
 
-  expect(open).toHaveBeenCalledWith('http://api.test/clients/c1/statement');
+  await fireEvent.press(screen.getByText('Statement'));
+
+  expect(mockShareDocument).toHaveBeenCalledWith(
+    expect.objectContaining({ path: '/clients/c1/statement' }),
+  );
 });

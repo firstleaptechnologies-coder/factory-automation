@@ -4,6 +4,7 @@ import { use, useState } from 'react';
 import type { CreditReason, Invoice, Receivable } from '@fas/shared';
 import { CREDIT_REASON_LABELS, PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
+import { openDocument } from '@/lib/documents';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
 import { Shell } from '@/components/Shell';
@@ -113,7 +114,7 @@ function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
           <Button
             title="Open the invoice"
             icon="arrowUpRight"
-            onClick={() => window.open(api.invoiceDocumentUrl(invoiceId), '_blank')}
+            onClick={() => void openDocument(`/invoices/${invoiceId}/document`)}
           />
         }
       />
@@ -232,7 +233,7 @@ function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
                   <span className="t-h3">{formatInr(one.total)}</span>
                   <Chip
                     label="Open"
-                    onClick={() => window.open(api.creditNoteDocumentUrl(one.id), '_blank')}
+                    onClick={() => void openDocument(`/credit-notes/${one.id}/document`)}
                   />
                 </div>
               </div>

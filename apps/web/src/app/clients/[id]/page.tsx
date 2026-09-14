@@ -4,6 +4,7 @@ import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Client, HistoryEntry } from '@fas/shared';
 import { api } from '@/lib/api';
+import { openDocument } from '@/lib/documents';
 import { useApi } from '@/lib/useApi';
 import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { Shell } from '@/components/Shell';
@@ -45,7 +46,7 @@ function ClientDetail({ clientId }: { clientId: string }) {
             <Button
               title="Statement"
               variant="dark"
-              onClick={() => window.open(api.clientStatementUrl(clientId), '_blank')}
+              onClick={() => void openDocument(`/clients/${clientId}/statement`)}
             />
             <Button
               title="Firm details"

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Challan, Invoice, Receivable } from '@fas/shared';
 import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
+import { openDocument } from '@/lib/documents';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
 import { Shell } from '@/components/Shell';
@@ -188,7 +189,7 @@ function OrderInvoice({ orderId }: { orderId: string }) {
                 </div>
                 <Chip
                   label="Open"
-                  onClick={() => window.open(api.challanDocumentUrl(row.id), '_blank')}
+                  onClick={() => void openDocument(`/challans/${row.id}/document`)}
                 />
               </div>
             </Card>

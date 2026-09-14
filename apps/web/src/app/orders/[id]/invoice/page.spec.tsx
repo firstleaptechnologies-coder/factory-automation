@@ -9,7 +9,6 @@ const apiMock = {
   challans: jest.fn(),
   raiseInvoice: jest.fn(),
   issueChallan: jest.fn(),
-  challanDocumentUrl: jest.fn(),
 };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
@@ -20,6 +19,8 @@ jest.mock('@/lib/api', () => ({
     },
   ),
 }));
+jest.mock('@/lib/documents', () => ({ openDocument: jest.fn() }));
+import { openDocument } from '@/lib/documents';
 
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
@@ -87,9 +88,6 @@ beforeEach(() => {
   granted = [PERMISSIONS.INVOICE_VIEW, PERMISSIONS.INVOICE_ISSUE];
   apiMock.raiseInvoice.mockResolvedValue({ id: 'i9' });
   apiMock.issueChallan.mockResolvedValue({});
-  apiMock.challanDocumentUrl.mockImplementation(
-    (id: unknown) => `https://api.test/challans/${id}/document`,
-  );
   window.open = jest.fn();
 });
 
@@ -152,5 +150,5 @@ it('opens a challan at the API rather than redrawing it', async () => {
   fireEvent.click(screen.getByText('Open'));
   // The same markup the app turns into a PDF, so a challan printed here and
   // one shared from a phone are the same piece of paper.
-  expect(window.open).toHaveBeenCalledWith('https://api.test/challans/d1/document', '_blank');
+  expect(openDocument).toHaveBeenCalledWith('/challans/d1/document');
 });

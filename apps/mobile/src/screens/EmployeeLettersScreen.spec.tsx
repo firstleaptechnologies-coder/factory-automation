@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Linking } from 'react-native';
 import { PERMISSIONS } from '@fas/shared';
 import { EmployeeLettersScreen } from './EmployeeLettersScreen';
 
@@ -8,6 +7,11 @@ const mockLetters = jest.fn();
 const mockTemplates = jest.fn();
 const mockDraft = jest.fn();
 const mockIssue = jest.fn();
+const mockShareDocument = jest.fn(async (_options: unknown) => true);
+jest.mock('../lib/documents', () => ({
+  shareDocument: (options: unknown) => mockShareDocument(options),
+}));
+
 jest.mock('../api/client', () => ({
   api: {
     employee: (...a: unknown[]) => mockEmployee(...a),
@@ -74,12 +78,16 @@ it('lists what somebody has been given', async () => {
   expect(screen.getByText(/Offer letter · /)).toBeTruthy();
 });
 
+// Fetched with the session and shared, not handed to the browser as a URL —
+// which carries none and comes back 401 in a blank tab.
 it('opens the printed letter on the shop’s letterhead', async () => {
-  const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true as never);
   await mount();
+
   await fireEvent.press(await screen.findByText('Offer — Ramesh Kumar'));
-  expect(open).toHaveBeenCalledWith('http://api.test/letters/l1/document');
-  open.mockRestore();
+
+  expect(mockShareDocument).toHaveBeenCalledWith(
+    expect.objectContaining({ path: '/letters/l1/document' }),
+  );
 });
 
 it('drafts the wording from the server, filled in for this person', async () => {

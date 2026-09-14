@@ -8,8 +8,6 @@ const apiMock = {
   orderReceivable: jest.fn(),
   cancelInvoice: jest.fn(),
   creditInvoice: jest.fn(),
-  invoiceDocumentUrl: jest.fn(),
-  creditNoteDocumentUrl: jest.fn(),
 };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
@@ -20,6 +18,8 @@ jest.mock('@/lib/api', () => ({
     },
   ),
 }));
+jest.mock('@/lib/documents', () => ({ openDocument: jest.fn() }));
+import { openDocument } from '@/lib/documents';
 
 let granted: string[] = [];
 jest.mock('@/lib/auth', () => ({
@@ -95,12 +95,6 @@ beforeEach(() => {
   granted = [PERMISSIONS.INVOICE_VIEW, PERMISSIONS.INVOICE_CANCEL, PERMISSIONS.CREDIT_NOTE_ISSUE];
   apiMock.cancelInvoice.mockResolvedValue({});
   apiMock.creditInvoice.mockResolvedValue({});
-  apiMock.invoiceDocumentUrl.mockImplementation(
-    (id: unknown) => `https://api.test/invoices/${id}/document`,
-  );
-  apiMock.creditNoteDocumentUrl.mockImplementation(
-    (id: unknown) => `https://api.test/credit-notes/${id}/document`,
-  );
   window.open = jest.fn();
 });
 
@@ -200,5 +194,5 @@ it('says on the page why a cancelled invoice still has its number', async () => 
 it('opens the printable invoice at the API', async () => {
   await mount();
   fireEvent.click(screen.getByText('Open the invoice'));
-  expect(window.open).toHaveBeenCalledWith('https://api.test/invoices/i1/document', '_blank');
+  expect(openDocument).toHaveBeenCalledWith('/invoices/i1/document');
 });

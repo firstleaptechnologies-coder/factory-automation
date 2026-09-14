@@ -4,6 +4,7 @@ import { use, useState } from 'react';
 import type { Employee, Letter, LetterTemplate } from '@fas/shared';
 import { LETTER_LABELS, PERMISSIONS, today } from '@fas/shared';
 import { api } from '@/lib/api';
+import { openDocument } from '@/lib/documents';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
 import { Shell } from '@/components/Shell';
@@ -116,13 +117,12 @@ function Letters({ employeeId }: { employeeId: string }) {
                   <td className="muted">{LETTER_LABELS[letter.kind]}</td>
                   <td className="muted">{formatDateShort(letter.issuedOn)}</td>
                   <td>
-                    <a
-                      className="t-small"
-                      href={api.letterDocumentUrl(letter.id)}
-                      target="_blank"
-                      rel="noreferrer">
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() => void openDocument(`/letters/${letter.id}/document`)}>
                       Open it
-                    </a>
+                    </button>
                   </td>
                 </tr>
               ))}

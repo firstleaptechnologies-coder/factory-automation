@@ -1348,21 +1348,18 @@ export class ApiClient {
     return this.post<Invoice>(`/invoices/${id}/cancel`, { reason });
   }
 
-  /**
-   * A client's statement, as paper. HTML the browser prints to PDF, like
-   * every other document here.
+  /*
+   * There were three of these — a statement URL, an invoice document URL and
+   * an estimate document URL — and every one of them was a trap. They built an
+   * address for a route that needs a session, and each caller handed it to the
+   * browser to fetch, which sends no session: the shop got thrown out of the
+   * app into a tab reading `{"message":"Unauthorized","statusCode":401}`.
+   *
+   * Documents are fetched with `fetchText` like any other request and then
+   * shown, which is what the estimate sharing on the phone always did. The
+   * paths are written where they are used, so there is nothing left to reach
+   * for by mistake.
    */
-  clientStatementUrl(id: string, period?: { from?: string; to?: string }): string {
-    const query = new URLSearchParams();
-    if (period?.from) query.set('from', period.from);
-    if (period?.to) query.set('to', period.to);
-    const suffix = query.toString() ? `?${query.toString()}` : '';
-    return `${this.baseUrl}/clients/${id}/statement${suffix}`;
-  }
-
-  invoiceDocumentUrl(id: string): string {
-    return `${this.baseUrl}/invoices/${id}/document`;
-  }
 
   challans(query?: { orderId?: string }) {
     return this.get<Challan[]>('/challans', query);
@@ -1390,9 +1387,6 @@ export class ApiClient {
     return this.post<Challan>(`/challans/${id}/cancel`, { reason });
   }
 
-  challanDocumentUrl(id: string): string {
-    return `${this.baseUrl}/challans/${id}/document`;
-  }
 
   creditNotes(query?: { invoiceId?: string }) {
     return this.get<CreditNote[]>('/credit-notes', query);
@@ -1419,9 +1413,6 @@ export class ApiClient {
     return this.post<CreditNote>(`/credit-notes/${id}/cancel`, { reason });
   }
 
-  creditNoteDocumentUrl(id: string): string {
-    return `${this.baseUrl}/credit-notes/${id}/document`;
-  }
 
   /**
    * What an order was charged, credited and paid.
@@ -1478,9 +1469,6 @@ export class ApiClient {
   }
 
   /** The letter itself, on the shop's letterhead. */
-  letterDocumentUrl(id: string): string {
-    return `${this.baseUrl}/letters/${id}/document`;
-  }
 
   // -- the firm, and the documents it prints ---------------------------------
 
@@ -1560,10 +1548,6 @@ export class ApiClient {
    * straight to WhatsApp, while the web prints the very same markup — one
    * layout, one set of totals.
    */
-  estimateDocumentUrl(id: string): string {
-    return `${this.baseUrl}/estimates/${id}/document`;
-  }
-
   // -- platform -------------------------------------------------------------
 
   tenants() {

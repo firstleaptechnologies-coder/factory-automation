@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { Estimate, EstimateStatus, HistoryEntry } from '@fas/shared';
 import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
+import { openDocument } from '@/lib/documents';
 import { useApi } from '@/lib/useApi';
 import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { useAuth } from '@/lib/auth';
@@ -71,7 +72,7 @@ function EstimateDetail({ estimateId }: { estimateId: string }) {
               onClick={() =>
                 // The server renders the document; the browser prints or saves
                 // it. Same markup the app turns into a PDF on the phone.
-                window.open(api.estimateDocumentUrl(estimateId), '_blank')
+                void openDocument(`/estimates/${estimateId}/document`)
               }
             />
           </div>

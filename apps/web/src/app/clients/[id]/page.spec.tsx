@@ -8,9 +8,10 @@ jest.mock('@/lib/api', () => ({
   api: {
     client: (...a: unknown[]) => clientCall(...a),
     history: (...a: unknown[]) => historyCall(...a),
-    clientStatementUrl: (id: string) => `http://api.test/clients/${id}/statement`,
   },
 }));
+jest.mock('@/lib/documents', () => ({ openDocument: jest.fn() }));
+import { openDocument } from '@/lib/documents';
 
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
@@ -165,11 +166,10 @@ describe('the orders', () => {
 // The statement is paper for the client: opened for the browser to print,
 // not downloaded as a file.
 it('opens the client’s statement in a new tab', async () => {
-  const open = jest.spyOn(window, 'open').mockImplementation(() => null);
-
   await mount();
   fireEvent.click(screen.getByText('Statement'));
 
-  expect(open).toHaveBeenCalledWith('http://api.test/clients/c1/statement', '_blank');
-  open.mockRestore();
+  // Fetched with the session and shown, not handed to the browser as a URL —
+  // which sent no session and came back 401 in a blank tab.
+  expect(openDocument).toHaveBeenCalledWith('/clients/c1/statement');
 });

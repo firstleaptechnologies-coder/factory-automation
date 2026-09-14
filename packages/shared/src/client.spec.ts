@@ -105,17 +105,27 @@ describe('transport', () => {
     expect(build().fileUrl('f1')).toBe('https://api.test/files/f1');
   });
 
-  it('builds the estimate document URL off the same base', () => {
-    expect(build().estimateDocumentUrl('e1')).toBe('https://api.test/estimates/e1/document');
-  });
+  /*
+   * There used to be five document-URL builders here, and every caller handed
+   * the address to the browser to fetch — which sends no session, so each one
+   * came back 401. They are gone: a document is fetched with `fetchText` like
+   * any other request and then shown, and the paths are written where they are
+   * used. `fileUrl` above stays, because an <img src> genuinely needs a URL
+   * and files are served without a session.
+   */
+  it('keeps no builder for a document that needs a session', () => {
+    const api = build() as unknown as Record<string, unknown>;
 
-  it('builds the three document URLs off the same base', () => {
-    // All three are fetched as text and turned into a PDF on the device, so
-    // they have to be absolute rather than relative to whatever screen asked.
-    const api = build();
-    expect(api.invoiceDocumentUrl('i1')).toBe('https://api.test/invoices/i1/document');
-    expect(api.challanDocumentUrl('d1')).toBe('https://api.test/challans/d1/document');
-    expect(api.creditNoteDocumentUrl('c1')).toBe('https://api.test/credit-notes/c1/document');
+    for (const gone of [
+      'clientStatementUrl',
+      'invoiceDocumentUrl',
+      'estimateDocumentUrl',
+      'challanDocumentUrl',
+      'creditNoteDocumentUrl',
+      'letterDocumentUrl',
+    ]) {
+      expect(api[gone]).toBeUndefined();
+    }
   });
 });
 

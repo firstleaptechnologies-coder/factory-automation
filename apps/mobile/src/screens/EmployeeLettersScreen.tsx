@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Alert, Linking, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type { Employee, Letter, LetterTemplate } from '@fas/shared';
 import { LETTER_LABELS, PERMISSIONS, today } from '@fas/shared';
 import { api } from '../api/client';
+import { shareDocument } from '../lib/documents';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../auth/AuthContext';
 import {
@@ -86,6 +87,19 @@ export function EmployeeLettersScreen({ navigation, route }: { navigation: any; 
     }
   };
 
+  /*
+   * Fetched and shared like every other document, not opened as a link:
+   * handing the URL to the browser sends it without the session, so the letter
+   * came back as a 401 in a blank tab.
+   */
+  const openLetter = async (letter: { id: string; title: string }) => {
+    try {
+      await shareDocument({ path: `/letters/${letter.id}/document`, fileName: letter.title });
+    } catch (e) {
+      Alert.alert('Could not open it', e instanceof Error ? e.message : 'Unknown error');
+    }
+  };
+
   if (letters.loading && !letters.data) return <Loader label="Loading" />;
   const rows = letters.data ?? [];
 
@@ -112,7 +126,7 @@ export function EmployeeLettersScreen({ navigation, route }: { navigation: any; 
             <Card
               tone="dark"
               style={styles.row}
-              onPress={() => Linking.openURL(api.letterDocumentUrl(letter.id))}>
+              onPress={() => void openLetter(letter)}>
               <View style={styles.rowTop}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="h3" numberOfLines={1}>{letter.title}</Text>

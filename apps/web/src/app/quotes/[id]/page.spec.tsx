@@ -7,7 +7,6 @@ const apiMock = {
   estimate: jest.fn(),
   setEstimateStatus: jest.fn(),
   convertEstimate: jest.fn(),
-  estimateDocumentUrl: jest.fn(() => 'https://api.test/estimates/e1/document'),
   history: jest.fn(),
 };
 jest.mock('@/lib/api', () => ({
@@ -19,6 +18,8 @@ jest.mock('@/lib/api', () => ({
     },
   ),
 }));
+jest.mock('@/lib/documents', () => ({ openDocument: jest.fn() }));
+import { openDocument } from '@/lib/documents';
 
 const push = jest.fn();
 let editing = false;
@@ -107,8 +108,6 @@ beforeEach(() => {
   apiMock.setEstimateStatus.mockResolvedValue({});
   apiMock.history.mockResolvedValue([]);
   apiMock.convertEstimate.mockResolvedValue({ id: 'o9' });
-  apiMock.estimateDocumentUrl.mockReturnValue('https://api.test/estimates/e1/document');
-  jest.spyOn(window, 'open').mockImplementation(() => null);
 });
 
 it('says it is loading rather than showing an empty quote', async () => {
@@ -139,7 +138,7 @@ it('opens the document the server renders', async () => {
   await mount();
   fireEvent.click(screen.getByText('Open the PDF'));
   // The same markup the app turns into a PDF on the phone.
-  expect(window.open).toHaveBeenCalledWith('https://api.test/estimates/e1/document', '_blank');
+  expect(openDocument).toHaveBeenCalledWith('/estimates/e1/document');
 });
 
 describe('the money', () => {
