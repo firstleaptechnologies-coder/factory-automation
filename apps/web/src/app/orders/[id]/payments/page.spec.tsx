@@ -215,6 +215,54 @@ describe('recording a payment', () => {
     expect(apiMock.recordPayment).not.toHaveBeenCalled();
   });
 
+  /*
+   * The sequence the shop's own trial walked into. ₹99,999 typed against
+   * ₹80,000 owed and refused, the sheet closed and reopened — and the refused
+   * figure was still sitting there, so the real amount typed after it read
+   * 9999930000.
+   */
+  describe('a figure that was abandoned', () => {
+    const open = () => fireEvent.click(screen.getByText('Record a payment'));
+    const close = () => fireEvent.click(screen.getByLabelText('Close'));
+
+    it('is gone when the sheet is closed and opened again', async () => {
+      await mount();
+      open();
+      fireEvent.change(field('Amount'), { target: { value: '99999' } });
+
+      close();
+      open();
+
+      expect(field('Amount')).toHaveValue('');
+    });
+
+    it('is gone after the server refuses it', async () => {
+      apiMock.recordPayment.mockRejectedValue(new Error('That is more than is owed'));
+      await mount();
+      open();
+      fireEvent.change(field('Amount'), { target: { value: '99999' } });
+      fireEvent.click(screen.getByText('Record'));
+      await waitFor(() => expect(apiMock.recordPayment).toHaveBeenCalled());
+
+      close();
+      open();
+
+      expect(field('Amount')).toHaveValue('');
+    });
+
+    it('takes the banked figure with it', async () => {
+      await mount();
+      open();
+      fireEvent.change(field('Amount'), { target: { value: '5000' } });
+      fireEvent.change(field('Banked straight away'), { target: { value: '3000' } });
+
+      close();
+      open();
+
+      expect(field('Banked straight away')).toHaveValue('');
+    });
+  });
+
   it('records cash, and how much of it went straight to the bank', async () => {
     await mount();
     fireEvent.click(screen.getByText('Record a payment'));

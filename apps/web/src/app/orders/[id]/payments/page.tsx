@@ -61,6 +61,26 @@ function Payments({ orderId }: { orderId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /*
+   * Closing a money sheet forgets what was in it.
+   *
+   * It used to keep everything and clear only on a payment that went through,
+   * so a figure the server had just refused was still sitting there on
+   * reopening with the cursor at the end of it — ₹99,999 refused, ₹23,200
+   * typed, and the field reading 9999923200.
+   */
+  const closePayment = () => {
+    setSheet(false);
+    setAmount('');
+    setReference('');
+    setBankedNow('');
+  };
+
+  const closeDeposit = () => {
+    setDepositFor(null);
+    setDepositAmount('');
+  };
+
   const record = async () => {
     setBusy(true);
     setError(null);
@@ -71,10 +91,7 @@ function Payments({ orderId }: { orderId: string }) {
         reference: reference || undefined,
         depositedAmount: mode === 'CASH' && bankedNow ? Number(bankedNow) : undefined,
       });
-      setSheet(false);
-      setAmount('');
-      setReference('');
-      setBankedNow('');
+      closePayment();
       summary.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record');
@@ -113,8 +130,7 @@ function Payments({ orderId }: { orderId: string }) {
         paymentId: depositFor ?? undefined,
         amount: Number(depositAmount),
       });
-      setDepositFor(null);
-      setDepositAmount('');
+      closeDeposit();
       summary.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record');
@@ -263,7 +279,7 @@ function Payments({ orderId }: { orderId: string }) {
         open={sheet}
         title="Record a payment"
         subtitle={`${formatInr(data.pending)} still owed`}
-        onClose={() => setSheet(false)}>
+        onClose={closePayment}>
         <span className="field-label">How did it arrive?</span>
         <div className="wrap" style={{ marginBottom: 'var(--s-lg)' }}>
           <Chip label="Cash" selected={mode === 'CASH'} onClick={() => setMode('CASH')} />
@@ -330,7 +346,7 @@ function Payments({ orderId }: { orderId: string }) {
         />
       </Sheet>
 
-      <Sheet open={Boolean(depositFor)} title="Bank this cash" onClose={() => setDepositFor(null)}>
+      <Sheet open={Boolean(depositFor)} title="Bank this cash" onClose={closeDeposit}>
         <Field
           label="Amount (₹)"
           value={depositAmount}

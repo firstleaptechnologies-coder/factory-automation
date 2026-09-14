@@ -87,6 +87,17 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
   const [reference, setReference] = useState('');
   const [busy, setBusy] = useState(false);
 
+  /*
+   * Closing a money sheet forgets what was in it — the same reason the
+   * payment sheet does. A figure the server refused, still sitting there with
+   * the cursor behind it, is how ₹99,999 and ₹23,200 became 9999923200.
+   */
+  const closeBanking = () => {
+    setRow(null);
+    setAmount('');
+    setReference('');
+  };
+
   const deposit = async () => {
     setBusy(true);
     try {
@@ -96,9 +107,7 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
         bankReference: reference || undefined,
       });
       haptic('notificationSuccess');
-      setRow(null);
-      setAmount('');
-      setReference('');
+      closeBanking();
       position.reload();
       toBank.reload();
       feed.reload();
@@ -335,7 +344,7 @@ export function TransactionsScreen({ navigation }: { navigation: any }) {
         visible={Boolean(row)}
         title="Bank this cash"
         subtitle={row ? `${row.orderCode} · ${row.client}` : undefined}
-        onClose={() => setRow(null)}>
+        onClose={closeBanking}>
         <Field
           label="Amount (₹)"
           value={amount}

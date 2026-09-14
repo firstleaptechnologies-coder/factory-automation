@@ -97,6 +97,30 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
       ],
     );
 
+  /*
+   * Closing a money sheet forgets what was in it.
+   *
+   * It used to keep everything, and only clear on a payment that actually went
+   * through — so a figure the server had just refused was still sitting there
+   * on reopening, with the cursor at the end of it. Typing the right amount
+   * appended to the wrong one: ₹99,999 refused, then ₹23,200 typed, and the
+   * field read 9999923200. On the screen where money is entered, a stale
+   * number nobody meant to keep is the most expensive thing to leave lying
+   * about.
+   */
+  const closePayment = () => {
+    setSheet(false);
+    setAmount('');
+    setReference('');
+    setBankedNow('');
+  };
+
+  const closeDeposit = () => {
+    setDepositFor(null);
+    setDepositAmount('');
+    setDepositRef('');
+  };
+
   const record = async () => {
     setBusy(true);
     try {
@@ -108,10 +132,7 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
           mode === 'CASH' && bankedNow ? Number(bankedNow) : undefined,
       });
       haptic('notificationSuccess');
-      setSheet(false);
-      setAmount('');
-      setReference('');
-      setBankedNow('');
+      closePayment();
       summary.reload();
     } catch (e) {
       haptic('notificationError');
@@ -130,9 +151,7 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
         bankReference: depositRef || undefined,
       });
       haptic('notificationSuccess');
-      setDepositFor(null);
-      setDepositAmount('');
-      setDepositRef('');
+      closeDeposit();
       summary.reload();
     } catch (e) {
       haptic('notificationError');
@@ -305,7 +324,7 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
         visible={sheet}
         title="Record a payment"
         subtitle={`${formatInr(data.pending)} still owed`}
-        onClose={() => setSheet(false)}>
+        onClose={closePayment}>
         <Text variant="label" tone="muted" style={{ marginBottom: spacing.sm }}>
           How did it arrive?
         </Text>
@@ -355,7 +374,7 @@ export function PaymentsScreen({ route, navigation }: { route: any; navigation: 
       <Sheet
         visible={Boolean(depositFor)}
         title="Bank this cash"
-        onClose={() => setDepositFor(null)}>
+        onClose={closeDeposit}>
         <Field
           label="Amount (₹)"
           value={depositAmount}

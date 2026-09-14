@@ -143,6 +143,61 @@ describe('recording a payment', () => {
     );
   });
 
+  /*
+   * The exact sequence the shop's own trial walked into.
+   *
+   * ₹99,999 typed against ₹27,200 owed, refused by the server as it should be.
+   * The sheet was closed and reopened — and ₹99,999 was still sitting there
+   * with the cursor at the end, so typing the real figure appended to it and
+   * the field read 9999923200. On the screen where money is entered, that is
+   * the most expensive thing to leave lying about.
+   */
+  describe('a figure that was abandoned', () => {
+    const amountField = () => screen.getByPlaceholderText('27200');
+
+    it('is gone when the sheet is closed and opened again', async () => {
+      await mount();
+      await openSheet();
+      await fireEvent.changeText(amountField(), '99999');
+
+      await fireEvent.press(screen.getByTestId('sheet-backdrop'));
+      await openSheet();
+
+      expect(amountField().props.value).toBe('');
+    });
+
+    it('is gone after the server refuses it', async () => {
+      mockRecordPayment.mockRejectedValue(new Error('That is more than is owed'));
+      await mount();
+      await openSheet();
+      await fireEvent.changeText(amountField(), '99999');
+      await fireEvent.press(screen.getByText('Record'));
+      await waitFor(() => expect(mockRecordPayment).toHaveBeenCalled());
+
+      await fireEvent.press(screen.getByTestId('sheet-backdrop'));
+      await openSheet();
+
+      expect(amountField().props.value).toBe('');
+    });
+
+    it('takes the reference and the banked figure with it', async () => {
+      await mount();
+      await openSheet();
+      await fireEvent.changeText(amountField(), '5000');
+      await fireEvent.changeText(
+        screen.getByPlaceholderText('Leave empty if it stayed in hand'),
+        '3000',
+      );
+
+      await fireEvent.press(screen.getByTestId('sheet-backdrop'));
+      await openSheet();
+
+      expect(
+        screen.getByPlaceholderText('Leave empty if it stayed in hand').props.value,
+      ).toBe('');
+    });
+  });
+
   it('records what was collected, and how', async () => {
     await mount();
     await openSheet();

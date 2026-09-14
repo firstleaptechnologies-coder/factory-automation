@@ -74,6 +74,29 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
     setAlreadyPaid(false);
   };
 
+  /*
+   * Closing a money sheet forgets what was in it — the same reason the payment
+   * sheet does. A figure the server refused, still sitting there with the
+   * cursor behind it, is how ₹99,999 and ₹23,200 became 9999923200. The reason
+   * for taking a payout back matters the same way: it is written into the
+   * ledger, and last time's half-typed sentence must not be offered as this
+   * time's.
+   */
+  const closeAdd = () => {
+    setSheet(false);
+    reset();
+  };
+
+  const closeSettle = () => {
+    setSettling(null);
+    setSettleRef('');
+  };
+
+  const closeTakeBack = () => {
+    setTaking(null);
+    setReason('');
+  };
+
   const create = async () => {
     setBusy(true);
     try {
@@ -87,8 +110,7 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
         paidMode: alreadyPaid ? mode : undefined,
       });
       haptic('notificationSuccess');
-      setSheet(false);
-      reset();
+      closeAdd();
       ledger.reload();
     } catch (e) {
       haptic('notificationError');
@@ -107,8 +129,7 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
         reference: settleRef.trim() || undefined,
       });
       haptic('notificationSuccess');
-      setSettling(null);
-      setSettleRef('');
+      closeSettle();
       ledger.reload();
     } catch (e) {
       haptic('notificationError');
@@ -130,8 +151,7 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
     try {
       await api.reverseDisbursement(taking.id, reason.trim());
       haptic('notificationSuccess');
-      setTaking(null);
-      setReason('');
+      closeTakeBack();
       ledger.reload();
     } catch (e) {
       haptic('notificationError');
@@ -268,7 +288,7 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
         visible={Boolean(taking)}
         title="Take this payout back?"
         subtitle="It stays on the record with a correction beside it. Say why."
-        onClose={() => setTaking(null)}>
+        onClose={closeTakeBack}>
         <Field
           label="Why"
           placeholder="Paid the wrong fitter"
@@ -289,7 +309,7 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
         visible={sheet}
         title={`Add ${data.label}`}
         subtitle="Money leaving this order"
-        onClose={() => setSheet(false)}>
+        onClose={closeAdd}>
         <Field
           label="Paid to"
           placeholder="Fitter, transporter, polisher…"
@@ -358,7 +378,7 @@ export function DisbursementsScreen({ route, navigation }: { route: any; navigat
         subtitle={
           settling ? `${settling.payeeName} · ${formatInr(Number(settling.amount))}` : undefined
         }
-        onClose={() => setSettling(null)}>
+        onClose={closeSettle}>
         <Text variant="label" tone="muted" style={{ marginBottom: spacing.sm }}>
           How did it go out?
         </Text>

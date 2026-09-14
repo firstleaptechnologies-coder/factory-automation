@@ -73,6 +73,30 @@ function OrderDisbursements({ orderId }: { orderId: string }) {
 
   const canManage = can(PERMISSIONS.DISBURSEMENT_MANAGE);
 
+  /*
+   * Closing a money sheet forgets what was in it — the same reason the payment
+   * sheet does. A refused figure still sitting there with the cursor behind it
+   * is how ₹99,999 and ₹23,200 became 9999923200. The reason for taking a
+   * payout back matters the same way: it is the only record of why.
+   */
+  const closeAdd = () => {
+    setSheet(false);
+    setPayeeName('');
+    setAmount('');
+    setNote('');
+    setAlreadyPaid(false);
+  };
+
+  const closeSettle = () => {
+    setSettling(null);
+    setSettleRef('');
+  };
+
+  const closeTakeBack = () => {
+    setTaking(null);
+    setReason('');
+  };
+
   const create = async () => {
     setBusy(true);
     setError(null);
@@ -85,11 +109,7 @@ function OrderDisbursements({ orderId }: { orderId: string }) {
         status: alreadyPaid ? 'PAID' : 'PLANNED',
         paidMode: alreadyPaid ? mode : undefined,
       });
-      setSheet(false);
-      setPayeeName('');
-      setAmount('');
-      setNote('');
-      setAlreadyPaid(false);
+      closeAdd();
       ledger.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not add');
@@ -206,7 +226,7 @@ function OrderDisbursements({ orderId }: { orderId: string }) {
         open={Boolean(taking)}
         title="Take this payout back?"
         subtitle="It stays on the record with a correction beside it. Say why."
-        onClose={() => setTaking(null)}>
+        onClose={closeTakeBack}>
         <Field
           label="Why"
           placeholder="Paid the wrong fitter"
@@ -239,7 +259,7 @@ function OrderDisbursements({ orderId }: { orderId: string }) {
         open={sheet}
         title={`Add ${data.label}`}
         subtitle="Money leaving this order"
-        onClose={() => setSheet(false)}>
+        onClose={closeAdd}>
         <Field
           label="Paid to"
           placeholder="Fitter, transporter, polisher…"
@@ -297,7 +317,7 @@ function OrderDisbursements({ orderId }: { orderId: string }) {
         subtitle={
           settling ? `${settling.payeeName} · ${formatInr(settling.amount)}` : undefined
         }
-        onClose={() => setSettling(null)}>
+        onClose={closeSettle}>
         <span className="field-label">How did it go out?</span>
         <div className="wrap" style={{ marginBottom: 'var(--s-lg)' }}>
           <Chip label="Cash" selected={settleMode === 'CASH'} onClick={() => setSettleMode('CASH')} />

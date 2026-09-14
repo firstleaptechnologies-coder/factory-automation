@@ -75,13 +75,30 @@ export function InvoiceDetailScreen({ route, navigation }: { route: any; navigat
     }
   };
 
+  /*
+   * Closing a money sheet forgets what was in it — the same reason the payment
+   * sheet does. A refused figure still sitting there with the cursor behind it
+   * is how ₹99,999 and ₹23,200 became 9999923200. The reason matters the same
+   * way: it is the only record of why a bill was voided or credited, and last
+   * time's half-typed sentence must not be offered as this time's.
+   */
+  const closeCancel = () => {
+    setCancelSheet(false);
+    setReason('');
+  };
+
+  const closeCredit = () => {
+    setCreditSheet(false);
+    setTaxable('');
+    setNote('');
+  };
+
   const cancel = async () => {
     setBusy(true);
     try {
       await api.cancelInvoice(invoiceId, reason.trim());
       haptic('notificationSuccess');
-      setCancelSheet(false);
-      setReason('');
+      closeCancel();
       invoice.reload();
     } catch (e) {
       haptic('notificationError');
@@ -100,9 +117,7 @@ export function InvoiceDetailScreen({ route, navigation }: { route: any; navigat
         note: note.trim(),
       });
       haptic('notificationSuccess');
-      setCreditSheet(false);
-      setTaxable('');
-      setNote('');
+      closeCredit();
       invoice.reload();
       receivable.reload();
     } catch (e) {
@@ -266,7 +281,7 @@ export function InvoiceDetailScreen({ route, navigation }: { route: any; navigat
         visible={cancelSheet}
         title="Cancel this invoice?"
         subtitle="The number stays used. Say why — it is the only record of what it means now."
-        onClose={() => setCancelSheet(false)}>
+        onClose={closeCancel}>
         <Field
           label="Why"
           placeholder="Raised against the wrong client"
@@ -287,7 +302,7 @@ export function InvoiceDetailScreen({ route, navigation }: { route: any; navigat
         visible={creditSheet}
         title="Raise a credit note"
         subtitle="Reduces what the client owes. It is not a payment and is never counted as one."
-        onClose={() => setCreditSheet(false)}>
+        onClose={closeCredit}>
         <Field
           label="Taxable value to credit (₹)"
           placeholder="0"
