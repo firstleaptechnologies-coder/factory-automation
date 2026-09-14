@@ -891,6 +891,18 @@ export class ApiClient {
   }
 
   /** Puts somebody on a role. Null takes their role away. */
+  /**
+   * Let somebody in, or stop them.
+   *
+   * The row is never deleted: a person who has left is switched off so their
+   * name stays on every order they punched. Nothing could set this before —
+   * the screens only drew whether it was on — so somebody switched off stayed
+   * switched off for good.
+   */
+  setUserActive(userId: string, isActive: boolean) {
+    return this.patch<WorkspaceUser>(`/users/${userId}`, { isActive });
+  }
+
   assignRole(userId: string, roleId: string | null) {
     return this.patch<WorkspaceUser>(`/roles/users/${userId}`, { roleId });
   }

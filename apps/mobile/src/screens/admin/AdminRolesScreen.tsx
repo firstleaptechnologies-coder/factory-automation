@@ -10,6 +10,7 @@ import { useAuth } from '../../auth/AuthContext';
 import {
   Button,
   Card,
+  Chip,
   Field,
   Icon,
   Loader,
@@ -196,6 +197,33 @@ export function AdminRolesScreen({ navigation }: { navigation: any }) {
             })
           }
         />
+
+        {/*
+          Whether they may sign in at all.
+
+          The list drew "Switched off" and nothing anywhere could turn it back
+          on: a person switched off stayed switched off, and the production
+          lead of the shop that tried this could not get in at all. The row is
+          never deleted — their name has to stay on every order they punched —
+          so this is the only way back.
+        */}
+        <Text variant="label" tone="muted" style={styles.sectionLabel}>Signing in</Text>
+        <Chip
+          label={assigning?.isActive ? 'Can sign in' : 'Switched off'}
+          selected={Boolean(assigning?.isActive)}
+          testID="toggle-active"
+          onPress={() =>
+            run(async () => {
+              await api.setUserActive(assigning!.id, !assigning!.isActive);
+              setAssigning(null);
+            })
+          }
+        />
+        <Text variant="tiny" tone="faint" style={{ marginTop: spacing.sm }}>
+          {assigning?.isActive
+            ? 'Switch somebody off when they leave. Everything they punched stays on the books under their name.'
+            : 'They cannot sign in. Tap to let them back in.'}
+        </Text>
       </Sheet>
     </Screen>
   );

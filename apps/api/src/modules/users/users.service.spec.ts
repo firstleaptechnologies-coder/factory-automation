@@ -105,3 +105,68 @@ describe('changePassword', () => {
     expect(a).not.toBe(b);
   });
 });
+
+/*
+ * Switching somebody off, and the one case that must be refused.
+ *
+ * The flag has always been on the model and the screens only ever drew it, so
+ * a person switched off stayed switched off — the production lead of the shop
+ * that tried this could not sign in and the owner had no way to let them back.
+ */
+describe('switching somebody on and off', () => {
+  /** `update` reads the person first, so they have to exist. */
+  const withUser = () => {
+    const { service, db } = build();
+    db.user.findUnique = jest.fn(async () => ({ id: 'u2', code: 'PROD01', isActive: false }));
+    return { service, db };
+  };
+
+  it('lets a person back in', async () => {
+    const { service, db } = withUser();
+
+    await service.update('u2', { isActive: true } as never, 'me');
+
+    expect(db.user.update.mock.calls[0][0].data).toMatchObject({ isActive: true });
+  });
+
+  it('switches somebody else off', async () => {
+    const { service, db } = withUser();
+
+    await service.update('u2', { isActive: false } as never, 'me');
+
+    // Never deleted: their name has to stay on every order they punched.
+    expect(db.user.update.mock.calls[0][0].data).toMatchObject({ isActive: false });
+    expect(db.user.delete).not.toHaveBeenCalled();
+  });
+
+  /*
+   * The one irrecoverable move. Everything else here can be undone by whoever
+   * did it; the last admin switching themselves off locks the door and posts
+   * the key through it, and no screen in the product could let anybody in.
+   */
+  it('refuses to let somebody switch themselves off', async () => {
+    const { service, db } = withUser();
+
+    await expect(
+      service.update('me', { isActive: false } as never, 'me'),
+    ).rejects.toThrow(/cannot switch yourself off/);
+
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  it('still lets somebody change their own name', async () => {
+    const { service, db } = withUser();
+
+    await service.update('me', { name: 'Nakul V' } as never, 'me');
+
+    expect(db.user.update).toHaveBeenCalled();
+  });
+
+  it('still lets somebody switch their own account back on', async () => {
+    const { service, db } = withUser();
+
+    await service.update('me', { isActive: true } as never, 'me');
+
+    expect(db.user.update).toHaveBeenCalled();
+  });
+});

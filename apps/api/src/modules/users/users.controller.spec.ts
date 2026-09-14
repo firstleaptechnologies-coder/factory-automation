@@ -29,8 +29,8 @@ it('adds one', async () => {
 });
 
 it('edits one', async () => {
-  await controller.update('u1', { name: 'Priya S' } as never);
-  expect(users.update).toHaveBeenCalledWith('u1', { name: 'Priya S' });
+  await controller.update('u1', { name: 'Priya S' } as never, { id: 'me' } as never);
+  expect(users.update).toHaveBeenCalledWith('u1', { name: 'Priya S' }, 'me');
 });
 
 it('changes a password on its own route, not through the general edit', async () => {

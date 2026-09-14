@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { ChangePasswordDto, CreateUserDto, UpdateUserDto } from './dto/user.dto';
@@ -50,8 +50,23 @@ export class UsersService {
     });
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  /**
+   * Change somebody's details, including whether they may sign in at all.
+   *
+   * The one thing refused is switching yourself off. Everything else is
+   * recoverable by the person who did it; that is not — the last admin in a
+   * workspace would lock the door and post the key through it, and no screen
+   * in the product could let anybody back in.
+   */
+  async update(id: string, dto: UpdateUserDto, byUserId?: string) {
     await this.findOne(id);
+
+    if (dto.isActive === false && byUserId && byUserId === id) {
+      throw new BadRequestException(
+        'You cannot switch yourself off — ask somebody else who manages people to do it',
+      );
+    }
+
     return this.prisma.user.update({ where: { id }, data: dto, select: SAFE_FIELDS });
   }
 

@@ -8,6 +8,7 @@ const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
 const mockDelete = jest.fn();
 const mockAssign = jest.fn();
+const mockSetActive = jest.fn();
 jest.mock('../../api/client', () => ({
   api: {
     roles: () => mockRoles(),
@@ -16,6 +17,7 @@ jest.mock('../../api/client', () => ({
     updateRole: (...a: unknown[]) => mockUpdate(...a),
     deleteRole: (...a: unknown[]) => mockDelete(...a),
     assignRole: (...a: unknown[]) => mockAssign(...a),
+    setUserActive: (...a: unknown[]) => mockSetActive(...a),
   },
 }));
 
@@ -71,6 +73,7 @@ beforeEach(() => {
   mockUpdate.mockResolvedValue(ACCOUNTANT);
   mockDelete.mockResolvedValue({ id: 'r2' });
   mockAssign.mockResolvedValue(USER);
+  mockSetActive.mockResolvedValue(USER);
 });
 
 const mount = async () => {
@@ -178,4 +181,49 @@ it('offers nothing but looking to somebody who may only look', async () => {
   expect(screen.queryByText('New role')).toBeNull();
   await fireEvent.press(screen.getByText('Owner'));
   expect(screen.queryByText('Save')).toBeNull();
+});
+
+/*
+ * Letting somebody back in.
+ *
+ * The list drew "Switched off" and nothing anywhere could change it. The shop
+ * that tried this had its production lead locked out with no way for the owner
+ * to fix it — and the sign-in screen told him his password was wrong.
+ */
+describe('whether somebody may sign in', () => {
+  const openPerson = async () => {
+    await mount();
+    await fireEvent.press(await screen.findByText('Production'));
+  };
+
+  it('switches a person off without deleting them', async () => {
+    await openPerson();
+
+    await fireEvent.press(screen.getByTestId('toggle-active'));
+
+    // Never deleted: their name has to stay on every order they punched.
+    await waitFor(() => expect(mockSetActive).toHaveBeenCalledWith('u1', false));
+  });
+
+  it('lets a switched-off person back in', async () => {
+    mockUsers.mockResolvedValue([{ ...USER, isActive: false }]);
+    await openPerson();
+
+    await fireEvent.press(screen.getByTestId('toggle-active'));
+
+    await waitFor(() => expect(mockSetActive).toHaveBeenCalledWith('u1', true));
+  });
+
+  it('says which way round it is', async () => {
+    mockUsers.mockResolvedValue([{ ...USER, isActive: false }]);
+    await openPerson();
+
+    expect(screen.getByText('They cannot sign in. Tap to let them back in.')).toBeTruthy();
+  });
+
+  it('says what switching somebody off costs, which is nothing', async () => {
+    await openPerson();
+
+    expect(screen.getByText(/Everything they punched stays on the books/)).toBeTruthy();
+  });
 });

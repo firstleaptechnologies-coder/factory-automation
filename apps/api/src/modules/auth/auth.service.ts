@@ -36,7 +36,12 @@ export class AuthService {
     const user = await runInTenant(tenant, () =>
       this.prisma.user.findFirst({
         where: {
-          isActive: true,
+          /*
+           * Switched-off people are found here rather than filtered out, so a
+           * correct password can be told apart from a wrong one. Somebody whose
+           * account was turned off used to get "wrong workspace, code or
+           * password" and go off resetting a password that was never broken.
+           */
           OR: [
             { code: dto.identifier.trim().toUpperCase() },
             { email: dto.identifier.trim().toLowerCase() },
@@ -51,6 +56,17 @@ export class AuthService {
     // wrong tells an attacker which codes exist.
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Wrong workspace, code or password');
+    }
+
+    /*
+     * Only once the password is right, so this says nothing to anybody who
+     * does not already hold working credentials — and everything to the person
+     * standing there wondering why their own code stopped working.
+     */
+    if (!user.isActive) {
+      throw new UnauthorizedException(
+        'That account is switched off. Ask whoever runs this workspace to turn it back on.',
+      );
     }
 
     const permissions = user.roleRef?.permissions ?? [];

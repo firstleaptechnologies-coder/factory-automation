@@ -3,6 +3,7 @@ import { PERMISSIONS } from '@fas/shared';
 import { UsersService } from './users.service';
 import { ChangePasswordDto, CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
 /**
  * The logins this workspace has issued.
@@ -35,8 +36,12 @@ export class UsersController {
 
   @RequirePermissions(PERMISSIONS.USER_MANAGE)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.users.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.users.update(id, dto, user?.id);
   }
 
   @RequirePermissions(PERMISSIONS.USER_MANAGE)

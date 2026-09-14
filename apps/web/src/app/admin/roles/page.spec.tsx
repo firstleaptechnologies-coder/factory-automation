@@ -9,6 +9,7 @@ const apiMock = {
   updateRole: jest.fn(),
   deleteRole: jest.fn(),
   assignRole: jest.fn(),
+  setUserActive: jest.fn(),
 };
 jest.mock('@/lib/api', () => ({
   api: new Proxy(
@@ -71,6 +72,7 @@ beforeEach(() => {
   apiMock.updateRole.mockResolvedValue(ACCOUNTANT);
   apiMock.deleteRole.mockResolvedValue({ id: 'r2' });
   apiMock.assignRole.mockResolvedValue(USER);
+  apiMock.setUserActive.mockResolvedValue(USER);
 });
 
 const mount = async () => {
@@ -172,4 +174,39 @@ it('shows the role as plain text to somebody who may only look', async () => {
   // The role reads as plain text rather than a well nobody may open.
   expect(document.querySelectorAll('.select-trigger')).toHaveLength(0);
   expect(screen.getByText('Owner', { selector: 'span' })).toBeInTheDocument();
+});
+
+/*
+ * Letting somebody back in.
+ *
+ * The table drew "Switched off" and nothing anywhere could change it, so a
+ * person switched off stayed switched off for good.
+ */
+describe('whether somebody may sign in', () => {
+  it('switches a person off without deleting them', async () => {
+    await mount();
+
+    fireEvent.click(await screen.findByText('Can sign in'));
+
+    // Never deleted: their name has to stay on every order they punched.
+    await waitFor(() => expect(apiMock.setUserActive).toHaveBeenCalledWith('u1', false));
+  });
+
+  it('lets a switched-off person back in', async () => {
+    apiMock.users.mockResolvedValue([{ ...USER, isActive: false }]);
+    await mount();
+
+    fireEvent.click(await screen.findByText('Switched off'));
+
+    await waitFor(() => expect(apiMock.setUserActive).toHaveBeenCalledWith('u1', true));
+  });
+
+  it('shows it as a fact, not a switch, to somebody who may not change it', async () => {
+    permissions = [PERMISSIONS.USER_VIEW];
+    apiMock.users.mockResolvedValue([{ ...USER, isActive: false }]);
+    await mount();
+
+    expect(await screen.findByText('Switched off')).toBeInTheDocument();
+    expect(screen.queryByText('Can sign in')).toBeNull();
+  });
 });

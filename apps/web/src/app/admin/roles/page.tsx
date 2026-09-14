@@ -157,7 +157,21 @@ function Roles() {
                   )}
                 </td>
                 <td>
-                  {user.isActive ? null : (
+                  {/*
+                    Whether they may sign in at all.
+
+                    This drew "Switched off" and nothing anywhere could turn it
+                    back on: a person switched off stayed switched off. The row
+                    is never deleted — their name has to stay on every order
+                    they punched — so this is the only way back.
+                  */}
+                  {canManage ? (
+                    <Chip
+                      label={user.isActive ? 'Can sign in' : 'Switched off'}
+                      selected={user.isActive}
+                      onClick={() => run(() => api.setUserActive(user.id, !user.isActive))}
+                    />
+                  ) : user.isActive ? null : (
                     <Pill label="Switched off" color="var(--text-faint)" />
                   )}
                 </td>

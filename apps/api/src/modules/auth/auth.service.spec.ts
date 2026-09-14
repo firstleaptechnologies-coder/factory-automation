@@ -41,6 +41,10 @@ async function activeUser(over: Record<string, unknown> = {}) {
     code: 'ADMIN',
     name: 'Administrator',
     role: 'ADMIN',
+    // Said out loud now. It used to be implied by the query filtering
+    // switched-off people out, which is exactly why a switched-off person got
+    // the same answer as a typo.
+    isActive: true,
     passwordHash: await bcrypt.hash(PASSWORD, 4),
     roleRef: { name: 'Owner', permissions: ['order.view', 'order.punch'] },
     ...over,
@@ -113,8 +117,10 @@ describe('login', () => {
       { email: 'admin@shop.test' },
       { phone: 'admin@shop.test' },
     ]);
-    // Only active users can sign in.
-    expect(where.isActive).toBe(true);
+    // Switched-off people are found and then refused by name, rather than
+    // filtered out here and left indistinguishable from a typo. The refusal
+    // has its own tests below.
+    expect(where.isActive).toBeUndefined();
   });
 
   it('never puts the password hash in the response', async () => {
@@ -253,5 +259,53 @@ describe('what /auth/me returns', () => {
     const me = (await build().me(identity as never)) as Record<string, unknown>;
     expect(me.name).toBe('Administrator');
     expect(me.roleName).toBe('Owner');
+  });
+});
+
+/*
+ * A person whose account was switched off used to be told "wrong workspace,
+ * code or password" — the same thing a typo gets. The shop that tried this
+ * sent its production lead off resetting a password that was never broken,
+ * and there was no way to turn the account back on either.
+ */
+describe('signing in with an account that is switched off', () => {
+  const login = (password = PASSWORD) =>
+    ({ workspace: 'decorbucket', identifier: 'PROD01', password }) as never;
+
+  it('says so, once the password is right', async () => {
+    const { service } = await build(await activeUser({ code: 'PROD01', isActive: false }));
+
+    await expect(service.login(login())).rejects.toThrow(/switched off/);
+  });
+
+  /*
+   * And says nothing to anybody who does not already hold the password.
+   * Naming a switched-off account to somebody guessing would tell them which
+   * codes exist, which is the whole reason the other message is vague.
+   */
+  it('gives a wrong password the same answer a wrong code gets', async () => {
+    const { service } = await build(await activeUser({ code: 'PROD01', isActive: false }));
+
+    await expect(service.login(login('guess'))).rejects.toThrow(
+      'Wrong workspace, code or password',
+    );
+  });
+
+  it('still lets a switched-on person in', async () => {
+    const { service } = await build(await activeUser({ code: 'PROD01', isActive: true }));
+
+    await expect(service.login(login())).resolves.toMatchObject({
+      accessToken: 'signed-token',
+    });
+  });
+
+  // It has to reach the row to tell them apart, so the query must not filter
+  // switched-off people out before the password is even checked.
+  it('looks the person up whether or not they are switched on', async () => {
+    const { service, db } = await build(await activeUser({ code: 'PROD01', isActive: true }));
+
+    await service.login(login());
+
+    expect(db.user.findFirst.mock.calls[0][0].where.isActive).toBeUndefined();
   });
 });
