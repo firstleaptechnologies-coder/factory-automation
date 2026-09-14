@@ -69,6 +69,8 @@ flowchart LR
     transactions["Transactions"]
     outstanding["Owed to you"]
     payouts["Payout ledger"]
+    payout_headings["Payout headings"]
+    payouts --> payout_headings
     invoices["Invoices"]
     invoice_detail["One invoice"]
     invoices --> invoice_detail
@@ -199,6 +201,7 @@ flowchart LR
 | Transactions | `/transactions` | `Transactions` | `payment.cash_position` |
 | Owed to you | `/outstanding` | `Outstanding` | `payment.cash_position` |
 | Payout ledger | `/disbursements` | `DisbursementLedger` | `disbursement.view` |
+|   ↳ Payout headings | `/admin/payout-headings` | `AdminPayoutHeadings` | `disbursement.manage` |
 | Invoices | `/invoices` | `Invoices` | `invoice.view` |
 |   ↳ One invoice | `/invoices/[id]` | `InvoiceDetail` | — |
 | Reports | `/reports` | `Reports` | `report.view` |

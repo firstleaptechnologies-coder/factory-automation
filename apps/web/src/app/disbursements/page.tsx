@@ -74,15 +74,26 @@ function Ledger() {
         subtitle="Money paid out to other people, after the client has paid"
         action={
           canManage ? (
-            <Button
-              title="Rename"
-              variant="dark"
-              size="sm"
-              onClick={() => {
-                setLabel(summary.label);
-                setRenaming(true);
-              }}
-            />
+            <div className="row">
+              {/* What a payout is filed under. Nothing could reach these
+                  before, so a shop that was never seeded any had a ledger of
+                  Uncategorised rows it could do nothing about. */}
+              <Button
+                title="Headings"
+                variant="dark"
+                icon="tune"
+                onClick={() => router.push('/admin/payout-headings')}
+              />
+              <Button
+                title="Rename"
+                variant="dark"
+                size="sm"
+                onClick={() => {
+                  setLabel(summary.label);
+                  setRenaming(true);
+                }}
+              />
+            </div>
           ) : null
         }
       />

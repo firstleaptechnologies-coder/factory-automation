@@ -8,6 +8,7 @@ import { paginate } from '../../common/dto/pagination.dto';
 import { round2 } from '../../common/utils/pricing';
 import {
   CategoryDto,
+  UpdateCategoryDto,
   CreateDisbursementDto,
   DisbursementQueryDto,
   SettleDisbursementDto,
@@ -77,11 +78,19 @@ export class DisbursementsService {
     });
   }
 
-  async deactivateCategory(id: string) {
-    return this.prisma.disbursementCategory.update({
-      where: { id },
-      data: { isActive: false },
-    });
+  /**
+   * Rename a heading, take it out of use, or bring it back.
+   *
+   * There was only a way to switch one off, so a heading taken out of use
+   * could never return and a typo in one was permanent. Never deleted: every
+   * payout already filed under it points here, and the ledger has to keep
+   * saying what those were for.
+   */
+  async updateCategory(id: string, dto: UpdateCategoryDto) {
+    const category = await this.prisma.disbursementCategory.findFirst({ where: { id } });
+    if (!category) throw new NotFoundException('That heading does not exist');
+
+    return this.prisma.disbursementCategory.update({ where: { id }, data: dto });
   }
 
   // -- per order ------------------------------------------------------------

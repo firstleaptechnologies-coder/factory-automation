@@ -3,6 +3,7 @@ import { MODULES, PERMISSIONS } from '@fas/shared';
 import { DisbursementsService } from './disbursements.service';
 import {
   CategoryDto,
+  UpdateCategoryDto,
   CreateDisbursementDto,
   DisbursementQueryDto,
   LabelDto,
@@ -45,9 +46,9 @@ export class DisbursementsController {
   }
 
   @RequirePermissions(PERMISSIONS.DISBURSEMENT_MANAGE)
-  @Delete('categories/:id')
-  deactivateCategory(@Param('id') id: string) {
-    return this.disbursements.deactivateCategory(id);
+  @Patch('categories/:id')
+  updateCategory(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+    return this.disbursements.updateCategory(id, dto);
   }
 
   @RequirePermissions(PERMISSIONS.DISBURSEMENT_VIEW)

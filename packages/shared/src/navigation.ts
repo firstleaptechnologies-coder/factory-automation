@@ -292,6 +292,21 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: PERMISSIONS.DISBURSEMENT_VIEW,
         web: '/disbursements',
         app: 'DisbursementLedger',
+        children: [
+          {
+            /*
+             * What a payout is filed under. Nothing could create one, so a
+             * shop that was never seeded any had every payout in its ledger
+             * reading "Uncategorised" for ever.
+             */
+            key: 'payout-headings',
+            label: 'Payout headings',
+            icon: 'tune',
+            permission: PERMISSIONS.DISBURSEMENT_MANAGE,
+            web: '/admin/payout-headings',
+            app: 'AdminPayoutHeadings',
+          },
+        ],
       },
       {
         key: 'invoices',

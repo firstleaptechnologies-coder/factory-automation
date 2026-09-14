@@ -692,8 +692,17 @@ export class ApiClient {
     return this.post<DisbursementCategory>('/disbursements/categories', body);
   }
 
-  deactivateDisbursementCategory(id: string) {
-    return this.del<DisbursementCategory>(`/disbursements/categories/${id}`);
+  /**
+   * Rename a heading, take it out of use, or bring it back.
+   *
+   * Never deleted: every payout already filed under one points at it, and the
+   * ledger has to keep saying what those were for.
+   */
+  updateDisbursementCategory(
+    id: string,
+    body: { name?: string; isActive?: boolean; sortOrder?: number },
+  ) {
+    return this.patch<DisbursementCategory>(`/disbursements/categories/${id}`, body);
   }
 
   disbursementLedger(query?: {

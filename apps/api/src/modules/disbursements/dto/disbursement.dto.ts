@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNumber,
@@ -58,6 +59,19 @@ export class DisbursementQueryDto extends PaginationDto {
 export class CategoryDto {
   @IsString() @MinLength(1) code: string;
   @IsString() @MinLength(1) name: string;
+  @IsOptional() @Type(() => Number) @IsNumber() sortOrder?: number;
+}
+
+/**
+ * Renaming a heading, or switching one back on.
+ *
+ * There was only a way to switch one off. A heading taken out of use could
+ * never come back, and a typo in one was permanent — which matters here
+ * because these are what every payout in the ledger is filed under.
+ */
+export class UpdateCategoryDto {
+  @IsOptional() @IsString() @MinLength(1) name?: string;
+  @IsOptional() @IsBoolean() isActive?: boolean;
   @IsOptional() @Type(() => Number) @IsNumber() sortOrder?: number;
 }
 

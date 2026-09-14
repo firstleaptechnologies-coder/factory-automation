@@ -89,7 +89,21 @@ export function DisbursementLedgerScreen({ navigation }: { navigation: any }) {
         title={`${ledgerLabel} ledger`}
         subtitle="Paid out after the client pays"
         onBack={() => navigation.goBack()}
-        right={<RoundButton icon="filter" testID="filter-button" onPress={() => setFilterSheet(true)} />}
+        right={
+          <View style={styles.actions}>
+            {/* What a payout is filed under. Nothing could reach these before,
+                so a shop that was never seeded any had a ledger of
+                Uncategorised rows it could do nothing about. */}
+            {canManage ? (
+              <RoundButton
+                icon="tune"
+                testID="payout-headings"
+                onPress={() => navigation.navigate('AdminPayoutHeadings')}
+              />
+            ) : null}
+            <RoundButton icon="filter" testID="filter-button" onPress={() => setFilterSheet(true)} />
+          </View>
+        }
       />
 
       <Animated.View entering={FadeInDown.duration(400).springify()}>
@@ -220,6 +234,7 @@ export function DisbursementLedgerScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
+  actions: { flexDirection: 'row', gap: spacing.sm },
   heroFoot: {
     flexDirection: 'row',
     justifyContent: 'space-between',

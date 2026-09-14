@@ -5,7 +5,7 @@ const disbursements = {
   setLabel: jest.fn(async (..._a: unknown[]) => 'set'),
   listCategories: jest.fn(async (..._a: unknown[]) => 'categories'),
   createCategory: jest.fn(async (..._a: unknown[]) => 'created'),
-  deactivateCategory: jest.fn(async (..._a: unknown[]) => 'gone'),
+  updateCategory: jest.fn(async (..._a: unknown[]) => 'gone'),
   ledger: jest.fn(async (..._a: unknown[]) => 'ledger'),
   forOrder: jest.fn(async (..._a: unknown[]) => 'order ledger'),
   create: jest.fn(async (..._a: unknown[]) => 'created'),
@@ -37,11 +37,11 @@ it('hides the retired categories unless the admin screen asks', async () => {
   expect(disbursements.listCategories).toHaveBeenLastCalledWith(true);
 });
 
-it('adds and retires a category', async () => {
+it('adds a heading, and changes one', async () => {
   await controller.createCategory({ name: 'Fitting' } as never);
-  await controller.deactivateCategory('c1');
+  await controller.updateCategory('c1', { isActive: false } as never);
   expect(disbursements.createCategory).toHaveBeenCalledWith({ name: 'Fitting' });
-  expect(disbursements.deactivateCategory).toHaveBeenCalledWith('c1');
+  expect(disbursements.updateCategory).toHaveBeenCalledWith('c1', { isActive: false });
 });
 
 it('reads the whole ledger, filtered', async () => {

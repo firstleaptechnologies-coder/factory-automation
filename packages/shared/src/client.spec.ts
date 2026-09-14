@@ -521,9 +521,9 @@ describe('endpoints', () => {
       '/disbursements/categories',
     ],
     [
-      'deactivateDisbursementCategory',
-      (a) => a.deactivateDisbursementCategory('c1'),
-      'DELETE',
+      'updateDisbursementCategory',
+      (a) => a.updateDisbursementCategory('c1', { isActive: false }),
+      'PATCH',
       '/disbursements/categories/c1',
     ],
     ['disbursementLedger', (a) => a.disbursementLedger(), 'GET', '/disbursements'],

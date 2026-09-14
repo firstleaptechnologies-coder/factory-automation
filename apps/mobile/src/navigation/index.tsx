@@ -30,6 +30,7 @@ import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { AdminHomeScreen } from '../screens/admin/AdminHomeScreen';
 import { AdminMaterialsScreen } from '../screens/admin/AdminMaterialsScreen';
 import { AdminGstScreen } from '../screens/admin/AdminGstScreen';
+import { AdminPayoutHeadingsScreen } from '../screens/admin/AdminPayoutHeadingsScreen';
 import { AdminSizesScreen } from '../screens/admin/AdminSizesScreen';
 import { AdminFlowScreen } from '../screens/admin/AdminFlowScreen';
 import { FlowCanvasScreen } from '../screens/admin/FlowCanvasScreen';
@@ -187,6 +188,7 @@ export function RootNavigator() {
             <Stack.Screen name="Outstanding" component={OutstandingScreen} />
             <Stack.Screen name="Disbursements" component={DisbursementsScreen} />
             <Stack.Screen name="DisbursementLedger" component={DisbursementLedgerScreen} />
+            <Stack.Screen name="AdminPayoutHeadings" component={AdminPayoutHeadingsScreen} />
             <Stack.Screen name="Invoices" component={InvoicesScreen} />
             <Stack.Screen name="InvoiceDetail" component={InvoiceDetailScreen} />
             <Stack.Screen name="Reports" component={ReportsScreen} />

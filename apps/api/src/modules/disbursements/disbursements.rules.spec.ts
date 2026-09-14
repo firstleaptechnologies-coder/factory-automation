@@ -68,13 +68,57 @@ describe('categories', () => {
     expect(db.disbursementCategory.create.mock.calls[0][0].data.code).toBe('FITTING');
   });
 
-  it('deactivates rather than deletes', async () => {
+  /*
+   * Never deleted: every payout already filed under a heading points at it,
+   * and the ledger has to keep saying what those were for.
+   */
+  it('takes a heading out of use rather than deleting it', async () => {
     const { service, db } = build();
-    await service.deactivateCategory('cat-1');
+    db.disbursementCategory.findFirst = jest.fn(async () => ({ id: 'cat-1' }));
+
+    await service.updateCategory('cat-1', { isActive: false } as never);
+
     expect(db.disbursementCategory.update).toHaveBeenCalledWith({
       where: { id: 'cat-1' },
       data: { isActive: false },
     });
+    expect(db.disbursementCategory.delete).not.toHaveBeenCalled();
+  });
+
+  /*
+   * There was only a way to switch one off. A heading taken out of use could
+   * never come back, and a typo in one was permanent — on the headings every
+   * payout in the ledger is filed under.
+   */
+  it('brings one back into use', async () => {
+    const { service, db } = build();
+    db.disbursementCategory.findFirst = jest.fn(async () => ({ id: 'cat-1' }));
+
+    await service.updateCategory('cat-1', { isActive: true } as never);
+
+    expect(db.disbursementCategory.update.mock.calls[0][0].data).toMatchObject({
+      isActive: true,
+    });
+  });
+
+  it('renames one', async () => {
+    const { service, db } = build();
+    db.disbursementCategory.findFirst = jest.fn(async () => ({ id: 'cat-1' }));
+
+    await service.updateCategory('cat-1', { name: 'Fitting & polish' } as never);
+
+    expect(db.disbursementCategory.update.mock.calls[0][0].data).toMatchObject({
+      name: 'Fitting & polish',
+    });
+  });
+
+  it('refuses a heading that does not exist', async () => {
+    const { service, db } = build();
+    db.disbursementCategory.findFirst = jest.fn(async () => null);
+
+    await expect(service.updateCategory('ghost', { name: 'X' } as never)).rejects.toThrow(
+      /does not exist/,
+    );
   });
 });
 
