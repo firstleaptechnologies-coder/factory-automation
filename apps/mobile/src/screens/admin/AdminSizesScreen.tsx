@@ -112,20 +112,20 @@ export function AdminSizesScreen({ navigation }: { navigation: any }) {
           label="Code"
           placeholder="SHEET-8X4"
           value={form.code}
-          onChangeText={(v) => setForm({ ...form, code: v.toUpperCase() })}
+          onChangeText={(v) => setForm((current) => ({ ...current, code: v.toUpperCase() }))}
           containerStyle={{ marginTop: spacing.lg }}
         />
         <Field
           label="Name"
           placeholder="8 × 4 ft sheet"
           value={form.name}
-          onChangeText={(v) => setForm({ ...form, name: v })}
+          onChangeText={(v) => setForm((current) => ({ ...current, name: v }))}
         />
         <View style={styles.row}>
           <Field
             label={`Length (${UNIT_LABEL[unit]})`}
             value={form.length}
-            onChangeText={(v) => setForm({ ...form, length: v })}
+            onChangeText={(v) => setForm((current) => ({ ...current, length: v }))}
             keyboardType="decimal-pad"
             containerStyle={{ flex: 1, marginRight: spacing.md }}
             hint={lengthMm !== null ? `${lengthMm} mm` : undefined}
@@ -133,7 +133,7 @@ export function AdminSizesScreen({ navigation }: { navigation: any }) {
           <Field
             label={`Width (${UNIT_LABEL[unit]})`}
             value={form.width}
-            onChangeText={(v) => setForm({ ...form, width: v })}
+            onChangeText={(v) => setForm((current) => ({ ...current, width: v }))}
             keyboardType="decimal-pad"
             containerStyle={{ flex: 1 }}
             hint={widthMm !== null ? `${widthMm} mm` : undefined}
@@ -142,7 +142,7 @@ export function AdminSizesScreen({ navigation }: { navigation: any }) {
         <Field
           label="Thickness (mm, optional)"
           value={form.thickness}
-          onChangeText={(v) => setForm({ ...form, thickness: v })}
+          onChangeText={(v) => setForm((current) => ({ ...current, thickness: v }))}
           keyboardType="decimal-pad"
         />
         <Button

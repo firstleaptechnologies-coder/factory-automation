@@ -245,12 +245,12 @@ export default function StaffPage() {
         <Field
           label="Name"
           value={invite.name}
-          onChange={(value) => setInvite({ ...invite, name: value })}
+          onChange={(value) => setInvite((current) => ({ ...current, name: value }))}
         />
         <Field
           label="Email"
           value={invite.email}
-          onChange={(value) => setInvite({ ...invite, email: value })}
+          onChange={(value) => setInvite((current) => ({ ...current, email: value }))}
         />
         <span className="field-label">Role</span>
         <div className="wrap" style={{ marginBottom: 'var(--s-lg)' }}>
@@ -259,7 +259,7 @@ export default function StaffPage() {
               key={role.key}
               label={role.name}
               selected={invite.role === role.key}
-              onClick={() => setInvite({ ...invite, role: role.key })}
+              onClick={() => setInvite((current) => ({ ...current, role: role.key }))}
             />
           ))}
         </div>
@@ -267,7 +267,7 @@ export default function StaffPage() {
           label="First password"
           type="password"
           value={invite.password}
-          onChange={(value) => setInvite({ ...invite, password: value })}
+          onChange={(value) => setInvite((current) => ({ ...current, password: value }))}
           hint="At least eight characters. They change it once they are in."
         />
         <Button

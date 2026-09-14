@@ -152,7 +152,7 @@ export function AdminLeadFieldsScreen({ navigation }: { navigation: any }) {
           label="Label"
           placeholder="e.g. Architect"
           value={form.label}
-          onChangeText={(v) => setForm({ ...form, label: v })}
+          onChangeText={(v) => setForm((current) => ({ ...current, label: v }))}
           hint="The key is generated from this."
         />
 
@@ -163,7 +163,7 @@ export function AdminLeadFieldsScreen({ navigation }: { navigation: any }) {
               key={type}
               label={type.replace('_', ' ').toLowerCase()}
               selected={form.type === type}
-              onPress={() => setForm({ ...form, type })}
+              onPress={() => setForm((current) => ({ ...current, type }))}
             />
           ))}
         </View>
@@ -173,7 +173,7 @@ export function AdminLeadFieldsScreen({ navigation }: { navigation: any }) {
             label="Options"
             placeholder="Under 1L, 1-5L, 5-10L"
             value={form.options}
-            onChangeText={(v) => setForm({ ...form, options: v })}
+            onChangeText={(v) => setForm((current) => ({ ...current, options: v }))}
             hint="Comma separated"
             containerStyle={{ marginTop: spacing.lg }}
           />
@@ -181,8 +181,8 @@ export function AdminLeadFieldsScreen({ navigation }: { navigation: any }) {
 
         <Text variant="label" tone="muted" style={styles.sheetLabel}>Required</Text>
         <View style={styles.chipWrap}>
-          <Chip label="No" selected={!form.required} onPress={() => setForm({ ...form, required: false })} />
-          <Chip label="Yes" selected={form.required} onPress={() => setForm({ ...form, required: true })} />
+          <Chip label="No" selected={!form.required} onPress={() => setForm((current) => ({ ...current, required: false }))} />
+          <Chip label="Yes" selected={form.required} onPress={() => setForm((current) => ({ ...current, required: true }))} />
         </View>
 
         <Button
@@ -214,13 +214,13 @@ export function AdminLeadFieldsScreen({ navigation }: { navigation: any }) {
           label="Code"
           placeholder="INSTAGRAM"
           value={source.code}
-          onChangeText={(v) => setSource({ ...source, code: v.toUpperCase().replace(/\s+/g, '_') })}
+          onChangeText={(v) => setSource((current) => ({ ...current, code: v.toUpperCase().replace(/\s+/g, '_') }))}
         />
         <Field
           label="Name"
           placeholder="Instagram"
           value={source.name}
-          onChangeText={(v) => setSource({ ...source, name: v })}
+          onChangeText={(v) => setSource((current) => ({ ...current, name: v }))}
         />
         <Button
           title="Add source"

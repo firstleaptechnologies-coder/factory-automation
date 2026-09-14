@@ -218,7 +218,7 @@ export function TenantsScreen({ navigation: _navigation }: { navigation: any }) 
           label="Workspace name"
           placeholder="woodcraft"
           value={form.slug}
-          onChangeText={(v) => setForm({ ...form, slug: v.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+          onChangeText={(v) => setForm((current) => ({ ...current, slug: v.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
           autoCapitalize="none"
           hint="What their staff type at sign-in."
         />
@@ -226,7 +226,7 @@ export function TenantsScreen({ navigation: _navigation }: { navigation: any }) 
           label="Business name"
           placeholder="Woodcraft Studio"
           value={form.name}
-          onChangeText={(v) => setForm({ ...form, name: v })}
+          onChangeText={(v) => setForm((current) => ({ ...current, name: v }))}
         />
 
         <Text variant="label" tone="muted" style={{ marginBottom: spacing.sm }}>
@@ -236,12 +236,12 @@ export function TenantsScreen({ navigation: _navigation }: { navigation: any }) 
           <Chip
             label="Shared database"
             selected={form.isolation === 'SHARED'}
-            onPress={() => setForm({ ...form, isolation: 'SHARED' })}
+            onPress={() => setForm((current) => ({ ...current, isolation: 'SHARED' }))}
           />
           <Chip
             label="Own database"
             selected={form.isolation === 'DEDICATED'}
-            onPress={() => setForm({ ...form, isolation: 'DEDICATED' })}
+            onPress={() => setForm((current) => ({ ...current, isolation: 'DEDICATED' }))}
           />
         </View>
         <Text variant="tiny" tone="faint" style={{ marginTop: spacing.sm, marginBottom: spacing.lg }}>
@@ -255,7 +255,7 @@ export function TenantsScreen({ navigation: _navigation }: { navigation: any }) 
             label="Connection string"
             placeholder="postgresql://…"
             value={form.databaseUrl}
-            onChangeText={(v) => setForm({ ...form, databaseUrl: v })}
+            onChangeText={(v) => setForm((current) => ({ ...current, databaseUrl: v }))}
             autoCapitalize="none"
             hint="Stored encrypted."
           />
@@ -268,19 +268,19 @@ export function TenantsScreen({ navigation: _navigation }: { navigation: any }) 
           label="Name"
           placeholder="Ravi Kumar"
           value={form.ownerName}
-          onChangeText={(v) => setForm({ ...form, ownerName: v })}
+          onChangeText={(v) => setForm((current) => ({ ...current, ownerName: v }))}
         />
         <Field
           label="Employee code"
           value={form.ownerCode}
-          onChangeText={(v) => setForm({ ...form, ownerCode: v.toUpperCase() })}
+          onChangeText={(v) => setForm((current) => ({ ...current, ownerCode: v.toUpperCase() }))}
           autoCapitalize="characters"
         />
         <Field
           label="Password"
           placeholder="••••••••"
           value={form.ownerPassword}
-          onChangeText={(v) => setForm({ ...form, ownerPassword: v })}
+          onChangeText={(v) => setForm((current) => ({ ...current, ownerPassword: v }))}
           secureTextEntry
           hint="At least 6 characters. They should change it."
         />

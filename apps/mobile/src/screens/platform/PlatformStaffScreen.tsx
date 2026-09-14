@@ -225,14 +225,14 @@ export function PlatformStaffScreen({ navigation }: { navigation: any }) {
         <Field
           label="Name"
           value={invite.name}
-          onChangeText={(value) => setInvite({ ...invite, name: value })}
+          onChangeText={(value) => setInvite((current) => ({ ...current, name: value }))}
         />
         <Field
           label="Email"
           keyboardType="email-address"
           autoCapitalize="none"
           value={invite.email}
-          onChangeText={(value) => setInvite({ ...invite, email: value })}
+          onChangeText={(value) => setInvite((current) => ({ ...current, email: value }))}
         />
         <Text variant="label" tone="muted">Role</Text>
         <View style={styles.chips}>
@@ -241,7 +241,7 @@ export function PlatformStaffScreen({ navigation }: { navigation: any }) {
               key={role.key}
               label={role.name}
               selected={invite.role === role.key}
-              onPress={() => setInvite({ ...invite, role: role.key })}
+              onPress={() => setInvite((current) => ({ ...current, role: role.key }))}
             />
           ))}
         </View>
@@ -249,7 +249,7 @@ export function PlatformStaffScreen({ navigation }: { navigation: any }) {
           label="First password"
           secureTextEntry
           value={invite.password}
-          onChangeText={(value) => setInvite({ ...invite, password: value })}
+          onChangeText={(value) => setInvite((current) => ({ ...current, password: value }))}
         />
         <Button
           title="Add them"

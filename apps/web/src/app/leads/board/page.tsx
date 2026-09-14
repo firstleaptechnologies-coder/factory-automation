@@ -175,30 +175,30 @@ export default function LeadBoardPage() {
               <input
                 value={form.title}
                 placeholder="What is the enquiry for?"
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))}
               />
             </div>
             <div className="field">
               <label>Contact name</label>
-              <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+              <input value={form.contactName} onChange={(e) => setForm((current) => ({ ...current, contactName: e.target.value }))} />
             </div>
             <div className="field">
               <label>Phone</label>
-              <input value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} />
+              <input value={form.contactPhone} onChange={(e) => setForm((current) => ({ ...current, contactPhone: e.target.value }))} />
             </div>
             <div className="field">
               <label>Company</label>
-              <input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
+              <input value={form.company} onChange={(e) => setForm((current) => ({ ...current, company: e.target.value }))} />
             </div>
             <div className="field">
               <label>Location</label>
-              <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+              <input value={form.location} onChange={(e) => setForm((current) => ({ ...current, location: e.target.value }))} />
             </div>
             <Select
               label="Source"
               value={form.sourceId}
               placeholder="—"
-              onChange={(value) => setForm({ ...form, sourceId: value })}
+              onChange={(value) => setForm((current) => ({ ...current, sourceId: value }))}
               options={[
                 { value: '', label: '—' },
                 ...sources.map((source) => ({
@@ -213,7 +213,7 @@ export default function LeadBoardPage() {
               <input
                 value={form.estimatedValue}
                 inputMode="numeric"
-                onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })}
+                onChange={(e) => setForm((current) => ({ ...current, estimatedValue: e.target.value }))}
               />
             </div>
           </div>

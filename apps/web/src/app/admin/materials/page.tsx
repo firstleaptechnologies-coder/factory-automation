@@ -117,7 +117,7 @@ export default function MaterialsAdminPage() {
                       placeholder={thicknessUnit === 'MM' ? '18' : '3/4'}
                       value={thicknessInput[material.id] ?? ''}
                       onChange={(e) =>
-                        setThicknessInput({ ...thicknessInput, [material.id]: e.target.value })
+                        setThicknessInput((current) => ({ ...current, [material.id]: e.target.value }))
                       }
                     />
                     <button
@@ -130,7 +130,7 @@ export default function MaterialsAdminPage() {
                             value: { value: mm, unit: 'MM' },
                             label: thicknessUnit === 'IN' ? `${raw} in` : undefined,
                           });
-                          setThicknessInput({ ...thicknessInput, [material.id]: '' });
+                          setThicknessInput((current) => ({ ...current, [material.id]: '' }));
                         })
                       }>
                       Add

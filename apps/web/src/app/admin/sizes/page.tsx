@@ -66,23 +66,23 @@ export default function SizesAdminPage() {
         <div className="field-row">
           <div className="col" style={{ flexBasis: 150 }}>
             <label>Code</label>
-            <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} />
+            <input value={form.code} onChange={(e) => setForm((current) => ({ ...current, code: e.target.value.toUpperCase() }))} />
           </div>
           <div className="col" style={{ flexBasis: 220 }}>
             <label>Name</label>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} />
           </div>
           <div className="col" style={{ flexBasis: 120 }}>
             <label>Length ({UNIT_LABEL[unit]})</label>
-            <input value={form.length} onChange={(e) => setForm({ ...form, length: e.target.value })} />
+            <input value={form.length} onChange={(e) => setForm((current) => ({ ...current, length: e.target.value }))} />
           </div>
           <div className="col" style={{ flexBasis: 120 }}>
             <label>Width ({UNIT_LABEL[unit]})</label>
-            <input value={form.width} onChange={(e) => setForm({ ...form, width: e.target.value })} />
+            <input value={form.width} onChange={(e) => setForm((current) => ({ ...current, width: e.target.value }))} />
           </div>
           <div className="col" style={{ flexBasis: 130 }}>
             <label>Thickness (mm)</label>
-            <input value={form.thickness} onChange={(e) => setForm({ ...form, thickness: e.target.value })} />
+            <input value={form.thickness} onChange={(e) => setForm((current) => ({ ...current, thickness: e.target.value }))} />
           </div>
           <button className="primary row-action" disabled={!form.code || !form.name} onClick={create}>
             Add

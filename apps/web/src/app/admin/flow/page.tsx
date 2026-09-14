@@ -658,7 +658,7 @@ export default function FlowBuilderPage() {
           label="Name"
           placeholder="In Production"
           value={stageForm.name}
-          onChange={(value) => setStageForm({ ...stageForm, name: value })}
+          onChange={(value) => setStageForm((current) => ({ ...current, name: value }))}
           autoFocus
         />
         {!stageSheet?.editing ? (
@@ -667,7 +667,7 @@ export default function FlowBuilderPage() {
             placeholder="PRODUCTION"
             value={stageForm.code}
             onChange={(value) =>
-              setStageForm({ ...stageForm, code: value.toUpperCase().replace(/\s+/g, '_') })
+              setStageForm((current) => ({ ...current, code: value.toUpperCase().replace(/\s+/g, '_') }))
             }
             hint="How the API refers to it. It cannot be changed later."
           />
@@ -678,7 +678,7 @@ export default function FlowBuilderPage() {
         <div style={{ marginBottom: 'var(--s-lg)' }}>
           <ColorPicker
             value={stageForm.color}
-            onChange={(colour) => setStageForm({ ...stageForm, color: colour })}
+            onChange={(colour) => setStageForm((current) => ({ ...current, color: colour }))}
           />
         </div>
 
@@ -689,7 +689,7 @@ export default function FlowBuilderPage() {
               key={category}
               label={category.replace('_', ' ')}
               selected={stageForm.category === category}
-              onClick={() => setStageForm({ ...stageForm, category })}
+              onClick={() => setStageForm((current) => ({ ...current, category }))}
             />
           ))}
         </div>

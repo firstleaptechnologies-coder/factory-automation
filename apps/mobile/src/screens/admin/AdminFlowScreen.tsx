@@ -372,14 +372,14 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
           label="Name"
           placeholder="In Production"
           value={form.name}
-          onChangeText={(v) => setForm({ ...form, name: v })}
+          onChangeText={(v) => setForm((current) => ({ ...current, name: v }))}
         />
         {!editing ? (
           <Field
             label="Code"
             placeholder="PRODUCTION"
             value={form.code}
-            onChangeText={(v) => setForm({ ...form, code: v.toUpperCase().replace(/\s+/g, '_') })}
+            onChangeText={(v) => setForm((current) => ({ ...current, code: v.toUpperCase().replace(/\s+/g, '_') }))}
           />
         ) : null}
 
@@ -388,7 +388,7 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
         <View style={styles.sheetLabel}>
           <ColorPicker
             value={form.color}
-            onChange={(color) => setForm({ ...form, color })}
+            onChange={(color) => setForm((current) => ({ ...current, color }))}
           />
         </View>
 
@@ -402,7 +402,7 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
               key={category}
               label={category.replace('_', ' ')}
               selected={form.category === category}
-              onPress={() => setForm({ ...form, category })}
+              onPress={() => setForm((current) => ({ ...current, category }))}
             />
           ))}
         </View>

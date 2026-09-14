@@ -67,7 +67,7 @@ export default function LeadFieldsAdminPage() {
             <input
               value={field.label}
               placeholder="e.g. Architect"
-              onChange={(e) => setField({ ...field, label: e.target.value })}
+              onChange={(e) => setField((current) => ({ ...current, label: e.target.value }))}
             />
           </div>
           <div className="col" style={{ flexBasis: 180 }}>
@@ -75,14 +75,14 @@ export default function LeadFieldsAdminPage() {
             <input
               value={field.key}
               placeholder="auto from label"
-              onChange={(e) => setField({ ...field, key: e.target.value })}
+              onChange={(e) => setField((current) => ({ ...current, key: e.target.value }))}
             />
           </div>
           <div className="col" style={{ flexBasis: 160 }}>
             <Select
               label="Type"
               value={field.type}
-              onChange={(value) => setField({ ...field, type: value as CustomFieldType })}
+              onChange={(value) => setField((current) => ({ ...current, type: value as CustomFieldType }))}
               options={TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
             />
           </div>
@@ -92,7 +92,7 @@ export default function LeadFieldsAdminPage() {
               <input
                 value={field.options}
                 placeholder="Under 1L, 1-5L, 5-10L"
-                onChange={(e) => setField({ ...field, options: e.target.value })}
+                onChange={(e) => setField((current) => ({ ...current, options: e.target.value }))}
               />
             </div>
           ) : null}
@@ -100,7 +100,7 @@ export default function LeadFieldsAdminPage() {
             <Select
               label="Required"
               value={field.required ? 'yes' : 'no'}
-              onChange={(value) => setField({ ...field, required: value === 'yes' })}
+              onChange={(value) => setField((current) => ({ ...current, required: value === 'yes' }))}
               options={[
                 { value: 'no', label: 'No' },
                 { value: 'yes', label: 'Yes' },
@@ -173,12 +173,12 @@ export default function LeadFieldsAdminPage() {
             <label>Code</label>
             <input
               value={source.code}
-              onChange={(e) => setSource({ ...source, code: e.target.value.toUpperCase() })}
+              onChange={(e) => setSource((current) => ({ ...current, code: e.target.value.toUpperCase() }))}
             />
           </div>
           <div className="col" style={{ flexBasis: 220 }}>
             <label>Name</label>
-            <input value={source.name} onChange={(e) => setSource({ ...source, name: e.target.value })} />
+            <input value={source.name} onChange={(e) => setSource((current) => ({ ...current, name: e.target.value }))} />
           </div>
           <button
             className="row-action"
