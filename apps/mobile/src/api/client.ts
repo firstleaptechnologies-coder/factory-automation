@@ -1,17 +1,25 @@
 import {Platform} from 'react-native';
+import * as Updates from 'expo-updates';
 import {ApiClient} from '@fas/shared';
+import {DEFAULT_CHANNEL, originFor} from './environments';
 
 /**
- * Android emulators reach the host machine on 10.0.2.2, not localhost. On a real
- * device this must point at the office LAN address of the API box — set it in
- * one place here rather than hunting through screens later.
+ * The channel this binary was built on, which names the deployment it belongs
+ * to. Null in a Metro build, where updates are off — that is development.
  */
-const DEV_HOST = Platform.select({
-  android: 'http://10.0.2.2:3001',
-  default: 'http://localhost:3001',
-});
+export const CHANNEL = Updates.channel ?? DEFAULT_CHANNEL;
 
-export const API_BASE_URL = `${DEV_HOST}/api`;
+const origin = originFor(CHANNEL, Platform.OS === 'android' ? 'android' : 'ios');
+
+/**
+ * A build whose channel has no server cannot reach one, and saying so here is
+ * better than every screen failing separately with a network error. It cannot
+ * happen through an update — the channel is native — and `environments.spec.ts`
+ * refuses to let such a binary be built in the first place.
+ */
+export const API_BASE_URL = origin
+  ? `${origin}/api`
+  : `unconfigured://${CHANNEL}`;
 
 let onUnauthorized: (() => void) | undefined;
 

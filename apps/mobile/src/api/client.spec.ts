@@ -1,16 +1,18 @@
 import { Platform } from 'react-native';
 
 /**
- * The module picks a host at import time from `Platform.select`, which the
- * React Native jest preset pins to iOS — so the platform branch is chosen here
- * rather than by setting `Platform.OS`, which that preset ignores.
+ * The module picks a host at import time — from the channel the binary carries
+ * and the platform it runs on — so both are set before the require.
+ *
+ * `jest.resetModules()` hands the module a fresh `expo-updates` too, which is
+ * why the channel is written on that copy rather than on the one this file
+ * imported.
  */
-function loadFor(os: 'ios' | 'android') {
+function loadFor(os: 'ios' | 'android', channel: string | null = 'development') {
   jest.resetModules();
   Platform.OS = os;
-  jest
-    .spyOn(Platform, 'select')
-    .mockImplementation((spec: Record<string, unknown>) => spec[os] ?? spec.default);
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  (require('expo-updates') as { channel: string | null }).channel = channel;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('./client') as typeof import('./client');
 }
@@ -27,6 +29,30 @@ it('reaches the host machine on the Android emulator’s own address', () => {
 
 it('uses localhost everywhere else', () => {
   expect(loadFor('ios').API_BASE_URL).toBe('http://localhost:3001/api');
+});
+
+/**
+ * The channel is native: it comes from the binary, so an over-the-air update
+ * cannot move a shop's app onto a different server.
+ */
+it('reads the deployment off the channel the binary carries', () => {
+  expect(loadFor('ios', 'development').CHANNEL).toBe('development');
+});
+
+it('treats no channel at all as development, which is Metro', () => {
+  expect(loadFor('ios', null).API_BASE_URL).toBe('http://localhost:3001/api');
+});
+
+it('refuses to fall back to a developer’s desk on an unknown channel', () => {
+  // Better a build that plainly cannot reach anything than one quietly sending
+  // a shop's orders to whatever is listening on somebody's laptop.
+  const { API_BASE_URL } = loadFor('ios', 'not-a-deployment');
+  expect(API_BASE_URL).not.toContain('localhost');
+  expect(API_BASE_URL).toBe('unconfigured://not-a-deployment');
+});
+
+it('says the same for a deployment that has not been built yet', () => {
+  expect(loadFor('ios', 'production').API_BASE_URL).toBe('unconfigured://production');
 });
 
 it('points the client at that base', () => {
