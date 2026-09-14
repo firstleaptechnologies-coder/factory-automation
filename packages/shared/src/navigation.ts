@@ -272,6 +272,19 @@ export const NAV_GROUPS: NavGroup[] = [
         app: 'Transactions',
       },
       {
+        /*
+         * The one figure a shop checks before it trusts a book, and it sat on
+         * no screen at all: the owner who trialled this added it up on paper.
+         */
+        key: 'outstanding',
+        module: MODULES.FINANCE,
+        label: 'Owed to you',
+        icon: 'trend',
+        permission: PERMISSIONS.CASH_POSITION_VIEW,
+        web: '/outstanding',
+        app: 'Outstanding',
+      },
+      {
         key: 'payouts',
         module: MODULES.FINANCE,
         label: 'Payout ledger',

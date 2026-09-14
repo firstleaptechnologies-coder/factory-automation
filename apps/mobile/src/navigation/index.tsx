@@ -41,6 +41,7 @@ import { EstimateDetailScreen } from '../screens/EstimateDetailScreen';
 import { ClientFirmScreen } from '../screens/ClientFirmScreen';
 import { AdminLeadFieldsScreen } from '../screens/admin/AdminLeadFieldsScreen';
 import { PaymentsScreen } from '../screens/PaymentsScreen';
+import { OutstandingScreen } from '../screens/OutstandingScreen';
 import { TransactionsScreen } from '../screens/TransactionsScreen';
 import { DisbursementsScreen } from '../screens/DisbursementsScreen';
 import { DisbursementLedgerScreen } from '../screens/DisbursementLedgerScreen';
@@ -183,6 +184,7 @@ export function RootNavigator() {
             <Stack.Screen name="AdminLeadFields" component={AdminLeadFieldsScreen} />
             <Stack.Screen name="Payments" component={PaymentsScreen} />
             <Stack.Screen name="Transactions" component={TransactionsScreen} />
+            <Stack.Screen name="Outstanding" component={OutstandingScreen} />
             <Stack.Screen name="Disbursements" component={DisbursementsScreen} />
             <Stack.Screen name="DisbursementLedger" component={DisbursementLedgerScreen} />
             <Stack.Screen name="Invoices" component={InvoicesScreen} />

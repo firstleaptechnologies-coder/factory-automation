@@ -335,7 +335,7 @@ describe('money', () => {
     // Roles are a tenant's to rename and recombine; the permissions on them
     // are what the product is written against.
     const money = routes.filter((route) => route.controller === 'PaymentsController');
-    expect(money.length).toBe(7);
+    expect(money.length).toBe(8);
     for (const route of money) {
       expect(route.permissions.length).toBeGreaterThan(0);
       expect(route.roles).toEqual([]);
@@ -345,6 +345,14 @@ describe('money', () => {
   it('separates seeing money from taking it', () => {
     expect(find('PaymentsController', 'summary').permissions).toEqual(['payment.view']);
     expect(find('PaymentsController', 'record').permissions).toEqual(['payment.record']);
+  });
+
+  // The whole book at once is the owner's question, not the floor's, so it
+  // sits with the cash position rather than with one order's receipts.
+  it('guards what the shop is owed like the cash position', () => {
+    expect(find('PaymentsController', 'outstanding').permissions).toEqual([
+      'payment.cash_position',
+    ]);
   });
 
   it('guards banking collected cash apart from taking it', () => {

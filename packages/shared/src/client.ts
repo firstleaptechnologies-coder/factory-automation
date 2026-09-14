@@ -36,6 +36,7 @@ import type {
   DisbursementStatus,
   DisbursementSummary,
   CashToBankRow,
+  Outstanding,
   CashPosition,
   Transaction,
   TransactionKind,
@@ -653,6 +654,11 @@ export class ApiClient {
 
   cashPosition(query?: { from?: string; to?: string }) {
     return this.get<CashPosition>('/payments/cash-position', query);
+  }
+
+  /** What the shop is owed, and by whom. */
+  outstanding() {
+    return this.get<Outstanding>('/payments/outstanding');
   }
 
   /** The receipts to walk to the bank. Not the drawer — see `cashPosition`. */

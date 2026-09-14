@@ -241,6 +241,31 @@ export interface CashPosition {
 }
 
 /**
+ * What the shop is owed, and by whom.
+ *
+ * `owed` and `held` are deliberately two figures. An order short by ₹1,000
+ * beside another overpaid by ₹500 is a debt of a thousand and five hundred
+ * rupees of somebody else's money, not a net of five hundred — reporting one
+ * number would say the debt is smaller than it is.
+ */
+export interface Outstanding {
+  owed: number;
+  /** How many orders are short. */
+  orders: number;
+  /** Taken against orders that came to less than was paid. Not a debt. */
+  held: number;
+  clients: OutstandingClient[];
+}
+
+export interface OutstandingClient {
+  clientId: string;
+  code: string;
+  name: string;
+  owed: number;
+  orders: number;
+}
+
+/**
  * One cash receipt that has not reached the bank.
  *
  * Not "in hand": a payout empties the drawer without touching any receipt, so

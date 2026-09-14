@@ -85,6 +85,19 @@ export class PaymentsController {
   }
 
   /** What is still in hand, order by order. */
+  /**
+   * What the shop is owed, and by whom.
+   *
+   * Gated with the cash position rather than with an order's own payments: it
+   * is the whole book at once, which is the owner's question and not the
+   * floor's.
+   */
+  @RequirePermissions(PERMISSIONS.CASH_POSITION_VIEW)
+  @Get('payments/outstanding')
+  outstanding() {
+    return this.payments.outstanding();
+  }
+
   @RequirePermissions(PERMISSIONS.CASH_POSITION_VIEW)
   @Get('payments/cash-in-hand')
   cashInHand() {

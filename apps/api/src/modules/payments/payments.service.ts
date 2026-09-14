@@ -5,6 +5,7 @@ import {
   PaymentMode,
   PaymentStatus,
   Prisma,
+  StatusCategory,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -369,6 +370,80 @@ export class PaymentsService {
       page: query.page,
       limit: query.limit,
     });
+  }
+
+  /**
+   * What the shop is owed, and by whom.
+   *
+   * It appeared on no screen. The owner who trialled this worked it out on
+   * paper — 43,200 + 16,200 + 25,000 — which is the one number a shop checks
+   * before it decides whether to trust a book at all.
+   *
+   * Two figures rather than one net. An order short by ₹1,000 beside another
+   * overpaid by ₹500 is not "owed ₹500": the shop is owed a thousand rupees
+   * and separately holds five hundred that is not its own. Netting them would
+   * report a debt as smaller than it is, which is the one thing these books
+   * must never do.
+   *
+   * A cancelled order owes nothing — the work is not happening — but it is
+   * counted nowhere else either, so anything paid against one shows up as
+   * money held rather than quietly disappearing.
+   */
+  async outstanding() {
+    const orders = await this.prisma.order.findMany({
+      where: { status: { category: { not: StatusCategory.CANCELLED } } },
+      select: {
+        id: true,
+        code: true,
+        grandTotal: true,
+        client: { select: { id: true, code: true, name: true } },
+        payments: { select: { amount: true } },
+      },
+    });
+
+    const byClient = new Map<
+      string,
+      { clientId: string; code: string; name: string; owed: number; orders: number }
+    >();
+    let owed = 0;
+    let held = 0;
+    let owing = 0;
+
+    for (const order of orders) {
+      // Reversals are stored as their own negative row, so the sum is the net
+      // of what was taken and what was handed back.
+      const received = sum(order.payments.map((payment) => Number(payment.amount)));
+      const short = round2(Number(order.grandTotal) - received);
+
+      if (short < -0.009) {
+        held = round2(held - short);
+        continue;
+      }
+      if (short < 0.009) continue;
+
+      owed = round2(owed + short);
+      owing += 1;
+
+      const client = order.client;
+      const row = byClient.get(client.id) ?? {
+        clientId: client.id,
+        code: client.code,
+        name: client.name,
+        owed: 0,
+        orders: 0,
+      };
+      row.owed = round2(row.owed + short);
+      row.orders += 1;
+      byClient.set(client.id, row);
+    }
+
+    return {
+      owed,
+      orders: owing,
+      /** Taken against orders that came to less than was paid. Not a debt. */
+      held,
+      clients: [...byClient.values()].sort((a, b) => b.owed - a.owed),
+    };
   }
 
   /**

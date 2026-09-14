@@ -67,6 +67,7 @@ flowchart LR
   subgraph cat_finances["Finances"]
     direction TB
     transactions["Transactions"]
+    outstanding["Owed to you"]
     payouts["Payout ledger"]
     invoices["Invoices"]
     invoice_detail["One invoice"]
@@ -196,6 +197,7 @@ flowchart LR
 | Screen | Web | App route | Permission |
 | --- | --- | --- | --- |
 | Transactions | `/transactions` | `Transactions` | `payment.cash_position` |
+| Owed to you | `/outstanding` | `Outstanding` | `payment.cash_position` |
 | Payout ledger | `/disbursements` | `DisbursementLedger` | `disbursement.view` |
 | Invoices | `/invoices` | `Invoices` | `invoice.view` |
 |   ↳ One invoice | `/invoices/[id]` | `InvoiceDetail` | — |
