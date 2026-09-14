@@ -128,6 +128,29 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
   };
   const statusById = (id: string) => data.statuses.find((s) => s.id === id);
 
+  /*
+   * Stages a quote cannot move an enquiry out of.
+   *
+   * The rule obeys the drawing: an enquiry only moves to the quote stage where
+   * the pipeline has an arrow from where it is sitting. That is the shop's
+   * drawing being respected rather than worked around — but it is also why a
+   * shop that quoted an enquiry on its first stage watched nothing happen and
+   * had nothing to tell it why. The terminal stages are left out: an enquiry
+   * that is already won or lost should not go back to Quoted.
+   */
+  const stranded = data.quoteStatusId
+    ? data.statuses.filter(
+        (status) =>
+          status.id !== data.quoteStatusId &&
+          status.category !== 'DONE' &&
+          status.category !== 'CANCELLED' &&
+          !data.transitions.some(
+            (move) =>
+              move.fromStatusId === status.id && move.toStatusId === data.quoteStatusId,
+          ),
+      )
+    : [];
+
   return (
     <Screen refreshing={workflow.refreshing} onRefresh={workflow.refresh}>
       <ScreenHeader
@@ -203,6 +226,22 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
                 ? 'An enquiry moves here when a quote is sent to the client.'
                 : 'A quote is recorded against the enquiry but moves it nowhere.'}
             </Text>
+            {/*
+              The move obeys the drawing above, which the promise on its own
+              did not say. A shop quoted an enquiry sitting on its first stage,
+              watched it not move, and had nothing anywhere to tell it why: the
+              pipeline simply had no arrow from there to Quoted. Naming the
+              stages it cannot happen from turns a silent no-op into something
+              somebody can go and draw.
+            */}
+            {stranded.length > 0 ? (
+              <Text variant="tiny" style={styles.stranded} testID="quote-stranded">
+                Not from {stranded.map((status) => status.name).join(', ')} — there is no
+                arrow from {stranded.length === 1 ? 'it' : 'them'} to{' '}
+                {statusById(data.quoteStatusId ?? '')?.name}. Draw one, or an enquiry
+                sitting there stays put.
+              </Text>
+            ) : null}
           </View>
           <Text variant="body" bold tone={data.quoteStatusId ? 'accent' : 'faint'}>
             {statusById(data.quoteStatusId ?? '')?.name ?? 'No move'}
@@ -631,6 +670,7 @@ export function AdminFlowScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
+  stranded: { color: palette.warning, marginTop: spacing.xs },
   wfRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

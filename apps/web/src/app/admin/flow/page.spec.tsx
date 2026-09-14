@@ -533,7 +533,68 @@ describe('when an enquiry goes quiet', () => {
     expect(screen.queryByText('Sending a quote means')).not.toBeInTheDocument();
   });
 
+  /*
+   * The promise read as unconditional, and a shop whose graph had no arrow
+   * into the quote stage watched its enquiry sit still with nothing said.
+   */
+  describe('and a stage cannot reach the quote stage', () => {
+    it('names the stages the move will not happen from', async () => {
+      await mount({ ...LEAD_FLOW, quoteStatusId: 's3' });
+      const warning = screen.getByTestId('quote-stranded');
+      // Punched has an arrow to Cutting only; Cutting reaches Delivered.
+      expect(warning).toHaveTextContent('Not from Punched');
+      expect(warning).toHaveTextContent('Delivered');
+      expect(warning).not.toHaveTextContent('Cutting');
+    });
 
+    it('says nothing when every stage can get there', async () => {
+      await mount({
+        ...LEAD_FLOW,
+        quoteStatusId: 's3',
+        transitions: [
+          ...GRAPH.transitions,
+          {
+            id: 't3',
+            fromStatusId: 's1',
+            toStatusId: 's3',
+            label: null,
+            requiresNote: false,
+            allowedRoles: [],
+          },
+        ],
+      });
+      expect(screen.queryByTestId('quote-stranded')).not.toBeInTheDocument();
+    });
+
+    it('says nothing while no stage is chosen', async () => {
+      await mount(LEAD_FLOW);
+      expect(screen.queryByTestId('quote-stranded')).not.toBeInTheDocument();
+    });
+
+    it('leaves out the stages an enquiry is finished at', async () => {
+      await mount({
+        ...LEAD_FLOW,
+        quoteStatusId: 's3',
+        statuses: [
+          PUNCHED,
+          CUTTING,
+          DONE,
+          status({ id: 's4', code: 'LOST', name: 'Lost', category: 'CANCELLED' }),
+        ],
+      });
+      // Nobody quotes a lost enquiry, so no arrow out of Lost is missing.
+      expect(screen.getByTestId('quote-stranded')).not.toHaveTextContent('Lost');
+    });
+
+    it('clears once the missing arrow is drawn, before it is even saved', async () => {
+      await mount({ ...LEAD_FLOW, quoteStatusId: 's3' });
+      expect(screen.getByTestId('quote-stranded')).toBeInTheDocument();
+      flow.onConnect!({ source: 's1', target: 's3' });
+      await waitFor(() =>
+        expect(screen.queryByTestId('quote-stranded')).not.toBeInTheDocument(),
+      );
+    });
+  });
 
   it('saves the stage that was picked', async () => {
     await mount(LEAD_FLOW);

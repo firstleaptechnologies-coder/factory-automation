@@ -512,6 +512,48 @@ describe('what sending a quote means', () => {
       expect(mockUpdateWorkflow).toHaveBeenCalledWith('w1', { quoteStatusId: null }),
     );
   });
+
+  /*
+   * The card promised the move unconditionally. It is made through this same
+   * graph, so a stage with no arrow into the quote stage simply stays put —
+   * and the shop was told nothing about why.
+   */
+  describe('and a stage cannot reach the chosen one', () => {
+    it('names the stages the move will not happen from', async () => {
+      await mount({ ...LEAD_FLOW, quoteStatusId: 's3' });
+      // Punched only goes to Cutting; Cutting reaches Delivered.
+      expect(screen.getByTestId('quote-stranded')).toHaveTextContent(
+        'Not from Punched — there is no arrow from it to Delivered. Draw one, ' +
+          'or an enquiry sitting there stays put.',
+      );
+    });
+
+    it('says nothing when every stage can get there', async () => {
+      await mount({ ...LEAD_FLOW, quoteStatusId: 's2' });
+      // Punched → Cutting is drawn, and Delivered is where an enquiry ends.
+      expect(screen.queryByTestId('quote-stranded')).toBeNull();
+    });
+
+    it('says nothing while no stage is chosen', async () => {
+      await mount(LEAD_FLOW);
+      expect(screen.queryByTestId('quote-stranded')).toBeNull();
+    });
+
+    it('leaves out the stages an enquiry is finished at', async () => {
+      await mount({
+        ...LEAD_FLOW,
+        quoteStatusId: 's3',
+        statuses: [
+          PUNCHED,
+          CUTTING,
+          DONE,
+          status({ id: 's4', code: 'LOST', name: 'Lost', category: 'CANCELLED', sortOrder: 3 }),
+        ],
+      });
+      // Nobody quotes a lost enquiry, so no arrow out of Lost is missing.
+      expect(screen.getByTestId('quote-stranded')).not.toHaveTextContent('Lost');
+    });
+  });
 });
 
 describe('when an enquiry goes quiet', () => {

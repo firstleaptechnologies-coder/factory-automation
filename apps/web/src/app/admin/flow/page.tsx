@@ -185,6 +185,25 @@ export default function FlowBuilderPage() {
 
   const statusById = (id: string) => workflow?.statuses.find((status) => status.id === id);
 
+  /*
+   * Stages with no arrow into the quote stage. An enquiry sitting on one of
+   * these does not move when its quote is sent — the move is made through this
+   * graph and the graph refuses it — so the promise above has to say where it
+   * does not hold. Read off the canvas's own edges, so a move drawn but not yet
+   * saved already counts.
+   */
+  const stranded = workflow?.quoteStatusId
+    ? workflow.statuses.filter(
+        (status) =>
+          status.id !== workflow.quoteStatusId &&
+          status.category !== 'DONE' &&
+          status.category !== 'CANCELLED' &&
+          !edges.some(
+            (edge) => edge.source === status.id && edge.target === workflow.quoteStatusId,
+          ),
+      )
+    : [];
+
   const addMove = (from: WorkflowStatus, to: WorkflowStatus) => {
     setEdges((current) =>
       addEdge(
@@ -463,6 +482,18 @@ export default function FlowBuilderPage() {
                 made through this same graph, so it only happens where the pipeline
                 allows it — the quote is recorded either way.
               </p>
+              {stranded.length > 0 ? (
+                <p
+                  className="warning"
+                  style={{ fontSize: 12, margin: '4px 0 0' }}
+                  data-testid="quote-stranded"
+                >
+                  Not from {stranded.map((status) => status.name).join(', ')} — there is
+                  no arrow from {stranded.length === 1 ? 'it' : 'them'} to{' '}
+                  {statusById(workflow.quoteStatusId ?? '')?.name}. Draw one, or an
+                  enquiry sitting there stays put.
+                </p>
+              ) : null}
             </div>
             <div className="spacer" />
             <div style={{ width: 260 }}>
