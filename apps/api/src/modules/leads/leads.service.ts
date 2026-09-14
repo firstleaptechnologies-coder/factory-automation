@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   CustomFieldEntity,
+  EstimateStatus,
   Prisma,
   StatusCategory,
   UserRole,
@@ -17,6 +18,7 @@ import { CodeGeneratorService } from '../../common/utils/code-generator.service'
 import { paginate } from '../../common/dto/pagination.dto';
 import { OrdersService } from '../orders/orders.service';
 import { CustomFieldsService } from './custom-fields.service';
+import { pricedFromQuote } from '../estimates/estimate-pricing';
 import {
   ChangeLeadStatusDto,
   ConvertLeadDto,
@@ -418,6 +420,21 @@ export class LeadsService {
      * match could not save it, because the client made from the quote screen
      * had no phone on it to match against.
      */
+    /*
+     * What the client already agreed to pay.
+     *
+     * Converting from the quote carried its figure across; converting from the
+     * enquiry punched an order with no price on it at all, so the shop typed
+     * ₹43,200 again by hand — the same job, the same figure, and one keystroke
+     * from a number nobody agreed to. The items the person just entered are
+     * kept, because those are the sizes the floor will cut; only the money
+     * comes from the quote.
+     *
+     * A declined or expired quote is not an agreement, so it prices nothing.
+     */
+    const standing = await this.standingQuote(lead.estimates ?? []);
+    const priced = standing ? pricedFromQuote(standing) : {};
+
     const knownClientId =
       lead.clientId ?? lead.estimates?.find((estimate) => estimate.clientId)?.clientId ?? undefined;
 
@@ -437,10 +454,23 @@ export class LeadsService {
         priority: dto.priority ?? lead.priority,
         dueDate: dto.dueDate,
         notes: dto.notes ?? `Converted from lead ${lead.code}`,
+        ...priced,
         items: dto.items,
-      },
+      } as never,
       user?.id,
     );
+
+    /*
+     * The quote the money came from becomes that order's quotation, exactly as
+     * it would have if its own button had been pressed. Otherwise it sits at
+     * SENT for ever, against a job that has been in production for a month.
+     */
+    if (standing) {
+      await this.prisma.estimate.update({
+        where: { id: standing.id },
+        data: { status: EstimateStatus.CONVERTED, orderId: order.id },
+      });
+    }
 
     // Park the lead on a closed stage so it leaves the active pipeline. Prefer
     // an explicit choice, else any DONE stage, else leave it where it is.
@@ -559,6 +589,39 @@ export class LeadsService {
    * touches a quiet lead it is live again because the clock is its own
    * `updatedAt`.
    */
+  /**
+   * The quotation an enquiry is converted at, if one still stands.
+   *
+   * Newest first, and only one the client could still say yes to: a declined
+   * or expired quote is not an agreement, and pricing a job at one would put a
+   * figure on the books that nobody accepted. Fetched rather than read off the
+   * lead's own summary because the money needs the treatment and the slab, and
+   * the summary carries neither.
+   */
+  private async standingQuote(
+    quotes: { id: string; status: string; orderId: string | null }[],
+  ) {
+    const candidate = quotes.find(
+      (quote) =>
+        !quote.orderId &&
+        quote.status !== EstimateStatus.DECLINED &&
+        quote.status !== EstimateStatus.EXPIRED,
+    );
+    if (!candidate) return null;
+
+    return this.prisma.estimate.findFirst({
+      where: { id: candidate.id },
+      select: {
+        id: true,
+        code: true,
+        taxTreatment: true,
+        total: true,
+        grandTotal: true,
+        items: { select: { gstSlabId: true } },
+      },
+    });
+  }
+
   private async quietCutoff(): Promise<Date | null> {
     const workflow = await this.prisma.workflow.findFirst({
       where: { kind: WorkflowKind.LEAD, isDefault: true, isActive: true },

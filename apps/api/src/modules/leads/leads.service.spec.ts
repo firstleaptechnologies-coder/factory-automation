@@ -845,3 +845,138 @@ describe('convert — the quote that is already an order', () => {
     });
   });
 });
+
+/*
+ * The money on a converted enquiry.
+ *
+ * Converting from the quote carried its figure across; converting from the
+ * enquiry punched an order with no price on it at all, so the shop re-keyed
+ * ₹43,200 it had already agreed. One job, two doors, and only one of them
+ * remembered the number.
+ */
+describe('convert — the figure the client agreed to', () => {
+  function withLead(db: Db, estimates: unknown[]) {
+    db.lead.findUnique = jest.fn(async () => ({
+      id: 'ld1',
+      code: 'LEAD-1',
+      statusId: 'l1',
+      workflowId: 'w1',
+      priority: 'HIGH',
+      clientId: 'c1',
+      contactName: 'Verma',
+      contactPhone: '9820012345',
+      title: 'Kitchen',
+      customFields: {},
+      convertedOrderId: null,
+      estimates,
+    }));
+  }
+
+  const summary = (over: Record<string, unknown> = {}) => ({
+    id: 'e1',
+    code: 'EST-1',
+    status: 'SENT',
+    orderId: null,
+    clientId: 'c1',
+    ...over,
+  });
+
+  const full = (over: Record<string, unknown> = {}) => ({
+    id: 'e1',
+    code: 'EST-1',
+    taxTreatment: 'EXCLUSIVE',
+    total: 43200,
+    grandTotal: 50976,
+    items: [{ gstSlabId: 'g18' }],
+    ...over,
+  });
+
+  const dto = () => ({ location: 'Site A', items: [{ materialId: 'm1' }] }) as never;
+
+  it('prices the order at the standing quote', async () => {
+    const { service, db, orders } = build();
+    withLead(db, [summary()]);
+    db.estimate.findFirst = jest.fn(async () => full());
+
+    await inTenant(() => service.convert('ld1', dto()));
+
+    const sent = orders.punch.mock.calls[0][0] as Record<string, unknown>;
+    expect(sent).toMatchObject({
+      pricingMode: 'LUMP_SUM',
+      taxTreatment: 'EXCLUSIVE',
+      total: 43200,
+      gstSlabId: 'g18',
+    });
+  });
+
+  it('keeps the sizes the person just entered, which the floor has to cut', async () => {
+    const { service, db, orders } = build();
+    withLead(db, [summary()]);
+    db.estimate.findFirst = jest.fn(async () => full());
+
+    await inTenant(() => service.convert('ld1', dto()));
+
+    const sent = orders.punch.mock.calls[0][0] as Record<string, unknown>;
+    expect(sent.items).toEqual([{ materialId: 'm1' }]);
+  });
+
+  it('marks that quote converted, so it does not sit at SENT for ever', async () => {
+    const { service, db } = build();
+    withLead(db, [summary()]);
+    db.estimate.findFirst = jest.fn(async () => full());
+
+    await inTenant(() => service.convert('ld1', dto()));
+
+    expect(db.estimate.update.mock.calls[0][0]).toMatchObject({
+      where: { id: 'e1' },
+      data: { status: 'CONVERTED', orderId: 'o1' },
+    });
+  });
+
+  it('prices nothing from a quote the client turned down', async () => {
+    const { service, db, orders } = build();
+    withLead(db, [summary({ status: 'DECLINED' })]);
+
+    await inTenant(() => service.convert('ld1', dto()));
+
+    // A declined quote is not an agreement. Better an unpriced order than a
+    // figure nobody accepted.
+    const sent = orders.punch.mock.calls[0][0] as Record<string, unknown>;
+    expect(sent.total).toBeUndefined();
+    expect(db.estimate.update).not.toHaveBeenCalled();
+  });
+
+  it('prices nothing from a quote that has expired', async () => {
+    const { service, db, orders } = build();
+    withLead(db, [summary({ status: 'EXPIRED' })]);
+
+    await inTenant(() => service.convert('ld1', dto()));
+
+    expect((orders.punch.mock.calls[0][0] as Record<string, unknown>).total).toBeUndefined();
+  });
+
+  it('leaves an enquiry with no quote behind it exactly as it was', async () => {
+    const { service, db, orders } = build();
+    withLead(db, []);
+
+    await inTenant(() => service.convert('ld1', dto()));
+
+    const sent = orders.punch.mock.calls[0][0] as Record<string, unknown>;
+    expect(sent.pricingMode).toBeUndefined();
+    expect(sent.total).toBeUndefined();
+  });
+
+  /*
+   * The treatment, which is where this goes expensively wrong. A lump sum
+   * under EXCLUSIVE has GST added to whatever it is handed.
+   */
+  it('hands over what the client pays when the tax comes out of it', async () => {
+    const { service, db, orders } = build();
+    withLead(db, [summary()]);
+    db.estimate.findFirst = jest.fn(async () => full({ taxTreatment: 'INCLUSIVE' }));
+
+    await inTenant(() => service.convert('ld1', dto()));
+
+    expect((orders.punch.mock.calls[0][0] as Record<string, unknown>).total).toBe(50976);
+  });
+});

@@ -15,6 +15,7 @@ import { ClientsService } from '../clients/clients.service';
 import { paginate } from '../../common/dto/pagination.dto';
 import { amountInWords, round2, splitTax } from '../../common/utils/pricing';
 import { estimateTotals } from './estimate-totals';
+import { pricedFromQuote } from './estimate-pricing';
 import {
   CreateEstimateDto,
   EstimateItemDto,
@@ -384,26 +385,10 @@ export class EstimatesService {
         workflowId: dto.workflowId,
         startStatusId: dto.startStatusId,
         notes: dto.notes ?? `From estimate ${estimate.code}`,
-        pricingMode: PricingMode.LUMP_SUM,
-        taxTreatment: estimate.taxTreatment,
-        /*
-         * The figure the treatment expects, so the order comes to exactly what
-         * was quoted.
-         *
-         * A lump-sum order under EXCLUSIVE reads its figure as the taxable
-         * value and adds GST on top; handing it the gross therefore taxed a
-         * figure that already included tax, and a client who agreed to
-         * ₹4,25,980 was invoiced ₹5,02,656. Under INCLUSIVE and ABSORBED the
-         * quoted figure is what they pay and the tax comes out of it, which is
-         * the gross.
-         */
-        total:
-          estimate.taxTreatment === TaxTreatment.EXCLUSIVE
-            ? Number(estimate.total)
-            : Number(estimate.grandTotal),
-        // The slab the quote was priced at, where it was all one slab. The
-        // shop's default is not necessarily the rate the client agreed to.
-        gstSlabId: oneSlab(estimate.items),
+        // The agreed figure, treatment and slab — shared with the enquiry's
+        // own conversion so the two doors cannot put different numbers on the
+        // same job.
+        ...pricedFromQuote(estimate),
         items: [
           {
             // One line standing for the whole quotation. Its own price is left
