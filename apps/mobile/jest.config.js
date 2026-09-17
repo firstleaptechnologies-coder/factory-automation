@@ -11,6 +11,26 @@ module.exports = {
     // Reaches into the native runtime through expo-modules-core, which Jest
     // cannot provide. See the file.
     '^expo-updates$': '<rootDir>/test/expo-updates-mock.js',
+    /*
+     * Babel compiles @fas/shared from source — the files live in
+     * packages/shared/src, outside this project — and emits
+     * require('@babel/runtime/helpers/...') into what it produces. Node then
+     * resolves that by walking up from *that file's* directory: past
+     * packages/shared, past packages, into the repository root. The root
+     * install is where it finds one.
+     *
+     * CI's mobile job deliberately does not run the root install, so on CI
+     * there is nothing there and forty suites fail to load with "Cannot find
+     * module '@babel/runtime/helpers/interopRequireDefault'". It passes on a
+     * developer machine, where the root install exists for the other three
+     * workspaces — so nothing local can catch it, and it failed only after
+     * being pushed.
+     *
+     * Pointing at this project's own copy makes the mobile suite genuinely
+     * independent of the root install, which is what its CI job already claims
+     * to be.
+     */
+    '^@babel/runtime/(.*)$': '<rootDir>/node_modules/@babel/runtime/$1',
   },
   transformIgnorePatterns: [
     // Expo's packages ship untranspiled ESM on purpose — babel-preset-expo is
