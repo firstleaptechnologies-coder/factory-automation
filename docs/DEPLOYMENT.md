@@ -238,20 +238,47 @@ modules through the platform screens — the API's own bootstrap — rather than
 by hand in SQL: a tenant without a `TenantModule` row is a workspace whose
 every screen is gated off, and that is very confusing to debug from the inside.
 
-## 6. The web app
+## 6. The web app — **done**
 
-A new Vercel project with root directory `apps/web`, and the domain
-`app.firstleaptechnologies.in` added to it — Vercel will name the CNAME target
-to put in BigRock. One environment variable:
+Live at **https://fas-web-tau.vercel.app**, on Vercel project `fas-web` in the
+`firshleap-technologies` team. Deployed from a working tree rather than from
+git, so nothing about it depends on the public repository.
 
+```bash
+npx vercel deploy --prod --yes     # from the repository root
 ```
-NEXT_PUBLIC_API_URL=https://api.firstleaptechnologies.in/api
-```
 
-`CORS_ORIGINS` on the box must already list that origin, or the browser refuses
-every call the page makes. Vercel's preview deployments get their own hostnames
-and are therefore *not* covered by it; that is deliberate, and a preview that
-needs to reach the API needs its origin added on purpose.
+Three settings make that work, and two of them are not obvious:
+
+- **Root Directory is `apps/web`**, set on the project rather than in a file —
+  so Vercel uploads the whole workspace and builds inside it. Deploying from
+  within `apps/web` instead uploads only that folder, and the build command's
+  `cd ../..` then lands at `/` with no package.json.
+- **`apps/web/vercel.json`** carries the install and build commands, because
+  `@fas/shared` resolves to `dist/` and has to be compiled before `next build`
+  ever runs.
+- **`NEXT_PUBLIC_API_URL`** is set on the project to
+  `https://api.firstleaptechnologies.in/api`.
+
+### Deployment protection is off, deliberately
+
+Vercel teams default to `ssoProtection: all_except_custom_domains`, which makes
+every `*.vercel.app` URL ask for a Vercel login first. A factory has no Vercel
+accounts, so that setting does not protect the app — it hides it. The app has
+its own login, which is the one that matters, so protection is turned off for
+this project.
+
+### CORS has to name it
+
+`CORS_ORIGINS` on the box lists the Vercel URL and the custom domain it will
+eventually have. Preview deployments get their own hostnames and are
+deliberately not covered: a preview that needs the live API needs its origin
+added on purpose, not by a wildcard nobody revisits.
+
+### When the custom domain is wanted
+
+Add `app.firstleaptechnologies.in` to the project, put the CNAME Vercel names
+into BigRock, and leave `CORS_ORIGINS` alone — it already lists it.
 
 ## 7. The phone app
 

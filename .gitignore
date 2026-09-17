@@ -37,3 +37,8 @@ apps/mobile/keys/
 # only on the box they run on; apps/api/.env.example says what goes in them.
 deploy/api.env
 deploy/.env
+
+# Vercel's link to the project, and the OIDC token it caches beside it. The ids
+# are not secret; the token is, and both belong to this machine rather than to
+# the repository.
+.vercel/

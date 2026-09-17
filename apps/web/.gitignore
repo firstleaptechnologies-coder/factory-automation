@@ -1,0 +1,8 @@
+# Vercel's link to the project, written by `vercel link`.
+.vercel
+
+# Local environment, including the OIDC token the CLI caches. Not `.env*`,
+# which Vercel's own default writes and which would also hide .env.example —
+# the one file here that is meant to be read.
+.env.local
+.env.*.local

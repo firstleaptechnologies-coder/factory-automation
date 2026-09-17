@@ -1,0 +1,11 @@
+# The build installs its own; uploading ours would ship macOS binaries.
+node_modules
+**/node_modules
+**/dist
+**/.next
+# Built by Xcode and Gradle, and the largest thing here.
+apps/mobile
+# Secrets. Neither is tracked, and neither should leave this machine.
+deploy/api.env
+deploy/.env
+.git
