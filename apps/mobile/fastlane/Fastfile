@@ -74,7 +74,18 @@ def build_ios
     scheme: "FAS",
     configuration: "Release",
     export_method: "app-store",
+    # TARGETED_DEVICE_FAMILY=1 — iPhone only. The project says so too; this
+    # repeats it because the first upload was rejected for exactly this:
+    #
+    #   Missing required icon file. The bundle does not contain an app icon
+    #   for iPad of exactly '152x152' pixels. (90023)
+    #
+    # The icon set has iPhone sizes only, and the layouts have only ever been
+    # designed and tested at phone width. Declaring iPad support the app does
+    # not have is worse than not declaring it — review tests on iPad when you
+    # claim it.
     xcargs: "MARKETING_VERSION=#{MARKETING_VERSION} CURRENT_PROJECT_VERSION=#{BUILD_NUMBER} " \
+            "TARGETED_DEVICE_FAMILY=1 " \
             "DEVELOPMENT_TEAM=#{team} CODE_SIGN_STYLE=Manual " \
             "PROVISIONING_PROFILE_SPECIFIER=\"#{profile}\" CODE_SIGN_IDENTITY=\"Apple Distribution\"",
     export_options: {
