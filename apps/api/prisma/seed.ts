@@ -80,6 +80,34 @@ async function seedPrices() {
   }
 }
 
+/**
+ * A seeded password, from the environment where one is given.
+ *
+ * The defaults below are development passwords, and this repository is public:
+ * anyone who can read seed.ts knows them. That is fine on a laptop and is an
+ * open door on an API with a public address, so in production there are no
+ * defaults — the variable is supplied or the seed refuses to run.
+ *
+ * Refusing is the point. A seed that quietly falls back to "admin123" on a
+ * shop's live database is one where nothing looks wrong until somebody else
+ * logs in.
+ */
+function seedPassword(variable: string, developmentDefault: string): string {
+  const given = process.env[variable];
+  if (given && given.length >= 12) return given;
+
+  if (process.env.APP_ENV === 'production') {
+    throw new Error(
+      given
+        ? `${variable} is too short — 12 characters or more, please.`
+        : `${variable} must be set when APP_ENV=production. ` +
+          'Seeding a live workspace with a password from a public repository ' +
+          'is not something this script will do quietly.',
+    );
+  }
+  return developmentDefault;
+}
+
 async function main() {
   const platformAdmin = await prisma.platformUser.upsert({
     where: { email: 'platform@decorbucket.app' },
@@ -87,7 +115,7 @@ async function main() {
     create: {
       email: 'platform@decorbucket.app',
       name: 'Platform Admin',
-      passwordHash: await bcrypt.hash('platform123', 10),
+      passwordHash: await bcrypt.hash(seedPassword('SEED_PLATFORM_PASSWORD', 'platform123'), 10),
     },
   });
 
@@ -100,7 +128,7 @@ async function main() {
       email: 'admin@firstleap.in',
       name: 'FirstLeap Owner',
       role: 'OWNER',
-      passwordHash: await bcrypt.hash('firstleap123', 10),
+      passwordHash: await bcrypt.hash(seedPassword('SEED_FIRSTLEAP_PASSWORD', 'firstleap123'), 10),
     },
   });
 
@@ -126,7 +154,7 @@ async function main() {
     await provisioning.seed(prisma, tenant.id, {
       name: 'Administrator',
       code: 'ADMIN',
-      password: 'admin123',
+      password: seedPassword('SEED_TENANT_ADMIN_PASSWORD', 'admin123'),
       email: 'admin@decorbucket.app',
     });
 
@@ -135,8 +163,10 @@ async function main() {
     const roleByCode = new Map(roles.map((role) => [role.code, role.id]));
 
     for (const person of [
-      { code: 'SALES01', name: 'Sales Desk', role: 'SALES', password: 'sales123' },
-      { code: 'PROD01', name: 'Production', role: 'PRODUCTION', password: 'prod123' },
+      { code: 'SALES01', name: 'Sales Desk', role: 'SALES',
+        password: seedPassword('SEED_SALES_PASSWORD', 'sales123') },
+      { code: 'PROD01', name: 'Production', role: 'PRODUCTION',
+        password: seedPassword('SEED_PRODUCTION_PASSWORD', 'prod123') },
     ]) {
       await prisma.user.create({
         data: {
@@ -187,7 +217,7 @@ async function main() {
     await new TenantProvisioningService().seed(prisma, flt.id, {
       name: 'FLT Admin',
       code: 'ADMIN',
-      password: 'flt12345',
+      password: seedPassword('SEED_FLT_ADMIN_PASSWORD', 'flt12345'),
       email: 'admin@firstleap.in',
     });
   }
@@ -196,14 +226,17 @@ async function main() {
 
   // eslint-disable-next-line no-console
   console.log('Seed complete:', counts);
+  // Accounts, not passwords. In development they are the defaults in
+  // seedPassword; in production they came from the environment, and echoing a
+  // live credential into a deploy log is how it ends up somewhere permanent.
   // eslint-disable-next-line no-console
-  console.log(`Platform: ${platformAdmin.email} / platform123`);
+  console.log(`Platform: ${platformAdmin.email}`);
   // eslint-disable-next-line no-console
-  console.log(`Workspace: ${tenant.slug}  ->  ADMIN / admin123`);
+  console.log(`Workspace: ${tenant.slug}  ->  ADMIN`);
   // eslint-disable-next-line no-console
-  console.log(`Workspace: ${flt.slug}  ->  ADMIN / flt12345  (ours, every module)`);
+  console.log(`Workspace: ${flt.slug}  ->  ADMIN  (ours, every module)`);
   // eslint-disable-next-line no-console
-  console.log(`Platform: ${firstLeapOwner.email} / firstleap123`);
+  console.log(`Platform: ${firstLeapOwner.email}`);
 }
 
 main()
