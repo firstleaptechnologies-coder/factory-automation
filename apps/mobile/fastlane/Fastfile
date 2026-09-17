@@ -19,6 +19,10 @@ def required(name)
   value
 end
 
+# Not a secret — see the note in Appfile — so it has a default and the lanes run
+# locally without anything being exported first.
+APPLE_TEAM_ID = ENV["APPLE_TEAM_ID"] && !ENV["APPLE_TEAM_ID"].empty? ? ENV["APPLE_TEAM_ID"] : "WHF7M743MW"
+
 # CI passes BUILD_NUMBER so the same value feeds the archive AND the version
 # gate that post-native-release writes; locally, compute it.
 BUILD_NUMBER = (ENV["BUILD_NUMBER"] && !ENV["BUILD_NUMBER"].empty?) ?
@@ -51,7 +55,7 @@ end
 # API key fetches (or creates) an App Store distribution profile, and the
 # imported Apple Distribution certificate signs with it.
 def build_ios
-  team = required("APPLE_TEAM_ID")
+  team = APPLE_TEAM_ID
   get_provisioning_profile(
     api_key: asc_key,
     app_identifier: BUNDLE_ID,

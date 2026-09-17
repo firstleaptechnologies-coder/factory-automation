@@ -5,6 +5,12 @@
 # secrets, so a fork of this public repository cannot act as FirstLeap.
 app_identifier(ENV["IOS_BUNDLE_ID"] || "com.firstleap.factoryautomation")
 apple_id(ENV["APPLE_ID"])
-team_id(ENV["APPLE_TEAM_ID"])
+
+# The Apple team that owns the bundle identifier. Committed rather than kept as
+# a secret because it is not one: a Team ID is carried in every provisioning
+# profile and can be read out of any shipped .ipa. Knowing it grants nothing —
+# building for the team still needs the distribution certificate, which is a
+# secret and is not here.
+team_id(ENV["APPLE_TEAM_ID"] || "WHF7M743MW")
 
 package_name(ENV["ANDROID_PACKAGE"] || "com.firstleap.factoryautomation")
