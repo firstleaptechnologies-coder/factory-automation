@@ -8,7 +8,7 @@ import { Platform } from 'react-native';
  * why the channel is written on that copy rather than on the one this file
  * imported.
  */
-function loadFor(os: 'ios' | 'android', channel: string | null = 'development') {
+function loadFor(os: 'ios' | 'android', channel: string | null = 'local') {
   jest.resetModules();
   Platform.OS = os;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -31,6 +31,15 @@ it('uses localhost everywhere else', () => {
   expect(loadFor('ios').API_BASE_URL).toBe('http://localhost:3001/api');
 });
 
+it('sends a TestFlight build to staging, not to somebody’s desk', () => {
+  // The development channel is a deployment, not a laptop. It was localhost
+  // once, which would have made every tester's build useless the moment it
+  // left the building.
+  expect(loadFor('ios', 'development').API_BASE_URL).toBe(
+    'https://api-staging.firstleaptechnologies.in/api',
+  );
+});
+
 /**
  * The channel is native: it comes from the binary, so an over-the-air update
  * cannot move a shop's app onto a different server.
@@ -39,8 +48,11 @@ it('reads the deployment off the channel the binary carries', () => {
   expect(loadFor('ios', 'development').CHANNEL).toBe('development');
 });
 
-it('treats no channel at all as development, which is Metro', () => {
+it('treats no channel at all as local, which is Metro', () => {
+  // Updates are off in a Metro build, so there is no channel to read. That is
+  // a desk, and a desk is not staging.
   expect(loadFor('ios', null).API_BASE_URL).toBe('http://localhost:3001/api');
+  expect(loadFor('ios', null).CHANNEL).toBe('local');
 });
 
 it('refuses to fall back to a developer’s desk on an unknown channel', () => {
@@ -51,8 +63,9 @@ it('refuses to fall back to a developer’s desk on an unknown channel', () => {
   expect(API_BASE_URL).toBe('unconfigured://not-a-deployment');
 });
 
-it('says the same for a deployment that has not been built yet', () => {
-  // Staging has no server. Production has one and is not built against it yet.
+it('refuses a channel that names an environment rather than a channel', () => {
+  // "staging" is the environment; "development" is the channel it serves.
+  // A binary built with the wrong one must not quietly reach anything.
   expect(loadFor('ios', 'staging').API_BASE_URL).toBe('unconfigured://staging');
 });
 

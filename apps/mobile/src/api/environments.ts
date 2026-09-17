@@ -4,14 +4,21 @@
  * The channel is baked into the binary — `expo-channel-name` in
  * `ios/Expo.plist` and `android/app/src/main/res/values/strings.xml` — so an
  * over-the-air update cannot repoint a shop's app at a different server. That
- * is the whole reason the choice hangs off the channel rather than off an
- * environment variable inlined into the JS bundle: the bundle is exactly the
- * thing that travels between deployments.
+ * is the reason the choice hangs off the channel rather than an environment
+ * variable inlined into the JS bundle: the bundle is exactly the thing that
+ * travels between deployments.
  *
- * `apiOrigin` is null for a deployment that does not exist yet — staging is
- * still one. Nothing falls back to localhost in its place: `environments.spec.ts`
- * fails the build if a binary ships a channel with no server, which is the only
- * moment anyone can still do something about it.
+ * Three worlds, not two:
+ *
+ *   local        a Metro build on somebody's desk. Updates are off, so
+ *                `Updates.channel` is null and this is what that means.
+ *   development  the staging deployment, carried by TestFlight and Play
+ *                internal builds. Cut from the `development` branch.
+ *   production   the shop's own deployment, carried by App Store and Play
+ *                production builds. Cut from `main`.
+ *
+ * The two deployed hosts also live in `deploy/environments.json`, which is what
+ * provisions them; `environments.spec.ts` fails if the two lists disagree.
  */
 export type Environment = {
   /** Origin the app calls, without the `/api` suffix. Null until it exists. */
@@ -24,16 +31,16 @@ export type Environment = {
 };
 
 export const ENVIRONMENTS: Readonly<Record<string, Environment>> = {
-  development: {
+  local: {
     apiOrigin: 'http://localhost:3001',
     androidApiOrigin: 'http://10.0.2.2:3001',
   },
-  staging: { apiOrigin: null },
+  development: { apiOrigin: 'https://api-staging.firstleaptechnologies.in' },
   production: { apiOrigin: 'https://api.firstleaptechnologies.in' },
 };
 
 /** The channel a build falls back to when updates are off — Metro, and tests. */
-export const DEFAULT_CHANNEL = 'development';
+export const DEFAULT_CHANNEL = 'local';
 
 /**
  * The origin for a channel on a platform, or null when there is none.

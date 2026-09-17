@@ -61,18 +61,64 @@ describe('where a binary asks for updates', () => {
   });
 });
 
+/**
+ * The deployments are described twice — here, for the app at runtime, and in
+ * deploy/environments.json, which is what actually provisions them. Two lists
+ * of the same hosts drift, and the way this one drifts is silent: the app keeps
+ * calling yesterday's address and every screen fails with a network error that
+ * names nothing.
+ *
+ * It has already happened once. configure-ota-target.js repointed the native
+ * files at staging while this table still said localhost, and only the update
+ * URL check below caught it.
+ */
+describe('against deploy/environments.json', () => {
+  const infra = JSON.parse(
+    readFileSync(join(root, '..', '..', 'deploy', 'environments.json'), 'utf8'),
+  ) as Record<string, { otaChannel?: string; apiDomain?: string }>;
+
+  const deployed = Object.entries(infra).filter(([key]) => !key.startsWith('_'));
+
+  it('describes some environments, so this is testing something', () => {
+    expect(deployed.length).toBeGreaterThan(0);
+  });
+
+  it.each(deployed)('has an entry for the %s channel', (_name, environment) => {
+    expect(Object.keys(ENVIRONMENTS)).toContain(environment.otaChannel!);
+  });
+
+  it.each(deployed)('points the %s channel at the host that serves it', (_name, environment) => {
+    expect(originFor(environment.otaChannel!, 'ios')).toBe(`https://${environment.apiDomain}`);
+  });
+
+  it('has no deployed channel left pointing at a desk', () => {
+    for (const [, environment] of deployed) {
+      expect(originFor(environment.otaChannel!, 'ios')).not.toContain('localhost');
+      expect(originFor(environment.otaChannel!, 'android')).not.toContain('10.0.2.2');
+    }
+  });
+});
+
 describe('the table itself', () => {
   it('never answers with a guess for a channel nobody wrote down', () => {
     expect(originFor('whatever-someone-typed', 'ios')).toBeNull();
   });
 
-  it('reads development as the channel when updates are off', () => {
+  it('reads local as the channel when updates are off', () => {
     // A Metro build reports no channel at all. That is a desk, not a shop.
-    expect(originFor(null, 'ios')).toBe(ENVIRONMENTS.development.apiOrigin);
+    expect(originFor(null, 'ios')).toBe(ENVIRONMENTS.local.apiOrigin);
   });
 
-  it('sends Android somewhere it can actually reach in development', () => {
+  it('sends Android somewhere it can actually reach on a desk', () => {
     // An emulator's localhost is the emulator.
-    expect(originFor('development', 'android')).toBe('http://10.0.2.2:3001');
+    expect(originFor('local', 'android')).toBe('http://10.0.2.2:3001');
+  });
+
+  it('sends both platforms to the same host once it is a deployment', () => {
+    // Only a desk differs by platform; a hosted API is one address.
+    for (const channel of ['development', 'production']) {
+      expect(originFor(channel, 'android')).toBe(originFor(channel, 'ios'));
+      expect(originFor(channel, 'ios')).toMatch(/^https:\/\//);
+    }
   });
 });

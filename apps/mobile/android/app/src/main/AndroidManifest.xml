@@ -22,7 +22,7 @@
         release was published against.
       -->
       <meta-data android:name="expo.modules.updates.ENABLED" android:value="true" />
-      <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://api.firstleaptechnologies.in/api/updates/manifest" />
+      <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://api-staging.firstleaptechnologies.in/api/updates/manifest" />
       <meta-data android:name="expo.modules.updates.EXPO_RUNTIME_VERSION" android:value="1" />
       <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS" />
       <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0" />

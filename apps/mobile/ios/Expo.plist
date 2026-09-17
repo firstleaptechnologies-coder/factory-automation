@@ -12,7 +12,7 @@
 		changing it is a store release rather than an update.
 	-->
 	<key>EXUpdatesURL</key>
-	<string>https://api.firstleaptechnologies.in/api/updates/manifest</string>
+	<string>https://api-staging.firstleaptechnologies.in/api/updates/manifest</string>
 	<!--
 		Must match the runtime version the release was published against. Bump
 		it whenever the native side changes: a bundle built for different
@@ -29,7 +29,7 @@
 	<key>EXUpdatesRequestHeaders</key>
 	<dict>
 		<key>expo-channel-name</key>
-		<string>production</string>
+		<string>development</string>
 	</dict>
 	<!--
 		The certificate the app checks every update against.
