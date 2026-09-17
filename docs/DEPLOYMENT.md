@@ -94,37 +94,57 @@ truth for the same database is how one of them silently undoes the other — and
 `defineConfig({})` is an empty desired state, which is not something to point
 at a shop's ledger to find out what it means.
 
-## 2. The instance
-
-`t3.micro`, Amazon Linux 2023, `ap-southeast-1`. Give it an **elastic IP** —
-a stopped instance comes back with a different address otherwise, and the DNS
-record would be pointing at somebody else's machine.
-
-Security group: 22 from your address only, 80 and 443 from anywhere. Nothing
-else. Postgres is not on this box and 5432 has no business being open.
-
-Then, on the instance:
+## 2. The instance and the bucket — one script
 
 ```bash
-# Docker, and the compose plugin, which AL2023 does not package.
-sudo dnf install -y docker git rsync
-sudo systemctl enable --now docker
-sudo usermod -aG docker ec2-user
-sudo mkdir -p /usr/libexec/docker/cli-plugins
-sudo curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-compose \
-  https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
-sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
-
-# Swap. 1 GB is not enough to run `npm ci` and tsc, and the build dies
-# without a word that says so.
-sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
-sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-
-sudo mkdir -p /srv/fas && sudo chown ec2-user:ec2-user /srv/fas
+AWS_PROFILE=fas deploy/provision-aws.sh
 ```
 
-Log out and back in, so the docker group takes effect.
+It is idempotent: run it twice and the second run reports what already exists
+rather than making a second of everything. In order it creates
+
+- an **S3 bucket**, private, encrypted and versioned, plus an **IAM user that
+  can reach only that bucket** — the deploy credentials are an administrator's,
+  and the thing running in a container all year should not be;
+- a **key pair** imported from `~/.ssh/fas-prod.pub`, so the private half never
+  travels to AWS at all;
+- a **security group** — 80 and 443 from anywhere, 22 from this machine's
+  address and nothing else;
+- a **t3.micro** running `deploy/cloud-init.sh` as user-data, on a 30 GiB
+  encrypted root volume;
+- an **elastic IP**, attached. Without one a stopped instance comes back on a
+  different address and the DNS record points at whoever gets it next.
+
+`deploy/cloud-init.sh` is what the box does to itself on first boot: Docker and
+the compose plugin, a 4 GiB swapfile, `/srv/fas`, and a weekly image prune. It
+is a file rather than a list of commands to paste because this box will be
+rebuilt one day, and a hand-built machine cannot be rebuilt the same way twice.
+It leaves `/var/lib/fas-bootstrap-done` behind, so a deploy can tell "still
+booting" from "booted and broken".
+
+### Two follow-ups the script prints rather than does
+
+**The A record**, at BigRock, using the address it printed:
+
+```
+api   A   <the elastic IP>
+```
+
+**The API's S3 credentials**, which are a secret and belong in `deploy/api.env`
+rather than in a script's output:
+
+```bash
+aws iam create-access-key --user-name fas-prod-s3
+```
+
+### When your address changes
+
+Home broadband hands out a new one every so often, and a security group pinned
+to yesterday's is a production box nobody can log into.
+
+```bash
+AWS_PROFILE=fas deploy/allow-my-ip.sh
+```
 
 ## 3. The environment
 
