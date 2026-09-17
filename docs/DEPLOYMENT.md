@@ -51,9 +51,7 @@ since 9 — so there is no deployment without one.
 - [x] **An AWS account.** Needs an EC2 key pair created in `ap-southeast-1`;
       a key pair belongs to one region.
 - [x] **A domain** — see above.
-- [ ] **A Neon project** in `aws-ap-southeast-1`. The API key this repository's
-      tooling has can read Neon but not create projects, so this one is done in
-      the console.
+- [x] **A Neon project** in `aws-ap-southeast-1` — see below.
 
 ### About the free tier
 
@@ -64,26 +62,37 @@ $8/mo on demand in Singapore once the credits are gone — the same money as a
 managed container host that would need none of the setup below. Worth a note in
 the calendar for month five rather than a surprise in month seven.
 
-## 1. The database
+## 1. The database — **done**
 
-In the Neon console, create a project in **AWS Asia Pacific 1 (Singapore)**,
-inside the existing `Momentum` organisation. It is on the Launch plan, which
-allows more than one project, so this adds no base fee — only whatever compute
-and storage it uses above what the plan already includes.
+Neon project **FAS** (`lucky-paper-80860691`), branch `production`, region
+**AWS Asia Pacific 1 (Singapore)**, Postgres 18. It sits in the
+`Firstleap Technologies` organisation on the free plan, which caps the branch at
+0.5 GiB — see the S3 note below, which that limit turns from optional into
+required.
 
-Set it to **autosuspend after 5 minutes** and **0.25–1 CU**. Do not copy the
-settings from `momentum-arena`, which never suspends and scales to 8 CU: that
-project alone already spends most of the plan's included compute hours, and a
-second one like it would be the largest bill in this document.
+The schema is already applied: all 37 migrations, run from a developer machine
+before the instance existed, because a 1 GB box is a bad place to find out a
+migration does not apply.
 
-Take two connection strings from it:
+Two connection strings, both in `deploy/api.env`:
 
 - the **pooled** one (its host contains `-pooler`) → `DATABASE_URL`
 - the **direct** one → `DIRECT_URL`
 
-Both are needed and they are not interchangeable: a pooler in transaction mode
-cannot hold the session a migration wants, so migrations go through
-`DIRECT_URL` while everything else goes through the pooler.
+They are not interchangeable. A pooler in transaction mode cannot hold the
+session a migration wants, so migrations go through `DIRECT_URL` and everything
+else through the pooler.
+
+### What Neon's own setup steps do and do not apply here
+
+Signing up offers a seven-step `neon config init` / `neon.ts` / `neon deploy`
+flow. The CLI is useful and is what produced the connection strings above.
+`neon deploy` is not used, and should not be: this database's shape is owned by
+Prisma migrations, which reach the platform database *and every dedicated
+tenant* through `npm run db:migrate:tenants`. A second, declarative source of
+truth for the same database is how one of them silently undoes the other — and
+`defineConfig({})` is an empty desired state, which is not something to point
+at a shop's ledger to find out what it means.
 
 ## 2. The instance
 
@@ -120,7 +129,19 @@ Log out and back in, so the docker group takes effect.
 ## 3. The environment
 
 Two files on the box, in `/srv/fas/deploy/`, and nowhere else. Neither is in
-the repository and `.gitignore` keeps it that way.
+the repository and `.gitignore` keeps it that way — `deploy/ship.sh` does not
+copy them either, so they are put there once, by hand.
+
+Both are already drafted on the development machine with the database, the
+domain and freshly generated secrets filled in. Send them across and lock them
+down:
+
+```bash
+scp deploy/api.env deploy/.env ec2-user@api.firstleaptechnologies.in:/srv/fas/deploy/
+ssh ec2-user@api.firstleaptechnologies.in 'chmod 600 /srv/fas/deploy/api.env'
+```
+
+What is in them, and why:
 
 `deploy/.env` — the one name compose itself interpolates:
 
@@ -142,7 +163,7 @@ S3_BUCKET=... S3_REGION=ap-southeast-1 S3_ACCESS_KEY_ID=... S3_SECRET_ACCESS_KEY
 EXPO_OTA_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
 
-Generate the two secrets with:
+Regenerate either secret with:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
@@ -159,6 +180,10 @@ Three of these are worth stopping on:
   point of view.
 - **`CORS_ORIGINS`** is the only thing deciding who may call this API from a
   browser. It is not a list to leave wide.
+
+`S3_*` is the fourth, and on this plan it is not optional. Without a bucket the
+API stores every order photo and every OTA bundle in a Postgres row, and the
+free branch stops at 0.5 GiB. Phone photos reach that in an afternoon.
 
 ## 4. The first deploy
 
