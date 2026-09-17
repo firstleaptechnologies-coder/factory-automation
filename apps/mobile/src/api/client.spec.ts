@@ -52,7 +52,18 @@ it('refuses to fall back to a developer’s desk on an unknown channel', () => {
 });
 
 it('says the same for a deployment that has not been built yet', () => {
-  expect(loadFor('ios', 'production').API_BASE_URL).toBe('unconfigured://production');
+  // Staging has no server. Production has one and is not built against it yet.
+  expect(loadFor('ios', 'staging').API_BASE_URL).toBe('unconfigured://staging');
+});
+
+it('sends a production build to the production server, on both platforms', () => {
+  // The same host for both: only a developer's desk differs by platform.
+  expect(loadFor('ios', 'production').API_BASE_URL).toBe(
+    'https://api.firstleaptechnologies.in/api',
+  );
+  expect(loadFor('android', 'production').API_BASE_URL).toBe(
+    'https://api.firstleaptechnologies.in/api',
+  );
 });
 
 it('points the client at that base', () => {

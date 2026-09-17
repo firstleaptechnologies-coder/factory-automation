@@ -30,30 +30,52 @@ same region, and the one hop from an Indian factory to Singapore is paid once
 per request instead of once per query. Neon has no Indian region, which is what
 settles it.
 
+## The names
+
+`firstleaptechnologies.in` is registered through BigRock, and its DNS is served
+by BigRock's nameservers — not by Vercel, and not by Route 53. Every record
+below is added in BigRock's control panel.
+
+| Name | Record | Points at | What it is |
+| --- | --- | --- | --- |
+| `firstleaptechnologies.in` | A | `216.198.79.1` | The company site, already on Vercel. **Leave it alone.** |
+| `api.firstleaptechnologies.in` | A | the EC2 elastic IP | The API. |
+| `app.firstleaptechnologies.in` | CNAME | whatever Vercel asks for | The web app. |
+
+The API needs a name of its own because it needs a certificate of its own: the
+phone app will not talk to plain HTTP — iOS blocks it outright and Android has
+since 9 — so there is no deployment without one.
+
 ## Before any of this can start
 
-Three things only you can do:
-
-- [ ] **An AWS account**, and an EC2 key pair in `ap-southeast-1`.
-- [ ] **A domain**, with an A record for the API — `api.<yourdomain>` pointing
-      at the instance's elastic IP. The app will not talk to plain HTTP (iOS
-      blocks it outright, Android since 9), so there is no deployment without a
-      name a certificate can be issued for.
+- [x] **An AWS account.** Needs an EC2 key pair created in `ap-southeast-1`;
+      a key pair belongs to one region.
+- [x] **A domain** — see above.
 - [ ] **A Neon project** in `aws-ap-southeast-1`. The API key this repository's
-      tooling has can read Neon but not create projects.
+      tooling has can read Neon but not create projects, so this one is done in
+      the console.
 
 ### About the free tier
 
-AWS changed it in mid-2025. Accounts opened before then get the old deal — 750
-hours of `t2.micro`/`t3.micro` a month for twelve months. Accounts opened after
-get credits for six months instead, and then pay. A `t3.micro` is around $8/mo
-on demand in Singapore once the credits are gone, which is the same money as a
-managed container host that would not need any of the setup below. Worth
-knowing before the sixth month, not after it.
+AWS changed it in mid-2025. Accounts opened before then got 750 hours of
+`t2.micro`/`t3.micro` a month for twelve months. This account was opened after,
+so it gets credits for six months instead, and then pays. A `t3.micro` is around
+$8/mo on demand in Singapore once the credits are gone — the same money as a
+managed container host that would need none of the setup below. Worth a note in
+the calendar for month five rather than a surprise in month seven.
 
 ## 1. The database
 
-In the Neon console, create a project in **AWS Asia Pacific 1 (Singapore)**.
+In the Neon console, create a project in **AWS Asia Pacific 1 (Singapore)**,
+inside the existing `Momentum` organisation. It is on the Launch plan, which
+allows more than one project, so this adds no base fee — only whatever compute
+and storage it uses above what the plan already includes.
+
+Set it to **autosuspend after 5 minutes** and **0.25–1 CU**. Do not copy the
+settings from `momentum-arena`, which never suspends and scales to 8 CU: that
+project alone already spends most of the plan's included compute hours, and a
+second one like it would be the largest bill in this document.
+
 Take two connection strings from it:
 
 - the **pooled** one (its host contains `-pooler`) → `DATABASE_URL`
@@ -103,7 +125,7 @@ the repository and `.gitignore` keeps it that way.
 `deploy/.env` — the one name compose itself interpolates:
 
 ```
-API_DOMAIN=api.yourdomain.com
+API_DOMAIN=api.firstleaptechnologies.in
 ```
 
 `deploy/api.env` — everything the API reads. `apps/api/.env.example` is the
@@ -115,7 +137,7 @@ DATABASE_URL=<Neon pooled>
 DIRECT_URL=<Neon direct>
 JWT_SECRET=<32+ random bytes>
 ENCRYPTION_KEYS=k1:<base64 32-byte key>
-CORS_ORIGINS=https://app.yourdomain.com
+CORS_ORIGINS=https://app.firstleaptechnologies.in
 S3_BUCKET=... S3_REGION=ap-southeast-1 S3_ACCESS_KEY_ID=... S3_SECRET_ACCESS_KEY=...
 EXPO_OTA_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
@@ -143,7 +165,7 @@ Three of these are worth stopping on:
 From this machine:
 
 ```bash
-deploy/ship.sh ec2-user@api.yourdomain.com
+deploy/ship.sh ec2-user@api.firstleaptechnologies.in
 ```
 
 That copies the working tree, builds the image on the box, migrates the
@@ -158,7 +180,7 @@ and are quick.
 Check it:
 
 ```bash
-curl https://api.yourdomain.com/api/health
+curl https://api.firstleaptechnologies.in/api/health
 ```
 
 It reports `APP_ENV`, so nobody has to guess whether they are looking at
@@ -173,27 +195,32 @@ every screen is gated off, and that is very confusing to debug from the inside.
 
 ## 6. The web app
 
-On Vercel, in the `momentumarenas-projects` team, with root directory
-`apps/web`. One environment variable:
+A new Vercel project with root directory `apps/web`, and the domain
+`app.firstleaptechnologies.in` added to it — Vercel will name the CNAME target
+to put in BigRock. One environment variable:
 
 ```
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
+NEXT_PUBLIC_API_URL=https://api.firstleaptechnologies.in/api
 ```
 
-Then add that deployment's URL to `CORS_ORIGINS` on the box and restart the
-API, or the browser will refuse every call it makes.
+`CORS_ORIGINS` on the box must already list that origin, or the browser refuses
+every call the page makes. Vercel's preview deployments get their own hostnames
+and are therefore *not* covered by it; that is deliberate, and a preview that
+needs to reach the API needs its origin added on purpose.
 
 ## 7. The phone app
 
 The app picks its server from the channel baked into the binary — see
 `apps/mobile/src/api/environments.ts`. For a production build:
 
-1. Fill in `production.apiOrigin` in that table with `https://api.yourdomain.com`.
+1. `production.apiOrigin` is already filled in as
+   `https://api.firstleaptechnologies.in`.
 2. Set the channel to `production` in **both** native files:
    `ios/Expo.plist` (`expo-channel-name`) and
    `android/app/src/main/res/values/strings.xml`.
-3. Set the update URL in both to `https://api.yourdomain.com/api/updates/manifest`
-   — `EXUpdatesURL` in the plist, `EXPO_UPDATE_URL` in `AndroidManifest.xml`.
+3. Set the update URL in both to
+   `https://api.firstleaptechnologies.in/api/updates/manifest` — `EXUpdatesURL`
+   in the plist, `EXPO_UPDATE_URL` in `AndroidManifest.xml`.
 4. `npm run verify`. `environments.spec.ts` fails if the two platforms disagree,
    if the channel has no server, or if the update URL is not the same server the
    app sends its work to.
@@ -205,7 +232,7 @@ any of them.
 ## Deploying again
 
 ```bash
-deploy/ship.sh ec2-user@api.yourdomain.com
+deploy/ship.sh ec2-user@api.firstleaptechnologies.in
 ```
 
 Same script, same order: copy, migrate every tenant, restart. It exits non-zero

@@ -8,10 +8,10 @@
  * environment variable inlined into the JS bundle: the bundle is exactly the
  * thing that travels between deployments.
  *
- * `apiOrigin` is null for a deployment that does not exist yet. Nothing falls
- * back to localhost in its place — `environments.spec.ts` fails the build if a
- * binary ships a channel with no server, which is the only moment anyone can
- * still do something about it.
+ * `apiOrigin` is null for a deployment that does not exist yet — staging is
+ * still one. Nothing falls back to localhost in its place: `environments.spec.ts`
+ * fails the build if a binary ships a channel with no server, which is the only
+ * moment anyone can still do something about it.
  */
 export type Environment = {
   /** Origin the app calls, without the `/api` suffix. Null until it exists. */
@@ -29,7 +29,7 @@ export const ENVIRONMENTS: Readonly<Record<string, Environment>> = {
     androidApiOrigin: 'http://10.0.2.2:3001',
   },
   staging: { apiOrigin: null },
-  production: { apiOrigin: null },
+  production: { apiOrigin: 'https://api.firstleaptechnologies.in' },
 };
 
 /** The channel a build falls back to when updates are off — Metro, and tests. */
