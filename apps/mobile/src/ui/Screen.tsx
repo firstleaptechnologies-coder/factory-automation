@@ -1,5 +1,7 @@
 import React from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -82,6 +84,23 @@ export function Screen({
           stickyHeaderIndices={sticky ? [0] : undefined}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={64}
+          /*
+           * Anything typed into near the bottom of a screen was hidden behind
+           * the keyboard, on every screen in the app. iOS does not move a
+           * scroll view out of the keyboard's way unless asked; Android does,
+           * because the manifest sets adjustResize.
+           *
+           * This inset is what asks. It is the whole fix for 73 screens, and
+           * it belongs here rather than in each of them.
+           */
+          automaticallyAdjustKeyboardInsets
+          /*
+           * Without this, the first tap while the keyboard is open only
+           * dismisses it — so Save under a field takes two taps, and the first
+           * one looks like the button is broken.
+           */
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           onScroll={
             onEndReached
               ? (event) => {
@@ -119,7 +138,18 @@ export function Screen({
           {content}
         </ScrollView>
       ) : (
-        <View style={{ flex: 1, paddingTop: insets.top + spacing.sm }}>{content}</View>
+        /*
+         * A screen that does not scroll cannot inset its way out of trouble —
+         * the punch keypad is the one that matters — so it is given room
+         * instead. 'padding' on iOS; Android's adjustResize already shrinks
+         * the window, and adding to it double-counts.
+         */
+        <KeyboardAvoidingView
+          testID="screen-fixed"
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, paddingTop: insets.top + spacing.sm }}>
+          {content}
+        </KeyboardAvoidingView>
       )}
     </View>
   );

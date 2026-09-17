@@ -1,5 +1,13 @@
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import Animated, { Easing, FadeIn, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette, radius, spacing } from '../theme';
@@ -34,6 +42,24 @@ export function Sheet({
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <Animated.View entering={FadeIn.duration(180)} style={styles.backdrop}>
         <Pressable testID="sheet-backdrop" style={StyleSheet.absoluteFill} onPress={onClose} />
+        {/*
+          A sheet lives at the bottom of the screen, which is precisely where
+          the keyboard arrives — so every form in one had its last fields and
+          its Save button underneath it.
+
+          The surface is lifted rather than the content scrolled, because a
+          sheet is short: pushing it up keeps the field, its hint and the
+          button together, where scrolling would leave the button below the
+          fold with nothing to say it was there.
+
+          A Modal on Android is its own window and the manifest's adjustResize
+          does not reach inside it, so unlike Screen this one needs a behavior
+          on both platforms.
+        */}
+        <KeyboardAvoidingView
+          testID="sheet-keyboard"
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.lift}>
         <Animated.View
           // A plain rise from the bottom. A spring here overshoots and bounces,
           // which reads as the sheet wobbling rather than arriving.
@@ -68,11 +94,13 @@ export function Sheet({
           <ScrollView
             testID="sheet-body"
             showsVerticalScrollIndicator={false}
+            automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.body}>
             {children}
           </ScrollView>
         </Animated.View>
+        </KeyboardAvoidingView>
       </Animated.View>
     </Modal>
   );
@@ -119,6 +147,8 @@ export function SheetOption({
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  /* Bottom-anchored, so the sheet keeps its shape as the keyboard lifts it. */
+  lift: { justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: palette.surface,
     borderTopLeftRadius: radius.xxl,
