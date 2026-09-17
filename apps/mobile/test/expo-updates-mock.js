@@ -14,7 +14,11 @@ const params = {};
 module.exports = {
   isEnabled: false,
   runtimeVersion: '1',
-  channel: 'development',
+  // Null, because `isEnabled: false` and a channel name cannot both be true:
+  // the channel comes from the native updates config, and a build with updates
+  // off has none. Saying 'development' here made the tests describe a build
+  // that does not exist, and quietly pointed SettingsScreen at staging.
+  channel: null,
   manifest: null,
   getExtraParamsAsync: jest.fn(async () => ({ ...params })),
   setExtraParamAsync: jest.fn(async (key, value) => {
