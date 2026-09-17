@@ -292,6 +292,7 @@ every screen needs a platform permission, which no tenant role can hold.*
 | --- | --- | --- | --- |
 | Staff and roles | `/platform/staff` | `PlatformStaff` | `platform.staff.view` |
 | Releases | `/platform/releases` | `PlatformReleases` | `platform.release.view` |
+|   ↳ How a release works | `/platform/releases/flow` | — | `platform.release.view` |
 
 ## Outside the menu
 

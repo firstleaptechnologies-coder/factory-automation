@@ -156,6 +156,11 @@ export default function ReleasesPage() {
         subtitle="What the app is running, and who has it yet"
         action={
           <div className="row">
+            <Button
+              title="How a release works"
+              variant="ghost"
+              onClick={() => router.push('/platform/releases/flow')}
+            />
             <Button title="Store builds" variant="ghost" onClick={() => editGate('ios')} />
             <Button title="Workspaces" variant="ghost" onClick={() => router.push('/platform/tenants')} />
           </div>

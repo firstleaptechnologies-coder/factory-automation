@@ -754,6 +754,22 @@ export const PLATFORM_NAV: NavGroup[] = [
         permission: PERMISSIONS.PLATFORM_RELEASE_VIEW,
         web: '/platform/releases',
         app: 'PlatformReleases',
+        children: [
+          {
+            /**
+             * How a change reaches a shop, written down.
+             *
+             * Web only, and long: it is a reference read at a desk when
+             * something has gone wrong with a release, not a thing to consult
+             * on a phone on a factory floor.
+             */
+            key: 'platform-release-flow',
+            label: 'How a release works',
+            icon: 'book',
+            permission: PERMISSIONS.PLATFORM_RELEASE_VIEW,
+            web: '/platform/releases/flow',
+          },
+        ],
       },
     ],
   },
