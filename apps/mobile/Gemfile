@@ -16,6 +16,12 @@ gem 'benchmark'
 gem 'mutex_m'
 gem 'nkf'
 
-# The store build lanes — see fastlane/Fastfile. Both CI workflows run
-# `bundle exec fastlane`, so this is what pins the version they get.
-gem 'fastlane'
+# The store build lanes — see fastlane/Fastfile. Both native workflows run
+# `bundle exec fastlane`.
+#
+# Pinned to a minor range rather than locked. There is deliberately no
+# Gemfile.lock: CI runs Ruby 3.3, and the only rubies on a developer machine
+# here are macOS's 2.6 and Homebrew's 4.0 — a lock resolved under either
+# constrains CI to versions chosen for a Ruby it is not running, which is worse
+# than resolving fresh. The pin gives most of the reproducibility without that.
+gem 'fastlane', '~> 2.230'

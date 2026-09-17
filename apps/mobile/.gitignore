@@ -73,3 +73,7 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Deliberately not committed — see the note in the Gemfile. A lock resolved
+# under a Ruby that CI is not running pins it to the wrong versions.
+Gemfile.lock
