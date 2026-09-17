@@ -1,0 +1,158 @@
+# Store builds for the bare React Native app, wired to the same conventions as
+# everything else in this repository:
+#
+#   build number  unix epoch minutes         (scripts/next-build-number.js)
+#   app version   version.json               (scripts/version.js)
+#   OTA target    manifest host + channel    (scripts/configure-ota-target.js)
+#
+#   bundle exec fastlane ios beta        development -> TestFlight
+#   bundle exec fastlane ios release     production  -> App Store
+#   bundle exec fastlane android beta    development -> Play internal
+#   bundle exec fastlane android release production  -> Play production
+#
+# Nothing about the Apple or Google account is hard-coded. This repository is
+# public, and an identifier committed here is one a fork can build against.
+
+def required(name)
+  value = ENV[name]
+  UI.user_error!("#{name} is not set — see .github/workflows/native-*.yml") if value.nil? || value.empty?
+  value
+end
+
+# CI passes BUILD_NUMBER so the same value feeds the archive AND the version
+# gate that post-native-release writes; locally, compute it.
+BUILD_NUMBER = (ENV["BUILD_NUMBER"] && !ENV["BUILD_NUMBER"].empty?) ?
+  ENV["BUILD_NUMBER"] :
+  `node #{File.expand_path('../scripts/next-build-number.js', __dir__)}`.strip
+
+# CI resolves the marketing version from the `bump` input; locally it comes
+# from the source of truth.
+MARKETING_VERSION = (ENV["MARKETING_VERSION"] && !ENV["MARKETING_VERSION"].empty?) ?
+  ENV["MARKETING_VERSION"] :
+  `node #{File.expand_path('../scripts/version.js', __dir__)} none`.strip
+
+BUNDLE_ID = ENV["IOS_BUNDLE_ID"] || "com.firstleap.factoryautomation"
+IOS_PROFILE_NAME = "FASAppStoreCI"
+
+def configure_ota(channel)
+  sh("node", File.expand_path("../scripts/configure-ota-target.js", __dir__), channel)
+end
+
+def asc_key
+  app_store_connect_api_key(
+    key_id: required("ASC_KEY_ID"),
+    issuer_id: required("ASC_ISSUER_ID"),
+    key_filepath: File.expand_path("~/.appstoreconnect/private_keys/AuthKey_#{required('ASC_KEY_ID')}.p8"),
+  )
+end
+
+# Manual App Store signing. Automatic signing cannot be used on CI: it archives
+# with a development certificate, which is not what gets shipped. Instead the
+# API key fetches (or creates) an App Store distribution profile, and the
+# imported Apple Distribution certificate signs with it.
+def build_ios
+  team = required("APPLE_TEAM_ID")
+  get_provisioning_profile(
+    api_key: asc_key,
+    app_identifier: BUNDLE_ID,
+    provisioning_name: IOS_PROFILE_NAME,
+    readonly: false,
+    skip_certificate_verification: true,
+  )
+  # Sign with the name sigh actually produced, not the one asked for. Enabling
+  # a capability on the App ID invalidates the existing profile but leaves its
+  # NAME taken, so sigh creates "<name> <timestamp>" instead — and a hard-coded
+  # name then fails with "No profile for team matching".
+  profile = lane_context[SharedValues::SIGH_NAME] || IOS_PROFILE_NAME
+  UI.message("Signing with provisioning profile: #{profile}")
+  build_app(
+    workspace: "ios/FAS.xcworkspace",
+    scheme: "FAS",
+    configuration: "Release",
+    export_method: "app-store",
+    xcargs: "MARKETING_VERSION=#{MARKETING_VERSION} CURRENT_PROJECT_VERSION=#{BUILD_NUMBER} " \
+            "DEVELOPMENT_TEAM=#{team} CODE_SIGN_STYLE=Manual " \
+            "PROVISIONING_PROFILE_SPECIFIER=\"#{profile}\" CODE_SIGN_IDENTITY=\"Apple Distribution\"",
+    export_options: {
+      signingStyle: "manual",
+      teamID: team,
+      provisioningProfiles: { BUNDLE_ID => profile },
+    },
+  )
+end
+
+platform :ios do
+  desc "Development build -> TestFlight"
+  lane :beta do
+    configure_ota("development")
+    build_ios
+    # Distribution must finish before post-native-release runs. With
+    # skip_waiting the build lands as "Ready to Submit" and nobody is assigned
+    # to it — testers stay on the old build while the version gate has already
+    # moved, so the app offers an update TestFlight is not serving.
+    upload_to_testflight(
+      api_key: asc_key,
+      distribute_external: false,
+      groups: ["Internal Testers"],
+      changelog: "Development build #{BUILD_NUMBER} (#{MARKETING_VERSION})",
+    )
+  end
+
+  desc "Production build -> App Store"
+  lane :release do
+    configure_ota("production")
+    build_ios
+    # The binary only. The listing, screenshots and privacy answers are kept by
+    # hand in App Store Connect, so deliver is told not to touch them —
+    # without these it aborts on metadata it cannot find.
+    upload_to_app_store(
+      api_key: asc_key,
+      submit_for_review: false,
+      precheck_include_in_app_purchases: false,
+      force: true,
+      skip_metadata: true,
+      skip_screenshots: true,
+    )
+  end
+end
+
+platform :android do
+  desc "Development build -> Play internal track"
+  lane :beta do
+    configure_ota("development")
+    gradle(
+      project_dir: "android",
+      task: "bundle",
+      build_type: "Release",
+      properties: { "versionCode" => BUILD_NUMBER.to_i, "versionName" => MARKETING_VERSION },
+    )
+    upload_to_play_store(
+      track: "internal",
+      json_key: required("GOOGLE_PLAY_JSON_KEY_PATH"),
+      skip_upload_metadata: true, skip_upload_images: true, skip_upload_screenshots: true,
+    )
+  end
+
+  desc "Production build -> Play production track"
+  lane :release do
+    configure_ota("production")
+    gradle(
+      project_dir: "android",
+      task: "bundle",
+      build_type: "Release",
+      properties: { "versionCode" => BUILD_NUMBER.to_i, "versionName" => MARKETING_VERSION },
+    )
+    # draft: the bundle uploads but nothing goes live until someone rolls it
+    # out in the Play Console. The safest posture for a shop's only app.
+    #
+    # The FIRST production release has to be created and completed by hand in
+    # the Console — store listing, data safety, content rating, target audience
+    # — before an API upload to this track is accepted at all.
+    upload_to_play_store(
+      track: "production",
+      json_key: required("GOOGLE_PLAY_JSON_KEY_PATH"),
+      release_status: "draft",
+      skip_upload_metadata: true, skip_upload_images: true, skip_upload_screenshots: true,
+    )
+  end
+end

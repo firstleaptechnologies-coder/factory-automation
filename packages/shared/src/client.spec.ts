@@ -590,7 +590,13 @@ describe('endpoints', () => {
     ['versionGates', (a) => a.versionGates(), 'GET', '/platform/releases/gates/all'],
     [
       'setVersionGate',
-      (a) => a.setVersionGate({ platform: 'ios', channel: 'production', minimumVersion: '1.0.0' }),
+      (a) =>
+        a.setVersionGate({
+          platform: 'ios',
+          channel: 'production',
+          latestBuild: 29827484,
+          storeUrl: 'https://apps.apple.com/app/id0000000000',
+        }),
       'PUT',
       '/platform/releases/gates',
     ],

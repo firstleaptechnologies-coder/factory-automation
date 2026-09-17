@@ -179,23 +179,87 @@ describe('an asset', () => {
 });
 
 describe('the version gate', () => {
+  const gate = (over: Record<string, unknown> = {}) => ({
+    latestBuild: 200,
+    latestVersionName: '1.2.0',
+    latestIsLive: true,
+    minSupportedBuild: 100,
+    storeUrl: 'https://apps.apple.com/app/id1',
+    message: 'Punching changed — please update.',
+    ...over,
+  });
+
   it('says a binary is fine when nothing has been set', async () => {
     const { service, db } = build();
     db.appVersionGate.findUnique = jest.fn(async () => null);
-    expect(await service.versionCheck('ios')).toEqual({ supported: true });
+    // A channel nobody configured must not stop an app that works.
+    expect(await service.versionCheck('ios')).toEqual({
+      supported: true,
+      updateAvailable: false,
+      forced: false,
+    });
   });
 
-  it('passes on the floor and the words to show', async () => {
+  it('offers the newer build to an older one', async () => {
     const { service, db } = build();
-    db.appVersionGate.findUnique = jest.fn(async () => ({
-      minimumVersion: '1.2.0',
-      recommendedVersion: '1.4.0',
-      message: 'Punching changed — please update.',
-    }));
+    db.appVersionGate.findUnique = jest.fn(async () => gate());
 
-    expect(await service.versionCheck('android', 'production')).toMatchObject({
-      minimumVersion: '1.2.0',
-      recommendedVersion: '1.4.0',
+    expect(await service.versionCheck('android', 'production', 150)).toMatchObject({
+      supported: true,
+      updateAvailable: true,
+      forced: false,
+      latestBuild: 200,
+      storeUrl: 'https://apps.apple.com/app/id1',
+    });
+  });
+
+  it('offers nothing to a build that is already the newest', async () => {
+    const { service, db } = build();
+    db.appVersionGate.findUnique = jest.fn(async () => gate());
+
+    expect(await service.versionCheck('android', 'production', 200)).toMatchObject({
+      updateAvailable: false,
+      forced: false,
+    });
+  });
+
+  /*
+   * The distinction the whole model exists for. A binary that has been
+   * uploaded is not one a shop can install: review takes days, and a Play
+   * upload lands as a draft. Offering it is a button that does nothing.
+   */
+  it('offers nothing while the store is not serving it yet', async () => {
+    const { service, db } = build();
+    db.appVersionGate.findUnique = jest.fn(async () => gate({ latestIsLive: false }));
+
+    expect(await service.versionCheck('ios', 'production', 150)).toMatchObject({
+      updateAvailable: false,
+    });
+  });
+
+  it('stops a binary below the supported floor', async () => {
+    const { service, db } = build();
+    db.appVersionGate.findUnique = jest.fn(async () => gate());
+
+    expect(await service.versionCheck('ios', 'production', 50)).toMatchObject({
+      supported: false,
+      forced: true,
+    });
+  });
+
+  /*
+   * Older binaries predate the build parameter. Refusing to run them over a
+   * missing query string would be the worst possible update prompt: one nobody
+   * can act on, on an app that was working a minute ago.
+   */
+  it('judges nothing when the app did not say which build it is', async () => {
+    const { service, db } = build();
+    db.appVersionGate.findUnique = jest.fn(async () => gate());
+
+    expect(await service.versionCheck('ios', 'production')).toMatchObject({
+      supported: true,
+      forced: false,
+      updateAvailable: false,
     });
   });
 });

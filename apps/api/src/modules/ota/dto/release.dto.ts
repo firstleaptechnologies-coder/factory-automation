@@ -1,5 +1,6 @@
 import { OtaPlatform, OtaReleaseKind, OtaReleaseStatus } from '@prisma/client';
 import {
+  IsBoolean,
   IsBooleanString,
   IsEnum,
   IsInt,
@@ -8,8 +9,8 @@ import {
   IsString,
   Matches,
   Max,
-  Min,
   MaxLength,
+  Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -53,7 +54,17 @@ export class UploadAssetDto {
 export class VersionGateDto {
   @IsEnum(OtaPlatform) platform!: OtaPlatform;
   @Matches(CHANNEL) channel!: string;
-  @IsString() @MaxLength(40) minimumVersion!: string;
-  @IsOptional() @IsString() @MaxLength(40) recommendedVersion?: string;
+
+  /// The newest native build that exists for this platform and channel.
+  @IsInt() @Min(0) latestBuild!: number;
+  @IsOptional() @IsString() @MaxLength(40) latestVersionName?: string;
+
+  /// Whether the store is serving it yet. CI says false; a person says true.
+  @IsOptional() @IsBoolean() latestIsLive?: boolean;
+
+  /// Below this, the app stops. Raised by a person, never by a deploy.
+  @IsOptional() @IsInt() @Min(0) minSupportedBuild?: number;
+
+  @IsString() @MaxLength(300) storeUrl!: string;
   @IsOptional() @IsString() @MaxLength(300) message?: string;
 }

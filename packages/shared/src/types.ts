@@ -877,15 +877,45 @@ export interface ReleaseAsset {
   byteSize: number;
 }
 
-/** The floor under which a binary is asked, or told, to update. */
+/**
+ * What the newest binary is, and which ones are still allowed to run.
+ *
+ * Build numbers rather than version strings: the marketing version is for
+ * people, the build number is what the binary reports and what can be compared
+ * without parsing "1.10.0" against "1.9.0" and getting it backwards.
+ */
 export interface VersionGate {
   id: string;
   platform: ReleasePlatform;
   channel: string;
-  minimumVersion: string;
-  recommendedVersion?: string | null;
+  /** The newest native build that exists for this platform and channel. */
+  latestBuild: number;
+  latestVersionName?: string | null;
+  /**
+   * Whether the store is serving it yet. Uploading is not publishing — review
+   * takes days — and an update prompt for a build nobody can download is a
+   * button that does nothing.
+   */
+  latestIsLive: boolean;
+  liveConfirmedAt?: string | null;
+  /** Below this, the app stops. Raised by a person, never by a deploy. */
+  minSupportedBuild: number;
+  storeUrl: string;
   message?: string | null;
+  updatedBy?: string | null;
   updatedAt: string;
+}
+
+/** What the app is told when it asks whether it may still run. */
+export interface VersionCheck {
+  supported: boolean;
+  updateAvailable: boolean;
+  forced: boolean;
+  latestBuild?: number;
+  latestVersionName?: string | null;
+  minSupportedBuild?: number;
+  storeUrl?: string;
+  message?: string | null;
 }
 
 // ---------------------------------------------------------------------------

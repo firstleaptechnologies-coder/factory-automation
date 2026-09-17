@@ -1,0 +1,92 @@
+name: Post native release
+
+# Runs after a native build has actually been uploaded to a store. On Ubuntu —
+# the same environment as ota-publish, so the fingerprints it writes are the
+# ones that workflow will compare against.
+#
+#   1. Recompute the native fingerprint and commit it as this
+#      channel/platform's baseline, so OTA resumes for the runtime that just
+#      shipped.
+#   2. Persist the marketing version the build went out with.
+#   3. Tell the API that a new build exists — but NOT that it is live. Uploading
+#      a binary is not the same as a store serving it: App Store review takes
+#      hours to days. The gate records latestIsLive=false, so no shop is
+#      prompted to install something they cannot yet download.
+#
+# Called by native-ios.yml and native-android.yml; dispatchable alone for repair.
+
+on:
+  workflow_call:
+    inputs:
+      platform: { required: true, type: string }
+      channel: { required: true, type: string }
+      build: { required: true, type: string }
+      versionName: { required: false, type: string, default: "1.0.0" }
+      storeUrl: { required: true, type: string }
+  workflow_dispatch:
+    inputs:
+      platform: { description: "ios | android", required: true, type: string }
+      channel: { description: "development | production", required: true, type: string }
+      build: { description: "native build number", required: true, type: string }
+      versionName: { description: "marketing version", required: false, type: string, default: "1.0.0" }
+      storeUrl: { description: "store deep link", required: true, type: string }
+
+permissions:
+  contents: write
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: |
+          npm ci
+          cd apps/mobile && npm ci
+
+      - name: Persist the version and the fingerprint baseline
+        run: |
+          set -e
+          node apps/mobile/scripts/version.js "${{ inputs.versionName }}"
+          CUR=$(cd apps/mobile && npx expo-updates fingerprint:generate --platform "${{ inputs.platform }}" \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).hash))")
+          FILE="apps/mobile/fingerprints/${{ inputs.channel }}.${{ inputs.platform }}.fingerprint"
+          echo "$CUR" > "$FILE"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$FILE" apps/mobile/version.json
+          if git diff --cached --quiet; then
+            echo "Baseline and version already current for ${{ inputs.channel }}/${{ inputs.platform }}."
+          else
+            git commit -m "chore(release): ${{ inputs.channel }}/${{ inputs.platform }} baseline, version ${{ inputs.versionName }} [skip ci]"
+            # A native build takes twenty minutes, and the branch moves while it
+            # runs. A plain push loses that race and strands the baseline — which
+            # looks like a green release that quietly stopped OTA. Rebase onto
+            # whatever landed and retry; this commit only touches the fingerprint
+            # and version files, so the rebase is always clean.
+            for i in 1 2 3; do
+              git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push rejected (branch moved) — rebase and retry $i/3"
+              git fetch origin "${{ github.ref_name }}"
+              git rebase "origin/${{ github.ref_name }}" || { git rebase --abort; exit 1; }
+              sleep $((i * 5))
+            done
+          fi
+
+      - name: Record the build with the version gate
+        env:
+          API_URL: ${{ inputs.channel == 'production' && 'https://api.firstleaptechnologies.in' || 'https://api-staging.firstleaptechnologies.in' }}
+          PLATFORM_EMAIL: ${{ inputs.channel == 'production' && secrets.PRODUCTION_PLATFORM_EMAIL || secrets.STAGING_PLATFORM_EMAIL }}
+          PLATFORM_PASSWORD: ${{ inputs.channel == 'production' && secrets.PRODUCTION_PLATFORM_PASSWORD || secrets.STAGING_PLATFORM_PASSWORD }}
+        run: |
+          npx tsx scripts/set-version-gate.ts \
+            --platform "${{ inputs.platform }}" --channel "${{ inputs.channel }}" \
+            --build "${{ inputs.build }}" --versionName "${{ inputs.versionName }}" \
+            --storeUrl "${{ inputs.storeUrl }}"

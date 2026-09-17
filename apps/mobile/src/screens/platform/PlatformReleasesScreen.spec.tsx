@@ -107,36 +107,77 @@ it('says so when a channel has nothing on it', async () => {
   expect(await screen.findByText('Nothing published on this channel')).toBeTruthy();
 });
 
-describe('the version floor', () => {
-  it('says plainly when there is none', async () => {
-    await mount();
-
-    expect(await screen.findByText(/No floor set/)).toBeTruthy();
+describe('what the stores are serving', () => {
+  const gate = (over: Record<string, unknown> = {}) => ({
+    id: 'g1',
+    platform: 'ios',
+    channel: 'production',
+    latestBuild: 29827484,
+    latestVersionName: '1.2.0',
+    latestIsLive: true,
+    minSupportedBuild: 0,
+    storeUrl: 'https://apps.apple.com/app/id1',
+    updatedAt: '2026-09-17T00:00:00.000Z',
+    ...over,
   });
 
-  it('shows one that is set', async () => {
-    mockGates.mockResolvedValue([
-      { id: 'g1', platform: 'ios', channel: 'production', minimumVersion: '1.2.0', recommendedVersion: '1.4.0' },
-    ]);
+  it('says plainly when nothing has shipped', async () => {
     await mount();
-
-    expect(await screen.findByText(/must be 1.2.0/)).toBeTruthy();
+    // Both platforms, both empty. Telling the app nothing is correct until a
+    // build exists.
+    expect(await screen.findAllByText(/Nothing recorded/)).toHaveLength(2);
   });
 
-  it('sets one for the channel being looked at', async () => {
+  it('shows the build that is recorded', async () => {
+    mockGates.mockResolvedValue([gate()]);
     await mount();
-    await fireEvent.press(await screen.findByText('Set the version floor'));
-    await fireEvent.changeText(await screen.findByPlaceholderText('1.2.0'), '1.5.0');
-    await fireEvent.press(screen.getByText('Set the floor'));
+
+    expect(await screen.findByText(/Build 29827484/)).toBeTruthy();
+    expect(screen.getByText('live on the store')).toBeTruthy();
+  });
+
+  it('separates a build that is uploaded from one the store is serving', async () => {
+    mockGates.mockResolvedValue([gate({ latestIsLive: false })]);
+    await mount();
+
+    expect(await screen.findByText('uploaded, not live')).toBeTruthy();
+    // The reason matters more than the badge.
+    expect(screen.getByText(/Nobody is being offered this yet/)).toBeTruthy();
+  });
+
+  it('lets somebody confirm the store went live without touching the floor', async () => {
+    mockGates.mockResolvedValue([gate({ latestIsLive: false })]);
+    await mount();
+    await fireEvent.press(await screen.findByText('It is live now'));
 
     await waitFor(() =>
-      expect(mockSetGate).toHaveBeenCalledWith({
-        platform: 'ios',
-        channel: 'production',
-        minimumVersion: '1.5.0',
-        recommendedVersion: undefined,
-        message: undefined,
-      }),
+      expect(mockSetGate).toHaveBeenCalledWith(
+        expect.objectContaining({ platform: 'ios', channel: 'production', latestIsLive: true }),
+      ),
+    );
+    // Raising the floor is a separate, deliberate act, not a side effect.
+    expect(mockSetGate.mock.calls[0][0]).not.toHaveProperty('minSupportedBuild');
+  });
+
+  it('records a build against the channel being looked at', async () => {
+    await mount();
+    await fireEvent.press((await screen.findAllByText('Record a build'))[0]);
+    await fireEvent.changeText(await screen.findByPlaceholderText('29827484'), '29827999');
+    await fireEvent.changeText(
+      screen.getByPlaceholderText('https://apps.apple.com/app/id…'),
+      'https://apps.apple.com/app/id1',
+    );
+    await fireEvent.press(screen.getByText('Save'));
+
+    await waitFor(() =>
+      expect(mockSetGate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: 'ios',
+          channel: 'production',
+          latestBuild: 29827999,
+          storeUrl: 'https://apps.apple.com/app/id1',
+        }),
+      ),
     );
   });
 });

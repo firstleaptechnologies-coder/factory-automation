@@ -51,8 +51,17 @@ export class UpdatesController {
   @Public()
   @Get('app/version-check')
   @Header('cache-control', 'no-store')
-  versionCheck(@Query('platform') platform?: string, @Query('channel') channel?: string) {
-    return this.ota.versionCheck(platform, channel || 'production');
+  versionCheck(
+    @Query('platform') platform?: string,
+    @Query('channel') channel?: string,
+    @Query('build') build?: string,
+  ) {
+    const running = build === undefined ? undefined : Number.parseInt(build, 10);
+    return this.ota.versionCheck(
+      platform,
+      channel || 'production',
+      Number.isFinite(running) ? running : undefined,
+    );
   }
 }
 

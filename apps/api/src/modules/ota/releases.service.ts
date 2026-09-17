@@ -172,14 +172,46 @@ export class ReleasesService {
     });
   }
 
-  setGate(dto: VersionGateDto) {
+  /**
+   * Write one gate.
+   *
+   * `latestIsLive` and `minSupportedBuild` are only touched when the caller
+   * names them, which is what keeps CI and a person out of each other's way:
+   * the release workflow records a new build without claiming the store is
+   * serving it, and without quietly lowering a minimum somebody raised on
+   * purpose.
+   */
+  setGate(dto: VersionGateDto, updatedBy?: string) {
+    const stated = <T>(value: T | undefined) => (value === undefined ? {} : { value });
+    const live = stated(dto.latestIsLive);
+    const minimum = stated(dto.minSupportedBuild);
+
     return this.prisma.platform.appVersionGate.upsert({
       where: { platform_channel: { platform: dto.platform, channel: dto.channel } },
-      create: dto,
-      update: {
-        minimumVersion: dto.minimumVersion,
-        recommendedVersion: dto.recommendedVersion ?? null,
+      create: {
+        platform: dto.platform,
+        channel: dto.channel,
+        latestBuild: dto.latestBuild,
+        latestVersionName: dto.latestVersionName ?? null,
+        latestIsLive: dto.latestIsLive ?? false,
+        liveConfirmedAt: dto.latestIsLive ? new Date() : null,
+        minSupportedBuild: dto.minSupportedBuild ?? 0,
+        storeUrl: dto.storeUrl,
         message: dto.message ?? null,
+        updatedBy: updatedBy ?? null,
+      },
+      update: {
+        latestBuild: dto.latestBuild,
+        latestVersionName: dto.latestVersionName ?? null,
+        storeUrl: dto.storeUrl,
+        message: dto.message ?? null,
+        updatedBy: updatedBy ?? null,
+        ...('value' in live ? { latestIsLive: live.value } : {}),
+        // Stamped only when it becomes live, so the date answers "since when"
+        // rather than "when did anyone last touch this row".
+        ...('value' in live && live.value ? { liveConfirmedAt: new Date() } : {}),
+        ...('value' in live && live.value === false ? { liveConfirmedAt: null } : {}),
+        ...('value' in minimum ? { minSupportedBuild: minimum.value } : {}),
       },
     });
   }

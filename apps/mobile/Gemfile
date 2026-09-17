@@ -15,3 +15,7 @@ gem 'logger'
 gem 'benchmark'
 gem 'mutex_m'
 gem 'nkf'
+
+# The store build lanes — see fastlane/Fastfile. Both CI workflows run
+# `bundle exec fastlane`, so this is what pins the version they get.
+gem 'fastlane'

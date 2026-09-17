@@ -471,19 +471,45 @@ model OtaReleaseAsset {
 /// Some changes cannot be delivered over the air — a native module, a
 /// permission, a new screen that needs one. This is how an old binary is told
 /// so, rather than failing in ways nobody can explain over the phone.
+/// The native-binary gate, one row per (platform, channel).
+///
+/// Build numbers, not version strings. The marketing version is for people;
+/// the build number is what the binary actually reports and what can be
+/// compared without parsing. Both are kept — one to decide, one to show.
+///
+/// The distinction that earns this model its complexity is `latestIsLive`.
+/// Uploading a binary is not the same as a store serving it: App Store review
+/// takes hours to days, and a Play upload lands as a draft. CI records a new
+/// build with latestIsLive = false, so nothing tells a shop to install
+/// something they cannot yet download — the worst kind of update prompt,
+/// because the only way out of it is to wait without being told to.
 model AppVersionGate {
   id       String      @id @default(cuid())
   platform OtaPlatform
   channel  String
 
-  /// Below this, the app stops and says it must be updated.
-  minimumVersion     String
-  /// Below this, it says there is a newer one and carries on.
-  recommendedVersion String?
-  /// What the app shows. Left empty, it uses its own words.
-  message            String?
+  /// The newest native build that exists for this platform and channel.
+  latestBuild       Int
+  /// What that build is called in public, e.g. "1.2.0".
+  latestVersionName String?
+  /// Whether the store is actually serving it yet.
+  latestIsLive      Boolean   @default(false)
+  /// When we last saw it live, either by checking or by someone saying so.
+  liveConfirmedAt   DateTime?
 
+  /// Below this, the app stops and says it must be updated. Raised by a person,
+  /// never by CI: forcing every shop to update is a decision, not a deploy.
+  minSupportedBuild Int @default(0)
+
+  /// Where to send someone who has to update.
+  storeUrl String
+  /// What the app shows. Left empty, it uses its own words.
+  message  String?
+
+  /// The platform user who last changed it.
+  updatedBy String?
   updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 
   @@unique([platform, channel])
 }

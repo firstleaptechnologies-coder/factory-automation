@@ -122,49 +122,91 @@ describe('the release list', () => {
   });
 });
 
-describe('the version floor', () => {
-  it('says when there is none', async () => {
-    await open();
-    expect(screen.getByText(/No floor set/)).toBeInTheDocument();
+describe('what the stores are serving', () => {
+  const gate = (over: Record<string, unknown> = {}) => ({
+    id: 'g1',
+    platform: 'ios',
+    channel: 'production',
+    latestBuild: 29827484,
+    latestVersionName: '1.2.0',
+    latestIsLive: true,
+    minSupportedBuild: 0,
+    storeUrl: 'https://apps.apple.com/app/id1',
+    updatedAt: '2026-09-17T00:00:00.000Z',
+    ...over,
   });
 
-  it('shows the floor for the channel being looked at', async () => {
+  it('says plainly when nothing has shipped', async () => {
+    await open();
+    // Two platforms, both empty. Telling the app nothing is the right answer
+    // until a build exists.
+    expect(screen.getAllByText(/Nothing recorded/)).toHaveLength(2);
+  });
+
+  it('shows the build for the channel being looked at', async () => {
     await open(
       [release()],
-      [
-        {
-          id: 'g1',
-          platform: 'ios',
-          channel: 'production',
-          minimumVersion: '1.2.0',
-          recommendedVersion: '1.4.0',
-        },
-        { id: 'g2', platform: 'ios', channel: 'staging', minimumVersion: '9.9.9' },
-      ],
+      [gate(), gate({ id: 'g2', channel: 'staging', latestBuild: 999, latestVersionName: '9.9.9' })],
     );
-
-    expect(screen.getByText(/must be 1.2.0/)).toBeInTheDocument();
-    expect(screen.queryByText(/9.9.9/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Build 29827484/)).toBeInTheDocument();
+    expect(screen.queryByText(/9\.9\.9/)).not.toBeInTheDocument();
   });
 
-  it('sets one for the channel in view', async () => {
+  it('separates a build that is uploaded from one the store is serving', async () => {
+    await open([release()], [gate({ latestIsLive: false })]);
+    expect(screen.getByText('uploaded, not live')).toBeInTheDocument();
+    // The reason matters more than the badge: an update prompt for something
+    // that cannot be downloaded is a button that does nothing.
+    expect(screen.getByText(/Nobody is being offered this yet/)).toBeInTheDocument();
+  });
+
+  it('says so when the store is serving it', async () => {
+    await open([release()], [gate({ latestIsLive: true })]);
+    expect(screen.getByText('live on the store')).toBeInTheDocument();
+    expect(screen.queryByText(/Nobody is being offered this yet/)).not.toBeInTheDocument();
+  });
+
+  it('lets somebody confirm the store went live, without touching anything else', async () => {
+    await open([release()], [gate({ latestIsLive: false })]);
+    await act(async () => {
+      fireEvent.click(screen.getByText('It is live now'));
+    });
+    expect(apiMock.setVersionGate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: 'ios',
+        channel: 'production',
+        latestIsLive: true,
+        latestBuild: 29827484,
+      }),
+    );
+    // Not its business: raising the floor is a separate, deliberate act.
+    expect(apiMock.setVersionGate.mock.calls[0][0]).not.toHaveProperty('minSupportedBuild');
+  });
+
+  it('records a build against the channel in view', async () => {
     await open();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Version floor' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Store builds' }));
     });
     await act(async () => {
-      fireEvent.change(field('Must be at least'), { target: { value: '1.2.0' } });
+      fireEvent.change(field('Newest build'), { target: { value: '29827484' } });
     });
     await act(async () => {
-      fireEvent.click(screen.getByText('Set the floor'));
+      fireEvent.change(field('Where to get it'), {
+        target: { value: 'https://apps.apple.com/app/id1' },
+      });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save'));
     });
 
-    expect(apiMock.setVersionGate).toHaveBeenCalledWith({
-      platform: 'ios',
-      channel: 'production',
-      minimumVersion: '1.2.0',
-      recommendedVersion: undefined,
-      message: undefined,
-    });
+    expect(apiMock.setVersionGate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: 'ios',
+        channel: 'production',
+        latestBuild: 29827484,
+        storeUrl: 'https://apps.apple.com/app/id1',
+      }),
+    );
   });
 });

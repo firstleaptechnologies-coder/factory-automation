@@ -53,9 +53,50 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
 
   const [gateSheet, setGateSheet] = useState(false);
   const [gatePlatform, setGatePlatform] = useState<'ios' | 'android'>('ios');
-  const [minimum, setMinimum] = useState('');
-  const [recommended, setRecommended] = useState('');
+  const [latestBuild, setLatestBuild] = useState('');
+  const [latestVersionName, setLatestVersionName] = useState('');
+  const [minSupported, setMinSupported] = useState('');
+  const [storeUrl, setStoreUrl] = useState('');
   const [message, setMessage] = useState('');
+
+  const gateFor = (platform: 'ios' | 'android') =>
+    gates.data?.find((gate) => gate.channel === channel && gate.platform === platform);
+
+  /** Open on what is already set, so nothing is retyped from memory. */
+  const editGate = (platform: 'ios' | 'android') => {
+    const gate = gateFor(platform);
+    setGatePlatform(platform);
+    setLatestBuild(gate ? String(gate.latestBuild) : '');
+    setLatestVersionName(gate?.latestVersionName ?? '');
+    setMinSupported(gate ? String(gate.minSupportedBuild) : '0');
+    setStoreUrl(gate?.storeUrl ?? '');
+    setMessage(gate?.message ?? '');
+    setGateSheet(true);
+  };
+
+  /**
+   * Say the store is serving the newest build.
+   *
+   * Separate from recording it on purpose: CI knows when a binary was uploaded
+   * and cannot know when review finished. Until a person says so, the app is
+   * told nothing — an update prompt for a build nobody can download is a
+   * button that does nothing.
+   */
+  const markLive = (platform: 'ios' | 'android', live: boolean) => {
+    const gate = gateFor(platform);
+    if (!gate) return;
+    void run(`live-${platform}`, () =>
+      api.setVersionGate({
+        platform,
+        channel,
+        latestBuild: gate.latestBuild,
+        latestVersionName: gate.latestVersionName ?? undefined,
+        latestIsLive: live,
+        storeUrl: gate.storeUrl,
+        message: gate.message ?? undefined,
+      }),
+    );
+  };
 
   const mayShip = can('platform.release.manage');
 
@@ -177,40 +218,71 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
         ))
       )}
 
-      <Text variant="label" tone="muted" style={styles.head}>Version floor</Text>
-      <Card tone="dark" style={styles.card}>
-        {(gates.data?.filter((gate) => gate.channel === channel).length ?? 0) === 0 ? (
-          <Text variant="small" tone="muted">
-            No floor set. Every binary is allowed to run whatever it can fetch.
-          </Text>
-        ) : (
-          gates.data
-            ?.filter((gate) => gate.channel === channel)
-            .map((gate) => (
-              <View key={gate.id} style={styles.row}>
-                <Text variant="small" bold style={{ flex: 1 }}>{gate.platform}</Text>
-                <Text variant="tiny" tone="muted">
-                  must be {gate.minimumVersion}
-                  {gate.recommendedVersion ? ` · asked for ${gate.recommendedVersion}` : ''}
+      <Text variant="label" tone="muted" style={styles.head}>
+        What the stores are serving
+      </Text>
+      {(['ios', 'android'] as const).map((platform) => {
+        const gate = gateFor(platform);
+        return (
+          <Card key={platform} tone="dark" style={styles.card}>
+            <View style={styles.row} testID={`gate-${platform}`}>
+              <Text variant="small" bold style={{ flex: 1 }}>{platform}</Text>
+              {gate ? (
+                <Text variant="tiny" tone={gate.latestIsLive ? 'accent' : 'muted'}>
+                  {gate.latestIsLive ? 'live on the store' : 'uploaded, not live'}
                 </Text>
-              </View>
-            ))
-        )}
-      </Card>
+              ) : null}
+            </View>
 
-      {mayShip ? (
-        <Button
-          title="Set the version floor"
-          variant="dark"
-          onPress={() => setGateSheet(true)}
-          style={{ marginTop: spacing.md }}
-        />
-      ) : null}
+            {!gate ? (
+              <Text variant="small" tone="muted" style={{ marginTop: spacing.xs }}>
+                Nothing recorded. The app is told nothing, which is the right
+                answer until a build has actually shipped.
+              </Text>
+            ) : (
+              <>
+                <Text variant="tiny" tone="muted" style={{ marginTop: spacing.xs }}>
+                  Build {gate.latestBuild}
+                  {gate.latestVersionName ? ` · ${gate.latestVersionName}` : ''}
+                  {gate.minSupportedBuild > 0
+                    ? ` · below ${gate.minSupportedBuild} the app stops`
+                    : ' · no build is blocked'}
+                </Text>
+                {!gate.latestIsLive ? (
+                  <Text variant="tiny" tone="faint" style={{ marginTop: spacing.xs }}>
+                    Nobody is being offered this yet. Review has to finish first —
+                    saying it is live before the store serves it leaves people
+                    tapping a button that does nothing.
+                  </Text>
+                ) : null}
+              </>
+            )}
+
+            {mayShip ? (
+              <View style={[styles.row, { marginTop: spacing.sm }]}>
+                {gate ? (
+                  <Button
+                    title={gate.latestIsLive ? 'Not live after all' : 'It is live now'}
+                    variant="dark"
+                    loading={busy === `live-${platform}`}
+                    onPress={() => markLive(platform, !gate.latestIsLive)}
+                  />
+                ) : null}
+                <Button
+                  title={gate ? 'Edit' : 'Record a build'}
+                  variant="dark"
+                  onPress={() => editGate(platform)}
+                />
+              </View>
+            ) : null}
+          </Card>
+        );
+      })}
 
       <Sheet
         visible={gateSheet}
-        title="Version floor"
-        subtitle="For changes an update cannot carry — a native module, a permission"
+        title="Store build"
+        subtitle="What is on the store, and which binaries may still run"
         onClose={() => setGateSheet(false)}>
         <View style={styles.chips}>
           {(['ios', 'android'] as const).map((one) => (
@@ -223,31 +295,48 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
           ))}
         </View>
         <Field
-          label="Must be at least"
-          placeholder="1.2.0"
-          value={minimum}
-          onChangeText={setMinimum}
-          hint="Below this the app stops and says it has to be updated."
+          label="Newest build"
+          placeholder="29827484"
+          keyboardType="number-pad"
+          value={latestBuild}
+          onChangeText={setLatestBuild}
+          hint="The build number, not the version. CI writes this when it uploads."
         />
         <Field
-          label="Ask for (optional)"
-          placeholder="1.4.0"
-          value={recommended}
-          onChangeText={setRecommended}
+          label="Called (optional)"
+          placeholder="1.2.0"
+          value={latestVersionName}
+          onChangeText={setLatestVersionName}
+        />
+        <Field
+          label="Stop below build"
+          placeholder="0"
+          keyboardType="number-pad"
+          value={minSupported}
+          onChangeText={setMinSupported}
+          hint="Older binaries are refused. Leave at 0 unless an old app would break."
+        />
+        <Field
+          label="Where to get it"
+          placeholder="https://apps.apple.com/app/id…"
+          value={storeUrl}
+          onChangeText={setStoreUrl}
         />
         <Field label="What to say (optional)" value={message} onChangeText={setMessage} />
         <Button
-          title="Set the floor"
+          title="Save"
           loading={busy === 'gate'}
-          disabled={!minimum.trim()}
+          disabled={!latestBuild.trim() || !storeUrl.trim()}
           onPress={() =>
             void (async () => {
               const done = await run('gate', () =>
                 api.setVersionGate({
                   platform: gatePlatform,
                   channel,
-                  minimumVersion: minimum.trim(),
-                  recommendedVersion: recommended.trim() || undefined,
+                  latestBuild: Number.parseInt(latestBuild, 10),
+                  latestVersionName: latestVersionName.trim() || undefined,
+                  minSupportedBuild: Number.parseInt(minSupported || '0', 10),
+                  storeUrl: storeUrl.trim(),
                   message: message.trim() || undefined,
                 }),
               );

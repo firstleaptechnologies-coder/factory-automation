@@ -1,0 +1,153 @@
+name: iOS native build
+
+# Build and upload a NATIVE iOS build. Manual, because a store build is a
+# decision rather than a consequence of a push.
+#
+#   track = testflight  -> TestFlight   (carries the development channel)
+#   track = appstore    -> App Store    (carries the production channel)
+#
+# Signing imports an Apple Distribution certificate into a temporary keychain;
+# the App Store Connect API key then handles provisioning through
+# -allowProvisioningUpdates, so no profile is committed.
+#
+# Required repository secrets:
+#   IOS_DIST_CERT_BASE64      base64 of the Apple Distribution .p12
+#   IOS_DIST_CERT_PASSWORD    the .p12 export password
+#   ASC_KEY_ID                App Store Connect API key id
+#   ASC_ISSUER_ID             App Store Connect issuer id
+#   ASC_API_KEY_P8_BASE64     base64 of the AuthKey_<id>.p8
+#
+# The build number is generated at archive time (unix epoch minutes) and never
+# committed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Where to publish"
+        type: choice
+        options: [testflight, appstore]
+        default: testflight
+      bump:
+        description: "App version bump"
+        type: choice
+        options: [none, patch, minor, major]
+        default: none
+
+concurrency:
+  group: ios-native-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Must match the local toolchain; the project's pods expect a current Xcode.
+    runs-on: macos-26
+    env:
+      FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "120"
+    outputs:
+      build: ${{ steps.bn.outputs.build }}
+      channel: ${{ steps.bn.outputs.channel }}
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      # An App Store build carries the production channel and goes to a real
+      # shop, so it is cut from main and nowhere else. TestFlight may be cut
+      # from any branch, which is the point of TestFlight.
+      - name: Guard — App Store builds only from main
+        if: ${{ inputs.track == 'appstore' && github.ref_name != 'main' }}
+        run: |
+          echo "::error::App Store builds must run from 'main', not '${{ github.ref_name }}'. Promote to main first."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compute build number and channel
+        id: bn
+        run: |
+          echo "build=$(node apps/mobile/scripts/next-build-number.js)" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.track }}" = "appstore" ]; then
+            echo "channel=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=development" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve app version
+        id: bump
+        run: echo "version=$(node apps/mobile/scripts/version.js '${{ inputs.bump }}')" >> "$GITHUB_OUTPUT"
+
+      # Before the archive, and before the pods: the manifest URL and channel
+      # are baked into the binary, and this is the only moment they can be set.
+      - name: Point the binary at its server
+        run: node apps/mobile/scripts/configure-ota-target.js "${{ steps.bn.outputs.channel }}"
+
+      - name: Set up Ruby for fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: apps/mobile
+
+      - name: Install mobile JS deps
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Install CocoaPods
+        working-directory: apps/mobile/ios
+        run: pod install
+
+      - name: Import the distribution certificate into a temporary keychain
+        env:
+          IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+        run: |
+          CERT="$RUNNER_TEMP/dist.p12"
+          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
+          PW="actions-temp-pwd"
+          echo "$IOS_DIST_CERT_BASE64" | base64 -d > "$CERT"
+          security create-keychain -p "$PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$PW" "$KEYCHAIN"
+          security import "$CERT" -P "$IOS_DIST_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$PW" "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN"
+
+      - name: Write the App Store Connect API key
+        env:
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_API_KEY_P8_BASE64" | base64 -d > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+      - name: Build and upload
+        working-directory: apps/mobile
+        env:
+          LANE: ${{ inputs.track == 'appstore' && 'release' || 'beta' }}
+          BUILD_NUMBER: ${{ steps.bn.outputs.build }}
+          MARKETING_VERSION: ${{ steps.bump.outputs.version }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: bundle exec fastlane ios "$LANE"
+
+      - name: Dump the raw build log on failure
+        if: failure()
+        run: |
+          echo "===== gym raw build log (tail 200) ====="
+          tail -200 ~/Library/Logs/gym/FAS-FAS.log 2>/dev/null || echo "(no gym log found)"
+
+  post_release:
+    needs: build
+    permissions:
+      contents: write
+    uses: ./.github/workflows/post-native-release.yml
+    with:
+      platform: ios
+      channel: ${{ needs.build.outputs.channel }}
+      build: ${{ needs.build.outputs.build }}
+      versionName: ${{ needs.build.outputs.version }}
+      # Replaced with the real id once the app has one on App Store Connect.
+      storeUrl: "https://apps.apple.com/app/id0000000000"
+    secrets: inherit

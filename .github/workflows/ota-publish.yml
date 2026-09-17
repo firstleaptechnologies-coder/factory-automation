@@ -1,0 +1,175 @@
+name: OTA publish
+
+# Decide, per platform, whether a push can be delivered over the air.
+#
+# The fingerprint of the native project is compared against the baseline that
+# was committed when that channel's store build was cut:
+#
+#   unchanged  the change is JS-only  -> publish an OTA
+#   changed    the native side moved  -> publish nothing; a store build is due
+#
+# That second case is the whole reason this workflow exists. Handing an
+# installed app a JS bundle built against different native code is an app that
+# crashes on launch, with no way back except the store — and the crash lands on
+# a factory floor, not here.
+#
+# Branch decides the world:
+#   development -> channel "development" -> the staging API  -> TestFlight / Play internal
+#   main        -> channel "production"  -> the shop's API   -> App Store / Play production
+#
+# Required repository secrets:
+#   STAGING_PLATFORM_EMAIL     / STAGING_PLATFORM_PASSWORD
+#   PRODUCTION_PLATFORM_EMAIL  / PRODUCTION_PLATFORM_PASSWORD
+# A platform account, not a tenant one — releases live above every workspace.
+# The manifest is signed by the API from EXPO_OTA_PRIVATE_KEY, so the signing
+# key is never needed here and must never be put here.
+
+on:
+  push:
+    branches: [development, main]
+    # Web-only pushes cannot change the JS bundle, so publishing for them would
+    # be a release nobody asked for and a needless brush with a flaky network.
+    paths:
+      - "apps/mobile/**"
+      - "scripts/publish-ota.ts"
+      - "deploy/environments.json"
+      - ".github/workflows/ota-publish.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ota-${{ github.ref }}
+  cancel-in-progress: true
+
+# actions:write lets a detected native change dispatch the native build
+# workflow, which is what makes development self-healing.
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  ota:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Resolve channel, API and runtime
+        id: cfg
+        run: |
+          set -e
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            ENVIRONMENT=production
+          else
+            ENVIRONMENT=staging
+          fi
+          # One list of hosts, the same one that provisions them.
+          read -r CHANNEL DOMAIN <<<"$(node -e "
+            const e = require('./deploy/environments.json')['$ENVIRONMENT'];
+            process.stdout.write(e.otaChannel + ' ' + e.apiDomain);
+          ")"
+          RUNTIME=$(node -e "process.stdout.write(require('./apps/mobile/app.json').expo.runtimeVersion)")
+          echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "api=https://$DOMAIN" >> "$GITHUB_OUTPUT"
+          echo "runtime=$RUNTIME" >> "$GITHUB_OUTPUT"
+          echo "$ENVIRONMENT / channel $CHANNEL / runtime $RUNTIME / https://$DOMAIN"
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Install mobile deps
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Decide and publish, per platform
+        env:
+          API_URL: ${{ steps.cfg.outputs.api }}
+          CHANNEL: ${{ steps.cfg.outputs.channel }}
+          RUNTIME: ${{ steps.cfg.outputs.runtime }}
+          PLATFORM_EMAIL: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_PLATFORM_EMAIL || secrets.STAGING_PLATFORM_EMAIL }}
+          PLATFORM_PASSWORD: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_PLATFORM_PASSWORD || secrets.STAGING_PLATFORM_PASSWORD }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          GH_TOKEN: ${{ github.token }}
+          # Production goes out to a slice first; an admin promotes it to
+          # everyone from the releases screen once it looks healthy.
+          OTA_CANARY_PERCENT: "20"
+        run: |
+          set -e
+          # Platforms that got no OTA this run. Collected rather than handled
+          # one at a time, because a silent per-platform skip is how one
+          # platform goes days without an update while the other keeps
+          # publishing, every run green.
+          BLOCKED=""
+
+          for PLATFORM in ios android; do
+            echo "::group::fingerprint $PLATFORM"
+            CUR=$(cd apps/mobile && npx expo-updates fingerprint:generate --platform "$PLATFORM" \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).hash))")
+            BASELINE="apps/mobile/fingerprints/${CHANNEL}.${PLATFORM}.fingerprint"
+            BASE=$( [ -f "$BASELINE" ] && cat "$BASELINE" || echo "" )
+            echo "current=$CUR baseline=${BASE:-<none>}"
+            echo "::endgroup::"
+
+            if [ -z "$BASE" ]; then
+              echo "::warning::No fingerprint baseline for $CHANNEL/$PLATFORM — nothing has shipped to a store yet, so there is no runtime to publish against."
+              BLOCKED="$BLOCKED $PLATFORM(no-baseline)"
+              continue
+            fi
+
+            if [ "$CUR" != "$BASE" ]; then
+              echo "::warning::NATIVE change for $CHANNEL/$PLATFORM — a store build is required; publishing nothing."
+              BLOCKED="$BLOCKED $PLATFORM(drift)"
+              # development self-heals: cut the test build automatically.
+              # Production store builds stay a deliberate human act.
+              if [ "$CHANNEL" = "development" ]; then
+                if [ "$PLATFORM" = "ios" ]; then WF=native-ios.yml; TRACK=testflight; else WF=native-android.yml; TRACK=internal; fi
+                echo "Dispatching $WF (track=$TRACK) for the native change…"
+                gh workflow run "$WF" --ref development -f track="$TRACK" || echo "::warning::could not dispatch $WF"
+              fi
+              continue
+            fi
+
+            echo "JS-only change for $CHANNEL/$PLATFORM — exporting the bundle"
+            (cd apps/mobile && npx expo export --platform "$PLATFORM" --output-dir "dist-$PLATFORM")
+
+            if [ "$CHANNEL" = "production" ]; then
+              echo "Publishing a canary at ${OTA_CANARY_PERCENT}%"
+              npx tsx scripts/publish-ota.ts \
+                --channel "$CHANNEL" --platform "$PLATFORM" --runtime "$RUNTIME" \
+                --dir "apps/mobile/dist-$PLATFORM" \
+                --changelog "${COMMIT_MSG:0:200}" \
+                --publish --rollout "$OTA_CANARY_PERCENT"
+            else
+              echo "Publishing a draft for someone to roll out"
+              npx tsx scripts/publish-ota.ts \
+                --channel "$CHANNEL" --platform "$PLATFORM" --runtime "$RUNTIME" \
+                --dir "apps/mobile/dist-$PLATFORM" \
+                --changelog "${COMMIT_MSG:0:200}"
+            fi
+          done
+
+          if [ -n "$BLOCKED" ]; then
+            {
+              echo "### No OTA published for ${CHANNEL}:${BLOCKED}"
+              echo ""
+              echo "The JS bundle no longer matches the native runtime of the shipped"
+              echo "store build, so publishing would hand installed apps JS their binary"
+              echo "cannot run."
+              echo ""
+              echo "Unblock: ship a store build for the platform(s) above. The baseline"
+              echo "at \`apps/mobile/fingerprints/${CHANNEL}.<platform>.fingerprint\` is"
+              echo "written by post-native-release once the upload succeeds."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # development has an escape hatch — the native build was dispatched
+          # above. Production has none, so a blocked platform must not rot
+          # behind a green checkmark.
+          if [ "$CHANNEL" = "production" ] && [ -n "$BLOCKED" ]; then
+            echo "::error::Production OTA did not publish for:$BLOCKED — see the job summary."
+            exit 1
+          fi

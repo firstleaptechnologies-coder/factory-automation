@@ -137,19 +137,37 @@ export class OtaService {
    * Some changes cannot be delivered over the air, and an old binary meeting
    * an API that has moved on fails in ways nobody can explain over the phone.
    */
-  async versionCheck(platformName?: string, channel = 'production') {
+  async versionCheck(platformName?: string, channel = 'production', build?: number) {
     const platform = asPlatform(platformName);
-    if (!platform) return { supported: true };
+    if (!platform) return { supported: true, updateAvailable: false, forced: false };
 
     const gate = await this.prisma.platform.appVersionGate.findUnique({
       where: { platform_channel: { platform, channel } },
     });
-    if (!gate) return { supported: true };
+    // No gate is not the same as a gate that says no. A channel nobody has
+    // configured must not stop an app that is working perfectly well.
+    if (!gate) return { supported: true, updateAvailable: false, forced: false };
+
+    // An app that did not say which build it is cannot be judged, only
+    // informed. Older binaries predate this parameter, and refusing to run
+    // them over a missing query string would be the update prompt from hell.
+    const running = Number.isFinite(build) ? (build as number) : null;
+    const forced = running !== null && running < gate.minSupportedBuild;
+
+    // Only offer what the store is actually serving. A build that is uploaded
+    // but still in review exists for us and not for the shop, and telling them
+    // to install it leaves them tapping a button that does nothing.
+    const updateAvailable =
+      gate.latestIsLive && running !== null && running < gate.latestBuild;
 
     return {
-      supported: true,
-      minimumVersion: gate.minimumVersion,
-      recommendedVersion: gate.recommendedVersion,
+      supported: !forced,
+      updateAvailable,
+      forced,
+      latestBuild: gate.latestBuild,
+      latestVersionName: gate.latestVersionName,
+      minSupportedBuild: gate.minSupportedBuild,
+      storeUrl: gate.storeUrl,
       message: gate.message,
     };
   }

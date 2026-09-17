@@ -156,13 +156,18 @@ describe('publishing', () => {
 });
 
 describe('the version gate', () => {
-  it('is one row per platform and channel', async () => {
-    const { service, db } = build();
-    await service.setGate({
+  const dto = (over: Record<string, unknown> = {}) =>
+    ({
       platform: 'ios' as never,
       channel: 'production',
-      minimumVersion: '1.2.0',
-    });
+      latestBuild: 200,
+      storeUrl: 'https://apps.apple.com/app/id1',
+      ...over,
+    }) as never;
+
+  it('is one row per platform and channel', async () => {
+    const { service, db } = build();
+    await service.setGate(dto());
 
     expect(db.appVersionGate.upsert.mock.calls[0][0].where).toEqual({
       platform_channel: { platform: 'ios', channel: 'production' },
@@ -171,14 +176,67 @@ describe('the version gate', () => {
 
   it('clears what was left out rather than keeping a stale message', async () => {
     const { service, db } = build();
-    await service.setGate({
-      platform: 'ios' as never,
-      channel: 'production',
-      minimumVersion: '1.2.0',
-    });
+    await service.setGate(dto());
+
     expect(db.appVersionGate.upsert.mock.calls[0][0].update).toMatchObject({
-      recommendedVersion: null,
+      latestVersionName: null,
       message: null,
     });
+  });
+
+  /*
+   * CI records a build; it cannot know whether review has finished. Leaving
+   * latestIsLive out has to mean "do not touch it", or every release would
+   * quietly un-publish the store state a person had confirmed.
+   */
+  it('leaves the store state alone when the caller did not mention it', async () => {
+    const { service, db } = build();
+    await service.setGate(dto());
+
+    expect(db.appVersionGate.upsert.mock.calls[0][0].update).not.toHaveProperty('latestIsLive');
+    expect(db.appVersionGate.upsert.mock.calls[0][0].update).not.toHaveProperty('liveConfirmedAt');
+  });
+
+  /* Same reasoning, and more consequential: a deploy must not lower a floor. */
+  it('leaves the supported floor alone when the caller did not mention it', async () => {
+    const { service, db } = build();
+    await service.setGate(dto());
+
+    expect(db.appVersionGate.upsert.mock.calls[0][0].update).not.toHaveProperty(
+      'minSupportedBuild',
+    );
+  });
+
+  it('stamps when the store went live, so the date answers "since when"', async () => {
+    const { service, db } = build();
+    await service.setGate(dto({ latestIsLive: true }));
+
+    const update = db.appVersionGate.upsert.mock.calls[0][0].update;
+    expect(update.latestIsLive).toBe(true);
+    expect(update.liveConfirmedAt).toBeInstanceOf(Date);
+  });
+
+  it('clears that date again when somebody says it is not live after all', async () => {
+    const { service, db } = build();
+    await service.setGate(dto({ latestIsLive: false }));
+
+    const update = db.appVersionGate.upsert.mock.calls[0][0].update;
+    expect(update.latestIsLive).toBe(false);
+    expect(update.liveConfirmedAt).toBeNull();
+  });
+
+  it('records who changed it', async () => {
+    const { service, db } = build();
+    await service.setGate(dto(), 'platform-user-1');
+
+    expect(db.appVersionGate.upsert.mock.calls[0][0].update.updatedBy).toBe('platform-user-1');
+  });
+
+  it('starts a new row not live, whatever else it was given', async () => {
+    const { service, db } = build();
+    await service.setGate(dto());
+
+    expect(db.appVersionGate.upsert.mock.calls[0][0].create.latestIsLive).toBe(false);
+    expect(db.appVersionGate.upsert.mock.calls[0][0].create.minSupportedBuild).toBe(0);
   });
 });

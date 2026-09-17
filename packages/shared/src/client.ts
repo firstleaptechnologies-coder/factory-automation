@@ -1637,11 +1637,22 @@ export class ApiClient {
     return this.get<VersionGate[]>('/platform/releases/gates/all');
   }
 
+  /**
+   * Write one gate.
+   *
+   * `latestIsLive` and `minSupportedBuild` are optional on purpose: leaving
+   * either out means "do not touch it". That is what keeps the release
+   * workflow from claiming a store is serving a build it has only uploaded,
+   * or from lowering a minimum somebody raised deliberately.
+   */
   setVersionGate(body: {
     platform: 'ios' | 'android';
     channel: string;
-    minimumVersion: string;
-    recommendedVersion?: string;
+    latestBuild: number;
+    latestVersionName?: string;
+    latestIsLive?: boolean;
+    minSupportedBuild?: number;
+    storeUrl: string;
     message?: string;
   }) {
     return this.request<VersionGate>('PUT', '/platform/releases/gates', body);
