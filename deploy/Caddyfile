@@ -8,7 +8,10 @@
 # The app will not talk to plain HTTP: iOS blocks it outright, and Android has
 # since 9. So this is not hardening that can wait — without it there is no app.
 
-{$API_DOMAIN} {
+# Two names while staging still answers on the one production will eventually
+# take. Caddy holds a certificate for each; when production is stood up on its
+# own box, the second name comes out of here and the DNS record moves with it.
+{$API_DOMAIN}, {$API_DOMAIN_ALIAS:api.firstleaptechnologies.in} {
 	# The API sets its own CORS from CORS_ORIGINS; nothing is added here, so
 	# there is one place that decides who may call it.
 	reverse_proxy api:3001

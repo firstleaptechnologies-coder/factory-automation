@@ -9,10 +9,11 @@
 # client costs more memory than the separation is worth, and a worker that gets
 # OOM-killed every night is worse than no separation at all.
 #
-# Everything secret comes from deploy/api.env, which is never committed. See
-# apps/api/.env.example for what belongs in it. The one variable compose itself
-# needs — API_DOMAIN, for the certificate — goes in deploy/.env, because
-# env_file is handed to the container and is not read for interpolation here.
+# Everything secret comes from deploy/env/<environment>.env, which is never
+# committed. See apps/api/.env.example for what belongs in it. The two
+# variables compose itself needs — FAS_ENV, to pick that file, and API_DOMAIN,
+# for the certificate — go in deploy/.env, because env_file is handed to the
+# container and is not read for interpolation here.
 
 name: fas
 
@@ -21,7 +22,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    env_file: api.env
+    env_file: env/${FAS_ENV:?set FAS_ENV}.env
     environment:
       # Caddy is the only thing that talks to it, over the compose network.
       PORT: 3001
@@ -56,7 +57,7 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: build
-    env_file: api.env
+    env_file: env/${FAS_ENV:?set FAS_ENV}.env
     command: ["npm", "run", "db:migrate:tenants"]
 
   caddy:

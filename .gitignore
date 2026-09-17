@@ -33,9 +33,12 @@ apps/api/test/**/*.js.map
 # environment and in a password manager, and nowhere else.
 apps/mobile/keys/
 
-# The deployment's secrets and the one name compose interpolates. Both live
-# only on the box they run on; apps/api/.env.example says what goes in them.
-deploy/api.env
+# Every environment's secrets, and the two names compose interpolates. These
+# live only on the box they run on; apps/api/.env.example says what goes in
+# them. The directory is ignored wholesale rather than file by file, because
+# the day production is stood up is the day a new filename appears here, and a
+# per-file rule is one nobody would think to add.
+deploy/env/*.env
 deploy/.env
 
 # Vercel's link to the project, and the OIDC token it caches beside it. The ids

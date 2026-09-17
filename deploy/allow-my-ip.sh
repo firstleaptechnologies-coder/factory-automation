@@ -2,15 +2,16 @@
 #
 # Let this machine's current address reach port 22, and no other address.
 #
-#   AWS_PROFILE=fas deploy/allow-my-ip.sh
+#   AWS_PROFILE=fas deploy/allow-my-ip.sh staging
 #
 # Home broadband hands out a new address every so often, and a security group
 # pinned to yesterday's is a production box nobody can log into. This re-points
 # the rule at wherever you are now, and removes where you were.
 set -euo pipefail
 
-REGION="${AWS_REGION:-ap-southeast-1}"
-NAME="${NAME:-fas-prod}"
+. "$(cd "$(dirname "$0")" && pwd)/env.sh" "${1:-}"
+REGION="$FAS_REGION"
+NAME="$FAS_NAME"
 ME="$(curl -fsS https://checkip.amazonaws.com | tr -d '[:space:]')/32"
 
 SG=$(aws --region "$REGION" ec2 describe-security-groups \

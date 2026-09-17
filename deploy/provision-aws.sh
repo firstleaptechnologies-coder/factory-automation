@@ -1,30 +1,41 @@
 #!/usr/bin/env bash
 #
-# Build the AWS side of the deployment. Idempotent: run it twice and the second
-# run reports what already exists rather than making a second of everything.
+# Build the AWS side of one environment. Idempotent: run it twice and the
+# second run reports what already exists rather than making a second of
+# everything.
 #
-#   AWS_PROFILE=fas deploy/provision-aws.sh
+#   AWS_PROFILE=fas deploy/provision-aws.sh staging
+#   AWS_PROFILE=fas deploy/provision-aws.sh production
+#
+# Every resource carries the environment in its name — fas-staging-*,
+# fas-production-* — so the two can sit in one AWS account without a chance of
+# one being mistaken for the other. That is the whole reason this takes an
+# argument: production is meant to be a second run of this script, not a second
+# script, and the day it is stood up is not the day to be discovering which
+# lines were hard-coded.
 #
 # Makes, in order: an S3 bucket and an IAM user that can reach only that
-# bucket; a key pair from ~/.ssh/fas-prod.pub; a security group; a t3.micro
+# bucket; a key pair from ~/.ssh/<name>.pub; a security group; an instance
 # running deploy/cloud-init.sh; and an elastic IP attached to it.
 #
-# It prints the values that belong in deploy/api.env and the A record that has
-# to be added at BigRock. It does not write either — an env file on a laptop
-# and a DNS record are the two things worth a human looking at.
+# It prints the values that belong in deploy/env/<environment>.env and the A
+# record that has to be added at BigRock. It does not write either — an env
+# file and a DNS record are the two things worth a human looking at.
 set -euo pipefail
 
-REGION="${AWS_REGION:-ap-southeast-1}"
-NAME="${NAME:-fas-prod}"
-BUCKET="${BUCKET:-fas-prod-files-$(aws sts get-caller-identity --query Account --output text)}"
-KEY_FILE="${KEY_FILE:-$HOME/.ssh/fas-prod.pub}"
+. "$(cd "$(dirname "$0")" && pwd)/env.sh" "${1:-}"
+
+REGION="$FAS_REGION"
+NAME="$FAS_NAME"
+BUCKET="${BUCKET:-${NAME}-files-$(aws sts get-caller-identity --query Account --output text)}"
+KEY_FILE="${KEY_FILE:-$HOME/.ssh/${NAME}.pub}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 aws() { command aws --region "$REGION" "$@"; }
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 exists() { [ -n "${1:-}" ] && [ "$1" != "None" ]; }
 
-say "Account $(command aws sts get-caller-identity --query Account --output text) in $REGION"
+say "Environment $FAS_ENV — account $(command aws sts get-caller-identity --query Account --output text) in $REGION"
 
 # ---------------------------------------------------------------------------
 # Files. The Neon branch is capped at 0.5 GiB, so order photos and OTA bundles
@@ -158,15 +169,19 @@ echo "$IP"
 say "Done"
 cat <<EOF
 
-  Instance   $ID
-  Address    $IP
-  Bucket     $BUCKET
+  Environment  $FAS_ENV
+  Instance     $ID
+  Address      $IP
+  Bucket       $BUCKET
+  API domain   $FAS_API_DOMAIN
+  OTA channel  $FAS_OTA_CHANNEL
 
 Add this at BigRock, then wait for it to resolve:
 
-  api   A   $IP
+  ${FAS_API_DOMAIN%%.firstleaptechnologies.in}   A   $IP
 
-Then create the API's S3 key and put the four values in deploy/api.env:
+Then create the API's S3 key and put the four values in
+deploy/env/${FAS_ENV}.env:
 
   aws iam create-access-key --user-name ${NAME}-s3
 

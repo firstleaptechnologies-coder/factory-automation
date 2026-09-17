@@ -2,7 +2,7 @@
 #
 # Run a command with deploy/api.env loaded, the way Compose loads it.
 #
-#   deploy/with-env.sh npm run db:seed
+#   deploy/with-env.sh staging npm run db:seed
 #
 # `source deploy/api.env` looks like it would do this and does not: the file is
 # written for Compose's env_file, where a value runs to the end of the line and
@@ -15,7 +15,12 @@
 # database, on the same laptop, with the same schema, reporting success.
 set -euo pipefail
 
-ENV_FILE="${ENV_FILE:-$(cd "$(dirname "$0")" && pwd)/api.env}"
+# First argument names the environment, unless ENV_FILE says otherwise.
+if [ -z "${ENV_FILE:-}" ]; then
+  . "$(cd "$(dirname "$0")" && pwd)/env.sh" "${1:-}"
+  ENV_FILE="$FAS_ENV_FILE"
+  shift
+fi
 [ -f "$ENV_FILE" ] || { echo "no such env file: $ENV_FILE" >&2; exit 1; }
 [ $# -gt 0 ] || { echo "usage: deploy/with-env.sh <command> [args...]" >&2; exit 2; }
 

@@ -1,0 +1,41 @@
+{
+  "_comment": [
+    "Every environment, and the facts about it that are not secret.",
+    "",
+    "Two worlds, the same shape, so production is a parameter rather than a",
+    "rewrite: `deploy/provision-aws.sh production` builds the second one from",
+    "this file, with names that cannot collide with the first.",
+    "",
+    "The OTA channel is the link between a git branch and a binary. The",
+    "development branch publishes to the development channel, which TestFlight",
+    "and Play-internal builds carry; main publishes to production, which App",
+    "Store and Play-production builds carry. Neither can reach the other, so a",
+    "bad staging bundle cannot land on a shop's phone.",
+    "",
+    "Secrets live in deploy/env/<environment>.env, on the box and nowhere else."
+  ],
+  "staging": {
+    "name": "staging",
+    "apiDomain": "api-staging.firstleaptechnologies.in",
+    "otaChannel": "development",
+    "appEnv": "staging",
+    "region": "ap-southeast-1",
+    "instanceType": "t3.micro",
+    "volumeGb": 30,
+    "neonBranch": "production",
+    "webProject": "fas-web",
+    "exists": true
+  },
+  "production": {
+    "name": "production",
+    "apiDomain": "api.firstleaptechnologies.in",
+    "otaChannel": "production",
+    "appEnv": "production",
+    "region": "ap-southeast-1",
+    "instanceType": "t3.micro",
+    "volumeGb": 30,
+    "neonBranch": "production",
+    "webProject": "fas-web-production",
+    "exists": false
+  }
+}
