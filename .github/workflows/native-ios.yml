@@ -148,6 +148,8 @@ jobs:
       channel: ${{ needs.build.outputs.channel }}
       build: ${{ needs.build.outputs.build }}
       versionName: ${{ needs.build.outputs.version }}
-      # Replaced with the real id once the app has one on App Store Connect.
-      storeUrl: "https://apps.apple.com/app/id0000000000"
+      # FAS on App Store Connect. This is the link a shop is sent to when the
+      # version gate says there is a newer build, so a wrong number here is a
+      # factory tapping through to a blank page.
+      storeUrl: "https://apps.apple.com/app/id6813100100"
     secrets: inherit
