@@ -47,6 +47,13 @@ COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 
+# V8 picks its heap ceiling from the machine it finds itself on, and on a 1 GB
+# instance that lands far below what `nest build` needs — the build dies with
+# "Ineffective mark-compacts near heap limit" and exit 134, which reads like a
+# crash rather than a machine that is too small. The box has a 4 GiB swapfile
+# for exactly this; without this line Node never reaches for it.
+ENV NODE_OPTIONS=--max-old-space-size=2048
+
 # Generate before compiling: 61 files in the API import types that do not
 # exist until the client has been generated.
 RUN npm run db:generate \

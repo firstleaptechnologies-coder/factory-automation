@@ -18,11 +18,21 @@ dnf install -y docker git rsync
 systemctl enable --now docker
 usermod -aG docker ec2-user
 
-# Amazon Linux 2023 packages the Docker engine but not the compose plugin.
+# Amazon Linux 2023 packages the Docker engine and neither CLI plugin.
 install -d /usr/libexec/docker/cli-plugins
 curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-compose \
   https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
 chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+# buildx as well: `docker compose build` refuses to run without it, and the
+# error names a version rather than saying the plugin is absent. Its release
+# assets carry the version in the filename, so there is no /latest/download
+# shortcut — the tag has to be asked for first.
+BUILDX=$(curl -fsSL https://api.github.com/repos/docker/buildx/releases/latest \
+  | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-buildx \
+  "https://github.com/docker/buildx/releases/download/${BUILDX}/buildx-${BUILDX}.linux-amd64"
+chmod +x /usr/libexec/docker/cli-plugins/docker-buildx
 
 # Swap. `npm ci` and tsc do not fit in 1 GB, and what they do instead of
 # failing honestly is get the build OOM-killed with no line saying why.
