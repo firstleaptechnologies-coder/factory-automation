@@ -101,14 +101,26 @@ platform :ios do
   lane :beta do
     configure_ota("development")
     build_ios
-    # Distribution must finish before post-native-release runs. With
-    # skip_waiting the build lands as "Ready to Submit" and nobody is assigned
-    # to it — testers stay on the old build while the version gate has already
-    # moved, so the app offers an update TestFlight is not serving.
+    # Internal testing only, and deliberately no `groups:`.
+    #
+    # Naming a group is what makes this an EXTERNAL distribution in fastlane,
+    # and external testing needs Beta App Review and a Beta App Description —
+    # the second build died on exactly that, after a successful upload:
+    #
+    #   [!] Beta App Description is missing. Beta App Description is required
+    #       to submit a build for external testing.
+    #
+    # Internal testers are simply the people with a role on the App Store
+    # Connect account. They get every processed build, with no group, no review
+    # and no waiting. That is what a development build wants.
+    #
+    # Processing IS waited for, though. With skip_waiting the build lands as
+    # "Ready to Submit" and nobody has it, while post-native-release has
+    # already moved the version gate — so the app offers an update TestFlight
+    # is not yet serving.
     upload_to_testflight(
       api_key: asc_key,
       distribute_external: false,
-      groups: ["Internal Testers"],
       changelog: "Development build #{BUILD_NUMBER} (#{MARKETING_VERSION})",
     )
   end
