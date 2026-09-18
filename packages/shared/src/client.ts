@@ -1633,6 +1633,20 @@ export class ApiClient {
     return this.patch<Release>(`/platform/releases/${id}`, body);
   }
 
+  /**
+   * Go back to what was running before this release.
+   *
+   * Answers with the release that was restored, or null when there was nothing
+   * to go back to — in which case the app falls back to the bundle inside the
+   * binary, and the screen should say so rather than imply a restore.
+   */
+  rollbackRelease(id: string) {
+    return this.request<{ rolledBackTo: Release | null }>(
+      'POST',
+      `/platform/releases/${id}/rollback`,
+    );
+  }
+
   versionGates() {
     return this.get<VersionGate[]>('/platform/releases/gates/all');
   }

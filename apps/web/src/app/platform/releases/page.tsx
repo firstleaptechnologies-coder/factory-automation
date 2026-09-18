@@ -79,6 +79,37 @@ export default function ReleasesPage() {
     }
   };
 
+  /**
+   * Go back to the update this one replaced.
+   *
+   * Confirmed first: it is the one action here that changes what a shop runs
+   * without anybody choosing the bundle they land on.
+   */
+  const rollback = async (release: Release) => {
+    if (
+      !window.confirm(
+        'Roll back this release?\n\nIt is retired, and the update it replaced goes back to everybody at 100%.',
+      )
+    ) {
+      return;
+    }
+    setBusy(release.id);
+    setError(null);
+    try {
+      const { rolledBackTo } = await api.rollbackRelease(release.id);
+      releases.reload();
+      setError(
+        rolledBackTo
+          ? null
+          : 'Retired. There was no earlier update on this channel, so the app falls back to the bundle inside the binary.',
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not roll that back');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const gateFor = (platform: 'ios' | 'android') =>
     gates.data?.find((gate) => gate.channel === channel && gate.platform === platform);
 
@@ -237,6 +268,14 @@ export default function ReleasesPage() {
                         label="Retire"
                         onClick={() => change(release, { status: 'ARCHIVED' })}
                       />
+                      {/*
+                        Retire takes this bundle away and leaves whatever the
+                        binary shipped with. Roll back takes it away AND puts
+                        the previous update back, at everybody — which is what
+                        somebody wants when a release turns out worse than the
+                        one it replaced.
+                      */}
+                      <Chip label="Roll back" onClick={() => void rollback(release)} />
                     </div>
                   </div>
                 </>

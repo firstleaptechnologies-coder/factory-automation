@@ -589,6 +589,12 @@ describe('endpoints', () => {
     ['updateRelease', (a) => a.updateRelease('r1', { rolloutPercent: 10 }), 'PATCH', '/platform/releases/r1'],
     ['versionGates', (a) => a.versionGates(), 'GET', '/platform/releases/gates/all'],
     [
+      'rollbackRelease',
+      (a) => a.rollbackRelease('r1'),
+      'POST',
+      '/platform/releases/r1/rollback',
+    ],
+    [
       'setVersionGate',
       (a) =>
         a.setVersionGate({

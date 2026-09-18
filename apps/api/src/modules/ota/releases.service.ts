@@ -166,6 +166,64 @@ export class ReleasesService {
     });
   }
 
+  /**
+   * Go back to what was running before this release.
+   *
+   * Retires it, then re-publishes the most recent update it replaced, at 100%.
+   * Full rollout on purpose: a rollback is not an experiment, it is an
+   * admission — everybody should be off the bad bundle at once, not a fifth of
+   * them at a time.
+   *
+   * When there is nothing to go back to, the release is retired and nothing
+   * takes its place. The app then falls back to the bundle inside the binary,
+   * which is the last thing known to work.
+   */
+  async rollback(id: string, byUserId?: string) {
+    const release = await this.prisma.platform.otaRelease.findUnique({ where: { id } });
+    if (!release) throw new NotFoundException('No such release');
+
+    return this.prisma.platform.$transaction(async (tx) => {
+      await tx.otaRelease.update({
+        where: { id },
+        data: { status: OtaReleaseStatus.ARCHIVED },
+      });
+
+      /*
+       * The newest thing retired in this slot that was an ordinary update.
+       *
+       * Rollbacks are skipped: rolling back to a rollback says nothing about
+       * which bundle anyone would end up running, and two of them in a row
+       * would walk backwards through the history one release per press.
+       */
+      const previous = await tx.otaRelease.findFirst({
+        where: {
+          channel: release.channel,
+          platform: release.platform,
+          runtimeVersion: release.runtimeVersion,
+          kind: OtaReleaseKind.UPDATE,
+          status: OtaReleaseStatus.ARCHIVED,
+          id: { not: id },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: SUMMARY,
+      });
+
+      if (!previous) return { rolledBackTo: null };
+
+      const restored = await tx.otaRelease.update({
+        where: { id: previous.id },
+        data: {
+          status: OtaReleaseStatus.PUBLISHED,
+          rolloutPercent: 100,
+          publishedBy: byUserId,
+          activatedAt: previous.activatedAt ?? new Date(),
+        },
+        select: SUMMARY,
+      });
+      return { rolledBackTo: restored };
+    });
+  }
+
   gates() {
     return this.prisma.platform.appVersionGate.findMany({
       orderBy: [{ channel: 'asc' }, { platform: 'asc' }],

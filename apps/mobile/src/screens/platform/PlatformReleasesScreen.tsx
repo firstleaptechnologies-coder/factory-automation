@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import type { Release, ReleaseStatus, VersionGate } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
@@ -121,6 +121,41 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
   const change = (release: Release, body: Record<string, unknown>) =>
     run(release.id, () => api.updateRelease(release.id, body as never));
 
+  /**
+   * Go back to the update this one replaced.
+   *
+   * Asked about first, because it is the one action here that changes what a
+   * shop is running without anybody choosing the bundle they end up on.
+   */
+  const confirmRollback = (release: Release) => {
+    Alert.alert(
+      'Roll back this release?',
+      'It is retired, and the update it replaced goes back to everybody at 100%.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Roll back',
+          style: 'destructive',
+          onPress: () =>
+            void (async () => {
+              let restored: { rolledBackTo: unknown } | null = null;
+              const ok = await run(release.id, async () => {
+                restored = (await api.rollbackRelease(release.id)) as { rolledBackTo: unknown };
+              });
+              if (!ok) return;
+              const wentBack = Boolean(restored && (restored as { rolledBackTo: unknown }).rolledBackTo);
+              Alert.alert(
+                wentBack ? 'Rolled back' : 'Retired, with nothing to go back to',
+                wentBack
+                  ? 'The update it replaced is live again, for everybody.'
+                  : 'There was no earlier update on this channel, so the app falls back to the bundle inside the binary.',
+              );
+            })(),
+        },
+      ],
+    );
+  };
+
   return (
     <Screen refreshing={releases.refreshing} onRefresh={releases.refresh}>
       <ScreenHeader
@@ -198,6 +233,12 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
                       label="Retire"
                       onPress={() => void change(release, { status: 'ARCHIVED' })}
                     />
+                    {/*
+                      Retire takes this bundle away and leaves whatever the
+                      binary shipped with — losing every good update since, not
+                      just the bad one. Roll back puts the previous update back.
+                    */}
+                    <Chip label="Roll back" onPress={() => confirmRollback(release)} />
                   </View>
                 ) : null}
               </>

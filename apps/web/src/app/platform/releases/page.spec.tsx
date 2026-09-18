@@ -4,6 +4,7 @@ import ReleasesPage from './page';
 const apiMock: Record<string, jest.Mock> = {
   releases: jest.fn(),
   versionGates: jest.fn(),
+  rollbackRelease: jest.fn(),
   updateRelease: jest.fn(),
   setVersionGate: jest.fn(),
 };
@@ -51,6 +52,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   apiMock.updateRelease.mockResolvedValue({});
   apiMock.setVersionGate.mockResolvedValue({});
+  apiMock.rollbackRelease.mockResolvedValue({ rolledBackTo: null });
+  // Rolling back asks before it acts, so the prompt has to answer something.
+  window.confirm = jest.fn(() => true);
 });
 
 describe('the release list', () => {
@@ -119,6 +123,49 @@ describe('the release list', () => {
       fireEvent.click(screen.getByText('staging'));
     });
     expect(apiMock.releases).toHaveBeenLastCalledWith({ channel: 'staging' });
+  });
+});
+
+describe('going back to what was running before', () => {
+  it('asks first, because nobody chose the bundle they land on', async () => {
+    (window.confirm as jest.Mock).mockReturnValue(false);
+    await open([release({ status: 'PUBLISHED', rolloutPercent: 50 })]);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Roll back'));
+    });
+    expect(apiMock.rollbackRelease).not.toHaveBeenCalled();
+  });
+
+  it('rolls back when that is confirmed', async () => {
+    (window.confirm as jest.Mock).mockReturnValue(true);
+    apiMock.rollbackRelease.mockResolvedValue({ rolledBackTo: release({ id: 'r0' }) });
+    await open([release({ status: 'PUBLISHED', rolloutPercent: 50 })]);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Roll back'));
+    });
+    expect(apiMock.rollbackRelease).toHaveBeenCalledWith('r1');
+  });
+
+  /*
+   * With nothing to go back to, the app falls back to the bundle inside the
+   * binary. Saying so beats silence, which reads as a restore that happened.
+   */
+  it('says so when there was nothing to go back to', async () => {
+    (window.confirm as jest.Mock).mockReturnValue(true);
+    apiMock.rollbackRelease.mockResolvedValue({ rolledBackTo: null });
+    await open([release({ status: 'PUBLISHED', rolloutPercent: 50 })]);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Roll back'));
+    });
+    expect(await screen.findByText(/no earlier update on this channel/)).toBeInTheDocument();
+  });
+
+  it('is not offered on a draft, which replaced nothing', async () => {
+    await open([release({ status: 'DRAFT' })]);
+    expect(screen.queryByText('Roll back')).not.toBeInTheDocument();
   });
 });
 

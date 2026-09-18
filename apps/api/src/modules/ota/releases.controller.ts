@@ -67,6 +67,19 @@ export class ReleasesController {
     return this.releases.update(id, dto, user?.id);
   }
 
+  /**
+   * Go back to what was running before this release.
+   *
+   * A POST rather than another shape of PATCH, because it is not an edit to
+   * this release — it retires this one and brings back a different one, and a
+   * verb that says so is one nobody has to read the service to understand.
+   */
+  @RequirePermissions(PERMISSIONS.PLATFORM_RELEASE_MANAGE)
+  @Post(':id/rollback')
+  rollback(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.releases.rollback(id, user?.id);
+  }
+
   @RequirePermissions(PERMISSIONS.PLATFORM_RELEASE_VIEW)
   @Get('gates/all')
   gates() {

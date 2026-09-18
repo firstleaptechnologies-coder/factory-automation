@@ -155,6 +155,120 @@ describe('publishing', () => {
   });
 });
 
+describe('going back to what was running before', () => {
+  const release = (over: Record<string, unknown> = {}) => ({
+    id: 'r2',
+    channel: 'production',
+    platform: 'ios',
+    runtimeVersion: '1',
+    kind: 'UPDATE',
+    status: 'PUBLISHED',
+    activatedAt: null,
+    ...over,
+  });
+
+  it('retires the release being rolled back', async () => {
+    const { service, db } = build();
+    db.otaRelease.findUnique = jest.fn(async () => release());
+    db.otaRelease.findFirst = jest.fn(async () => null);
+
+    await service.rollback('r2');
+
+    expect(db.otaRelease.update.mock.calls[0][0]).toMatchObject({
+      where: { id: 'r2' },
+      data: { status: 'ARCHIVED' },
+    });
+  });
+
+  it('re-publishes the update it replaced, at everybody', async () => {
+    const { service, db } = build();
+    db.otaRelease.findUnique = jest.fn(async () => release());
+    db.otaRelease.findFirst = jest.fn(async () => release({ id: 'r1', status: 'ARCHIVED' }));
+
+    await service.rollback('r2', 'platform-user-1');
+
+    const restore = db.otaRelease.update.mock.calls[1][0];
+    expect(restore.where).toEqual({ id: 'r1' });
+    expect(restore.data).toMatchObject({ status: 'PUBLISHED', rolloutPercent: 100 });
+    expect(restore.data.publishedBy).toBe('platform-user-1');
+  });
+
+  /*
+   * Full rollout, not a canary. A rollback is not an experiment, it is an
+   * admission: everybody should be off the bad bundle at once rather than a
+   * fifth of them at a time.
+   */
+  it('never rolls back to a partial rollout', async () => {
+    const { service, db } = build();
+    db.otaRelease.findUnique = jest.fn(async () => release());
+    db.otaRelease.findFirst = jest.fn(async () => release({ id: 'r1', status: 'ARCHIVED' }));
+
+    await service.rollback('r2');
+
+    expect(db.otaRelease.update.mock.calls[1][0].data.rolloutPercent).toBe(100);
+  });
+
+  it('looks only within the same channel, platform and runtime', async () => {
+    const { service, db } = build();
+    db.otaRelease.findUnique = jest.fn(async () => release());
+    db.otaRelease.findFirst = jest.fn(async () => null);
+
+    await service.rollback('r2');
+
+    expect(db.otaRelease.findFirst.mock.calls[0][0].where).toMatchObject({
+      channel: 'production',
+      platform: 'ios',
+      runtimeVersion: '1',
+    });
+  });
+
+  /*
+   * Rolling back to a rollback would walk backwards through history one press
+   * at a time, and says nothing about which bundle anyone ends up running.
+   */
+  it('goes back to an ordinary update, never to another rollback', async () => {
+    const { service, db } = build();
+    db.otaRelease.findUnique = jest.fn(async () => release());
+    db.otaRelease.findFirst = jest.fn(async () => null);
+
+    await service.rollback('r2');
+
+    expect(db.otaRelease.findFirst.mock.calls[0][0].where.kind).toBe('UPDATE');
+    expect(db.otaRelease.findFirst.mock.calls[0][0].where.id).toEqual({ not: 'r2' });
+  });
+
+  it('takes the newest one it retired, not the oldest', async () => {
+    const { service, db } = build();
+    db.otaRelease.findUnique = jest.fn(async () => release());
+    db.otaRelease.findFirst = jest.fn(async () => null);
+
+    await service.rollback('r2');
+
+    expect(db.otaRelease.findFirst.mock.calls[0][0].orderBy).toEqual({ createdAt: 'desc' });
+  });
+
+  /*
+   * With nothing to go back to, the app falls back to the bundle inside the
+   * binary — the last thing known to have worked. Saying so lets the screen
+   * tell somebody that rather than implying a release was restored.
+   */
+  it('says plainly when there was nothing to go back to', async () => {
+    const { service, db } = build();
+    db.otaRelease.findUnique = jest.fn(async () => release());
+    db.otaRelease.findFirst = jest.fn(async () => null);
+
+    await expect(service.rollback('r2')).resolves.toEqual({ rolledBackTo: null });
+    expect(db.otaRelease.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a release that does not exist', async () => {
+    const { service, db } = build();
+    db.otaRelease.findUnique = jest.fn(async () => null);
+
+    await expect(service.rollback('nope')).rejects.toThrow('No such release');
+  });
+});
+
 describe('the version gate', () => {
   const dto = (over: Record<string, unknown> = {}) =>
     ({
