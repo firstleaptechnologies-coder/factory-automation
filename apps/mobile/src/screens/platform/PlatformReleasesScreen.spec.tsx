@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { PlatformReleasesScreen } from './PlatformReleasesScreen';
 
@@ -107,6 +108,79 @@ it('says so when a channel has nothing on it', async () => {
   await mount();
 
   expect(await screen.findByText('Nothing published on this channel')).toBeTruthy();
+});
+
+describe('forcing everyone onto the newest build', () => {
+  /*
+   * The confirmation is a native Alert, which never appears in a test
+   * renderer. Spying on it is what lets the destructive button be pressed —
+   * and the point of the test is what happens after that press, not the
+   * dialog.
+   */
+  beforeEach(() => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  });
+
+  const forcedGate = (over: Record<string, unknown> = {}) => ({
+    id: 'g1',
+    platform: 'ios',
+    channel: 'production',
+    latestBuild: 29827684,
+    latestVersionName: '1.2.0',
+    latestIsLive: true,
+    minSupportedBuild: 0,
+    storeUrl: 'https://apps.apple.com/app/id1',
+    updatedAt: '2026-09-17T00:00:00.000Z',
+    ...over,
+  });
+
+  it('says plainly that nobody is being forced', async () => {
+    mockGates.mockResolvedValue([forcedGate()]);
+    await mount();
+    expect(await screen.findByText('not forcing')).toBeTruthy();
+  });
+
+  it('says so when they are', async () => {
+    mockGates.mockResolvedValue([forcedGate({ minSupportedBuild: 29827684 })]);
+    await mount();
+    expect(await screen.findByText('forcing')).toBeTruthy();
+  });
+
+  /*
+   * Forcing people onto a build the store is not serving yet is an app that
+   * will not open, with no way out but waiting and nothing to say why.
+   */
+  it('explains why it will not force while the store is not serving it', async () => {
+    mockGates.mockResolvedValue([forcedGate({ latestIsLive: false })]);
+    await mount();
+    expect(
+      await screen.findByText(/that would be an app nobody can open/),
+    ).toBeTruthy();
+  });
+
+  it('is not offered once everyone is already on it', async () => {
+    mockGates.mockResolvedValue([forcedGate({ minSupportedBuild: 29827684 })]);
+    await mount();
+    expect(screen.queryByText(/Force every install below/)).toBeNull();
+  });
+
+  it('raises the minimum to the newest build when confirmed', async () => {
+    mockGates.mockResolvedValue([forcedGate()]);
+    await mount();
+    await fireEvent.press(await screen.findByText(/Force every install below 29827684/));
+    // The confirmation's destructive button.
+    const alert = (jest.mocked(Alert.alert).mock.calls.at(-1) ?? []) as unknown[];
+    const buttons = alert[2] as { text: string; onPress?: () => void }[];
+    buttons.find((b) => b.text === 'Force update')?.onPress?.();
+
+    await waitFor(() =>
+      expect(mockSetGate).toHaveBeenCalledWith(
+        expect.objectContaining({ minSupportedBuild: 29827684, latestBuild: 29827684 }),
+      ),
+    );
+    // Whether the store is serving it is a separate fact, not this button's.
+    expect(mockSetGate.mock.calls[0][0]).not.toHaveProperty('latestIsLive');
+  });
 });
 
 describe('what the stores are serving', () => {

@@ -83,6 +83,45 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
    * told nothing — an update prompt for a build nobody can download is a
    * button that does nothing.
    */
+  /**
+   * Refuse every build older than the newest one.
+   *
+   * The heaviest thing on this screen: every install below the latest stops at
+   * a blocking update screen until the person goes to the store.
+   *
+   * Only once the store is actually serving that build. Forcing people onto
+   * something they cannot download is not an inconvenience, it is an app that
+   * will not open with no way out but waiting, and nothing on screen to say
+   * why.
+   */
+  const forceUpdate = (platform: 'ios' | 'android') => {
+    const gate = gateFor(platform);
+    if (!gate || !gate.latestIsLive) return;
+    Alert.alert(
+      `Force every ${platform} install below build ${gate.latestBuild} to update?`,
+      'They will be stopped at an update screen until they install it from the store.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Force update',
+          style: 'destructive',
+          onPress: () =>
+            void run(`force-${platform}`, () =>
+              api.setVersionGate({
+                platform,
+                channel,
+                latestBuild: gate.latestBuild,
+                latestVersionName: gate.latestVersionName ?? undefined,
+                minSupportedBuild: gate.latestBuild,
+                storeUrl: gate.storeUrl,
+                message: gate.message ?? undefined,
+              }),
+            ),
+        },
+      ],
+    );
+  };
+
   const markLive = (platform: 'ios' | 'android', live: boolean) => {
     const gate = gateFor(platform);
     if (!gate) return;
@@ -270,6 +309,19 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
             <View style={styles.row} testID={`gate-${platform}`}>
               <Text variant="small" bold style={{ flex: 1 }}>{platform}</Text>
               {gate ? (
+                <Text
+                  variant="tiny"
+                  tone={
+                    gate.minSupportedBuild >= gate.latestBuild && gate.latestBuild > 0
+                      ? 'danger'
+                      : 'muted'
+                  }>
+                  {gate.minSupportedBuild >= gate.latestBuild && gate.latestBuild > 0
+                    ? 'forcing'
+                    : 'not forcing'}
+                </Text>
+              ) : null}
+              {gate ? (
                 <Text variant="tiny" tone={gate.latestIsLive ? 'accent' : 'muted'}>
                   {gate.latestIsLive ? 'live on the store' : 'uploaded, not live'}
                 </Text>
@@ -316,6 +368,25 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
                   onPress={() => editGate(platform)}
                 />
               </View>
+            ) : null}
+
+            {mayShip && gate && gate.minSupportedBuild < gate.latestBuild ? (
+              <>
+                <Button
+                  title={`Force every install below ${gate.latestBuild} to update`}
+                  variant="danger"
+                  size="sm"
+                  disabled={!gate.latestIsLive}
+                  loading={busy === `force-${platform}`}
+                  onPress={() => forceUpdate(platform)}
+                  style={{ marginTop: spacing.sm }}
+                />
+                <Text variant="tiny" tone="faint" style={{ marginTop: spacing.xs }}>
+                  {gate.latestIsLive
+                    ? 'Older installs stop at an update screen until they install it.'
+                    : 'Not while the store is not serving it — that would be an app nobody can open and no way to say why.'}
+                </Text>
+              </>
             ) : null}
           </Card>
         );

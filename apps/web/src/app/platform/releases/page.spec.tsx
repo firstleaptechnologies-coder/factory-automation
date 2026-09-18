@@ -128,6 +128,82 @@ describe('the release list', () => {
   });
 });
 
+describe('forcing everyone onto the newest build', () => {
+  const gate = (over: Record<string, unknown> = {}) => ({
+    id: 'g1',
+    platform: 'ios',
+    channel: 'production',
+    latestBuild: 29827684,
+    latestVersionName: '1.2.0',
+    latestIsLive: true,
+    minSupportedBuild: 0,
+    storeUrl: 'https://apps.apple.com/app/id1',
+    updatedAt: '2026-09-17T00:00:00.000Z',
+    ...over,
+  });
+
+  it('says plainly that nobody is being forced', async () => {
+    await open([release()], [gate()]);
+    expect(screen.getAllByText('not forcing').length).toBeGreaterThan(0);
+  });
+
+  it('says so when they are', async () => {
+    await open([release()], [gate({ minSupportedBuild: 29827684 })]);
+    expect(screen.getByText('forcing')).toBeInTheDocument();
+  });
+
+  /*
+   * The important guard. Forcing people onto a build the store is not serving
+   * yet is not an inconvenience — it is an app that will not open, with no way
+   * out but waiting, and nothing on screen to say why.
+   */
+  it('will not force while the store is not serving that build', async () => {
+    await open([release()], [gate({ latestIsLive: false })]);
+    const button = screen.getByRole('button', {
+      name: /Force every install below 29827684/,
+    });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/that would be an app nobody can open/)).toBeInTheDocument();
+  });
+
+  it('asks before it does it', async () => {
+    (window.confirm as jest.Mock).mockReturnValue(false);
+    await open([release()], [gate()]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Force every install below/ }));
+    });
+    expect(apiMock.setVersionGate).not.toHaveBeenCalled();
+  });
+
+  it('raises the minimum to the newest build, and changes nothing else', async () => {
+    (window.confirm as jest.Mock).mockReturnValue(true);
+    await open([release()], [gate()]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Force every install below/ }));
+    });
+    expect(apiMock.setVersionGate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: 'ios',
+        channel: 'production',
+        minSupportedBuild: 29827684,
+        latestBuild: 29827684,
+      }),
+    );
+    // Not its business: whether the store is serving it is a separate fact.
+    expect(apiMock.setVersionGate.mock.calls[0][0]).not.toHaveProperty('latestIsLive');
+  });
+
+  it('is not offered once everyone is already on it', async () => {
+    await open([release()], [gate({ minSupportedBuild: 29827684 })]);
+    expect(screen.queryByRole('button', { name: /Force every install below/ })).toBeNull();
+  });
+
+  it('shows where the update comes from', async () => {
+    await open([release()], [gate()]);
+    expect(screen.getByText('https://apps.apple.com/app/id1')).toBeInTheDocument();
+  });
+});
+
 describe('going back to what was running before', () => {
   it('asks first, because nobody chose the bundle they land on', async () => {
     (window.confirm as jest.Mock).mockReturnValue(false);

@@ -156,6 +156,48 @@ export default function ReleasesPage() {
    * the app is told nothing — an update prompt for a build that cannot be
    * downloaded is a button that does nothing, over and over.
    */
+  /**
+   * Refuse every build older than the newest one.
+   *
+   * The heaviest thing on this screen: every install below the latest stops at
+   * a blocking "you must update" screen until the person goes to the store.
+   *
+   * Only offered once the store is actually serving that build. Forcing people
+   * onto something they cannot download is not an inconvenience, it is an app
+   * that will not open, with no way out but waiting — and nothing on the screen
+   * would say why.
+   */
+  const forceUpdate = async (platform: 'ios' | 'android') => {
+    const gate = gateFor(platform);
+    if (!gate || !gate.latestIsLive) return;
+    if (
+      !window.confirm(
+        `Force every ${platform} install below build ${gate.latestBuild} to update?\n\n` +
+          'They will be stopped at an update screen until they install it from the store.',
+      )
+    ) {
+      return;
+    }
+    setBusy(`force-${platform}`);
+    setError(null);
+    try {
+      await api.setVersionGate({
+        platform,
+        channel,
+        latestBuild: gate.latestBuild,
+        latestVersionName: gate.latestVersionName ?? undefined,
+        minSupportedBuild: gate.latestBuild,
+        storeUrl: gate.storeUrl,
+        message: gate.message ?? undefined,
+      });
+      gates.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not change the minimum');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const markLive = async (platform: 'ios' | 'android', live: boolean) => {
     const gate = gateFor(platform);
     if (!gate) return;
@@ -305,10 +347,24 @@ export default function ReleasesPage() {
               <div className="row-between">
                 <span className="t-small bold">{platform}</span>
                 {gate ? (
-                  <Pill
-                    label={gate.latestIsLive ? 'live on the store' : 'uploaded, not live'}
-                    color={gate.latestIsLive ? 'var(--success)' : 'var(--warning)'}
-                  />
+                  <div className="row">
+                    <Pill
+                      label={
+                        gate.minSupportedBuild >= gate.latestBuild && gate.latestBuild > 0
+                          ? 'forcing'
+                          : 'not forcing'
+                      }
+                      color={
+                        gate.minSupportedBuild >= gate.latestBuild && gate.latestBuild > 0
+                          ? 'var(--danger)'
+                          : 'var(--surface-lit)'
+                      }
+                    />
+                    <Pill
+                      label={gate.latestIsLive ? 'live on the store' : 'uploaded, not live'}
+                      color={gate.latestIsLive ? 'var(--success)' : 'var(--warning)'}
+                    />
+                  </div>
                 ) : null}
               </div>
 
@@ -333,6 +389,9 @@ export default function ReleasesPage() {
                       leaves people tapping a button that does nothing.
                     </p>
                   ) : null}
+                  <p className="t-tiny faint" style={{ marginTop: 'var(--s-xs)' }}>
+                    {gate.storeUrl}
+                  </p>
                   <div className="row" style={{ marginTop: 'var(--s-sm)' }}>
                     <Button
                       title={gate.latestIsLive ? 'Not live after all' : 'It is live now'}
@@ -342,6 +401,23 @@ export default function ReleasesPage() {
                     />
                     <Button title="Edit" variant="ghost" onClick={() => editGate(platform)} />
                   </div>
+                  {gate.minSupportedBuild < gate.latestBuild ? (
+                    <div style={{ marginTop: 'var(--s-sm)' }}>
+                      <Button
+                        title={`Force every install below ${gate.latestBuild} to update`}
+                        variant="danger"
+                        block
+                        disabled={!gate.latestIsLive}
+                        loading={busy === `force-${platform}`}
+                        onClick={() => void forceUpdate(platform)}
+                      />
+                      <p className="t-tiny faint" style={{ marginTop: 'var(--s-xs)' }}>
+                        {gate.latestIsLive
+                          ? 'Older installs stop at an update screen until they install it.'
+                          : 'Not while the store is not serving it — that would be an app nobody can open and no way to say why.'}
+                      </p>
+                    </div>
+                  ) : null}
                 </>
               )}
               {!gate ? (
