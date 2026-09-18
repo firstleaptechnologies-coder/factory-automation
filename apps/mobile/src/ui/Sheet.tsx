@@ -94,7 +94,19 @@ export function Sheet({
           <ScrollView
             testID="sheet-body"
             showsVerticalScrollIndicator={false}
-            automaticallyAdjustKeyboardInsets
+            /*
+             * Deliberately NOT automaticallyAdjustKeyboardInsets.
+             *
+             * The surface above already rises with the keyboard, and doing
+             * both makes them fight: the sheet lifts AND the body scrolls up
+             * inside it, so the first field slides up behind the title and the
+             * thing being typed into is the thing you cannot see. That is
+             * exactly what happened to "Find a client".
+             *
+             * One mechanism, and for a sheet it is the lift — a sheet is short,
+             * and moving it whole keeps the field, its hint and the button
+             * together.
+             */
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.body}>
             {children}

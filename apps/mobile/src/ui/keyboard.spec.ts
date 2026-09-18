@@ -20,6 +20,15 @@ import { join } from 'path';
  */
 const ui = (name: string) => readFileSync(join(__dirname, name), 'utf8');
 
+/*
+ * What the file actually does, with the prose taken out — so an assertion that
+ * a prop is absent cannot be satisfied or broken by a comment discussing it.
+ */
+const code = (name: string) =>
+  ui(name)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
 describe('a screen that scrolls', () => {
   const screen = ui('Screen.tsx');
 
@@ -70,8 +79,15 @@ describe('a sheet', () => {
     expect(sheet).toMatch(/Platform\.OS === 'ios' \? 'padding' : 'height'/);
   });
 
-  it('still lets its own body scroll clear of the keyboard when it is tall', () => {
-    expect(sheet).toMatch(/automaticallyAdjustKeyboardInsets/);
+  /*
+   * The regression this replaced: the sheet had BOTH the lift and the inset,
+   * added in the same change, and they fought. The surface rose and the body
+   * scrolled up inside it, sliding the first field behind the title — so on
+   * "Find a client" the search box was hidden by the words "Find a client".
+   */
+  it('avoids the keyboard exactly once', () => {
+    expect(code('Sheet.tsx')).toMatch(/KeyboardAvoidingView/);
+    expect(code('Sheet.tsx')).not.toMatch(/automaticallyAdjustKeyboardInsets/);
   });
 
   it('keeps taps working while the keyboard is up', () => {
