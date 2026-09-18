@@ -128,6 +128,80 @@ describe('the release list', () => {
   });
 });
 
+describe('publishing a draft that something newer has overtaken', () => {
+  const draft = release({ id: 'old', sequence: 1, status: 'DRAFT' });
+  const live = release({ id: 'new', sequence: 2, status: 'PUBLISHED', rolloutPercent: 100 });
+
+  it('publishes plainly when nothing newer is live', async () => {
+    await open([draft]);
+    await act(async () => {
+      fireEvent.click(screen.getByText('Publish to 5%'));
+    });
+    expect(apiMock.updateRelease).toHaveBeenCalledWith('old', {
+      status: 'PUBLISHED',
+      rolloutPercent: 5,
+    });
+  });
+
+  /*
+   * Only one release is live per slot, so publishing this one retires the
+   * newer one. The button used to say "Publish to 5%" and nothing else, which
+   * reads like moving forwards while doing the opposite.
+   */
+  it('says what publishing it would retire', async () => {
+    await open([live, draft]);
+    expect(screen.getByTestId('supersedes-old')).toHaveTextContent(
+      /OTA 2 is live at 100% and is newer than this/,
+    );
+  });
+
+  it('names the consequence on the button itself', async () => {
+    await open([live, draft]);
+    expect(screen.getByText('Publish anyway, retiring OTA 2')).toBeInTheDocument();
+  });
+
+  it('asks before doing it', async () => {
+    (window.confirm as jest.Mock).mockReturnValue(false);
+    await open([live, draft]);
+    await act(async () => {
+      fireEvent.click(screen.getByText('Publish anyway, retiring OTA 2'));
+    });
+    expect(apiMock.updateRelease).not.toHaveBeenCalled();
+  });
+
+  it('goes ahead when that is confirmed, since it is sometimes what you want', async () => {
+    // A newer release can be bad and the older draft the only way back, when
+    // nothing older was ever published for Roll back to find.
+    (window.confirm as jest.Mock).mockReturnValue(true);
+    await open([live, draft]);
+    await act(async () => {
+      fireEvent.click(screen.getByText('Publish anyway, retiring OTA 2'));
+    });
+    expect(apiMock.updateRelease).toHaveBeenCalledWith('old', {
+      status: 'PUBLISHED',
+      rolloutPercent: 5,
+    });
+  });
+
+  it('says nothing about a newer release on another platform', async () => {
+    const otherPlatform = release({
+      id: 'android', sequence: 9, status: 'PUBLISHED', platform: 'android',
+    });
+    await open([otherPlatform, draft]);
+    expect(screen.queryByTestId('supersedes-old')).toBeNull();
+  });
+
+  it('says nothing about a newer release built for another runtime', async () => {
+    // A bundle for a different runtime cannot run on this binary, so it is not
+    // in the same slot and retires nothing.
+    const otherRuntime = release({
+      id: 'rt2', sequence: 9, status: 'PUBLISHED', runtimeVersion: '2',
+    });
+    await open([otherRuntime, draft]);
+    expect(screen.queryByTestId('supersedes-old')).toBeNull();
+  });
+});
+
 describe('forcing everyone onto the newest build', () => {
   const gate = (over: Record<string, unknown> = {}) => ({
     id: 'g1',

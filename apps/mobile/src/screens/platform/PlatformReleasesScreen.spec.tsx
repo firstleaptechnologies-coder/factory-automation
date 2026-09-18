@@ -110,6 +110,64 @@ it('says so when a channel has nothing on it', async () => {
   expect(await screen.findByText('Nothing published on this channel')).toBeTruthy();
 });
 
+describe('publishing a draft that something newer has overtaken', () => {
+  beforeEach(() => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  });
+
+  it('publishes plainly when nothing newer is live', async () => {
+    mockReleases.mockResolvedValue([release({ id: 'old', sequence: 1, status: 'DRAFT' })]);
+    await mount();
+    await fireEvent.press(await screen.findByText('Publish to 5%'));
+
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith('old', {
+        status: 'PUBLISHED',
+        rolloutPercent: 5,
+      }),
+    );
+  });
+
+  /*
+   * Only one release is live per slot, so publishing this one retires the
+   * newer one. "Publish to 5%" reads like moving forwards while doing the
+   * opposite.
+   */
+  it('says what publishing it would retire', async () => {
+    mockReleases.mockResolvedValue([
+      release({ id: 'new', sequence: 2, status: 'PUBLISHED', rolloutPercent: 100 }),
+      release({ id: 'old', sequence: 1, status: 'DRAFT' }),
+    ]);
+    await mount();
+
+    expect(await screen.findByTestId('supersedes-old')).toBeTruthy();
+    expect(screen.getByText(/Publish anyway, retiring OTA 2/)).toBeTruthy();
+  });
+
+  it('asks before doing it, and does nothing if that is declined', async () => {
+    mockReleases.mockResolvedValue([
+      release({ id: 'new', sequence: 2, status: 'PUBLISHED', rolloutPercent: 100 }),
+      release({ id: 'old', sequence: 1, status: 'DRAFT' }),
+    ]);
+    await mount();
+    await fireEvent.press(await screen.findByText(/Publish anyway, retiring OTA 2/));
+
+    expect(Alert.alert).toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('says nothing about a newer release on another platform', async () => {
+    mockReleases.mockResolvedValue([
+      release({ id: 'a', sequence: 9, status: 'PUBLISHED', platform: 'android' }),
+      release({ id: 'old', sequence: 1, status: 'DRAFT' }),
+    ]);
+    await mount();
+
+    await screen.findByText('Publish to 5%');
+    expect(screen.queryByTestId('supersedes-old')).toBeNull();
+  });
+});
+
 describe('forcing everyone onto the newest build', () => {
   /*
    * The confirmation is a native Alert, which never appears in a test

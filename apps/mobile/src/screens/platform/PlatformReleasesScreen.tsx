@@ -60,6 +60,44 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
   const [storeUrl, setStoreUrl] = useState('');
   const [message, setMessage] = useState('');
 
+  /**
+   * The release currently live in this one's slot, if it is a newer one.
+   *
+   * Publishing a draft retires whatever is live in the same channel, platform
+   * and runtime — there is only ever one. When the draft is OLDER than what is
+   * live, that is a downgrade wearing the word "Publish".
+   */
+  const supersedes = (draft: Release) =>
+    releases.data?.find(
+      (other) =>
+        other.id !== draft.id &&
+        other.status === 'PUBLISHED' &&
+        other.platform === draft.platform &&
+        other.runtimeVersion === draft.runtimeVersion &&
+        other.sequence > draft.sequence,
+    ) ?? null;
+
+  /** Put a draft live at 5%, asking first if it would retire something newer. */
+  const publishDraft = (draft: Release) => {
+    const newer = supersedes(draft);
+    if (!newer) {
+      void change(draft, { status: 'PUBLISHED', rolloutPercent: 5 });
+      return;
+    }
+    Alert.alert(
+      `Publish OTA ${draft.sequence} and retire OTA ${newer.sequence}?`,
+      `OTA ${newer.sequence} is newer and live at ${newer.rolloutPercent}%. Installs that already took it keep it — this puts an older bundle in front of new ones.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Publish anyway',
+          style: 'destructive',
+          onPress: () => void change(draft, { status: 'PUBLISHED', rolloutPercent: 5 }),
+        },
+      ],
+    );
+  };
+
   const gateFor = (platform: 'ios' | 'android') =>
     gates.data?.find((gate) => gate.channel === channel && gate.platform === platform);
 
@@ -285,15 +323,33 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
             ) : null}
 
             {release.status === 'DRAFT' && mayShip ? (
-              <Button
-                title="Publish to 5%"
-                size="sm"
-                loading={busy === release.id}
-                onPress={() =>
-                  void change(release, { status: 'PUBLISHED', rolloutPercent: 5 })
-                }
-                style={{ marginTop: spacing.sm }}
-              />
+              <>
+                {supersedes(release) ? (
+                  <Text
+                    variant="tiny"
+                    tone="warning"
+                    testID={`supersedes-${release.id}`}
+                    style={{ marginTop: spacing.sm }}>
+                    OTA {supersedes(release)!.sequence} is live at{' '}
+                    {supersedes(release)!.rolloutPercent}% and is newer than this.
+                    Publishing this one retires it, and puts an older bundle in front
+                    of people — which is what Roll back on OTA{' '}
+                    {supersedes(release)!.sequence} is for.
+                  </Text>
+                ) : null}
+                <Button
+                  title={
+                    supersedes(release)
+                      ? `Publish anyway, retiring OTA ${supersedes(release)!.sequence}`
+                      : 'Publish to 5%'
+                  }
+                  variant={supersedes(release) ? 'dark' : undefined}
+                  size="sm"
+                  loading={busy === release.id}
+                  onPress={() => publishDraft(release)}
+                  style={{ marginTop: spacing.sm }}
+                />
+              </>
             ) : null}
           </Card>
         ))
