@@ -49,13 +49,21 @@ const dryRun = process.argv.includes('--dry');
  * `DIRECT_URL` is overridden alongside it: when it is set, that is the one
  * Prisma actually connects with for migrations, and leaving it pointing at the
  * platform database would migrate that database again under a tenant's name.
+ *
+ * `directUrl` is the exception, and it exists because of the platform database.
+ * Its DATABASE_URL is a pooler, and a pooler in transaction mode cannot hold
+ * the session-level advisory lock a migration takes — Prisma waits ten seconds
+ * and then reports the database server is not running, which is not what
+ * happened and sends you looking in the wrong place. The platform passes its
+ * real DIRECT_URL here; a tenant, whose one stored URL is already direct,
+ * passes nothing and keeps the old behaviour.
  */
-function migrate(url: string): { ok: boolean; detail: string } {
+function migrate(url: string, directUrl = url): { ok: boolean; detail: string } {
   if (dryRun) return { ok: true, detail: 'would migrate (dry run)' };
 
   const result = spawnSync('npx', ['prisma', 'migrate', 'deploy'], {
     cwd: API_DIR,
-    env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
+    env: { ...process.env, DATABASE_URL: url, DIRECT_URL: directUrl },
     encoding: 'utf8',
   });
 
@@ -139,7 +147,8 @@ async function main(): Promise<void> {
     console.log(`FAIL platform — database is not reachable — ${platformMissing}`);
     process.exit(1);
   }
-  const platform = migrate(platformUrl);
+  // The platform's own DIRECT_URL, not its pooler. See migrate() above.
+  const platform = migrate(platformUrl, process.env.DIRECT_URL || platformUrl);
   console.log(`${platform.ok ? 'ok  ' : 'FAIL'} platform — ${platform.detail}`);
   if (!platform.ok) process.exit(1);
 

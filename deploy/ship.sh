@@ -37,9 +37,20 @@ rsync -az --stats \
   --exclude '.DS_Store' \
   "$ROOT/" "$HOST:$REMOTE_DIR/"
 
+# --profile migrate on the build, and --build on the run.
+#
+# `docker compose build` skips services behind a profile, so the migrate image
+# was never rebuilt and `run` happily reused whatever was there from last time.
+# `prisma migrate deploy` then reported "no pending migrations" — truthfully,
+# because in that stale image there were none — and the deploy went green
+# having skipped a schema change entirely. The API then answered every write to
+# the changed table with a 500 saying the column did not exist.
+#
+# Either flag alone fixes it. Both are here because this failure is silent and
+# says the opposite of what happened.
 ssh "$HOST" "cd $REMOTE_DIR && \
-  docker compose -f deploy/compose.yml build && \
-  docker compose -f deploy/compose.yml --profile migrate run --rm migrate && \
+  docker compose -f deploy/compose.yml --profile migrate build && \
+  docker compose -f deploy/compose.yml --profile migrate run --rm --build migrate && \
   docker compose -f deploy/compose.yml up -d"
 
 echo
