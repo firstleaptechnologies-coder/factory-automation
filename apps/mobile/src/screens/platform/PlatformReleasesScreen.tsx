@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
+import { DEFAULT_OTA_CHANNEL, OTA_CHANNELS } from '@fas/shared';
 import type { Release, ReleaseStatus, VersionGate } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
@@ -43,7 +44,7 @@ const STEPS = [0, 5, 10, 25, 50, 100];
  */
 export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
   const { can } = useAuth();
-  const [channel, setChannel] = useState('production');
+  const [channel, setChannel] = useState<string>(DEFAULT_OTA_CHANNEL);
 
   const releases = useApi<Release[]>(() => api.releases({ channel }), [channel]);
   const gates = useApi<VersionGate[]>(() => api.versionGates(), []);
@@ -165,7 +166,7 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
       />
 
       <View style={styles.chips}>
-        {['production', 'staging'].map((one) => (
+        {OTA_CHANNELS.map((one) => (
           <Chip
             key={one}
             label={one}

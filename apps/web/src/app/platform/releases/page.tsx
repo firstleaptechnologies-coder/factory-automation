@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { DEFAULT_OTA_CHANNEL, OTA_CHANNELS } from '@fas/shared';
 import type { Release, ReleaseStatus, VersionGate } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
@@ -48,7 +49,7 @@ export default function ReleasesPage() {
     if (!loading && user && !user.isPlatform) router.replace('/');
   }, [loading, user, router]);
 
-  const [channel, setChannel] = useState('production');
+  const [channel, setChannel] = useState<string>(DEFAULT_OTA_CHANNEL);
   const releases = useApi<Release[]>(() => api.releases({ channel }), [channel]);
   const gates = useApi<VersionGate[]>(() => api.versionGates(), []);
 
@@ -199,7 +200,7 @@ export default function ReleasesPage() {
       />
 
       <div className="wrap" style={{ marginBottom: 'var(--s-lg)' }}>
-        {['production', 'staging'].map((one) => (
+        {OTA_CHANNELS.map((one) => (
           <Chip
             key={one}
             label={one}

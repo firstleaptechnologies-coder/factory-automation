@@ -878,6 +878,36 @@ export interface ReleaseAsset {
 }
 
 /**
+ * The OTA channels, and the only ones anything publishes to.
+ *
+ * A channel is baked into a binary — `expo-channel-name` in the native files —
+ * so this list is not a preference, it is the set of names a real app will ever
+ * ask about. A release or a version gate written against any other channel is
+ * one nothing will ever read.
+ *
+ * `development` is carried by TestFlight and Play-internal builds and served by
+ * staging; `production` is carried by App Store and Play-production builds.
+ * They are named for the branch that publishes them, which is why neither is
+ * called "staging" — the environment is staging, the channel is development.
+ *
+ * deploy/environments.json is where the deployments themselves are described,
+ * and ota-channels.spec.ts fails if the two disagree.
+ */
+export const OTA_CHANNELS = ['development', 'production'] as const;
+
+export type OtaChannel = (typeof OTA_CHANNELS)[number];
+
+/**
+ * Which channel a release screen opens on.
+ *
+ * Production, not the first in the list. The list is in pipeline order —
+ * development is where a change goes first — but the screen answers "what are
+ * shops running", and that is production. Opening on development would show an
+ * empty list most days and bury the one that matters.
+ */
+export const DEFAULT_OTA_CHANNEL: OtaChannel = 'production';
+
+/**
  * What the newest binary is, and which ones are still allowed to run.
  *
  * Build numbers rather than version strings: the marketing version is for

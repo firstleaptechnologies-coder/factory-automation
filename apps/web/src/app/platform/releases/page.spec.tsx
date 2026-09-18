@@ -119,10 +119,12 @@ describe('the release list', () => {
     await open();
     expect(apiMock.releases).toHaveBeenCalledWith({ channel: 'production' });
 
+    // development, not "staging": the environment is staging, the channel it
+    // serves is development, and only a channel a binary carries exists here.
     await act(async () => {
-      fireEvent.click(screen.getByText('staging'));
+      fireEvent.click(screen.getByText('development'));
     });
-    expect(apiMock.releases).toHaveBeenLastCalledWith({ channel: 'staging' });
+    expect(apiMock.releases).toHaveBeenLastCalledWith({ channel: 'development' });
   });
 });
 

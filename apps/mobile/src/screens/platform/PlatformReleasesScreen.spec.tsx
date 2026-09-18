@@ -59,9 +59,11 @@ it('says what is out and how far', async () => {
 
 it('reads the channel it is asked for', async () => {
   await mount();
-  await fireEvent.press(screen.getByText('staging'));
+  // development, not "staging": the environment is staging, the channel it
+  // serves is development, and only a channel a binary carries exists here.
+  await fireEvent.press(screen.getByText('development'));
 
-  await waitFor(() => expect(mockReleases).toHaveBeenLastCalledWith({ channel: 'staging' }));
+  await waitFor(() => expect(mockReleases).toHaveBeenLastCalledWith({ channel: 'development' }));
 });
 
 it('publishes a draft to a few people first', async () => {
