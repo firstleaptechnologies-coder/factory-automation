@@ -16,6 +16,13 @@ jest.mock('../api/client', () => ({
   api: { searchClients: (...a: unknown[]) => mockSearchClients(...a) },
 }));
 
+const mockContactAccess = jest.fn();
+const mockContacts = jest.fn();
+jest.mock('../lib/contacts', () => ({
+  requestContactsAccess: () => mockContactAccess(),
+  loadContacts: () => mockContacts(),
+}));
+
 const VERMA = {
   id: 'c1',
   code: 'CL-1',
@@ -40,6 +47,8 @@ const openSheet = async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   mockSearchClients.mockResolvedValue([VERMA]);
+  mockContactAccess.mockResolvedValue(true);
+  mockContacts.mockResolvedValue([{ id: '1', name: 'Anil Verma', phone: '9829012345' }]);
 });
 
 describe('what a screen sends to the API', () => {
@@ -114,14 +123,81 @@ describe('searching what the shop already has', () => {
     expect(screen.getByText('or add a new one')).toBeTruthy();
   });
 
-  it('says so when nothing matches, and points at the other half', async () => {
-    mockSearchClients.mockResolvedValue([]);
-    await render(<Host />);
-    await fireEvent.changeText(await openSheet(), 'nobody');
+  /*
+   * A search that found nobody used to say "close this and add them as a new
+   * client" — an instruction, not a way out. The name had already been typed,
+   * and the answer was to go and type it again somewhere else. Now the search
+   * term becomes the client, here.
+   */
+  describe('when nothing matches', () => {
+    const searchFor = async (term: string) => {
+      mockSearchClients.mockResolvedValue([]);
+      await render(<Host />);
+      await fireEvent.changeText(await openSheet(), term);
+      await screen.findByTestId('picker-add-typed');
+    };
 
-    expect(
-      await screen.findByText('No match. Close this and add them as a new client.'),
-    ).toBeTruthy();
+    it('names who was looked for rather than only saying no', async () => {
+      await searchFor('nobody');
+      expect(screen.getByText('Nobody on file matches “nobody”.')).toBeTruthy();
+    });
+
+    it('turns what was typed into the new client, without retyping it', async () => {
+      await searchFor('Kapoor Glass');
+      await fireEvent.press(screen.getByTestId('picker-add-typed'));
+
+      expect(await screen.findByDisplayValue('Kapoor Glass')).toBeTruthy();
+    });
+
+    it('closes the search once the name has been taken from it', async () => {
+      await searchFor('Kapoor Glass');
+      await fireEvent.press(screen.getByTestId('picker-add-typed'));
+
+      await waitFor(() => expect(screen.queryByPlaceholderText('Type to search…')).toBeNull());
+    });
+
+    it('offers the phone book as the other way in', async () => {
+      await searchFor('nobody');
+      expect(screen.getByTestId('picker-contacts-empty')).toBeTruthy();
+    });
+
+    it('offers neither when this screen is not allowed to create clients', async () => {
+      mockSearchClients.mockResolvedValue([]);
+      await render(<Host allowCreate={false} />);
+      await fireEvent.changeText(await openSheet(), 'nobody');
+
+      expect(
+        await screen.findByText('No match. Only clients the shop has on file can be reported on.'),
+      ).toBeTruthy();
+      expect(screen.queryByTestId('picker-add-typed')).toBeNull();
+      expect(screen.queryByTestId('picker-contacts-empty')).toBeNull();
+    });
+  });
+
+  /*
+   * The address book is read only on a tap, and only the one contact chosen
+   * ever leaves the device.
+   */
+  describe('from the phone book', () => {
+    it('fills the new client from the contact that was picked', async () => {
+      await render(<Host />);
+      await fireEvent.press(screen.getByTestId('picker-contacts'));
+      await fireEvent.press(await screen.findByText('Anil Verma'));
+
+      expect(await screen.findByDisplayValue('Anil Verma')).toBeTruthy();
+      expect(screen.getByDisplayValue('9829012345')).toBeTruthy();
+    });
+
+    it('does not read the address book until somebody asks it to', async () => {
+      await render(<Host />);
+      expect(mockContactAccess).not.toHaveBeenCalled();
+      expect(mockContacts).not.toHaveBeenCalled();
+    });
+
+    it('is not offered where this screen cannot create clients', async () => {
+      await render(<Host allowCreate={false} />);
+      expect(screen.queryByTestId('picker-contacts')).toBeNull();
+    });
   });
 
   // A failing lookup must not take the screen down mid-order.

@@ -9,6 +9,7 @@ export * from './subscriptions';
 export * from './modules';
 export * from './image-policy';
 export * from './types';
+export * from './phone';
 export * from './client';
 export * from './color';
 export * from './navigation';

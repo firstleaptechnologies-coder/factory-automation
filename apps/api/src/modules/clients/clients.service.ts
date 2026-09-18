@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CodeGeneratorService } from '../../common/utils/code-generator.service';
@@ -9,6 +9,7 @@ import {
   CreateClientDto,
   UpdateClientDto,
 } from './dto/client.dto';
+import { normalisePhone } from '@fas/shared';
 import { tenantId } from '../../common/tenancy/tenant-context';
 
 @Injectable()
@@ -123,16 +124,62 @@ export class ClientsService {
     return client;
   }
 
+  /**
+   * A client is where a firm's money history lives, so the same firm existing
+   * twice is not untidiness — it is a ledger split in half, an outstanding
+   * balance that reads as two smaller ones, and a statement that is wrong on
+   * both records.
+   *
+   * The phone number is what a shop actually identifies a client by, and the
+   * address book makes a duplicate a single mistaken tap. So a second active
+   * client on a number already in use is refused, and the refusal names the
+   * one that exists — the caller wanted that client, and can now open it.
+   */
   async create(dto: CreateClientDto, userId?: string) {
+    const phone = normalisePhone(dto.phone);
+    if (phone) {
+      const existing = await this.prisma.client.findFirst({
+        where: { isActive: true, phone },
+        select: { id: true, name: true, code: true, phone: true },
+      });
+      if (existing) {
+        throw new ConflictException({
+          message: `${existing.name} (${existing.code}) already has this number.`,
+          existing,
+        });
+      }
+    }
+
     const code = await this.codes.next('client');
     return this.prisma.client.create({
-      data: { ...dto, code, tenantId: tenantId(), createdById: userId },
+      data: { ...dto, phone, code, tenantId: tenantId(), createdById: userId },
     });
   }
 
   async update(id: string, dto: UpdateClientDto) {
     await this.findOne(id);
-    return this.prisma.client.update({ where: { id }, data: dto });
+
+    // Editing a number onto a client that another client already has merges
+    // nothing and splits everything, exactly as creating the duplicate would.
+    const data = { ...dto };
+    if (dto.phone !== undefined) {
+      const phone = normalisePhone(dto.phone);
+      data.phone = phone;
+      if (phone) {
+        const clash = await this.prisma.client.findFirst({
+          where: { isActive: true, phone, id: { not: id } },
+          select: { id: true, name: true, code: true, phone: true },
+        });
+        if (clash) {
+          throw new ConflictException({
+            message: `${clash.name} (${clash.code}) already has this number.`,
+            existing: clash,
+          });
+        }
+      }
+    }
+
+    return this.prisma.client.update({ where: { id }, data });
   }
 
   async addLocation(clientId: string, dto: AddLocationDto) {

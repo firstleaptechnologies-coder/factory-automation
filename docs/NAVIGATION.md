@@ -129,6 +129,8 @@ flowchart LR
     stock_waste["Waste"]
     stock --> stock_waste
     clients["Clients"]
+    client_new["New client"]
+    clients --> client_new
     client_detail["One client"]
     clients --> client_detail
     client_firm["Billing details"]
@@ -246,6 +248,7 @@ flowchart LR
 |   ↳ One material’s moves | `/stock/[materialId]` | `StockMoves` | — |
 |   ↳ Waste | `/stock/waste` | `Waste` | — |
 | Clients | `/clients` | `Clients` | `client.view` |
+|   ↳ New client | `/clients/new` | `ClientNew` | `client.manage` |
 |   ↳ One client | `/clients/[id]` | `ClientDetail` | — |
 |     ↳ Billing details | `/clients/[id]/firm` | `ClientFirm` | — |
 

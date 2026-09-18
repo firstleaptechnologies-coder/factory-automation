@@ -1,5 +1,8 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import Contacts from 'react-native-contacts';
+// The same reduction the server applies before it stores or compares a number,
+// so a contact and a hand-typed number cannot become two clients.
+import { normalisePhone } from '@fas/shared';
 
 export interface PickedContact {
   id: string;
@@ -64,16 +67,4 @@ export async function loadContacts(): Promise<PickedContact[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Address books hold numbers as they were typed — spaces, dashes, brackets,
- * a leading +91. Stripping the noise keeps a contact and a hand-typed number
- * from becoming two different clients.
- */
-export function normalisePhone(raw?: string | null): string | undefined {
-  if (!raw) return undefined;
-  const digits = raw.replace(/[^\d]/g, '');
-  if (!digits) return undefined;
-  // Indian numbers are ten digits; a country code in front is the same person.
-  if (digits.length > 10 && digits.startsWith('91')) return digits.slice(-10);
-  return digits.length > 10 ? digits.slice(-10) : digits;
-}
+export { normalisePhone };

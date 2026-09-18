@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { Client } from '@fas/shared';
 import { api } from '../api/client';
-import { Avatar, Card, Field, Icon, Sheet, SheetOption, Text, haptic } from '../ui';
+import { ContactPickerSheet } from './ContactPickerSheet';
+import { Avatar, Button, Card, Chip, Field, Icon, Sheet, SheetOption, Text, haptic } from '../ui';
 import { palette, spacing } from '../theme';
 
 /**
@@ -96,6 +97,7 @@ export function ClientPicker({
   namePlaceholder?: string;
 }) {
   const [sheet, setSheet] = useState(false);
+  const [contactSheet, setContactSheet] = useState(false);
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<Client[]>([]);
 
@@ -166,6 +168,13 @@ export function ClientPicker({
           {allowCreate ? (
             <>
               <Text variant="label" tone="faint" style={styles.or}>or add a new one</Text>
+              <View style={styles.chipWrap}>
+                <Chip
+                  label="Use a contact"
+                  onPress={() => setContactSheet(true)}
+                  testID="picker-contacts"
+                />
+              </View>
               <Field
                 label={nameLabel}
                 placeholder={namePlaceholder}
@@ -215,14 +224,57 @@ export function ClientPicker({
             }}
           />
         ))}
+        {/*
+          A search that finds nobody used to say "close this and add them as a
+          new client", which is an instruction, not a way out: the person had
+          already typed the name and was told to go and type it again. Now the
+          name they typed becomes the client, here.
+        */}
         {search.trim() && results.length === 0 ? (
-          <Text variant="small" tone="faint" style={styles.none}>
-            {allowCreate
-              ? 'No match. Close this and add them as a new client.'
-              : 'No match. Only clients the shop has on file can be reported on.'}
-          </Text>
+          allowCreate ? (
+            <View style={styles.noneWrap}>
+              <Text variant="small" tone="faint" style={styles.none}>
+                Nobody on file matches “{search.trim()}”.
+              </Text>
+              <Button
+                title={`Add “${search.trim()}” as a new client`}
+                testID="picker-add-typed"
+                onPress={() => {
+                  onChange(typedClient(search.trim(), value.phone));
+                  close();
+                  haptic('impactLight');
+                }}
+              />
+              <Button
+                title="Pick from contacts instead"
+                variant="ghost"
+                testID="picker-contacts-empty"
+                onPress={() => setContactSheet(true)}
+              />
+            </View>
+          ) : (
+            <Text variant="small" tone="faint" style={styles.none}>
+              No match. Only clients the shop has on file can be reported on.
+            </Text>
+          )
         ) : null}
       </Sheet>
+
+      {/*
+        Opened only on a tap, and only the one contact chosen ever leaves the
+        device — the address book is read to pick from, never uploaded.
+      */}
+      <ContactPickerSheet
+        visible={contactSheet}
+        onClose={() => setContactSheet(false)}
+        title="Pick a client from contacts"
+        onPick={(contact) => {
+          onChange(typedClient(contact.name, contact.phone ?? ''));
+          setContactSheet(false);
+          close();
+          haptic('impactLight');
+        }}
+      />
     </>
   );
 }
@@ -232,4 +284,6 @@ const styles = StyleSheet.create({
   search: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg },
   or: { textAlign: 'center', marginVertical: spacing.lg },
   none: { textAlign: 'center', paddingVertical: 20 },
+  noneWrap: { gap: spacing.sm, paddingBottom: spacing.lg },
+  chipWrap: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
 });

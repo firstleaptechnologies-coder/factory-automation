@@ -12,6 +12,7 @@ import {
   Icon,
   ListFooter,
   Loader,
+  RoundButton,
   Screen,
   ScreenHeader,
   Text,
@@ -34,6 +35,14 @@ export function ClientsScreen({ navigation }: { navigation: any }) {
         title="Clients"
         subtitle={`${clients.total} on file`}
         onBack={() => navigation.goBack()}
+        right={
+          <RoundButton
+            icon="plus"
+            onPress={() => navigation.navigate('ClientNew')}
+            accessibilityLabel="Add a client"
+            testID="add-client"
+          />
+        }
       />
 
       <Field
@@ -48,8 +57,16 @@ export function ClientsScreen({ navigation }: { navigation: any }) {
       ) : clients.items.length === 0 ? (
         <EmptyState
           icon="users"
-          title="No clients yet"
-          message="Clients are added automatically as orders are punched."
+          title={search ? 'Nobody matches that' : 'No clients yet'}
+          message={
+            search
+              ? 'Add them, and the next order can be punched against their name.'
+              : 'Add one from your contacts or by hand — orders punched for somebody new add them too.'
+          }
+          actionLabel="Add a client"
+          onAction={() =>
+            navigation.navigate('ClientNew', { name: search.trim() || undefined })
+          }
         />
       ) : (
         clients.items.map((client, index) => (

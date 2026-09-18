@@ -34,6 +34,7 @@ export function Button({
   style,
   icon,
   size = 'md',
+  testID,
 }: {
   title: string;
   onPress: () => void;
@@ -43,6 +44,7 @@ export function Button({
   style?: ViewStyle;
   icon?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg';
+  testID?: string;
 }) {
   const scale = useSharedValue(1);
   const [pressed, setPressed] = React.useState(false);
@@ -80,6 +82,7 @@ export function Button({
 
   return (
     <AnimatedPressable
+      testID={testID}
       disabled={isDisabled}
       onPress={() => {
         haptic('impactLight');

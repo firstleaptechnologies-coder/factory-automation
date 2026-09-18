@@ -91,10 +91,29 @@ it('asks for everybody again when the search is cleared', async () => {
   );
 });
 
-it('explains where clients come from when there are none', async () => {
+/*
+ * A client could only appear as a side effect of punching an order. That is
+ * fine on the floor and no use at all at a desk, where somebody has a firm's
+ * card in front of them and no way to put it on file.
+ */
+it('offers a way to add one, rather than only explaining where they come from', async () => {
   await mount([]);
   expect(await screen.findByText('No clients yet')).toBeInTheDocument();
-  expect(
-    screen.getByText('Clients are added automatically as orders are punched.'),
-  ).toBeInTheDocument();
+
+  // Two of them: the header's, always there, and the empty state's.
+  fireEvent.click(screen.getAllByText('Add client')[1]);
+  await waitFor(() => expect(push).toHaveBeenCalledWith('/clients/new'));
+});
+
+it('carries a search that found nobody into the new client form', async () => {
+  await mount([]);
+  fireEvent.change(screen.getByPlaceholderText('Name, phone or code'), {
+    target: { value: 'Kapoor Glass' },
+  });
+
+  expect(await screen.findByText('Nobody matches that')).toBeInTheDocument();
+  fireEvent.click(screen.getAllByText('Add client')[1]);
+  await waitFor(() =>
+    expect(push).toHaveBeenCalledWith('/clients/new?name=Kapoor%20Glass'),
+  );
 });

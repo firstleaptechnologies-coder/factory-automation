@@ -585,6 +585,14 @@ export const NAV_GROUPS: NavGroup[] = [
         app: 'Clients',
         children: [
           {
+            key: 'client-new',
+            label: 'New client',
+            icon: 'plus',
+            permission: PERMISSIONS.CLIENT_MANAGE,
+            web: '/clients/new',
+            app: 'ClientNew',
+          },
+          {
             key: 'client-detail',
             label: 'One client',
             icon: 'users',

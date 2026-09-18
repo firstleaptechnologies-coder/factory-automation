@@ -9,7 +9,7 @@ import Animated, {
 import { motion, palette, radius as R, readableOn, spacing } from '../theme';
 import { Text } from './Text';
 import { Icon, IconName } from './Icon';
-import { haptic } from './Button';
+import { Button, haptic } from './Button';
 import { AccentSurface, Neumorph } from './Neumorph';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -198,14 +198,25 @@ export function Loader({ label }: { label?: string }) {
   );
 }
 
+/**
+ * `actionLabel` is how an empty state stops being a dead end.
+ *
+ * Telling somebody a list is empty and what would fill it, while giving them
+ * nothing to press, sends them back to a menu to find the thing the screen
+ * just named. The action is optional — plenty of lists fill themselves.
+ */
 export function EmptyState({
   icon = 'box',
   title,
   message,
+  actionLabel,
+  onAction,
 }: {
   icon?: IconName;
   title: string;
   message?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
     <Animated.View entering={FadeInDown.duration(motion.base)} style={styles.center}>
@@ -215,6 +226,14 @@ export function EmptyState({
       <Text variant="h3" tone="muted" style={{ marginTop: spacing.md }}>{title}</Text>
       {message ? (
         <Text variant="small" tone="faint" style={styles.emptyMessage}>{message}</Text>
+      ) : null}
+      {actionLabel && onAction ? (
+        <Button
+          title={actionLabel}
+          onPress={onAction}
+          testID="empty-action"
+          style={{ marginTop: spacing.lg }}
+        />
       ) : null}
     </Animated.View>
   );

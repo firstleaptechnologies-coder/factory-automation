@@ -12,6 +12,7 @@ import {
   EmptyState,
   Field,
   Icon,
+  Button,
   ListFooter,
   Loader,
   PageHead,
@@ -36,7 +37,11 @@ function Clients() {
 
   return (
     <>
-      <PageHead title="Clients" subtitle={`${clients.total} on file`} />
+      <PageHead
+        title="Clients"
+        subtitle={`${clients.total} on file`}
+        action={<Button title="Add client" icon="plus" onClick={() => router.push('/clients/new')} />}
+      />
 
       <Field
         placeholder="Name, phone or code"
@@ -51,8 +56,24 @@ function Clients() {
       ) : clients.items.length === 0 ? (
         <EmptyState
           icon="users"
-          title="No clients yet"
-          message="Clients are added automatically as orders are punched."
+          title={search ? 'Nobody matches that' : 'No clients yet'}
+          message={
+            search
+              ? 'Add them, and the next order can be punched against their name.'
+              : 'Add one by hand — orders punched for somebody new add them too.'
+          }
+          action={
+            <Button
+              title="Add client"
+              onClick={() =>
+                router.push(
+                  search.trim()
+                    ? `/clients/new?name=${encodeURIComponent(search.trim())}`
+                    : '/clients/new',
+                )
+              }
+            />
+          }
         />
       ) : (
         <div className="stack-sm">

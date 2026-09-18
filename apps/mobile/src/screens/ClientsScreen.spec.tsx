@@ -87,3 +87,35 @@ it('confirms when the whole list has been seen', async () => {
   // Without this a finished list looks like one that failed to load more.
   expect(await screen.findByText('All 1 clients')).toBeTruthy();
 });
+
+/*
+ * A client could only ever appear as a side effect of punching an order.
+ * That suits the floor and not an owner holding a firm's visiting card, who
+ * had no way in at all.
+ */
+describe('adding one', () => {
+  it('offers it from the header, whether or not the list is empty', async () => {
+    await mount();
+    await fireEvent.press(screen.getByTestId('add-client'));
+    expect(navigate).toHaveBeenCalledWith('ClientNew');
+  });
+
+  it('offers it from an empty list too, instead of only explaining it', async () => {
+    await mount(page([]));
+    await fireEvent.press(await screen.findByTestId('empty-action'));
+    expect(navigate).toHaveBeenCalledWith('ClientNew', { name: undefined });
+  });
+
+  it('carries the name that was searched for into the form', async () => {
+    await mount(page([]));
+    await fireEvent.changeText(screen.getByPlaceholderText('Name, phone or code'), 'Kapoor Glass');
+    await fireEvent.press(await screen.findByTestId('empty-action'));
+    expect(navigate).toHaveBeenCalledWith('ClientNew', { name: 'Kapoor Glass' });
+  });
+
+  it('stops telling somebody who searched that there are no clients at all', async () => {
+    await mount(page([]));
+    await fireEvent.changeText(screen.getByPlaceholderText('Name, phone or code'), 'Kapoor');
+    expect(await screen.findByText('Nobody matches that')).toBeTruthy();
+  });
+});

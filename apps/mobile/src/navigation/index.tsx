@@ -40,6 +40,7 @@ import { EstimatesScreen } from '../screens/EstimatesScreen';
 import { EstimateEditScreen } from '../screens/EstimateEditScreen';
 import { EstimateDetailScreen } from '../screens/EstimateDetailScreen';
 import { ClientFirmScreen } from '../screens/ClientFirmScreen';
+import { ClientNewScreen } from '../screens/ClientNewScreen';
 import { AdminLeadFieldsScreen } from '../screens/admin/AdminLeadFieldsScreen';
 import { PaymentsScreen } from '../screens/PaymentsScreen';
 import { OutstandingScreen } from '../screens/OutstandingScreen';
@@ -224,6 +225,7 @@ export function RootNavigator() {
             <Stack.Screen name="EstimateEdit" component={EstimateEditScreen} />
             <Stack.Screen name="EstimateDetail" component={EstimateDetailScreen} />
             <Stack.Screen name="ClientFirm" component={ClientFirmScreen} />
+            <Stack.Screen name="ClientNew" component={ClientNewScreen} />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />

@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ClientsService } from './clients.service';
 import { inTenant, prismaMock } from '../../../test/prisma-mock';
 
@@ -210,3 +210,108 @@ describe('resolveInline', () => {
     expect(db.client.create).toHaveBeenCalled();
   });
 });
+
+/*
+ * A client record is where a firm's money history lives. Two records for one
+ * firm is a split ledger — half the outstanding on each, and a statement that
+ * is wrong whichever one you print. The address book makes that a single
+ * mistaken tap, so it is checked before the row is written, not cleaned up
+ * afterwards.
+ */
+describe('create', () => {
+  const dto = (over: Record<string, unknown> = {}) =>
+    ({ name: 'Verma Interiors', phone: '9829012345', ...over }) as never;
+
+  it('refuses a second client on a number already in use', async () => {
+    const { service, db } = build();
+    db.client.findFirst.mockResolvedValue({
+      id: 'c1',
+      name: 'Verma Interiors',
+      code: 'CLI-7',
+      phone: '9829012345',
+    });
+
+    await expect(inTenant(() => service.create(dto()))).rejects.toThrow(ConflictException);
+    expect(db.client.create).not.toHaveBeenCalled();
+  });
+
+  it('names the client that already exists, so the caller can open it', async () => {
+    const { service, db } = build();
+    db.client.findFirst.mockResolvedValue({
+      id: 'c1',
+      name: 'Verma Interiors',
+      code: 'CLI-7',
+      phone: '9829012345',
+    });
+
+    const error = await inTenant(() => service.create(dto())).catch((e) => e);
+    expect(error.getResponse()).toMatchObject({ existing: { id: 'c1', code: 'CLI-7' } });
+  });
+
+  it('sees through the spelling: +91, spaces and dashes are the same number', async () => {
+    const { service, db } = build();
+    db.client.findFirst.mockResolvedValue(null);
+    db.client.create.mockResolvedValue({});
+
+    await inTenant(() => service.create(dto({ phone: '+91 98290-12345' })));
+    expect(db.client.findFirst.mock.calls[0][0].where.phone).toBe('9829012345');
+    expect(db.client.create.mock.calls[0][0].data.phone).toBe('9829012345');
+  });
+
+  it('only counts active clients — an archived one is not in the way', async () => {
+    const { service, db } = build();
+    db.client.findFirst.mockResolvedValue(null);
+    db.client.create.mockResolvedValue({});
+
+    await inTenant(() => service.create(dto()));
+    expect(db.client.findFirst.mock.calls[0][0].where.isActive).toBe(true);
+  });
+
+  it('still lets a client through with no number at all', async () => {
+    const { service, db } = build();
+    db.client.create.mockResolvedValue({});
+
+    await inTenant(() => service.create(dto({ phone: undefined })));
+    expect(db.client.findFirst).not.toHaveBeenCalled();
+    expect(db.client.create).toHaveBeenCalled();
+  });
+});
+
+describe('update', () => {
+  it('refuses to move a number onto a client another one already has', async () => {
+    const { service, db } = build();
+    db.client.findUnique.mockResolvedValue({ id: 'c2' });
+    db.client.findFirst.mockResolvedValue({
+      id: 'c1',
+      name: 'Verma Interiors',
+      code: 'CLI-7',
+      phone: '9829012345',
+    });
+
+    await expect(
+      inTenant(() => service.update('c2', { phone: '9829012345' } as never)),
+    ).rejects.toThrow(ConflictException);
+    expect(db.client.update).not.toHaveBeenCalled();
+  });
+
+  it('does not count the client being edited as its own duplicate', async () => {
+    const { service, db } = build();
+    db.client.findUnique.mockResolvedValue({ id: 'c2' });
+    db.client.findFirst.mockResolvedValue(null);
+    db.client.update.mockResolvedValue({});
+
+    await inTenant(() => service.update('c2', { phone: '9829012345' } as never));
+    expect(db.client.findFirst.mock.calls[0][0].where.id).toEqual({ not: 'c2' });
+  });
+
+  it('leaves the number alone when the edit does not touch it', async () => {
+    const { service, db } = build();
+    db.client.findUnique.mockResolvedValue({ id: 'c2' });
+    db.client.update.mockResolvedValue({});
+
+    await inTenant(() => service.update('c2', { notes: 'pays on delivery' } as never));
+    expect(db.client.findFirst).not.toHaveBeenCalled();
+    expect(db.client.update.mock.calls[0][0].data).toEqual({ notes: 'pays on delivery' });
+  });
+});
+
