@@ -4,7 +4,13 @@ import { LENGTH_UNITS, UNIT_LABEL } from '@fas/shared';
 import { useAuth } from '../auth/AuthContext';
 import { useDisplayUnit } from '../hooks/useUnit';
 import { API_BASE_URL } from '../api/client';
-import { runningVersion } from '../lib/ota';
+import {
+  marketingVersion,
+  nativeBuildNumber,
+  otaBuildNumber,
+  runtimeVersion,
+  versionLabel,
+} from '../lib/appVersion';
 import { roleLabel, whoLabel } from '../lib/format';
 import {
   Avatar,
@@ -55,7 +61,13 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           somebody on the floor can say "OTA 7" down the phone instead of
           describing what they see.
         */}
-        <Row label="Version" value={versionLabel()} />
+        <Row label="Version" value={marketingVersion()} />
+        <Row label="Store build" value={String(nativeBuildNumber())} />
+        <Row
+          label="Update"
+          value={otaBuildNumber() === 0 ? 'none taken' : `OTA ${otaBuildNumber()}`}
+        />
+        <Row label="Runtime" value={runtimeVersion()} />
         <Row label="Server" value={serverLabel()} />
         <Row label="Signed in as" value={user?.code ?? '—'} />
         <Row label="Role" value={roleLabel(user) ?? '—'} />
@@ -72,6 +84,22 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
         }
         style={{ marginTop: spacing.xl }}
       />
+
+      {/*
+        The same four numbers again, on one line at the very bottom.
+
+        Not a duplicate for its own sake: this is the line somebody reads out
+        down a phone when a shop says the app is doing the wrong thing, and it
+        is where every app puts it, so it is where people look. The rows above
+        are for reading; this is for quoting.
+      */}
+      <Text
+        variant="tiny"
+        tone="faint"
+        testID="version-footer"
+        style={styles.versionFooter}>
+        {versionLabel()}
+      </Text>
     </Screen>
   );
 }
@@ -88,12 +116,6 @@ export function serverLabel(url: string = API_BASE_URL): string {
   return url.replace(/\/api\/?$/, '');
 }
 
-/** "1 · OTA 7", or just the runtime version where no update has been taken. */
-function versionLabel(): string {
-  const { runtime, ota } = runningVersion();
-  return ota === null ? runtime : `${runtime} · OTA ${ota}`;
-}
-
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.row}>
@@ -106,6 +128,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  versionFooter: { textAlign: 'center', marginTop: spacing.xl },
   profile: { flexDirection: 'row', alignItems: 'center' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   row: {

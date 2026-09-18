@@ -11,6 +11,8 @@ module.exports = {
     // Reaches into the native runtime through expo-modules-core, which Jest
     // cannot provide. See the file.
     '^expo-updates$': '<rootDir>/test/expo-updates-mock.js',
+    // Reads the binary's own version numbers, through the same native runtime.
+    '^expo-application$': '<rootDir>/test/expo-application-mock.js',
     /*
      * Babel compiles @fas/shared from source — the files live in
      * packages/shared/src, outside this project — and emits
