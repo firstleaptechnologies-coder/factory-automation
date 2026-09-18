@@ -40,8 +40,14 @@ const release = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+/** The list pages, so the endpoint answers with a page and a count. */
+const page = (rows: unknown[], total = rows.length, at = 1, limit = 25) => ({
+  data: rows,
+  meta: { page: at, limit, total, pages: Math.max(Math.ceil(total / limit), 1) },
+});
+
 const open = async (releases: unknown[] = [release()], gates: unknown[] = []) => {
-  apiMock.releases.mockResolvedValue(releases);
+  apiMock.releases.mockResolvedValue(page(releases));
   apiMock.versionGates.mockResolvedValue(gates);
   await act(async () => {
     render(<ReleasesPage />);
@@ -117,14 +123,77 @@ describe('the release list', () => {
 
   it('asks for the channel that is selected', async () => {
     await open();
-    expect(apiMock.releases).toHaveBeenCalledWith({ channel: 'production' });
+    expect(apiMock.releases).toHaveBeenCalledWith({ channel: 'production', page: 1, limit: 25 });
 
     // development, not "staging": the environment is staging, the channel it
     // serves is development, and only a channel a binary carries exists here.
     await act(async () => {
       fireEvent.click(screen.getByText('development'));
     });
-    expect(apiMock.releases).toHaveBeenLastCalledWith({ channel: 'development' });
+    expect(apiMock.releases).toHaveBeenLastCalledWith({
+      channel: 'development',
+      page: 1,
+      limit: 25,
+    });
+  });
+});
+
+/*
+ * The list was capped at a hundred with nothing saying so, which for a channel
+ * that publishes often means the history quietly falls off the bottom.
+ */
+describe('a channel with more releases than fit on one screen', () => {
+  it('says how many there are, not how many are on screen', async () => {
+    apiMock.releases.mockResolvedValue(page([release()], 214));
+    apiMock.versionGates.mockResolvedValue([]);
+    await act(async () => {
+      render(<ReleasesPage />);
+    });
+
+    expect(screen.getByText(/214/)).toBeInTheDocument();
+  });
+
+  it('fetches the next page rather than stopping at the first', async () => {
+    apiMock.releases.mockResolvedValue(page([release()], 60));
+    apiMock.versionGates.mockResolvedValue([]);
+    await act(async () => {
+      render(<ReleasesPage />);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Show more/i));
+    });
+
+    expect(apiMock.releases).toHaveBeenLastCalledWith({
+      channel: 'production',
+      page: 2,
+      limit: 25,
+    });
+  });
+
+  /*
+   * The supersede warning reads the releases loaded so far. That is sound only
+   * because newer releases sort above older ones and pages load downward — so
+   * anything that could retire a draft on screen is already on screen. If the
+   * ordering ever changes, this is what notices.
+   */
+  it('still warns about a downgrade when the newer release came from an earlier page', async () => {
+    const live = release({ id: 'r-live', status: 'PUBLISHED', sequence: 9 });
+    const older = release({ id: 'r-old', status: 'DRAFT', sequence: 7 });
+
+    apiMock.releases.mockResolvedValueOnce(page([live], 50, 1));
+    apiMock.releases.mockResolvedValueOnce(page([older], 50, 2));
+    apiMock.versionGates.mockResolvedValue([]);
+    await act(async () => {
+      render(<ReleasesPage />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Show more/i));
+    });
+
+    expect(screen.getByTestId('supersedes-r-old')).toHaveTextContent(
+      /OTA 9 is live at .* and is newer than this/,
+    );
   });
 });
 

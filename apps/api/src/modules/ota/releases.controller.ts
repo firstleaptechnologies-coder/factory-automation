@@ -19,6 +19,7 @@ import type { IncomingFile } from '../files/files.service';
 import { ReleasesService } from './releases.service';
 import {
   CreateReleaseDto,
+  ReleaseQueryDto,
   UpdateReleaseDto,
   UploadAssetDto,
   VersionGateDto,
@@ -37,8 +38,8 @@ export class ReleasesController {
 
   @RequirePermissions(PERMISSIONS.PLATFORM_RELEASE_VIEW)
   @Get()
-  list(@Query('channel') channel?: string, @Query('platform') platform?: string) {
-    return this.releases.list(channel, platform);
+  list(@Query() query: ReleaseQueryDto) {
+    return this.releases.list(query);
   }
 
   @RequirePermissions(PERMISSIONS.PLATFORM_RELEASE_MANAGE)

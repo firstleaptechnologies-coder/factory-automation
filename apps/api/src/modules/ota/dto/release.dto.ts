@@ -13,9 +13,24 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 /** Channels are a small closed set; a typo here serves nobody an update. */
 const CHANNEL = /^[a-z][a-z0-9-]{1,30}$/;
+
+/**
+ * Which releases, and how many of them.
+ *
+ * The list used to end at a hard `take: 100` with nothing saying so — the
+ * hundred-and-first release simply did not exist to the screen, and a channel
+ * that publishes daily reaches that inside four months. A page with a total
+ * on it is the difference between "that is all of them" and "that is all we
+ * showed you".
+ */
+export class ReleaseQueryDto extends PaginationDto {
+  @IsOptional() @IsString() channel?: string;
+  @IsOptional() @IsString() platform?: string;
+}
 
 export class CreateReleaseDto {
   @Matches(CHANNEL, { message: 'A channel is lowercase letters, digits and dashes' })

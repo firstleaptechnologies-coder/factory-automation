@@ -4,6 +4,7 @@ import { DEFAULT_OTA_CHANNEL, OTA_CHANNELS } from '@fas/shared';
 import type { Release, ReleaseStatus, VersionGate } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
+import { usePaginated } from '../../hooks/usePaginated';
 import { useAuth } from '../../auth/AuthContext';
 import {
   Button,
@@ -11,6 +12,7 @@ import {
   Chip,
   EmptyState,
   Field,
+  ListFooter,
   Loader,
   Pill,
   Screen,
@@ -46,7 +48,10 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
   const { can } = useAuth();
   const [channel, setChannel] = useState<string>(DEFAULT_OTA_CHANNEL);
 
-  const releases = useApi<Release[]>(() => api.releases({ channel }), [channel]);
+  const releases = usePaginated<Release>(
+    (page) => api.releases({ channel, page, limit: 25 }),
+    [channel],
+  );
   const gates = useApi<VersionGate[]>(() => api.versionGates(), []);
 
   const [busy, setBusy] = useState<string | null>(null);
@@ -66,9 +71,15 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
    * Publishing a draft retires whatever is live in the same channel, platform
    * and runtime — there is only ever one. When the draft is OLDER than what is
    * live, that is a downgrade wearing the word "Publish".
+   *
+   * Looking only at the pages loaded so far is still the whole answer: a
+   * release that supersedes this one has a higher sequence, so it was created
+   * later, so it sorts above this one in a newest-first list — and pages load
+   * from the top down. Change that ordering and this quietly stops warning,
+   * which is what the spec pins.
    */
   const supersedes = (draft: Release) =>
-    releases.data?.find(
+    releases.items.find(
       (other) =>
         other.id !== draft.id &&
         other.status === 'PUBLISHED' &&
@@ -235,7 +246,10 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
   };
 
   return (
-    <Screen refreshing={releases.refreshing} onRefresh={releases.refresh}>
+    <Screen
+      refreshing={releases.refreshing}
+      onRefresh={releases.refresh}
+      onEndReached={releases.loadMore}>
       <ScreenHeader
         title="Releases"
         subtitle="What the app is running, and who has it yet"
@@ -255,16 +269,16 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
 
       {failed ? <Text variant="small" tone="danger">{failed}</Text> : null}
 
-      {releases.loading && !releases.data ? (
+      {releases.loading ? (
         <Loader />
-      ) : (releases.data?.length ?? 0) === 0 ? (
+      ) : releases.items.length === 0 ? (
         <EmptyState
           icon="box"
           title="Nothing published on this channel"
           message="Releases arrive from the publish script as drafts."
         />
       ) : (
-        releases.data?.map((release) => (
+        releases.items.map((release) => (
           <Card key={release.id} tone="dark" style={styles.card}>
             <View style={styles.row}>
               <View style={{ flex: 1, minWidth: 0 }}>
@@ -354,6 +368,14 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
           </Card>
         ))
       )}
+
+      <ListFooter
+        loading={releases.loadingMore}
+        hasMore={releases.hasMore}
+        shown={releases.items.length}
+        total={releases.total}
+        noun="releases"
+      />
 
       <Text variant="label" tone="muted" style={styles.head}>
         What the stores are serving

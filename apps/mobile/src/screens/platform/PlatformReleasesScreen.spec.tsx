@@ -37,14 +37,33 @@ const release = (over: Record<string, unknown> = {}) => ({
 
 const navigation = { goBack: jest.fn() };
 
+/** The list pages, so the endpoint answers with a page and a count. */
+const page = (rows: unknown[], total = rows.length, at = 1, limit = 25) => ({
+  data: rows,
+  meta: { page: at, limit, total, pages: Math.max(Math.ceil(total / limit), 1) },
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockPermissions = ['platform.release.view', 'platform.release.manage'];
-  mockReleases.mockResolvedValue([release()]);
+  mockReleases.mockResolvedValue(page([release()]));
   mockGates.mockResolvedValue([]);
   mockUpdate.mockResolvedValue(release());
   mockSetGate.mockResolvedValue({ id: 'g1' });
 });
+
+/**
+ * Drags the list to the bottom, which is what asks for the next page — the
+ * screen fetches a little early, so a screen's worth of slack is enough.
+ */
+const scrollToBottom = async () =>
+  fireEvent.scroll(screen.getByTestId('screen-scroll'), {
+    nativeEvent: {
+      contentOffset: { y: 2000 },
+      contentSize: { height: 2400 },
+      layoutMeasurement: { height: 800 },
+    },
+  });
 
 const mount = async () => {
   await render(<PlatformReleasesScreen navigation={navigation as never} />);
@@ -64,11 +83,17 @@ it('reads the channel it is asked for', async () => {
   // serves is development, and only a channel a binary carries exists here.
   await fireEvent.press(screen.getByText('development'));
 
-  await waitFor(() => expect(mockReleases).toHaveBeenLastCalledWith({ channel: 'development' }));
+  await waitFor(() =>
+    expect(mockReleases).toHaveBeenLastCalledWith({
+      channel: 'development',
+      page: 1,
+      limit: 25,
+    }),
+  );
 });
 
 it('publishes a draft to a few people first', async () => {
-  mockReleases.mockResolvedValue([release({ status: 'DRAFT', rolloutPercent: 0 })]);
+  mockReleases.mockResolvedValue(page([release({ status: 'DRAFT', rolloutPercent: 0 })]));
   await mount();
   await fireEvent.press(await screen.findByText('Publish to 5%'));
 
@@ -104,7 +129,7 @@ it('retires one', async () => {
 });
 
 it('says so when a channel has nothing on it', async () => {
-  mockReleases.mockResolvedValue([]);
+  mockReleases.mockResolvedValue(page([]));
   await mount();
 
   expect(await screen.findByText('Nothing published on this channel')).toBeTruthy();
@@ -116,7 +141,7 @@ describe('publishing a draft that something newer has overtaken', () => {
   });
 
   it('publishes plainly when nothing newer is live', async () => {
-    mockReleases.mockResolvedValue([release({ id: 'old', sequence: 1, status: 'DRAFT' })]);
+    mockReleases.mockResolvedValue(page([release({ id: 'old', sequence: 1, status: 'DRAFT' })]));
     await mount();
     await fireEvent.press(await screen.findByText('Publish to 5%'));
 
@@ -134,10 +159,10 @@ describe('publishing a draft that something newer has overtaken', () => {
    * opposite.
    */
   it('says what publishing it would retire', async () => {
-    mockReleases.mockResolvedValue([
+    mockReleases.mockResolvedValue(page([
       release({ id: 'new', sequence: 2, status: 'PUBLISHED', rolloutPercent: 100 }),
       release({ id: 'old', sequence: 1, status: 'DRAFT' }),
-    ]);
+    ]));
     await mount();
 
     expect(await screen.findByTestId('supersedes-old')).toBeTruthy();
@@ -145,10 +170,10 @@ describe('publishing a draft that something newer has overtaken', () => {
   });
 
   it('asks before doing it, and does nothing if that is declined', async () => {
-    mockReleases.mockResolvedValue([
+    mockReleases.mockResolvedValue(page([
       release({ id: 'new', sequence: 2, status: 'PUBLISHED', rolloutPercent: 100 }),
       release({ id: 'old', sequence: 1, status: 'DRAFT' }),
-    ]);
+    ]));
     await mount();
     await fireEvent.press(await screen.findByText(/Publish anyway, retiring OTA 2/));
 
@@ -157,10 +182,10 @@ describe('publishing a draft that something newer has overtaken', () => {
   });
 
   it('says nothing about a newer release on another platform', async () => {
-    mockReleases.mockResolvedValue([
+    mockReleases.mockResolvedValue(page([
       release({ id: 'a', sequence: 9, status: 'PUBLISHED', platform: 'android' }),
       release({ id: 'old', sequence: 1, status: 'DRAFT' }),
-    ]);
+    ]));
     await mount();
 
     await screen.findByText('Publish to 5%');
@@ -329,4 +354,37 @@ it('offers nothing but looking to somebody who may not ship', async () => {
   expect(screen.queryByText('25%')).toBeNull();
   expect(screen.queryByText('Retire')).toBeNull();
   expect(screen.queryByText('Set the version floor')).toBeNull();
+});
+
+/*
+ * The list was capped at a hundred with nothing saying so. A channel that
+ * publishes often reaches that inside months, and from then on its history
+ * fell off the bottom silently.
+ */
+describe('a channel with more releases than fit on one screen', () => {
+  it('says how many there are, not how many are on screen', async () => {
+    mockReleases.mockResolvedValue(page([release()], 214));
+    await mount();
+
+    expect(await screen.findByText(/214/)).toBeTruthy();
+  });
+
+  /*
+   * The supersede warning reads the releases loaded so far. That holds only
+   * because newer releases sort above older ones and pages load downward, so
+   * anything that could retire a draft on screen is already on screen. This is
+   * what notices if the ordering ever changes.
+   */
+  it('still warns about a downgrade when the newer release came from an earlier page', async () => {
+    mockReleases.mockResolvedValueOnce(
+      page([release({ id: 'live', sequence: 9, status: 'PUBLISHED' })], 50, 1),
+    );
+    mockReleases.mockResolvedValueOnce(
+      page([release({ id: 'old', sequence: 7, status: 'DRAFT' })], 50, 2),
+    );
+    await mount();
+    await scrollToBottom();
+
+    expect(await screen.findByText(/OTA 9 is live/)).toBeTruthy();
+  });
 });

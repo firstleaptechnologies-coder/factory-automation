@@ -3,7 +3,13 @@ import { OtaPlatform, OtaReleaseKind, OtaReleaseStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import type { IncomingFile } from '../files/files.service';
 import { OtaService } from './ota.service';
-import { CreateReleaseDto, UpdateReleaseDto, VersionGateDto } from './dto/release.dto';
+import {
+  CreateReleaseDto,
+  ReleaseQueryDto,
+  UpdateReleaseDto,
+  VersionGateDto,
+} from './dto/release.dto';
+import { paginate } from '../../common/dto/pagination.dto';
 
 /** What a listed release says without its bytes. */
 const SUMMARY = {
@@ -36,18 +42,34 @@ export class ReleasesService {
     private readonly ota: OtaService,
   ) {}
 
-  list(channel?: string, platform?: string) {
-    return this.prisma.platform.otaRelease.findMany({
-      where: {
-        ...(channel ? { channel } : {}),
-        ...(platform === 'ios' || platform === 'android'
-          ? { platform: platform as OtaPlatform }
-          : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      select: { ...SUMMARY, _count: { select: { assets: true } } },
-    });
+  /**
+   * A page of releases, newest first.
+   *
+   * It was a flat `take: 100` and no total, which is the worst of both: a
+   * channel that publishes often silently loses its history off the bottom,
+   * and the screen has no way to know it happened. The count is returned with
+   * the rows so the list can say how far through it the reader is.
+   */
+  async list(query: ReleaseQueryDto) {
+    const where = {
+      ...(query.channel ? { channel: query.channel } : {}),
+      ...(query.platform === 'ios' || query.platform === 'android'
+        ? { platform: query.platform as OtaPlatform }
+        : {}),
+    };
+
+    const [data, total] = await this.prisma.platform.$transaction([
+      this.prisma.platform.otaRelease.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: query.skip,
+        take: query.limit,
+        select: { ...SUMMARY, _count: { select: { assets: true } } },
+      }),
+      this.prisma.platform.otaRelease.count({ where }),
+    ]);
+
+    return paginate(data, total, query);
   }
 
   async create(dto: CreateReleaseDto) {

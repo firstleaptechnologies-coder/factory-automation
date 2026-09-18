@@ -1619,8 +1619,13 @@ export class ApiClient {
     }>(`/platform/tenants/${tenantId}/open`, { reason });
   }
 
-  releases(query?: { channel?: string; platform?: string }) {
-    return this.get<Release[]>('/platform/releases', query);
+  /**
+   * Paginated deliberately: a channel that publishes often outgrows one screen
+   * of releases, and a list that quietly stopped at a hundred could not say
+   * that it had.
+   */
+  releases(query?: { channel?: string; platform?: string; page?: number; limit?: number }) {
+    return this.get<Paginated<Release>>('/platform/releases', query);
   }
 
 

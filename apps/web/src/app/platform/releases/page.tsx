@@ -6,6 +6,7 @@ import { DEFAULT_OTA_CHANNEL, OTA_CHANNELS } from '@fas/shared';
 import type { Release, ReleaseStatus, VersionGate } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { usePaginated } from '@/lib/usePaginated';
 import { useAuth } from '@/lib/auth';
 import {
   Button,
@@ -13,6 +14,7 @@ import {
   Chip,
   EmptyState,
   Field,
+  ListFooter,
   Loader,
   PageHead,
   Pill,
@@ -50,7 +52,10 @@ export default function ReleasesPage() {
   }, [loading, user, router]);
 
   const [channel, setChannel] = useState<string>(DEFAULT_OTA_CHANNEL);
-  const releases = useApi<Release[]>(() => api.releases({ channel }), [channel]);
+  const releases = usePaginated<Release>(
+    (page) => api.releases({ channel, page, limit: 25 }),
+    [channel],
+  );
   const gates = useApi<VersionGate[]>(() => api.versionGates(), []);
 
   const [busy, setBusy] = useState<string | null>(null);
@@ -118,9 +123,17 @@ export default function ReleasesPage() {
    * and runtime — there is only ever one. When the draft is OLDER than what is
    * live, that is a downgrade wearing the word "Publish", and the button said
    * nothing about it.
+   *
+   * This looks only at the releases loaded so far, and that is still the whole
+   * answer: a release that supersedes this one has a higher sequence, so it was
+   * created later, so it sorts ABOVE this one in a newest-first list — and
+   * pages are loaded from the top down. Anything that could supersede a
+   * release on screen is already on screen. Change the ordering and this
+   * stops being true, which is why `reads a superseding release off a page
+   * already loaded` is in the spec.
    */
   const supersedes = (draft: Release) =>
-    releases.data?.find(
+    releases.items.find(
       (other) =>
         other.id !== draft.id &&
         other.status === 'PUBLISHED' &&
@@ -295,7 +308,7 @@ export default function ReleasesPage() {
 
       {releases.loading ? (
         <Loader />
-      ) : (releases.data?.length ?? 0) === 0 ? (
+      ) : releases.items.length === 0 ? (
         <EmptyState
           icon="box"
           title="Nothing published on this channel"
@@ -303,7 +316,7 @@ export default function ReleasesPage() {
         />
       ) : (
         <div className="stack-sm">
-          {releases.data?.map((release) => (
+          {releases.items.map((release) => (
             <Card key={release.id} size="sm">
               <div className="row-between">
                 <div style={{ minWidth: 0 }}>
@@ -392,6 +405,15 @@ export default function ReleasesPage() {
           ))}
         </div>
       )}
+
+      <ListFooter
+        loading={releases.loadingMore}
+        hasMore={releases.hasMore}
+        shown={releases.items.length}
+        total={releases.total}
+        noun="releases"
+        onMore={releases.loadMore}
+      />
 
       <SectionHead title="What the stores are serving" />
       <div className="stack-sm" data-testid="version-gates">

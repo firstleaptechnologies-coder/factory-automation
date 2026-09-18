@@ -354,3 +354,80 @@ describe('the version gate', () => {
     expect(db.appVersionGate.upsert.mock.calls[0][0].create.minSupportedBuild).toBe(0);
   });
 });
+
+/*
+ * The list used to end at a hard `take: 100` and return a bare array. A
+ * channel that publishes daily reaches a hundred inside four months, and from
+ * then on the older releases simply did not exist to the screen — no total, no
+ * "and more", nothing to say the history had been cut off. A page with a count
+ * on it is the difference between "that is all of them" and "that is all we
+ * showed you".
+ */
+describe('listing releases', () => {
+  const query = (over: Record<string, unknown> = {}) =>
+    ({ page: 1, limit: 25, skip: 0, ...over }) as never;
+
+  function listing(rows: unknown[], total: number) {
+    const built = build();
+    (built.db as unknown as Record<string, jest.Mock>).$transaction = jest.fn(async () => [
+      rows,
+      total,
+    ]);
+    return built;
+  }
+
+  it('asks for one page rather than a flat hundred', async () => {
+    const { service, db } = listing([], 0);
+    await service.list(query({ page: 3, limit: 25, skip: 50 }));
+
+    expect(db.otaRelease.findMany.mock.calls[0][0]).toMatchObject({ skip: 50, take: 25 });
+  });
+
+  it('says how many there are, not just how many came back', async () => {
+    const { service } = listing([{ id: 'r1' }], 214);
+    const result = (await service.list(query())) as { meta: { total: number; pages: number } };
+
+    expect(result.meta.total).toBe(214);
+    expect(result.meta.pages).toBe(9);
+  });
+
+  it('counts against the same filter it lists with', async () => {
+    const { service, db } = listing([], 0);
+    await service.list(query({ channel: 'production', platform: 'ios' }));
+
+    expect(db.otaRelease.count.mock.calls[0][0].where).toEqual(
+      db.otaRelease.findMany.mock.calls[0][0].where,
+    );
+  });
+
+  it('filters by channel and platform when asked', async () => {
+    const { service, db } = listing([], 0);
+    await service.list(query({ channel: 'production', platform: 'ios' }));
+
+    expect(db.otaRelease.findMany.mock.calls[0][0].where).toEqual({
+      channel: 'production',
+      platform: 'ios',
+    });
+  });
+
+  it('ignores a platform that is neither of the two', async () => {
+    const { service, db } = listing([], 0);
+    await service.list(query({ platform: 'windows' }));
+
+    expect(db.otaRelease.findMany.mock.calls[0][0].where).toEqual({});
+  });
+
+  /*
+   * Newest first is not only a preference here. The screens decide whether
+   * publishing a draft would retire something NEWER by looking at the releases
+   * they have loaded — which is only sound while anything newer sorts above,
+   * and so is always already loaded. Reverse this and both screens quietly
+   * stop warning about a downgrade.
+   */
+  it('returns them newest first, which is what makes the supersede warning sound', async () => {
+    const { service, db } = listing([], 0);
+    await service.list(query());
+
+    expect(db.otaRelease.findMany.mock.calls[0][0].orderBy).toEqual({ createdAt: 'desc' });
+  });
+});
