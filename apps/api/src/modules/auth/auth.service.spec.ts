@@ -309,3 +309,71 @@ describe('signing in with an account that is switched off', () => {
     expect(db.user.findFirst.mock.calls[0][0].where.isActive).toBeUndefined();
   });
 });
+
+/*
+ * Signing in has to say what this person may do, not only who they are.
+ *
+ * A workspace sign-in has always returned the permissions on the user; the
+ * platform one returned them only inside the token, which nothing on the
+ * client reads. So every client signed a platform admin in with an empty
+ * permission list and asked `can()` about it — and on the phone the console's
+ * menu, which is drawn from exactly that, came out with no rows at all.
+ * Releases, Workspaces, Staff and Billing were all built, all routed, and
+ * none of them reachable until the app was restarted and re-read /auth/me.
+ */
+describe('signing in to the platform', () => {
+  const admin = async (over: Record<string, unknown> = {}) => ({
+    id: 'p1',
+    email: 'owner@firstleap.in',
+    name: 'FirstLeap Owner',
+    role: 'OWNER',
+    isActive: true,
+    passwordHash: await bcrypt.hash(PASSWORD, 4),
+    ...over,
+  });
+
+  async function platform(over: Record<string, unknown> = {}) {
+    const built = await build(null);
+    built.db.platformUser.findUnique = jest.fn(async () => await admin(over));
+    return built;
+  }
+
+  const signIn = (service: AuthService) =>
+    service.platformLogin({ email: 'owner@firstleap.in', password: PASSWORD } as never);
+
+  it('says what this person may do, not only who they are', async () => {
+    const { service } = await platform();
+    const { user } = (await signIn(service)) as { user: { permissions?: string[] } };
+
+    expect(user.permissions).toEqual(expect.arrayContaining(['platform.release.manage']));
+  });
+
+  it('carries the role, so a screen can say whose console this is', async () => {
+    const { service } = await platform();
+    const { user } = (await signIn(service)) as { user: { role?: string } };
+    expect(user.role).toBe('OWNER');
+  });
+
+  it('gives support staff their own smaller list, not the owner list', async () => {
+    // Somebody answering a support call has no business publishing a release.
+    const { service } = await platform({ role: 'SUPPORT' });
+    const { user } = (await signIn(service)) as { user: { permissions: string[] } };
+
+    expect(user.permissions).not.toContain('platform.release.manage');
+  });
+
+  it('puts the same list in the token, so the two cannot disagree', async () => {
+    const { service, jwt } = await platform();
+    const { user } = (await signIn(service)) as { user: { permissions: string[] } };
+
+    const claims = jwt.signAsync.mock.calls[0][0] as { permissions: string[] };
+    expect(claims.permissions).toEqual(user.permissions);
+  });
+
+  it('still refuses a wrong password', async () => {
+    const { service } = await platform();
+    await expect(
+      service.platformLogin({ email: 'owner@firstleap.in', password: 'nope' } as never),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+});

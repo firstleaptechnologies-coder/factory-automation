@@ -119,7 +119,25 @@ export class AuthService {
         // answering a support call has no business publishing a release.
         permissions: platformPermissionsFor(admin.role),
       }),
-      user: { id: admin.id, name: admin.name, email: admin.email, isPlatform: true },
+      /*
+       * The permissions come back on the user, not only inside the token.
+       *
+       * A workspace sign-in has always done this and the platform one did not,
+       * so every client signed a platform admin in and then had nothing to ask
+       * about what they could do: `can()` was false for everything until the
+       * app was restarted and re-read /auth/me. On the phone that meant the
+       * console's menu drew zero rows — Releases, Workspaces, Staff and
+       * Billing all existed, were all routed, and none of them could be
+       * reached.
+       */
+      user: {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        isPlatform: true,
+        role: admin.role,
+        permissions: platformPermissionsFor(admin.role),
+      },
     };
   }
 
