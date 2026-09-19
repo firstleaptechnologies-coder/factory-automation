@@ -217,10 +217,18 @@ describe('a release older than the one that is live', () => {
     release({ id: 'old', sequence: 12, status: 'DRAFT', rolloutPercent: 0 }),
   ];
 
-  it('cannot be published', async () => {
+  it('offers no way to publish it at all', async () => {
     await mount({ ios: older });
-    await fireEvent.press(await screen.findByTestId('rung-old-20'));
-    expect(mockUpdate).not.toHaveBeenCalled();
+    await screen.findByTestId('rung-live-20');
+    // Not a dimmed ladder: the same paragraph four times down the screen is
+    // how the one release that matters ends up scrolled off the top.
+    expect(screen.queryByTestId('rung-old-20')).toBeNull();
+    expect(screen.queryByTestId('rung-old-100')).toBeNull();
+  });
+
+  it('can still be retired, which is the one thing left to do with it', async () => {
+    await mount({ ios: older });
+    expect(await screen.findByTestId('archive-old')).toBeTruthy();
   });
 
   it('says why, rather than looking broken', async () => {

@@ -95,6 +95,35 @@ export function RolloutLadder({
     return run(null, () => api.updateRelease(release.id, { status: 'ARCHIVED' }));
   };
 
+  /*
+   * Nothing can be published here, so nothing offers to.
+   *
+   * A dimmed ladder plus a sentence of explanation on every superseded
+   * release is four identical paragraphs down a page whose whole job is to
+   * show you the one release that matters. The rungs were never pressable;
+   * showing them greyed out just made the page long enough to hide the live
+   * one off the top.
+   */
+  if (blocked) {
+    return (
+      <div className="ladder">
+        <p className="t-tiny faint ladder-note">{blockedReason}</p>
+        {release.status !== 'ARCHIVED' ? (
+          <div className="ladder-secondary">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={archive}
+              className="mini-btn mini-btn-danger">
+              <Icon name="box" size={13} />
+              Archive
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="ladder">
       <div className="ladder-row">
@@ -139,9 +168,6 @@ export function RolloutLadder({
         </div>
       </div>
 
-      {blocked ? (
-        <p className="t-tiny warning ladder-note">{blockedReason}</p>
-      ) : null}
 
       {/*
         Pausing, reverting and retiring are different in kind from walking the

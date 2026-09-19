@@ -7,7 +7,6 @@ import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/auth';
 import { Button, Card, Loader, PageHead, Pill, SectionHead } from '@/ui';
-import { Shell } from '@/components/Shell';
 import { GateCard } from './gate-card';
 import { SlotCard } from './slot-card';
 
@@ -32,14 +31,6 @@ const PLATFORMS = ['ios', 'android'] as const;
  * Not a tenant screen: there is one app in the stores for every workspace.
  */
 export default function ReleasesPage() {
-  return (
-    <Shell>
-      <Releases />
-    </Shell>
-  );
-}
-
-function Releases() {
   const router = useRouter();
   const { user, loading } = useAuth();
 

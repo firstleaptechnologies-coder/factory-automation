@@ -98,6 +98,33 @@ export function ReleaseLadder({
       },
     ]);
 
+  /*
+   * Nothing can be published here, so nothing offers to. A dimmed ladder and
+   * a sentence of explanation on every superseded release is the same
+   * paragraph four times down a screen whose job is to show the one release
+   * that matters.
+   */
+  if (blocked) {
+    return (
+      <View style={styles.wrap}>
+        <Text variant="tiny" tone="faint" style={styles.note}>
+          {blockedReason}
+        </Text>
+        {release.status !== 'ARCHIVED' ? (
+          <View style={styles.secondary}>
+            <Mini
+              label="Archive"
+              tone={palette.danger}
+              testID={`archive-${release.id}`}
+              disabled={pending}
+              onPress={archive}
+            />
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.wrap}>
       <Text variant="label" tone="faint">
@@ -141,11 +168,6 @@ export function ReleaseLadder({
         })}
       </View>
 
-      {blocked ? (
-        <Text variant="tiny" tone="warning" style={styles.note}>
-          {blockedReason}
-        </Text>
-      ) : null}
 
       {/*
         Pausing, reverting and retiring differ in kind from walking the ladder

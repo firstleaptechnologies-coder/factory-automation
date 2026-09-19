@@ -247,11 +247,17 @@ describe('a release older than the one that is live', () => {
     release({ id: 'old', sequence: 7, status: 'DRAFT', rolloutPercent: 0 }),
   ];
 
-  it('cannot be published at any rung', async () => {
+  it('offers no way to publish it at all', async () => {
     await open({ ios: older });
-    const rungs = slot('ios').getAllByTitle(/is live and newer/);
-    expect(rungs).toHaveLength(5);
-    for (const rung of rungs) expect(rung).toBeDisabled();
+    // Not a greyed-out ladder: four identical dimmed ladders down the page
+    // is how the live release ends up scrolled off the top.
+    expect(slot('ios').queryByTitle('Publish at 20%')).not.toBeInTheDocument();
+    expect(slot('ios').queryByTitle('Publish at 100%')).not.toBeInTheDocument();
+  });
+
+  it('can still be retired, which is the one thing left to do with it', async () => {
+    await open({ ios: older });
+    expect(slot('ios').getAllByText('Archive').length).toBeGreaterThan(0);
   });
 
   it('says why, rather than looking broken', async () => {
