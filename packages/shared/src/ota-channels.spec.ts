@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { DEFAULT_OTA_CHANNEL, OTA_CHANNELS } from './types';
+import { DEFAULT_OTA_CHANNEL, OTA_CHANNELS, channelForAppEnv } from './types';
 
 /**
  * The channel names are written down twice — here, for the screens that let
@@ -58,5 +58,49 @@ describe('the channels the screens offer', () => {
 
   it('open on production, not on whichever happens to be first', () => {
     expect(DEFAULT_OTA_CHANNEL).toBe('production');
+  });
+});
+
+/*
+ * Which channel each deployment manages.
+ *
+ * The release screen locks itself to one channel — the one this deployment's
+ * database actually holds — rather than offering a picker over channels it
+ * cannot serve. That lock is only as good as this mapping, and the mapping is
+ * exactly the place the environment/channel confusion would return: `staging`
+ * is an environment, `development` is the channel it serves.
+ */
+describe('the channel a deployment manages', () => {
+  const byAppEnv = Object.entries(environments)
+    .filter(([key]) => !key.startsWith('_'))
+    .map(([, environment]) => environment as { appEnv?: string; otaChannel?: string });
+
+  it('matches what deploy/environments.json says each environment serves', () => {
+    for (const environment of byAppEnv) {
+      expect(channelForAppEnv(environment.appEnv)).toBe(environment.otaChannel);
+    }
+  });
+
+  it('covers every environment we deploy, so none falls back to a guess', () => {
+    for (const environment of byAppEnv) {
+      expect(channelForAppEnv(environment.appEnv)).not.toBeNull();
+    }
+  });
+
+  /*
+   * A developer running the API locally has APP_ENV=development and is
+   * publishing to the development channel, same as staging.
+   */
+  it('puts a local API on the same channel as staging, not on production', () => {
+    expect(channelForAppEnv('development')).toBe('development');
+  });
+
+  it('refuses to guess for an environment it does not know', () => {
+    // Guessing 'production' here is how a screen nobody checked starts
+    // publishing to shops.
+    expect(channelForAppEnv('qa')).toBeNull();
+    expect(channelForAppEnv('')).toBeNull();
+    expect(channelForAppEnv(null)).toBeNull();
+    expect(channelForAppEnv(undefined)).toBeNull();
   });
 });

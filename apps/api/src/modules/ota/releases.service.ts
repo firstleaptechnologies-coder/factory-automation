@@ -152,6 +152,46 @@ export class ReleasesService {
       throw new BadRequestException('This release has no bundle to serve');
     }
 
+    if (publishing) {
+      /*
+       * Publishing a release older than the one that is live does nothing —
+       * and looks like it did something, which is worse.
+       *
+       * Every manifest is stamped with its release's createdAt, and
+       * expo-updates refuses to load an update older than the one it is
+       * already running. So a device on the newer bundle stays on it. What
+       * actually happens is that the newer release gets retired in the
+       * records while every phone keeps running it: the screen then says one
+       * thing and the fleet is doing another, and the next person to look
+       * cannot tell.
+       *
+       * Going back is what `rollback` is for — it re-publishes the previous
+       * update, whose own createdAt is older still, but does it by telling
+       * the app to drop back to the bundle in the binary rather than by
+       * pretending an old update is new. Moving a live release's own
+       * percentage is untouched by this: it is excluded by id below, so
+       * nothing is found and nothing is refused.
+       */
+      const live = await this.prisma.platform.otaRelease.findFirst({
+        where: {
+          channel: release.channel,
+          platform: release.platform,
+          runtimeVersion: release.runtimeVersion,
+          status: OtaReleaseStatus.PUBLISHED,
+          id: { not: id },
+        },
+        select: { sequence: true, createdAt: true },
+      });
+
+      if (live && live.createdAt > release.createdAt) {
+        throw new BadRequestException(
+          `OTA ${live.sequence} is live and newer than this one. Devices will not ` +
+            'go backwards, so publishing this would retire it on paper and change ' +
+            'nothing on any phone. Roll back instead, or publish a new release.',
+        );
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       if (publishing) {
         /*

@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { channelForAppEnv } from '@fas/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { Public } from '../../common/decorators/public.decorator';
 
@@ -32,6 +33,14 @@ export class HealthController {
     return {
       status: database === 'ok' ? 'ok' : 'degraded',
       env: APP_ENV(),
+      /*
+       * The OTA channel this deployment manages, so the release screen can
+       * lock itself to it rather than offering a picker over channels whose
+       * rows live in another deployment's database entirely. Null when the
+       * environment is one we do not deploy: the screen then says it cannot
+       * tell, which is better than it guessing 'production'.
+       */
+      otaChannel: channelForAppEnv(APP_ENV()),
       version: process.env.APP_VERSION ?? null,
       commit: process.env.APP_COMMIT ?? null,
       uptimeSeconds: Math.round(process.uptime()),

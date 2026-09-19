@@ -1,7 +1,8 @@
-import { act, render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import ReleasesPage from './page';
 
 const apiMock: Record<string, jest.Mock> = {
+  health: jest.fn(),
   releases: jest.fn(),
   versionGates: jest.fn(),
   rollbackRelease: jest.fn(),
@@ -19,6 +20,10 @@ jest.mock('@/lib/auth', () => ({
   useAuth: () => ({ user: { id: 'p1', isPlatform: true }, loading: false, signOut: jest.fn() }),
 }));
 
+jest.mock('@/components/Shell', () => ({
+  Shell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
 /** The Field component wraps its label; there is no htmlFor to query by. */
 const field = (label: string) =>
   Array.from(document.querySelectorAll('label.field'))
@@ -27,12 +32,12 @@ const field = (label: string) =>
 
 const release = (over: Record<string, unknown> = {}) => ({
   id: 'r1',
-  channel: 'production',
-  runtimeVersion: '1.0.0',
+  channel: 'development',
+  runtimeVersion: '1',
   platform: 'ios',
   kind: 'UPDATE',
   status: 'PUBLISHED',
-  rolloutPercent: 5,
+  rolloutPercent: 20,
   sequence: 7,
   changelog: 'Fix the punch screen',
   createdAt: '2026-09-08T10:00:00.000Z',
@@ -40,441 +45,370 @@ const release = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-/** The list pages, so the endpoint answers with a page and a count. */
-const page = (rows: unknown[], total = rows.length, at = 1, limit = 25) => ({
+const page = (rows: unknown[], total = rows.length, at = 1, limit = 10) => ({
   data: rows,
   meta: { page: at, limit, total, pages: Math.max(Math.ceil(total / limit), 1) },
 });
 
-const open = async (releases: unknown[] = [release()], gates: unknown[] = []) => {
-  apiMock.releases.mockResolvedValue(page(releases));
+const gate = (over: Record<string, unknown> = {}) => ({
+  id: 'g1',
+  platform: 'ios',
+  channel: 'development',
+  latestBuild: 29828633,
+  latestVersionName: '1.0.1',
+  latestIsLive: true,
+  minSupportedBuild: 0,
+  storeUrl: 'https://apps.apple.com/app/id123',
+  message: null,
+  ...over,
+});
+
+/**
+ * Releases are asked for per platform, so the mock answers per platform.
+ * `ios` gets the rows under test; `android` is empty unless a test says
+ * otherwise, which is also the real shape of things today.
+ */
+function servingReleases(byPlatform: Record<string, unknown>) {
+  apiMock.releases.mockImplementation(
+    async ({ platform }: { platform: string }) => byPlatform[platform] ?? page([]),
+  );
+}
+
+async function open({
+  ios = [release()],
+  android = [] as unknown[],
+  gates = [gate()] as unknown[],
+  env = 'staging',
+  otaChannel = 'development' as string | null,
+}: {
+  ios?: unknown[];
+  android?: unknown[];
+  gates?: unknown[];
+  env?: string;
+  otaChannel?: string | null;
+} = {}) {
+  apiMock.health.mockResolvedValue({ status: 'ok', env, otaChannel, database: 'ok' });
+  servingReleases({ ios: page(ios), android: page(android) });
   apiMock.versionGates.mockResolvedValue(gates);
   await act(async () => {
     render(<ReleasesPage />);
   });
-};
+}
+
+const slot = (platform: 'ios' | 'android') => within(screen.getByTestId(`slot-${platform}`));
 
 beforeEach(() => {
   jest.clearAllMocks();
   apiMock.updateRelease.mockResolvedValue({});
   apiMock.setVersionGate.mockResolvedValue({});
-  apiMock.rollbackRelease.mockResolvedValue({ rolledBackTo: null });
-  // Rolling back asks before it acts, so the prompt has to answer something.
+  apiMock.rollbackRelease.mockResolvedValue({ rolledBackTo: release({ id: 'r0' }) });
   window.confirm = jest.fn(() => true);
 });
 
-describe('the release list', () => {
-  it('says which build it is, in the words the app shows', async () => {
+/*
+ * One deployment, one channel. Each API has its own database holding only its
+ * own channel's rows, so a picker offered one real list and one permanently
+ * empty one — and once offered "staging", a channel no binary has ever asked
+ * for, against which a store build could have been recorded to no effect.
+ */
+describe('which world this screen is looking at', () => {
+  it('says which environment and channel, without asking anyone to choose', async () => {
     await open();
-    // "OTA 7", so nobody has to read a UUID over the phone.
-    expect(screen.getByText('OTA 7 · ios')).toBeInTheDocument();
-    expect(screen.getByText(/runtime 1.0.0/)).toBeInTheDocument();
+    expect(screen.getByText('staging · development channel')).toBeInTheDocument();
+    expect(screen.queryByText('production')).not.toBeInTheDocument();
   });
 
-  it('shows how far a rollout has been walked', async () => {
+  it('asks the API rather than guessing at build time', async () => {
     await open();
-    expect(screen.getByText('5% of installs')).toBeInTheDocument();
+    expect(apiMock.health).toHaveBeenCalled();
+    expect(apiMock.releases).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'development' }),
+    );
   });
 
-  it('offers only the steps above where it already is', async () => {
-    await open([release({ rolloutPercent: 25 })]);
-    // Sticky buckets mean a rollout only ever goes up; offering 10% would be
-    // offering to take it away from people who have it.
-    expect(screen.queryByText('10%')).not.toBeInTheDocument();
-    expect(screen.getByText('50%')).toBeInTheDocument();
-  });
-
-  it('walks a rollout up', async () => {
+  it('says what the channel means for who receives it', async () => {
     await open();
-    await act(async () => {
-      fireEvent.click(screen.getByText('25%'));
-    });
-    expect(apiMock.updateRelease).toHaveBeenCalledWith('r1', { rolloutPercent: 25 });
+    expect(screen.getByText(/TestFlight and Play internal testing/)).toBeInTheDocument();
   });
 
-  it('puts a draft in front of a few people first', async () => {
-    await open([release({ status: 'DRAFT', rolloutPercent: 0 })]);
-    await act(async () => {
-      fireEvent.click(screen.getByText('Publish to 5%'));
-    });
-    expect(apiMock.updateRelease).toHaveBeenCalledWith('r1', {
-      status: 'PUBLISHED',
-      rolloutPercent: 5,
-    });
+  it('warns plainly on production, where the audience is shops', async () => {
+    await open({ env: 'production', otaChannel: 'production' });
+    expect(screen.getByText(/App Store and Play builds/)).toBeInTheDocument();
   });
 
-  it('retires one', async () => {
-    await open();
-    await act(async () => {
-      fireEvent.click(screen.getByText('Retire'));
-    });
-    expect(apiMock.updateRelease).toHaveBeenCalledWith('r1', { status: 'ARCHIVED' });
-  });
-
-  it('marks a rollback as the different thing it is', async () => {
-    await open([release({ kind: 'ROLLBACK' })]);
-    expect(screen.getByText('Rollback')).toBeInTheDocument();
-  });
-
-  it('says plainly when a channel has nothing on it', async () => {
-    await open([]);
-    expect(screen.getByText('Nothing published on this channel')).toBeInTheDocument();
-  });
-
-  it('asks for the channel that is selected', async () => {
-    await open();
-    expect(apiMock.releases).toHaveBeenCalledWith({ channel: 'production', page: 1, limit: 25 });
-
-    // development, not "staging": the environment is staging, the channel it
-    // serves is development, and only a channel a binary carries exists here.
-    await act(async () => {
-      fireEvent.click(screen.getByText('development'));
-    });
-    expect(apiMock.releases).toHaveBeenLastCalledWith({
-      channel: 'development',
-      page: 1,
-      limit: 25,
-    });
+  it('shows nothing at all when the API names an environment we do not deploy', async () => {
+    await open({ env: 'qa', otaChannel: null });
+    expect(screen.getByText(/not one of the deployments/)).toBeInTheDocument();
+    expect(screen.queryByTestId('slot-ios')).not.toBeInTheDocument();
+    // Guessing 'production' here is how a staging screen publishes to shops.
+    expect(apiMock.releases).not.toHaveBeenCalled();
   });
 });
 
 /*
- * The list was capped at a hundred with nothing saying so, which for a channel
- * that publishes often means the history quietly falls off the bottom.
+ * iOS and Android are separate queues with their own live release, history
+ * and store. One mixed list meant reading the platform off every row to work
+ * out which of two numbers was live on the phone in your hand.
  */
-describe('a channel with more releases than fit on one screen', () => {
-  it('says how many there are, not how many are on screen', async () => {
-    apiMock.releases.mockResolvedValue(page([release()], 214));
-    apiMock.versionGates.mockResolvedValue([]);
-    await act(async () => {
-      render(<ReleasesPage />);
-    });
-
-    expect(screen.getByText(/214/)).toBeInTheDocument();
+describe('one card per platform', () => {
+  it('asks for each platform separately', async () => {
+    await open();
+    const asked = apiMock.releases.mock.calls.map((c) => c[0].platform);
+    expect(asked).toEqual(expect.arrayContaining(['ios', 'android']));
   });
 
-  it('fetches the next page rather than stopping at the first', async () => {
-    apiMock.releases.mockResolvedValue(page([release()], 60));
-    apiMock.versionGates.mockResolvedValue([]);
-    await act(async () => {
-      render(<ReleasesPage />);
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByText(/Show more/i));
-    });
-
-    expect(apiMock.releases).toHaveBeenLastCalledWith({
-      channel: 'production',
-      page: 2,
-      limit: 25,
-    });
+  it('names what is live in the card header', async () => {
+    await open({ ios: [release({ sequence: 7, rolloutPercent: 40 })] });
+    expect(slot('ios').getByText('Live · OTA 7 · 40%')).toBeInTheDocument();
   });
 
-  /*
-   * The supersede warning reads the releases loaded so far. That is sound only
-   * because newer releases sort above older ones and pages load downward — so
-   * anything that could retire a draft on screen is already on screen. If the
-   * ordering ever changes, this is what notices.
-   */
-  it('still warns about a downgrade when the newer release came from an earlier page', async () => {
-    const live = release({ id: 'r-live', status: 'PUBLISHED', sequence: 9 });
-    const older = release({ id: 'r-old', status: 'DRAFT', sequence: 7 });
+  it('says so when a platform has nothing live', async () => {
+    await open({ ios: [release({ status: 'DRAFT' })] });
+    expect(slot('ios').getByText('Nothing live')).toBeInTheDocument();
+  });
 
-    apiMock.releases.mockResolvedValueOnce(page([live], 50, 1));
-    apiMock.releases.mockResolvedValueOnce(page([older], 50, 2));
-    apiMock.versionGates.mockResolvedValue([]);
+  it('says a platform has nothing rather than leaving the card blank', async () => {
+    await open();
+    expect(slot('android').getByText(/Nothing has been published for android/)).toBeInTheDocument();
+  });
+
+  it('counts the whole history, not the rows on screen', async () => {
+    // The list was capped at a hundred with nothing saying so; a card that
+    // shows ten rows has to be able to say there are two hundred behind them.
+    apiMock.health.mockResolvedValue({ status: 'ok', env: 'staging', otaChannel: 'development' });
+    apiMock.versionGates.mockResolvedValue([gate()]);
+    servingReleases({ ios: page([release()], 214), android: page([]) });
     await act(async () => {
       render(<ReleasesPage />);
     });
-    await act(async () => {
-      fireEvent.click(screen.getByText(/Show more/i));
-    });
-
-    expect(screen.getByTestId('supersedes-r-old')).toHaveTextContent(
-      /OTA 9 is live at .* and is newer than this/,
-    );
+    expect(slot('ios').getByText('214 releases')).toBeInTheDocument();
   });
 });
 
-describe('publishing a draft that something newer has overtaken', () => {
-  const draft = release({ id: 'old', sequence: 1, status: 'DRAFT' });
-  const live = release({ id: 'new', sequence: 2, status: 'PUBLISHED', rolloutPercent: 100 });
-
-  it('publishes plainly when nothing newer is live', async () => {
-    await open([draft]);
+/*
+ * The ladder. Publishing is a staged decision — up a rung, watch, up again —
+ * and the control keeps its shape when a draft goes live, which is exactly
+ * when somebody is watching it most closely.
+ */
+describe('walking a rollout up', () => {
+  it('publishes a draft at the rung that was pressed', async () => {
+    await open({ ios: [release({ status: 'DRAFT', rolloutPercent: 0 })] });
     await act(async () => {
-      fireEvent.click(screen.getByText('Publish to 5%'));
+      fireEvent.click(slot('ios').getByTitle('Publish at 20%'));
     });
-    expect(apiMock.updateRelease).toHaveBeenCalledWith('old', {
+    expect(apiMock.updateRelease).toHaveBeenCalledWith('r1', {
       status: 'PUBLISHED',
-      rolloutPercent: 5,
+      rolloutPercent: 20,
     });
   });
 
-  /*
-   * Only one release is live per slot, so publishing this one retires the
-   * newer one. The button used to say "Publish to 5%" and nothing else, which
-   * reads like moving forwards while doing the opposite.
-   */
-  it('says what publishing it would retire', async () => {
-    await open([live, draft]);
-    expect(screen.getByTestId('supersedes-old')).toHaveTextContent(
-      /OTA 2 is live at 100% and is newer than this/,
-    );
-  });
-
-  it('names the consequence on the button itself', async () => {
-    await open([live, draft]);
-    expect(screen.getByText('Publish anyway, retiring OTA 2')).toBeInTheDocument();
-  });
-
-  it('asks before doing it', async () => {
-    (window.confirm as jest.Mock).mockReturnValue(false);
-    await open([live, draft]);
+  it('moves a live release without republishing it', async () => {
+    await open({ ios: [release({ status: 'PUBLISHED', rolloutPercent: 20 })] });
     await act(async () => {
-      fireEvent.click(screen.getByText('Publish anyway, retiring OTA 2'));
+      fireEvent.click(slot('ios').getByTitle('Move the rollout to 60%'));
     });
-    expect(apiMock.updateRelease).not.toHaveBeenCalled();
+    expect(apiMock.updateRelease).toHaveBeenCalledWith('r1', { rolloutPercent: 60 });
   });
 
-  it('goes ahead when that is confirmed, since it is sometimes what you want', async () => {
-    // A newer release can be bad and the older draft the only way back, when
-    // nothing older was ever published for Roll back to find.
-    (window.confirm as jest.Mock).mockReturnValue(true);
-    await open([live, draft]);
+  it('will not re-press the rung it is already on', async () => {
+    await open({ ios: [release({ rolloutPercent: 40 })] });
+    expect(slot('ios').getByTitle('Already at 40%')).toBeDisabled();
+  });
+
+  it('offers no rung below a fifth — zero is Pause, which is a different thing', async () => {
+    await open({ ios: [release({ status: 'DRAFT', rolloutPercent: 0 })] });
+    expect(slot('ios').queryByTitle('Publish at 5%')).not.toBeInTheDocument();
+    expect(slot('ios').queryByTitle('Publish at 0%')).not.toBeInTheDocument();
+  });
+
+  it('pauses by serving nobody, without retiring anything', async () => {
+    await open({ ios: [release({ rolloutPercent: 40 })] });
     await act(async () => {
-      fireEvent.click(screen.getByText('Publish anyway, retiring OTA 2'));
+      fireEvent.click(slot('ios').getByText('Pause'));
     });
-    expect(apiMock.updateRelease).toHaveBeenCalledWith('old', {
-      status: 'PUBLISHED',
-      rolloutPercent: 5,
-    });
+    expect(apiMock.updateRelease).toHaveBeenCalledWith('r1', { rolloutPercent: 0 });
   });
 
-  it('says nothing about a newer release on another platform', async () => {
-    const otherPlatform = release({
-      id: 'android', sequence: 9, status: 'PUBLISHED', platform: 'android',
-    });
-    await open([otherPlatform, draft]);
-    expect(screen.queryByTestId('supersedes-old')).toBeNull();
-  });
-
-  it('says nothing about a newer release built for another runtime', async () => {
-    // A bundle for a different runtime cannot run on this binary, so it is not
-    // in the same slot and retires nothing.
-    const otherRuntime = release({
-      id: 'rt2', sequence: 9, status: 'PUBLISHED', runtimeVersion: '2',
-    });
-    await open([otherRuntime, draft]);
-    expect(screen.queryByTestId('supersedes-old')).toBeNull();
+  it('says it is paused rather than showing a Pause that does nothing', async () => {
+    await open({ ios: [release({ rolloutPercent: 0 })] });
+    expect(slot('ios').getByText('Paused — serving nobody')).toBeInTheDocument();
+    expect(slot('ios').queryByText('Pause')).not.toBeInTheDocument();
   });
 });
 
-describe('forcing everyone onto the newest build', () => {
-  const gate = (over: Record<string, unknown> = {}) => ({
-    id: 'g1',
-    platform: 'ios',
-    channel: 'production',
-    latestBuild: 29827684,
-    latestVersionName: '1.2.0',
-    latestIsLive: true,
-    minSupportedBuild: 0,
-    storeUrl: 'https://apps.apple.com/app/id1',
-    updatedAt: '2026-09-17T00:00:00.000Z',
-    ...over,
+/*
+ * expo-updates will not load an update older than the one running, so
+ * publishing an older release retires the live one on paper and changes
+ * nothing on any phone. The server refuses it; the ladder says so first.
+ */
+describe('a release older than the one that is live', () => {
+  const older = [
+    release({ id: 'live', sequence: 9, status: 'PUBLISHED', rolloutPercent: 100 }),
+    release({ id: 'old', sequence: 7, status: 'DRAFT', rolloutPercent: 0 }),
+  ];
+
+  it('cannot be published at any rung', async () => {
+    await open({ ios: older });
+    const rungs = slot('ios').getAllByTitle(/is live and newer/);
+    expect(rungs).toHaveLength(5);
+    for (const rung of rungs) expect(rung).toBeDisabled();
   });
 
-  it('says plainly that nobody is being forced', async () => {
-    await open([release()], [gate()]);
-    expect(screen.getAllByText('not forcing').length).toBeGreaterThan(0);
+  it('says why, rather than looking broken', async () => {
+    await open({ ios: older });
+    expect(slot('ios').getByText(/OTA 9 is live and newer/)).toBeInTheDocument();
+    expect(slot('ios').getByText(/roll that back instead/i)).toBeInTheDocument();
   });
 
-  it('says so when they are', async () => {
-    await open([release()], [gate({ minSupportedBuild: 29827684 })]);
-    expect(screen.getByText('forcing')).toBeInTheDocument();
-  });
-
-  /*
-   * The important guard. Forcing people onto a build the store is not serving
-   * yet is not an inconvenience — it is an app that will not open, with no way
-   * out but waiting, and nothing on screen to say why.
-   */
-  it('will not force while the store is not serving that build', async () => {
-    await open([release()], [gate({ latestIsLive: false })]);
-    const button = screen.getByRole('button', {
-      name: /Force every install below 29827684/,
-    });
-    expect(button).toBeDisabled();
-    expect(screen.getByText(/that would be an app nobody can open/)).toBeInTheDocument();
-  });
-
-  it('asks before it does it', async () => {
-    (window.confirm as jest.Mock).mockReturnValue(false);
-    await open([release()], [gate()]);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Force every install below/ }));
-    });
-    expect(apiMock.setVersionGate).not.toHaveBeenCalled();
-  });
-
-  it('raises the minimum to the newest build, and changes nothing else', async () => {
-    (window.confirm as jest.Mock).mockReturnValue(true);
-    await open([release()], [gate()]);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Force every install below/ }));
-    });
-    expect(apiMock.setVersionGate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        platform: 'ios',
-        channel: 'production',
-        minSupportedBuild: 29827684,
-        latestBuild: 29827684,
-      }),
-    );
-    // Not its business: whether the store is serving it is a separate fact.
-    expect(apiMock.setVersionGate.mock.calls[0][0]).not.toHaveProperty('latestIsLive');
-  });
-
-  it('is not offered once everyone is already on it', async () => {
-    await open([release()], [gate({ minSupportedBuild: 29827684 })]);
-    expect(screen.queryByRole('button', { name: /Force every install below/ })).toBeNull();
-  });
-
-  it('shows where the update comes from', async () => {
-    await open([release()], [gate()]);
-    expect(screen.getByText('https://apps.apple.com/app/id1')).toBeInTheDocument();
+  it('leaves the ladder of the live release itself alone', async () => {
+    await open({ ios: older });
+    expect(slot('ios').getByTitle('Move the rollout to 20%')).not.toBeDisabled();
   });
 });
 
-describe('going back to what was running before', () => {
+describe('going back', () => {
   it('asks first, because nobody chose the bundle they land on', async () => {
-    (window.confirm as jest.Mock).mockReturnValue(false);
-    await open([release({ status: 'PUBLISHED', rolloutPercent: 50 })]);
-
+    await open();
     await act(async () => {
-      fireEvent.click(screen.getByText('Roll back'));
+      fireEvent.click(slot('ios').getByText('Roll back'));
+    });
+    expect(window.confirm).toHaveBeenCalled();
+    expect(apiMock.rollbackRelease).toHaveBeenCalledWith('r1');
+  });
+
+  it('does nothing when that is declined', async () => {
+    window.confirm = jest.fn(() => false);
+    await open();
+    await act(async () => {
+      fireEvent.click(slot('ios').getByText('Roll back'));
     });
     expect(apiMock.rollbackRelease).not.toHaveBeenCalled();
   });
 
-  it('rolls back when that is confirmed', async () => {
-    (window.confirm as jest.Mock).mockReturnValue(true);
-    apiMock.rollbackRelease.mockResolvedValue({ rolledBackTo: release({ id: 'r0' }) });
-    await open([release({ status: 'PUBLISHED', rolloutPercent: 50 })]);
-
-    await act(async () => {
-      fireEvent.click(screen.getByText('Roll back'));
-    });
-    expect(apiMock.rollbackRelease).toHaveBeenCalledWith('r1');
-  });
-
-  /*
-   * With nothing to go back to, the app falls back to the bundle inside the
-   * binary. Saying so beats silence, which reads as a restore that happened.
-   */
   it('says so when there was nothing to go back to', async () => {
-    (window.confirm as jest.Mock).mockReturnValue(true);
     apiMock.rollbackRelease.mockResolvedValue({ rolledBackTo: null });
-    await open([release({ status: 'PUBLISHED', rolloutPercent: 50 })]);
-
+    await open();
     await act(async () => {
-      fireEvent.click(screen.getByText('Roll back'));
+      fireEvent.click(slot('ios').getByText('Roll back'));
     });
-    expect(await screen.findByText(/no earlier update on this channel/)).toBeInTheDocument();
+    expect(screen.getByTestId('release-error')).toHaveTextContent(/bundle inside the binary/);
   });
 
   it('is not offered on a draft, which replaced nothing', async () => {
-    await open([release({ status: 'DRAFT' })]);
-    expect(screen.queryByText('Roll back')).not.toBeInTheDocument();
+    await open({ ios: [release({ status: 'DRAFT' })] });
+    expect(slot('ios').queryByText('Roll back')).not.toBeInTheDocument();
   });
 });
 
-describe('what the stores are serving', () => {
-  const gate = (over: Record<string, unknown> = {}) => ({
-    id: 'g1',
-    platform: 'ios',
-    channel: 'production',
-    latestBuild: 29827484,
-    latestVersionName: '1.2.0',
-    latestIsLive: true,
-    minSupportedBuild: 0,
-    storeUrl: 'https://apps.apple.com/app/id1',
-    updatedAt: '2026-09-17T00:00:00.000Z',
-    ...over,
-  });
-
-  it('says plainly when nothing has shipped', async () => {
+describe('retiring one', () => {
+  it('asks first, then archives', async () => {
     await open();
-    // Two platforms, both empty. Telling the app nothing is the right answer
-    // until a build exists.
-    expect(screen.getAllByText(/Nothing recorded/)).toHaveLength(2);
+    await act(async () => {
+      fireEvent.click(slot('ios').getByText('Archive'));
+    });
+    expect(apiMock.updateRelease).toHaveBeenCalledWith('r1', { status: 'ARCHIVED' });
   });
 
-  it('shows the build for the channel being looked at', async () => {
-    await open(
-      [release()],
-      [gate(), gate({ id: 'g2', channel: 'staging', latestBuild: 999, latestVersionName: '9.9.9' })],
-    );
-    expect(screen.getByText(/Build 29827484/)).toBeInTheDocument();
-    expect(screen.queryByText(/9\.9\.9/)).not.toBeInTheDocument();
+  it('is not offered on one that is already archived', async () => {
+    await open({ ios: [release({ status: 'ARCHIVED' })] });
+    expect(slot('ios').queryByText('Archive')).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * The gate drives the store-update prompt and the blocking update screen. It
+ * used to live behind a modal, which hid the numbers you read far more often
+ * than you change.
+ */
+describe('what the stores are serving', () => {
+  const gateFor = (platform: 'ios' | 'android') =>
+    within(screen.getByTestId(`gate-${platform}`));
+
+  it('shows the build and whether the store has it, without opening anything', async () => {
+    await open();
+    expect(gateFor('ios').getByText('29828633')).toBeInTheDocument();
+    expect(gateFor('ios').getByText('Serving')).toBeInTheDocument();
+  });
+
+  it('says plainly when nobody is being forced', async () => {
+    await open();
+    expect(gateFor('ios').getByText('Not forcing')).toBeInTheDocument();
+  });
+
+  it('says so when they are', async () => {
+    await open({ gates: [gate({ minSupportedBuild: 29828633 })] });
+    expect(gateFor('ios').getByText('Forcing')).toBeInTheDocument();
   });
 
   it('separates a build that is uploaded from one the store is serving', async () => {
-    await open([release()], [gate({ latestIsLive: false })]);
-    expect(screen.getByText('uploaded, not live')).toBeInTheDocument();
-    // The reason matters more than the badge: an update prompt for something
-    // that cannot be downloaded is a button that does nothing.
-    expect(screen.getByText(/Nobody is being offered this yet/)).toBeInTheDocument();
+    await open({ gates: [gate({ latestIsLive: false })] });
+    expect(gateFor('ios').getByText(/uploaded but the store is not serving it/)).toBeInTheDocument();
   });
 
-  it('says so when the store is serving it', async () => {
-    await open([release()], [gate({ latestIsLive: true })]);
-    expect(screen.getByText('live on the store')).toBeInTheDocument();
-    expect(screen.queryByText(/Nobody is being offered this yet/)).not.toBeInTheDocument();
+  it('will not force while the store is not serving that build', async () => {
+    // Locking people out of an app they cannot update is an app that will not
+    // open, with no way out but waiting.
+    await open({ gates: [gate({ latestIsLive: false })] });
+    expect(gateFor('ios').getByText('Force everyone onto it')).toBeDisabled();
   });
 
-  it('lets somebody confirm the store went live, without touching anything else', async () => {
-    await open([release()], [gate({ latestIsLive: false })]);
-    await act(async () => {
-      fireEvent.click(screen.getByText('It is live now'));
-    });
-    expect(apiMock.setVersionGate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        platform: 'ios',
-        channel: 'production',
-        latestIsLive: true,
-        latestBuild: 29827484,
-      }),
-    );
-    // Not its business: raising the floor is a separate, deliberate act.
-    expect(apiMock.setVersionGate.mock.calls[0][0]).not.toHaveProperty('minSupportedBuild');
-  });
-
-  it('records a build against the channel in view', async () => {
+  it('raises the minimum to the newest build, and changes nothing else', async () => {
     await open();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Store builds' }));
+      fireEvent.click(gateFor('ios').getByText('Force everyone onto it'));
     });
-    await act(async () => {
-      fireEvent.change(field('Newest build'), { target: { value: '29827484' } });
-    });
-    await act(async () => {
-      fireEvent.change(field('Where to get it'), {
-        target: { value: 'https://apps.apple.com/app/id1' },
-      });
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByText('Save'));
-    });
-
     expect(apiMock.setVersionGate).toHaveBeenCalledWith(
       expect.objectContaining({
         platform: 'ios',
-        channel: 'production',
-        latestBuild: 29827484,
-        storeUrl: 'https://apps.apple.com/app/id1',
+        channel: 'development',
+        latestBuild: 29828633,
+        minSupportedBuild: 29828633,
+        storeUrl: 'https://apps.apple.com/app/id123',
       }),
     );
+  });
+
+  it('lets the forcing be lifted again', async () => {
+    await open({ gates: [gate({ minSupportedBuild: 29828633 })] });
+    await act(async () => {
+      fireEvent.click(gateFor('ios').getByText('Stop forcing'));
+    });
+    expect(apiMock.setVersionGate).toHaveBeenCalledWith(
+      expect.objectContaining({ minSupportedBuild: 0 }),
+    );
+  });
+
+  it('lets somebody confirm the store went live without touching the floor', async () => {
+    await open({ gates: [gate({ latestIsLive: false })] });
+    await act(async () => {
+      fireEvent.click(gateFor('ios').getByText('It is on the store now'));
+    });
+    expect(apiMock.setVersionGate).toHaveBeenCalledWith(
+      expect.objectContaining({ latestIsLive: true }),
+    );
+  });
+
+  it('records a build against the channel being looked at', async () => {
+    await open({ gates: [] });
+    await act(async () => {
+      fireEvent.click(within(screen.getByTestId('gate-ios')).getByText('Record a build'));
+    });
+    await act(async () => {
+      fireEvent.change(field('Newest build number'), { target: { value: '42' } });
+      fireEvent.change(field('Store link'), { target: { value: 'https://apps.apple.com/x' } });
+    });
+    await act(async () => {
+      fireEvent.click(within(screen.getByTestId('gate-ios')).getByText('Save'));
+    });
+    expect(apiMock.setVersionGate).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'development', latestBuild: 42 }),
+    );
+  });
+
+  it('says when a platform has no store build at all', async () => {
+    await open({ gates: [] });
+    expect(
+      within(screen.getByTestId('gate-android')).getByText(/No store build recorded/),
+    ).toBeInTheDocument();
   });
 });

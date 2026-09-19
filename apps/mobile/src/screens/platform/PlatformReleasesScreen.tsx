@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-import { DEFAULT_OTA_CHANNEL, OTA_CHANNELS } from '@fas/shared';
+import { StyleSheet, View } from 'react-native';
 import type { Release, ReleaseStatus, VersionGate } from '@fas/shared';
 import { api } from '../../api/client';
 import { useApi } from '../../hooks/useApi';
@@ -23,6 +22,9 @@ import {
 } from '../../ui';
 import { palette, spacing } from '../../theme';
 import { formatDateTime } from '../../lib/format';
+import { ReleaseLadder } from './ReleaseLadder';
+
+const PLATFORMS = ['ios', 'android'] as const;
 
 const STATUS_COLOR: Record<ReleaseStatus, string> = {
   DRAFT: palette.surfaceLit,
@@ -30,164 +32,44 @@ const STATUS_COLOR: Record<ReleaseStatus, string> = {
   ARCHIVED: palette.textFaint,
 };
 
-/** The steps a rollout is walked up in. Small enough to stop at. */
-const STEPS = [0, 5, 10, 25, 50, 100];
-
 /**
  * What the app is running, and who has it yet.
  *
- * The same screen the browser has, and it earns its place on a phone more than
- * most: a rollout going wrong is something you find out about away from a
- * desk, and walking it back down to zero should not need one.
+ * A release arrives as a draft from the publish robot, gets looked at, then
+ * goes in front of a fifth of installs and is walked up. The percentage is
+ * sticky per install, so raising it only ever adds people — which is what
+ * makes it safe to stop halfway and think.
  *
- * The percentage is sticky per install, so raising it only ever adds people —
- * which is what makes it safe to stop halfway and think. Not a tenant screen:
- * there is one app in the stores for every workspace.
+ * There is no channel picker, and that is the point. Each deployment holds
+ * only its own channel: the staging API serves `development`, which TestFlight
+ * and Play-internal builds carry, and production serves `production`. A picker
+ * offered one real list and one permanently empty one — and once offered
+ * "staging", which no binary has ever asked for.
+ *
+ * Not a tenant screen: there is one app in the stores for every workspace.
  */
 export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
   const { can } = useAuth();
-  const [channel, setChannel] = useState<string>(DEFAULT_OTA_CHANNEL);
+  const mayShip = can('platform.release.manage');
 
-  const releases = usePaginated<Release>(
-    (page) => api.releases({ channel, page, limit: 25 }),
-    [channel],
-  );
+  // Asked, not assumed: the app and the API ship separately, and a baked-in
+  // guess is how a staging screen starts writing production rows.
+  const health = useApi(() => api.health(), []);
+  const channel = health.data?.otaChannel ?? null;
+
   const gates = useApi<VersionGate[]>(() => api.versionGates(), []);
-
-  const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
 
   const [gateSheet, setGateSheet] = useState(false);
   const [gatePlatform, setGatePlatform] = useState<'ios' | 'android'>('ios');
   const [latestBuild, setLatestBuild] = useState('');
   const [latestVersionName, setLatestVersionName] = useState('');
-  const [minSupported, setMinSupported] = useState('');
   const [storeUrl, setStoreUrl] = useState('');
   const [message, setMessage] = useState('');
-
-  /**
-   * The release currently live in this one's slot, if it is a newer one.
-   *
-   * Publishing a draft retires whatever is live in the same channel, platform
-   * and runtime — there is only ever one. When the draft is OLDER than what is
-   * live, that is a downgrade wearing the word "Publish".
-   *
-   * Looking only at the pages loaded so far is still the whole answer: a
-   * release that supersedes this one has a higher sequence, so it was created
-   * later, so it sorts above this one in a newest-first list — and pages load
-   * from the top down. Change that ordering and this quietly stops warning,
-   * which is what the spec pins.
-   */
-  const supersedes = (draft: Release) =>
-    releases.items.find(
-      (other) =>
-        other.id !== draft.id &&
-        other.status === 'PUBLISHED' &&
-        other.platform === draft.platform &&
-        other.runtimeVersion === draft.runtimeVersion &&
-        other.sequence > draft.sequence,
-    ) ?? null;
-
-  /** Put a draft live at 5%, asking first if it would retire something newer. */
-  const publishDraft = (draft: Release) => {
-    const newer = supersedes(draft);
-    if (!newer) {
-      void change(draft, { status: 'PUBLISHED', rolloutPercent: 5 });
-      return;
-    }
-    Alert.alert(
-      `Publish OTA ${draft.sequence} and retire OTA ${newer.sequence}?`,
-      `OTA ${newer.sequence} is newer and live at ${newer.rolloutPercent}%. Installs that already took it keep it — this puts an older bundle in front of new ones.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Publish anyway',
-          style: 'destructive',
-          onPress: () => void change(draft, { status: 'PUBLISHED', rolloutPercent: 5 }),
-        },
-      ],
-    );
-  };
+  const [busy, setBusy] = useState<string | null>(null);
 
   const gateFor = (platform: 'ios' | 'android') =>
-    gates.data?.find((gate) => gate.channel === channel && gate.platform === platform);
-
-  /** Open on what is already set, so nothing is retyped from memory. */
-  const editGate = (platform: 'ios' | 'android') => {
-    const gate = gateFor(platform);
-    setGatePlatform(platform);
-    setLatestBuild(gate ? String(gate.latestBuild) : '');
-    setLatestVersionName(gate?.latestVersionName ?? '');
-    setMinSupported(gate ? String(gate.minSupportedBuild) : '0');
-    setStoreUrl(gate?.storeUrl ?? '');
-    setMessage(gate?.message ?? '');
-    setGateSheet(true);
-  };
-
-  /**
-   * Say the store is serving the newest build.
-   *
-   * Separate from recording it on purpose: CI knows when a binary was uploaded
-   * and cannot know when review finished. Until a person says so, the app is
-   * told nothing — an update prompt for a build nobody can download is a
-   * button that does nothing.
-   */
-  /**
-   * Refuse every build older than the newest one.
-   *
-   * The heaviest thing on this screen: every install below the latest stops at
-   * a blocking update screen until the person goes to the store.
-   *
-   * Only once the store is actually serving that build. Forcing people onto
-   * something they cannot download is not an inconvenience, it is an app that
-   * will not open with no way out but waiting, and nothing on screen to say
-   * why.
-   */
-  const forceUpdate = (platform: 'ios' | 'android') => {
-    const gate = gateFor(platform);
-    if (!gate || !gate.latestIsLive) return;
-    Alert.alert(
-      `Force every ${platform} install below build ${gate.latestBuild} to update?`,
-      'They will be stopped at an update screen until they install it from the store.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Force update',
-          style: 'destructive',
-          onPress: () =>
-            void run(`force-${platform}`, () =>
-              api.setVersionGate({
-                platform,
-                channel,
-                latestBuild: gate.latestBuild,
-                latestVersionName: gate.latestVersionName ?? undefined,
-                minSupportedBuild: gate.latestBuild,
-                storeUrl: gate.storeUrl,
-                message: gate.message ?? undefined,
-              }),
-            ),
-        },
-      ],
-    );
-  };
-
-  const markLive = (platform: 'ios' | 'android', live: boolean) => {
-    const gate = gateFor(platform);
-    if (!gate) return;
-    void run(`live-${platform}`, () =>
-      api.setVersionGate({
-        platform,
-        channel,
-        latestBuild: gate.latestBuild,
-        latestVersionName: gate.latestVersionName ?? undefined,
-        latestIsLive: live,
-        storeUrl: gate.storeUrl,
-        message: gate.message ?? undefined,
-      }),
-    );
-  };
-
-  const mayShip = can('platform.release.manage');
+    gates.data?.find((gate) => gate.channel === channel && gate.platform === platform) ?? null;
 
   const run = async (key: string, work: () => Promise<unknown>) => {
     setBusy(key);
@@ -195,7 +77,6 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
     try {
       await work();
       haptic('notificationSuccess');
-      releases.reload();
       gates.reload();
       return true;
     } catch (error) {
@@ -207,268 +88,205 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
     }
   };
 
-  const change = (release: Release, body: Record<string, unknown>) =>
-    run(release.id, () => api.updateRelease(release.id, body as never));
-
-  /**
-   * Go back to the update this one replaced.
-   *
-   * Asked about first, because it is the one action here that changes what a
-   * shop is running without anybody choosing the bundle they end up on.
-   */
-  const confirmRollback = (release: Release) => {
-    Alert.alert(
-      'Roll back this release?',
-      'It is retired, and the update it replaced goes back to everybody at 100%.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Roll back',
-          style: 'destructive',
-          onPress: () =>
-            void (async () => {
-              let restored: { rolledBackTo: unknown } | null = null;
-              const ok = await run(release.id, async () => {
-                restored = (await api.rollbackRelease(release.id)) as { rolledBackTo: unknown };
-              });
-              if (!ok) return;
-              const wentBack = Boolean(restored && (restored as { rolledBackTo: unknown }).rolledBackTo);
-              Alert.alert(
-                wentBack ? 'Rolled back' : 'Retired, with nothing to go back to',
-                wentBack
-                  ? 'The update it replaced is live again, for everybody.'
-                  : 'There was no earlier update on this channel, so the app falls back to the bundle inside the binary.',
-              );
-            })(),
-        },
-      ],
-    );
+  /** Everything the gate holds, so a save never blanks a field it did not show. */
+  const keeping = (
+    platform: 'ios' | 'android',
+    over: Record<string, unknown>,
+  ): Parameters<typeof api.setVersionGate>[0] => {
+    const gate = gateFor(platform);
+    return {
+      platform,
+      channel: channel as string,
+      latestBuild: gate?.latestBuild ?? 0,
+      latestVersionName: gate?.latestVersionName ?? undefined,
+      storeUrl: gate?.storeUrl ?? '',
+      message: gate?.message ?? undefined,
+      ...over,
+    } as Parameters<typeof api.setVersionGate>[0];
   };
 
+  const editGate = (platform: 'ios' | 'android') => {
+    const gate = gateFor(platform);
+    setGatePlatform(platform);
+    setLatestBuild(gate ? String(gate.latestBuild) : '');
+    setLatestVersionName(gate?.latestVersionName ?? '');
+    setStoreUrl(gate?.storeUrl ?? '');
+    setMessage(gate?.message ?? '');
+    setFailed(null);
+    setGateSheet(true);
+  };
+
+  if (health.loading) return <Loader label="Reading the deployment" />;
+
   return (
-    <Screen
-      refreshing={releases.refreshing}
-      onRefresh={releases.refresh}
-      onEndReached={releases.loadMore}>
+    <Screen>
       <ScreenHeader
         title="Releases"
         subtitle="What the app is running, and who has it yet"
         onBack={() => navigation.goBack()}
       />
 
-      <View style={styles.chips}>
-        {OTA_CHANNELS.map((one) => (
-          <Chip
-            key={one}
-            label={one}
-            selected={channel === one}
-            onPress={() => setChannel(one)}
-          />
-        ))}
-      </View>
-
-      {failed ? <Text variant="small" tone="danger">{failed}</Text> : null}
-
-      {releases.loading ? (
-        <Loader />
-      ) : releases.items.length === 0 ? (
+      {!channel ? (
+        /*
+         * The API named an environment we do not deploy, so nothing here can
+         * say which channel its rows belong to. Saying so beats guessing
+         * "production" and publishing into the wrong world.
+         */
         <EmptyState
           icon="box"
-          title="Nothing published on this channel"
-          message="Releases arrive from the publish script as drafts."
+          title="Cannot tell which world this is"
+          message={`The API reports its environment as "${health.data?.env ?? 'unknown'}", which is not one we deploy. Nothing is shown rather than the wrong thing.`}
         />
       ) : (
-        releases.items.map((release) => (
-          <Card key={release.id} tone="dark" style={styles.card}>
-            <View style={styles.row}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text variant="h3">
-                  OTA {release.sequence} · {release.platform}
-                </Text>
-                <Text variant="tiny" tone="muted">
-                  runtime {release.runtimeVersion} · {formatDateTime(release.createdAt)}
-                </Text>
-              </View>
-              {release.kind === 'ROLLBACK' ? (
-                <Pill label="Rollback" color={palette.warning} small />
-              ) : null}
-              <Pill label={release.status} color={STATUS_COLOR[release.status]} small />
-            </View>
+        <>
+          <View style={styles.badgeRow} testID="environment-badge">
+            <Pill
+              label={`${health.data?.env} · ${channel}`}
+              color={channel === 'production' ? palette.danger : palette.info}
+              small
+            />
+            <Text variant="tiny" tone="faint" style={{ flex: 1 }}>
+              {channel === 'production'
+                ? 'Goes to shops on the store builds.'
+                : 'Goes to TestFlight and Play internal testing.'}
+            </Text>
+          </View>
 
-            {release.changelog ? (
-              <Text variant="small" tone="muted" style={{ marginTop: spacing.sm }}>
-                {release.changelog}
-              </Text>
-            ) : null}
+          {failed ? (
+            <Text variant="small" tone="danger" testID="release-error" style={styles.failed}>
+              {failed}
+            </Text>
+          ) : null}
 
-            {release.status === 'PUBLISHED' ? (
-              <>
-                <Text variant="tiny" tone="muted" style={{ marginTop: spacing.sm }}>
-                  {release.rolloutPercent}% of installs
-                </Text>
+          {PLATFORMS.map((platform) => (
+            <PlatformReleases
+              key={platform}
+              channel={channel}
+              platform={platform}
+              mayShip={mayShip}
+              onError={setFailed}
+            />
+          ))}
+
+          <Text variant="label" tone="muted" style={styles.head}>
+            What the stores are serving
+          </Text>
+
+          {PLATFORMS.map((platform) => {
+            const gate = gateFor(platform);
+            const forcing = Boolean(
+              gate && gate.latestBuild > 0 && gate.minSupportedBuild >= gate.latestBuild,
+            );
+            const awaitingStore = Boolean(gate && gate.latestBuild > 0 && !gate.latestIsLive);
+
+            return (
+              <View key={platform} testID={`gate-${platform}`}>
+              <Card tone="dark" style={styles.card}>
+                <View style={styles.row}>
+                  <Text variant="small" bold style={{ flex: 1 }}>
+                    {platform}
+                  </Text>
+                  <Pill
+                    label={forcing ? 'Forcing' : 'Not forcing'}
+                    color={forcing ? palette.danger : palette.surfaceLit}
+                    small
+                  />
+                </View>
+
+                {!gate ? (
+                  <Text variant="small" tone="muted" style={styles.gap}>
+                    No store build recorded. The app asks nobody to update until
+                    there is one, which is the right answer until a build has
+                    actually shipped.
+                  </Text>
+                ) : (
+                  <Text variant="tiny" tone="muted" style={styles.gap}>
+                    Build {gate.latestBuild}
+                    {gate.latestVersionName ? ` · ${gate.latestVersionName}` : ''}
+                    {' · '}
+                    {awaitingStore ? 'store not serving it yet' : 'on the store'}
+                    {gate.minSupportedBuild > 0
+                      ? ` · below ${gate.minSupportedBuild} the app stops`
+                      : ' · no build is blocked'}
+                  </Text>
+                )}
+
+                {/*
+                  CI records a build the moment it uploads and cannot know when
+                  review ends. Until a person says the store serves it, the app
+                  is told nothing — an update prompt pointing at a store page
+                  that still has the old version is a button that does nothing.
+                */}
+                {gate && awaitingStore ? (
+                  <Text variant="tiny" tone="warning" style={styles.gap}>
+                    Nobody is being prompted while this is true.
+                  </Text>
+                ) : null}
+
                 {mayShip ? (
-                  <View style={styles.chips}>
-                    {/*
-                      Sticky buckets mean walking this up only ever adds
-                      people, so the steps are safe to stop between — and
-                      stepping back down is the reason this screen is worth
-                      having on a phone at all.
-                    */}
-                    {STEPS.filter((step) => step !== release.rolloutPercent).map((step) => (
-                      <Chip
-                        key={step}
-                        label={`${step}%`}
-                        onPress={() => void change(release, { rolloutPercent: step })}
+                  <View style={[styles.row, styles.gap]}>
+                    {gate ? (
+                      <Button
+                        title={gate.latestIsLive ? 'Not live after all' : 'It is on the store now'}
+                        variant="dark"
+                        size="sm"
+                        loading={busy === `live-${platform}`}
+                        onPress={() =>
+                          void run(`live-${platform}`, () =>
+                            api.setVersionGate(
+                              keeping(platform, { latestIsLive: !gate.latestIsLive }),
+                            ),
+                          )
+                        }
                       />
-                    ))}
-                    <Chip
-                      label="Retire"
-                      onPress={() => void change(release, { status: 'ARCHIVED' })}
+                    ) : null}
+                    <Button
+                      title={gate ? 'Edit' : 'Record a build'}
+                      variant="dark"
+                      size="sm"
+                      onPress={() => editGate(platform)}
                     />
-                    {/*
-                      Retire takes this bundle away and leaves whatever the
-                      binary shipped with — losing every good update since, not
-                      just the bad one. Roll back puts the previous update back.
-                    */}
-                    <Chip label="Roll back" onPress={() => confirmRollback(release)} />
                   </View>
                 ) : null}
-              </>
-            ) : null}
 
-            {release.status === 'DRAFT' && mayShip ? (
-              <>
-                {supersedes(release) ? (
-                  <Text
-                    variant="tiny"
-                    tone="warning"
-                    testID={`supersedes-${release.id}`}
-                    style={{ marginTop: spacing.sm }}>
-                    OTA {supersedes(release)!.sequence} is live at{' '}
-                    {supersedes(release)!.rolloutPercent}% and is newer than this.
-                    Publishing this one retires it, and puts an older bundle in front
-                    of people — which is what Roll back on OTA{' '}
-                    {supersedes(release)!.sequence} is for.
-                  </Text>
+                {mayShip && gate && gate.latestBuild > 0 ? (
+                  <>
+                    <Button
+                      title={
+                        forcing
+                          ? 'Stop forcing'
+                          : `Force every install below ${gate.latestBuild} to update`
+                      }
+                      variant={forcing ? 'dark' : 'danger'}
+                      size="sm"
+                      disabled={!forcing && !gate.latestIsLive}
+                      loading={busy === `force-${platform}`}
+                      onPress={() =>
+                        void run(`force-${platform}`, () =>
+                          api.setVersionGate(
+                            keeping(platform, {
+                              minSupportedBuild: forcing ? 0 : gate.latestBuild,
+                            }),
+                          ),
+                        )
+                      }
+                      style={styles.gap}
+                    />
+                    <Text variant="tiny" tone="faint" style={styles.gap}>
+                      {forcing
+                        ? 'Every install below the newest is stopped at an update screen.'
+                        : gate.latestIsLive
+                          ? 'Older installs stop at an update screen until they install it.'
+                          : 'Not while the store is not serving it — that is an app nobody can open, and nothing on screen to say why.'}
+                    </Text>
+                  </>
                 ) : null}
-                <Button
-                  title={
-                    supersedes(release)
-                      ? `Publish anyway, retiring OTA ${supersedes(release)!.sequence}`
-                      : 'Publish to 5%'
-                  }
-                  variant={supersedes(release) ? 'dark' : undefined}
-                  size="sm"
-                  loading={busy === release.id}
-                  onPress={() => publishDraft(release)}
-                  style={{ marginTop: spacing.sm }}
-                />
-              </>
-            ) : null}
-          </Card>
-        ))
-      )}
-
-      <ListFooter
-        loading={releases.loadingMore}
-        hasMore={releases.hasMore}
-        shown={releases.items.length}
-        total={releases.total}
-        noun="releases"
-      />
-
-      <Text variant="label" tone="muted" style={styles.head}>
-        What the stores are serving
-      </Text>
-      {(['ios', 'android'] as const).map((platform) => {
-        const gate = gateFor(platform);
-        return (
-          <Card key={platform} tone="dark" style={styles.card}>
-            <View style={styles.row} testID={`gate-${platform}`}>
-              <Text variant="small" bold style={{ flex: 1 }}>{platform}</Text>
-              {gate ? (
-                <Text
-                  variant="tiny"
-                  tone={
-                    gate.minSupportedBuild >= gate.latestBuild && gate.latestBuild > 0
-                      ? 'danger'
-                      : 'muted'
-                  }>
-                  {gate.minSupportedBuild >= gate.latestBuild && gate.latestBuild > 0
-                    ? 'forcing'
-                    : 'not forcing'}
-                </Text>
-              ) : null}
-              {gate ? (
-                <Text variant="tiny" tone={gate.latestIsLive ? 'accent' : 'muted'}>
-                  {gate.latestIsLive ? 'live on the store' : 'uploaded, not live'}
-                </Text>
-              ) : null}
-            </View>
-
-            {!gate ? (
-              <Text variant="small" tone="muted" style={{ marginTop: spacing.xs }}>
-                Nothing recorded. The app is told nothing, which is the right
-                answer until a build has actually shipped.
-              </Text>
-            ) : (
-              <>
-                <Text variant="tiny" tone="muted" style={{ marginTop: spacing.xs }}>
-                  Build {gate.latestBuild}
-                  {gate.latestVersionName ? ` · ${gate.latestVersionName}` : ''}
-                  {gate.minSupportedBuild > 0
-                    ? ` · below ${gate.minSupportedBuild} the app stops`
-                    : ' · no build is blocked'}
-                </Text>
-                {!gate.latestIsLive ? (
-                  <Text variant="tiny" tone="faint" style={{ marginTop: spacing.xs }}>
-                    Nobody is being offered this yet. Review has to finish first —
-                    saying it is live before the store serves it leaves people
-                    tapping a button that does nothing.
-                  </Text>
-                ) : null}
-              </>
-            )}
-
-            {mayShip ? (
-              <View style={[styles.row, { marginTop: spacing.sm }]}>
-                {gate ? (
-                  <Button
-                    title={gate.latestIsLive ? 'Not live after all' : 'It is live now'}
-                    variant="dark"
-                    loading={busy === `live-${platform}`}
-                    onPress={() => markLive(platform, !gate.latestIsLive)}
-                  />
-                ) : null}
-                <Button
-                  title={gate ? 'Edit' : 'Record a build'}
-                  variant="dark"
-                  onPress={() => editGate(platform)}
-                />
+              </Card>
               </View>
-            ) : null}
-
-            {mayShip && gate && gate.minSupportedBuild < gate.latestBuild ? (
-              <>
-                <Button
-                  title={`Force every install below ${gate.latestBuild} to update`}
-                  variant="danger"
-                  size="sm"
-                  disabled={!gate.latestIsLive}
-                  loading={busy === `force-${platform}`}
-                  onPress={() => forceUpdate(platform)}
-                  style={{ marginTop: spacing.sm }}
-                />
-                <Text variant="tiny" tone="faint" style={{ marginTop: spacing.xs }}>
-                  {gate.latestIsLive
-                    ? 'Older installs stop at an update screen until they install it.'
-                    : 'Not while the store is not serving it — that would be an app nobody can open and no way to say why.'}
-                </Text>
-              </>
-            ) : null}
-          </Card>
-        );
-      })}
+            );
+          })}
+        </>
+      )}
 
       <Sheet
         visible={gateSheet}
@@ -476,7 +294,7 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
         subtitle="What is on the store, and which binaries may still run"
         onClose={() => setGateSheet(false)}>
         <View style={styles.chips}>
-          {(['ios', 'android'] as const).map((one) => (
+          {PLATFORMS.map((one) => (
             <Chip
               key={one}
               label={one}
@@ -500,14 +318,6 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
           onChangeText={setLatestVersionName}
         />
         <Field
-          label="Stop below build"
-          placeholder="0"
-          keyboardType="number-pad"
-          value={minSupported}
-          onChangeText={setMinSupported}
-          hint="Older binaries are refused. Leave at 0 unless an old app would break."
-        />
-        <Field
           label="Where to get it"
           placeholder="https://apps.apple.com/app/id…"
           value={storeUrl}
@@ -521,15 +331,14 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
           onPress={() =>
             void (async () => {
               const done = await run('gate', () =>
-                api.setVersionGate({
-                  platform: gatePlatform,
-                  channel,
-                  latestBuild: Number.parseInt(latestBuild, 10),
-                  latestVersionName: latestVersionName.trim() || undefined,
-                  minSupportedBuild: Number.parseInt(minSupported || '0', 10),
-                  storeUrl: storeUrl.trim(),
-                  message: message.trim() || undefined,
-                }),
+                api.setVersionGate(
+                  keeping(gatePlatform, {
+                    latestBuild: Number.parseInt(latestBuild, 10),
+                    latestVersionName: latestVersionName.trim() || undefined,
+                    storeUrl: storeUrl.trim(),
+                    message: message.trim() || undefined,
+                  }),
+                ),
               );
               if (done) setGateSheet(false);
             })()
@@ -540,9 +349,124 @@ export function PlatformReleasesScreen({ navigation }: { navigation: any }) {
   );
 }
 
+/**
+ * One platform's releases, newest first, paging on its own.
+ *
+ * Split by platform because they are genuinely separate queues — their own
+ * live release, their own history, their own store. A single mixed list meant
+ * reading the platform off every row to work out which of two numbers was the
+ * one live on the phone in your hand.
+ */
+function PlatformReleases({
+  channel,
+  platform,
+  mayShip,
+  onError,
+}: {
+  channel: string;
+  platform: 'ios' | 'android';
+  mayShip: boolean;
+  onError: (message: string | null) => void;
+}) {
+  const releases = usePaginated<Release>(
+    (page) => api.releases({ channel, platform, page, limit: 10 }),
+    [channel, platform],
+  );
+
+  const live = releases.items.find((r) => r.status === 'PUBLISHED') ?? null;
+
+  return (
+    <View testID={`slot-${platform}`} style={styles.slot}>
+      <View style={styles.row}>
+        <Text variant="small" bold style={{ flex: 1 }}>
+          {platform}
+        </Text>
+        <Pill
+          label={live ? `Live · OTA ${live.sequence} · ${live.rolloutPercent}%` : 'Nothing live'}
+          color={live ? palette.success : palette.surfaceLit}
+          small
+        />
+      </View>
+
+      {releases.loading ? (
+        <Loader />
+      ) : releases.items.length === 0 ? (
+        <Text variant="small" tone="faint" style={styles.gap}>
+          Nothing published for {platform} on this channel. Releases arrive here
+          from the publish robot as drafts.
+        </Text>
+      ) : (
+        releases.items.map((release) => {
+          /*
+           * A release older than the live one cannot be published: installs do
+           * not go backwards, so it would retire the live release on paper and
+           * change nothing on any phone. The server refuses it; the ladder
+           * says so before anybody taps it.
+           */
+          const blockedReason =
+            live && release.id !== live.id && release.sequence < live.sequence
+              ? `OTA ${live.sequence} is live and newer. Installs will not go backwards — roll that back instead, or publish a new release.`
+              : undefined;
+
+          return (
+            <Card key={release.id} tone="dark" style={styles.card}>
+              <View style={styles.row}>
+                <Text variant="h3" style={{ flex: 1 }}>
+                  OTA {release.sequence}
+                </Text>
+                {release.kind === 'ROLLBACK' ? (
+                  <Pill label="Rollback" color={palette.warning} small />
+                ) : null}
+                <Pill label={release.status} color={STATUS_COLOR[release.status]} small />
+              </View>
+
+              <Text variant="tiny" tone="muted" style={styles.gap}>
+                runtime {release.runtimeVersion} · {formatDateTime(release.createdAt)}
+                {release.status === 'PUBLISHED' ? ` · ${release.rolloutPercent}% of installs` : ''}
+              </Text>
+
+              {release.changelog ? (
+                <Text variant="small" tone="muted" style={styles.gap} numberOfLines={2}>
+                  {release.changelog}
+                </Text>
+              ) : null}
+
+              {mayShip ? (
+                <ReleaseLadder
+                  release={release}
+                  blockedReason={blockedReason}
+                  onChanged={releases.reload}
+                  onError={onError}
+                />
+              ) : null}
+            </Card>
+          );
+        })
+      )}
+
+      <ListFooter
+        loading={releases.loadingMore}
+        hasMore={releases.hasMore}
+        shown={releases.items.length}
+        total={releases.total}
+        noun="releases"
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: { marginBottom: spacing.sm },
+  slot: { marginBottom: spacing.lg },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
   head: { marginTop: spacing.xl, marginBottom: spacing.sm },
+  gap: { marginTop: spacing.xs },
+  failed: { marginBottom: spacing.md },
 });

@@ -742,3 +742,210 @@ button.primary:disabled {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
+
+/* -- the release screen -----------------------------------------------------
+ *
+ * The rollout ladder, and the per-platform release cards it sits in.
+ *
+ * The ladder is drawn as one connected track rather than five loose chips.
+ * Loose chips in a narrow column wrapped one per line and a single release
+ * grew taller than the screen; a track also reads as one control — "you are
+ * here, the next rung is there" — which is what walking a rollout up actually
+ * is.
+ */
+.ladder { display: flex; flex-direction: column; gap: var(--s-sm); }
+
+.ladder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm);
+}
+
+.ladder-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.ladder-track {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  flex: 1 1 260px;
+  max-width: 320px;
+  overflow: hidden;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+}
+
+.rung {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 2px;
+  border: 0;
+  border-left: 1px solid rgba(255, 107, 26, 0.3);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+
+.rung:first-child { border-left: 0; }
+.rung:hover:not(:disabled) { background: rgba(255, 107, 26, 0.16); }
+.rung:disabled { cursor: not-allowed; opacity: 0.4; }
+
+/* Where this release is now. Filled, and never dimmed by :disabled — it is
+   disabled because you are already there, which is not the same as unavailable. */
+.rung-here {
+  background: rgba(255, 107, 26, 0.28);
+  color: var(--text);
+}
+.rung-here:disabled { opacity: 1; }
+
+/* Rungs already climbed, so the track shows the distance travelled. */
+.rung-passed { background: rgba(255, 107, 26, 0.09); color: rgba(255, 145, 66, 0.75); }
+
+.ladder-note { margin: 0; line-height: 1.45; }
+
+.ladder-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-sm);
+}
+
+.mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--surface-lit);
+  border-radius: var(--r-sm);
+  background: var(--surface-shade);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.mini-btn:hover:not(:disabled):not(.is-static) { background: var(--surface-lit); color: var(--text); }
+.mini-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.mini-btn.is-static { cursor: default; }
+.mini-btn-warning { border-color: rgba(255, 177, 61, 0.35); color: var(--warning); }
+.mini-btn-danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+
+.link-btn {
+  margin-top: var(--s-sm);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.link-btn:hover:not(:disabled) { color: var(--text); }
+
+.spinner-xs {
+  width: 11px;
+  height: 11px;
+  border-width: 1.5px;
+}
+
+/* -- one platform's releases ------------------------------------------------ */
+
+.slot-head { margin-bottom: var(--s-md); }
+
+.slot-list { list-style: none; margin: 0; padding: 0; }
+
+.slot-row {
+  padding: var(--s-md) 0;
+  border-top: 1px solid var(--surface-lit);
+}
+.slot-row:first-child { border-top: 0; padding-top: 0; }
+
+.slot-row-head {
+  flex-wrap: wrap;
+  gap: var(--s-sm);
+  align-items: center;
+}
+
+/* Pushed to the end of the line, and first to drop to its own row when the
+   card is narrow — it is the detail you read last. */
+.slot-row-meta { margin-left: auto; }
+
+.slot-changelog {
+  margin: 6px 0 var(--s-sm);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.slot-empty { padding: var(--s-xl) 0; text-align: center; }
+
+.rollout-bar {
+  display: inline-block;
+  width: 60px;
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--surface-inset);
+  overflow: hidden;
+}
+
+.rollout-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--success);
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* -- the store gate --------------------------------------------------------- */
+
+.gate-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--s-md);
+  margin: var(--s-md) 0 0;
+}
+
+.gate-facts dt { margin-bottom: 2px; }
+.gate-facts dd { margin: 0; }
+
+.gate-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: var(--s-md);
+  padding: var(--s-md);
+  border: 1px solid rgba(255, 177, 61, 0.35);
+  border-radius: var(--r-md);
+  background: rgba(255, 177, 61, 0.08);
+}
+
+.gate-banner p { margin: 0; }
+
+.gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-sm);
+  margin-top: var(--s-md);
+}
+
+@media (max-width: 560px) {
+  .ladder-track { max-width: none; }
+  .slot-row-meta { margin-left: 0; width: 100%; }
+}

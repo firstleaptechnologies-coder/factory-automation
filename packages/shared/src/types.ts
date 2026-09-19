@@ -908,6 +908,39 @@ export type OtaChannel = (typeof OTA_CHANNELS)[number];
 export const DEFAULT_OTA_CHANNEL: OtaChannel = 'production';
 
 /**
+ * Which channel a deployment manages.
+ *
+ * One deployment, one channel: the staging API publishes to `development` and
+ * the production API to `production`, and each has its own database, so the
+ * rows for the other channel are not merely hidden — they do not exist there.
+ * A release screen that offered both would therefore be offering one real
+ * list and one permanently empty one, and inviting somebody to record a store
+ * build against a channel this deployment can never serve.
+ *
+ * The environment is not the channel — the environment is `staging`, the
+ * channel it serves is `development`. Naming one after the other is the
+ * specific mistake `ota-channels.spec.ts` exists to stop coming back, so the
+ * mapping is written down once, here, and checked against
+ * `deploy/environments.json`.
+ */
+export const CHANNEL_BY_APP_ENV: Readonly<Record<string, OtaChannel>> = {
+  development: 'development',
+  staging: 'development',
+  production: 'production',
+};
+
+/**
+ * The channel for a deployment's `APP_ENV`, or null when it names no
+ * environment we deploy — null rather than a guess, because guessing
+ * `production` for an unknown environment is how a staging screen ends up
+ * publishing to shops.
+ */
+export function channelForAppEnv(appEnv: string | null | undefined): OtaChannel | null {
+  if (!appEnv) return null;
+  return CHANNEL_BY_APP_ENV[appEnv] ?? null;
+}
+
+/**
  * What the newest binary is, and which ones are still allowed to run.
  *
  * Build numbers rather than version strings: the marketing version is for

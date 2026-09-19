@@ -139,6 +139,74 @@ describe('publishing', () => {
     });
   });
 
+  /*
+   * Publishing something older than what is live is the one publish that
+   * silently does nothing. expo-updates will not load an update older than
+   * the one running, so every phone stays where it is — while the records
+   * show the newer release retired. The screen and the fleet then disagree,
+   * and nothing says so.
+   */
+  describe('when something newer is already live', () => {
+    const older = new Date('2026-09-01T00:00:00.000Z');
+    const newer = new Date('2026-09-10T00:00:00.000Z');
+
+    function withLive(liveAt: Date, mine: Date) {
+      const built = build(draft({ createdAt: mine }));
+      built.db.otaRelease.findFirst = jest.fn(async () => ({
+        sequence: 9,
+        createdAt: liveAt,
+      }));
+      return built;
+    }
+
+    it('refuses, rather than retiring a release every phone is still running', async () => {
+      const { service, db } = withLive(newer, older);
+      await expect(
+        service.update('r1', { status: 'PUBLISHED' as never }, 'p1'),
+      ).rejects.toThrow(/will not go backwards/);
+      expect(db.otaRelease.updateMany).not.toHaveBeenCalled();
+      expect(db.otaRelease.update).not.toHaveBeenCalled();
+    });
+
+    it('names the release in the way, and what to do instead', async () => {
+      const { service } = withLive(newer, older);
+      const error: Error = await service
+        .update('r1', { status: 'PUBLISHED' as never }, 'p1')
+        .then(() => new Error('it published'))
+        .catch((e: Error) => e);
+      expect(error.message).toMatch(/OTA 9/);
+      expect(error.message).toMatch(/Roll back/);
+    });
+
+    it('still publishes one that is newer than what is live', async () => {
+      const { service } = withLive(older, newer);
+      await expect(
+        service.update('r1', { status: 'PUBLISHED' as never }, 'p1'),
+      ).resolves.toBeDefined();
+    });
+
+    it('does not stand in the way of a live release moving its own rollout', async () => {
+      // The live release is excluded by id, so nothing is found to compare
+      // against — pausing or advancing the current one is never a downgrade.
+      const { service, db } = build(draft({ status: 'PUBLISHED', createdAt: older }));
+      await service.update('r1', { rolloutPercent: 0 }, 'p1');
+      expect(db.otaRelease.findFirst).not.toHaveBeenCalled();
+      expect(db.otaRelease.update).toHaveBeenCalled();
+    });
+
+    it('looks only within the same channel, platform and runtime', async () => {
+      const { service, db } = withLive(older, newer);
+      await service.update('r1', { status: 'PUBLISHED' as never }, 'p1');
+      expect(db.otaRelease.findFirst.mock.calls[0][0].where).toMatchObject({
+        channel: 'production',
+        platform: 'ios',
+        runtimeVersion: '1.0.0',
+        status: 'PUBLISHED',
+        id: { not: 'r1' },
+      });
+    });
+  });
+
   it('retires nothing when only the rollout moved', async () => {
     const { service, db } = build(draft({ status: 'PUBLISHED' }));
     await service.update('r1', { rolloutPercent: 50 }, 'p1');

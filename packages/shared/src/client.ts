@@ -93,6 +93,7 @@ import type {
   ExpenseOption,
   ExpenseOptionField,
   ExpensePage,
+  OtaChannel,
 } from './types';
 
 /** The editable fields of a client. Shared by create and update. */
@@ -281,6 +282,25 @@ export class ApiClient {
 
   me() {
     return this.get<AuthUser>('/auth/me');
+  }
+
+  /**
+   * Which deployment this is, and which OTA channel it manages.
+   *
+   * Public, and deliberately so: "am I looking at staging or at a shop's live
+   * data" is a question that gets answered wrongly exactly once before it
+   * matters, and the release screen needs the answer before anyone is signed
+   * in enough to be told it privately.
+   */
+  health() {
+    return this.get<{
+      status: string;
+      env: string;
+      otaChannel: OtaChannel | null;
+      version: string | null;
+      commit: string | null;
+      database: string;
+    }>('/health');
   }
 
   // -- clients --------------------------------------------------------------
