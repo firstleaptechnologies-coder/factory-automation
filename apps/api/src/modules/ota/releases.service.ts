@@ -301,7 +301,45 @@ export class ReleasesService {
    * serving it, and without quietly lowering a minimum somebody raised on
    * purpose.
    */
-  setGate(dto: VersionGateDto, updatedBy?: string) {
+  /**
+   * Record what the stores have, refusing the one pair that cannot be true.
+   *
+   * A newer build carrying an older version name is not a tidiness problem —
+   * it is the update screen telling somebody to go and install 1.0.0 when
+   * they already have 1.0.1. It happened: two native builds were dispatched
+   * 49 seconds apart, serialised, and the second one built the tree from
+   * before the first one's version bump. It uploaded build 29828651 calling
+   * itself 1.0.0, twenty-three minutes after build 29828633 called itself
+   * 1.0.1, and then wrote that over the gate. Nothing failed. It was found
+   * days later by somebody trying to mark a build live and noticing the
+   * number was not the one they meant.
+   *
+   * The workflows now refuse to build a tree the branch has moved past, which
+   * stops it happening. This refuses to record it if it somehow does.
+   */
+  async setGate(dto: VersionGateDto, updatedBy?: string) {
+    const current = await this.prisma.platform.appVersionGate.findUnique({
+      where: { platform_channel: { platform: dto.platform, channel: dto.channel } },
+      select: { latestBuild: true, latestVersionName: true },
+    });
+
+    if (
+      current &&
+      dto.latestBuild > current.latestBuild &&
+      olderVersion(dto.latestVersionName, current.latestVersionName)
+    ) {
+      throw new BadRequestException(
+        `Build ${dto.latestBuild} says it is ${dto.latestVersionName}, which is older than ` +
+          `${current.latestVersionName} on build ${current.latestBuild}. A newer build cannot ` +
+          'carry an older version name — it would send people to install something they ' +
+          'already have. Check which build actually belongs here.',
+      );
+    }
+
+    return this.writeGate(dto, updatedBy);
+  }
+
+  private writeGate(dto: VersionGateDto, updatedBy?: string) {
     const stated = <T>(value: T | undefined) => (value === undefined ? {} : { value });
     const live = stated(dto.latestIsLive);
     const minimum = stated(dto.minSupportedBuild);
@@ -335,4 +373,30 @@ export class ReleasesService {
       },
     });
   }
+}
+
+/**
+ * Whether one marketing version is older than another.
+ *
+ * Only answers when it is sure: anything it cannot read as a run of numbers —
+ * an empty name, "1.0.0-rc2", a name somebody typed by hand — is not treated
+ * as older, because refusing a legitimate record on a string this does not
+ * understand is worse than letting an odd one through.
+ */
+export function olderVersion(next?: string | null, previous?: string | null): boolean {
+  const parts = (value?: string | null) =>
+    /^\d+(\.\d+)*$/.test((value ?? '').trim())
+      ? value!.trim().split('.').map(Number)
+      : null;
+
+  const a = parts(next);
+  const b = parts(previous);
+  if (!a || !b) return false;
+
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const left = a[i] ?? 0;
+    const right = b[i] ?? 0;
+    if (left !== right) return left < right;
+  }
+  return false;
 }

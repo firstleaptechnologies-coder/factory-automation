@@ -60,6 +60,26 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      # A run carries the commit it was QUEUED at, not the branch tip it ends
+      # up running against. These builds serialise behind one another, so a
+      # second dispatch can sit in the queue while the first one finishes and
+      # commits its version bump — and then build the tree from before that
+      # bump. That is exactly what happened on 18 Sep: two dispatches 49
+      # seconds apart produced build 29828651 carrying version 1.0.0 *after*
+      # build 29828633 carrying 1.0.1, and the later one overwrote the version
+      # gate with a higher build number and an older name.
+      #
+      # Re-dispatching is one click. A binary in TestFlight that claims to be
+      # older than the one before it is days of confusion.
+      - name: Guard — the branch has not moved since this run was queued
+        run: |
+          git fetch --quiet origin "${{ github.ref_name }}"
+          TIP="$(git rev-parse "origin/${{ github.ref_name }}")"
+          if [ "$TIP" != "${{ github.sha }}" ]; then
+            echo "::error::This run was queued at ${{ github.sha }}, but ${{ github.ref_name }} is now at $TIP — probably a build that finished while this one waited. Re-dispatch so the build is cut from the current tree."
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22

@@ -1,4 +1,4 @@
-import { ReleasesService } from './releases.service';
+import { ReleasesService, olderVersion } from './releases.service';
 import { prismaMock } from '../../../test/prisma-mock';
 
 type Db = Record<string, Record<string, jest.Mock>>;
@@ -497,5 +497,112 @@ describe('listing releases', () => {
     await service.list(query());
 
     expect(db.otaRelease.findMany.mock.calls[0][0].orderBy).toEqual({ createdAt: 'desc' });
+  });
+});
+
+/*
+ * The incident this exists for: two native builds dispatched 49 seconds apart
+ * serialised behind one another, and the second built the tree from before the
+ * first one's version bump. It uploaded build 29828651 calling itself 1.0.0,
+ * twenty-three minutes after build 29828633 called itself 1.0.1, and wrote
+ * that over the gate. Nothing failed. It was found days later by somebody
+ * trying to mark a build live and noticing the number was not the one they
+ * meant — by which time the update screen would have been telling people on
+ * 1.0.1 to go and install 1.0.0.
+ */
+describe('recording what the stores are serving', () => {
+  const gate = (over: Record<string, unknown> = {}) =>
+    ({
+      platform: 'ios',
+      channel: 'development',
+      latestBuild: 29828651,
+      latestVersionName: '1.0.0',
+      storeUrl: 'https://apps.apple.com/app/id1',
+      ...over,
+    }) as never;
+
+  function existing(latestBuild: number, latestVersionName: string | null) {
+    const built = build();
+    built.db.appVersionGate.findUnique = jest.fn(async () => ({
+      latestBuild,
+      latestVersionName,
+    }));
+    return built;
+  }
+
+  it('refuses a newer build that calls itself an older version', async () => {
+    const { service, db } = existing(29828633, '1.0.1');
+    await expect(service.setGate(gate())).rejects.toThrow(/cannot carry an older version name/);
+    expect(db.appVersionGate.upsert).not.toHaveBeenCalled();
+  });
+
+  it('names both builds, so the one to keep is obvious', async () => {
+    const { service } = existing(29828633, '1.0.1');
+    const error: Error = await service
+      .setGate(gate())
+      .then(() => new Error('it recorded'))
+      .catch((e: Error) => e);
+
+    expect(error.message).toMatch(/29828651/);
+    expect(error.message).toMatch(/29828633/);
+  });
+
+  it('records a newer build with a newer version, which is the normal case', async () => {
+    const { service, db } = existing(29828633, '1.0.1');
+    await service.setGate(gate({ latestBuild: 29828700, latestVersionName: '1.0.2' }));
+    expect(db.appVersionGate.upsert).toHaveBeenCalled();
+  });
+
+  it('records a newer build with the same version — a rebuild is not a downgrade', async () => {
+    const { service, db } = existing(29828633, '1.0.1');
+    await service.setGate(gate({ latestBuild: 29828700, latestVersionName: '1.0.1' }));
+    expect(db.appVersionGate.upsert).toHaveBeenCalled();
+  });
+
+  it('lets a person put the number back by hand, which is how this gets fixed', async () => {
+    // Correcting it means writing a LOWER build number, which is never the
+    // shape being refused.
+    const { service, db } = existing(29828651, '1.0.0');
+    await service.setGate(gate({ latestBuild: 29828633, latestVersionName: '1.0.1' }));
+    expect(db.appVersionGate.upsert).toHaveBeenCalled();
+  });
+
+  it('records the first gate for a platform, with nothing to compare against', async () => {
+    const { service, db } = build();
+    db.appVersionGate.findUnique = jest.fn(async () => null);
+    await service.setGate(gate());
+    expect(db.appVersionGate.upsert).toHaveBeenCalled();
+  });
+
+  it('does not block on a version name it cannot read', async () => {
+    // "1.0.0-rc2" is not a run of numbers, and refusing a real record over a
+    // string this does not understand is worse than letting it through.
+    const { service, db } = existing(29828633, '1.0.1');
+    await service.setGate(gate({ latestBuild: 29828700, latestVersionName: '1.0.0-rc2' }));
+    expect(db.appVersionGate.upsert).toHaveBeenCalled();
+  });
+});
+
+describe('olderVersion', () => {
+  it('compares the parts as numbers, not as text', () => {
+    // "1.10.0" sorts before "1.9.0" as a string, and is newer as a version.
+    expect(olderVersion('1.9.0', '1.10.0')).toBe(true);
+    expect(olderVersion('1.10.0', '1.9.0')).toBe(false);
+  });
+
+  it('treats a missing part as zero', () => {
+    expect(olderVersion('1.0', '1.0.1')).toBe(true);
+    expect(olderVersion('1.0.0', '1.0')).toBe(false);
+  });
+
+  it('says no for the same version', () => {
+    expect(olderVersion('1.0.1', '1.0.1')).toBe(false);
+  });
+
+  it('says no rather than guessing at anything it cannot read', () => {
+    for (const odd of [undefined, null, '', '   ', 'v1.0.1', '1.0.0-rc2', 'latest']) {
+      expect(olderVersion(odd, '2.0.0')).toBe(false);
+      expect(olderVersion('1.0.0', odd)).toBe(false);
+    }
   });
 });
