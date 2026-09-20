@@ -72,10 +72,33 @@ describe('the manual a vendor is sent', () => {
     expect(html).toMatch(/a &amp; b/);
   });
 
-  it('marks a field nobody has written up, rather than leaving a blank cell', () => {
-    // A blank reads as "nothing to say"; it means "nobody has said it".
+  /*
+   * A blank reads as "nothing to say"; it means "nobody has said it".
+   *
+   * Which is true only while something is unwritten. Every module a shop can
+   * be sold is now explained in full, so the assertion is the other way round
+   * — and it asks the data rather than assuming, because this was pinned to
+   * the gaps existing and failed the day they stopped existing.
+   */
+  it('either marks what nobody has written up, or has nothing left to mark', () => {
     const html = manualHtml(manualFor(PRODUCT_MANUAL, sold));
-    expect(html).toMatch(/Not yet written up/);
+    const unexplained = workspaceModules(PRODUCT_MANUAL).some((module) =>
+      module.actions.some((action) => action.fields.some((f) => !f.definition.trim())),
+    );
+
+    if (unexplained) expect(html).toMatch(/Not yet written up/);
+    else expect(html).not.toMatch(/Not yet written up/);
+  });
+
+  it('is complete for everything a shop can buy', () => {
+    // The console is excluded on purpose — it is never exported, so what is
+    // still unwritten there cannot reach a vendor.
+    const blanks = workspaceModules(PRODUCT_MANUAL).flatMap((module) =>
+      module.actions.flatMap((action) =>
+        action.fields.filter((f) => !f.definition.trim()).map((f) => `${module.key}.${f.name}`),
+      ),
+    );
+    expect(blanks).toEqual([]);
   });
 
   it('gives every module it prints a heading and a description', () => {

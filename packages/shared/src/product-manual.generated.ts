@@ -6288,21 +6288,21 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "GET",
           "path": "/reports",
           "handler": "list",
-          "summary": "",
+          "summary": "What has been asked for, and what is ready.",
           "permissions": [],
           "fields": [
             {
               "name": "kind",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one kind of report.",
               "constraints": []
             },
             {
               "name": "status",
               "type": "ReportStatus",
               "required": false,
-              "definition": "",
+              "definition": "Queued, building, ready, or failed. A large export is built in the background rather than holding a screen open, so \"is it ready yet\" is a question worth being able to ask.",
               "constraints": [
                 "one of ReportStatus"
               ]
@@ -6311,7 +6311,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "take",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "How many to return. The most recent first, since that is what is wanted.",
               "constraints": [
                 "not below 1",
                 "not above 200"
@@ -6342,14 +6342,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "kind",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Which report — sales for a period, outstanding by client, stock movement. Named from the shop's catalogue of reports rather than chosen from a fixed list, so a report added later needs no change here.",
               "constraints": []
             },
             {
               "name": "format",
               "type": "ReportFormat",
               "required": false,
-              "definition": "",
+              "definition": "What to produce it as — a spreadsheet for an accountant, a PDF for a meeting. The figures are the same; what differs is who is going to open it.",
               "constraints": [
                 "one of ReportFormat"
               ]
@@ -6358,7 +6358,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "clientId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Narrow it to one client, where the report is about a single account.",
               "constraints": []
             }
           ]
@@ -6530,14 +6530,14 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/auth/workspace",
           "handler": "lookup",
-          "summary": "",
+          "summary": "Checking a workspace exists before asking anybody for a password.",
           "permissions": [],
           "fields": [
             {
               "name": "workspace",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The short name the shop was given — what goes in the first box.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -6573,7 +6573,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "password",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Their password. Never stored as typed, and never returned by anything.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -6591,14 +6591,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "email",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The FirstLeap staff member's email. Not an employee code — that is a shop's.",
               "constraints": []
             },
             {
               "name": "password",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Their password.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -6649,7 +6649,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/config/materials",
           "handler": "createMaterial",
-          "summary": "",
+          "summary": "Something the shop works in, and what can be picked while punching. The list is the shop's own. What one shop calls \"18mm ply\" another calls by a brand name, and an order priced against the wrong material is an order priced wrongly.",
           "permissions": [
             "CONFIG_MANAGE"
           ],
@@ -6658,7 +6658,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "A short code for it, used on job cards and purchase orders. Fixed once created, because orders and stock already refer to it.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -6667,7 +6667,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What it is called when picking it — what the floor says out loud.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -6676,21 +6676,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "description",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything worth knowing about it — a grade, a finish, a supplier's name.",
               "constraints": []
             },
             {
               "name": "color",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A colour, so a board of orders can be read at a glance.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list. What the shop uses daily belongs at the top, because this is picked while somebody is on the phone.",
               "constraints": []
             },
             {
@@ -6706,21 +6706,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "thicknesses[].value",
               "type": "MeasurementDto",
               "required": false,
-              "definition": "",
+              "definition": "The thickness itself, in whatever unit it is spoken of.",
               "constraints": []
             },
             {
               "name": "thicknesses[].label",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the shop calls it, when that is not just the number — \"18mm\", \"3/4 inch\", \"single\". Printed on the job card so the floor reads its own words.",
               "constraints": []
             },
             {
               "name": "thicknesses[].sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list offered for this material.",
               "constraints": []
             }
           ]
@@ -6738,42 +6738,42 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The short code used on job cards and purchase orders.",
               "constraints": []
             },
             {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What it is called when picking it.",
               "constraints": []
             },
             {
               "name": "description",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything worth knowing about it.",
               "constraints": []
             },
             {
               "name": "color",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A colour, so a board can be read at a glance.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list.",
               "constraints": []
             },
             {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether it is still offered while punching. Switching it off takes it out of the list and leaves every order already made from it alone — those are a record of what was built.",
               "constraints": []
             }
           ]
@@ -6782,7 +6782,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/config/materials/:id/thicknesses",
           "handler": "addThickness",
-          "summary": "",
+          "summary": "One thickness this material is stocked and sold in.",
           "permissions": [
             "CONFIG_MANAGE"
           ],
@@ -6791,14 +6791,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "value",
               "type": "MeasurementDto",
               "required": false,
-              "definition": "",
+              "definition": "The thickness itself, in whatever unit it is spoken of.",
               "constraints": []
             },
             {
               "name": "value.value",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The number as it was measured — 2.5, 600, 18.",
               "constraints": [
                 "not below 0"
               ]
@@ -6807,21 +6807,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "value.unit",
               "type": "LengthUnit",
               "required": true,
-              "definition": "",
+              "definition": "What that number is in: millimetres, inches, feet. It travels with the number because the same figure means four different sizes without it, and a shop whose tape reads in feet should not be converting in its head.",
               "constraints": []
             },
             {
               "name": "label",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the shop calls it, when that is not just the number — \"18mm\", \"3/4 inch\", \"single\". Printed on the job card so the floor reads its own words.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list offered for this material.",
               "constraints": []
             }
           ]
@@ -6840,7 +6840,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/config/size-presets",
           "handler": "createSizePreset",
-          "summary": "",
+          "summary": "A size the shop makes often enough to name. A standard door, a shutter, a drawer front. Picking one is faster than typing three dimensions, and faster on the phone is the whole point of punching.",
           "permissions": [
             "CONFIG_MANAGE"
           ],
@@ -6849,7 +6849,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "A short code for it. Fixed once created, because orders refer to it.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -6858,7 +6858,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What the shop calls this size — \"Standard door\", \"Full shutter\".",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -6867,14 +6867,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "length",
               "type": "MeasurementDto",
               "required": false,
-              "definition": "",
+              "definition": "How long, in whatever unit the shop thinks in.",
               "constraints": []
             },
             {
               "name": "length.value",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The number as it was measured — 2.5, 600, 18.",
               "constraints": [
                 "not below 0"
               ]
@@ -6883,21 +6883,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "length.unit",
               "type": "LengthUnit",
               "required": true,
-              "definition": "",
+              "definition": "What that number is in: millimetres, inches, feet. It travels with the number because the same figure means four different sizes without it, and a shop whose tape reads in feet should not be converting in its head.",
               "constraints": []
             },
             {
               "name": "width",
               "type": "MeasurementDto",
               "required": false,
-              "definition": "",
+              "definition": "How wide.",
               "constraints": []
             },
             {
               "name": "width.value",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The number as it was measured — 2.5, 600, 18.",
               "constraints": [
                 "not below 0"
               ]
@@ -6906,21 +6906,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "width.unit",
               "type": "LengthUnit",
               "required": true,
-              "definition": "",
+              "definition": "What that number is in: millimetres, inches, feet. It travels with the number because the same figure means four different sizes without it, and a shop whose tape reads in feet should not be converting in its head.",
               "constraints": []
             },
             {
               "name": "thickness",
               "type": "MeasurementDto",
               "required": false,
-              "definition": "",
+              "definition": "How thick, where the size implies one.",
               "constraints": []
             },
             {
               "name": "thickness.value",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The number as it was measured — 2.5, 600, 18.",
               "constraints": [
                 "not below 0"
               ]
@@ -6929,14 +6929,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "thickness.unit",
               "type": "LengthUnit",
               "required": true,
-              "definition": "",
+              "definition": "What that number is in: millimetres, inches, feet. It travels with the number because the same figure means four different sizes without it, and a shop whose tape reads in feet should not be converting in its head.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list offered while punching.",
               "constraints": []
             }
           ]
@@ -6954,28 +6954,28 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The short code orders refer to.",
               "constraints": []
             },
             {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the shop calls this size.",
               "constraints": []
             },
             {
               "name": "length",
               "type": "MeasurementDto",
               "required": false,
-              "definition": "",
+              "definition": "How long. Changing it changes what the preset offers from now on and leaves orders already punched at the old size exactly as they were.",
               "constraints": []
             },
             {
               "name": "length.value",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The number as it was measured — 2.5, 600, 18.",
               "constraints": [
                 "not below 0"
               ]
@@ -6984,21 +6984,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "length.unit",
               "type": "LengthUnit",
               "required": true,
-              "definition": "",
+              "definition": "What that number is in: millimetres, inches, feet. It travels with the number because the same figure means four different sizes without it, and a shop whose tape reads in feet should not be converting in its head.",
               "constraints": []
             },
             {
               "name": "width",
               "type": "MeasurementDto",
               "required": false,
-              "definition": "",
+              "definition": "How wide.",
               "constraints": []
             },
             {
               "name": "width.value",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The number as it was measured — 2.5, 600, 18.",
               "constraints": [
                 "not below 0"
               ]
@@ -7007,21 +7007,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "width.unit",
               "type": "LengthUnit",
               "required": true,
-              "definition": "",
+              "definition": "What that number is in: millimetres, inches, feet. It travels with the number because the same figure means four different sizes without it, and a shop whose tape reads in feet should not be converting in its head.",
               "constraints": []
             },
             {
               "name": "thickness",
               "type": "MeasurementDto",
               "required": false,
-              "definition": "",
+              "definition": "How thick.",
               "constraints": []
             },
             {
               "name": "thickness.value",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The number as it was measured — 2.5, 600, 18.",
               "constraints": [
                 "not below 0"
               ]
@@ -7030,21 +7030,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "thickness.unit",
               "type": "LengthUnit",
               "required": true,
-              "definition": "",
+              "definition": "What that number is in: millimetres, inches, feet. It travels with the number because the same figure means four different sizes without it, and a shop whose tape reads in feet should not be converting in its head.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list.",
               "constraints": []
             },
             {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether it is still offered while punching.",
               "constraints": []
             }
           ]
@@ -7062,7 +7062,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What it is called on screen — \"18%\", \"Plywood 18\".",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -7071,7 +7071,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "ratePct",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The rate itself, as a percentage.",
               "constraints": [
                 "not below 0"
               ]
@@ -7080,14 +7080,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isDefault",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether this is the rate used when a line does not name one. Exactly one slab is the default, so a line that says nothing still gets taxed rather than silently getting nothing.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list.",
               "constraints": []
             }
           ]
@@ -7105,14 +7105,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What it is called on screen.",
               "constraints": []
             },
             {
               "name": "ratePct",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The rate. Changing it applies to what is priced from now on; invoices already raised keep the rate they were raised at, because that is what was charged and what was filed.",
               "constraints": [
                 "not below 0"
               ]
@@ -7121,21 +7121,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isDefault",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether this is the rate used when a line does not name one.",
               "constraints": []
             },
             {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether it is still offered when pricing.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list.",
               "constraints": []
             }
           ]
@@ -7228,21 +7228,21 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/logs",
           "handler": "record",
-          "summary": "",
+          "summary": "What the app or the browser saw, sent up in batches. Queued on the device until it can be sent, because the moment worth reporting is often the moment the network was not there.",
           "permissions": [],
           "fields": [
             {
               "name": "client",
               "type": "'app' | 'web'",
               "required": true,
-              "definition": "",
+              "definition": "Which one is reporting — the phone app, or the browser.",
               "constraints": []
             },
             {
               "name": "platform",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which platform it was on, so an iOS-only fault is visible as one.",
               "constraints": [
                 "at most 40 characters"
               ]
@@ -7251,7 +7251,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "appVersion",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which version of the app was running. What tells a fault that is already fixed from one that is not.",
               "constraints": [
                 "at most 40 characters"
               ]
@@ -7260,7 +7260,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "entries",
               "type": "ClientLogEntryDto[]",
               "required": true,
-              "definition": "",
+              "definition": "The entries themselves — a batch, not a backlog dump.",
               "constraints": [
                 "a list"
               ]
@@ -7269,14 +7269,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "entries[].level",
               "type": "(typeof LOG_LEVELS)[number]",
               "required": true,
-              "definition": "",
+              "definition": "How bad it was — information, a warning, or an error.",
               "constraints": []
             },
             {
               "name": "entries[].message",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What happened, as the app or the browser saw it.",
               "constraints": [
                 "at most 2000 characters"
               ]
@@ -7367,7 +7367,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "title",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The heading the notification arrives with. Empty keeps the product's own.",
               "constraints": [
                 "at most 120 characters"
               ]
@@ -7376,7 +7376,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "body",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The line under it. Empty keeps the product's own.",
               "constraints": [
                 "at most 400 characters"
               ]
@@ -7385,7 +7385,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "enabled",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether this notification is sent at all. Switching one off is how a shop stops the kind of alert it does not want — a product that cannot be quietened is one people turn off entirely.",
               "constraints": []
             }
           ]
@@ -7428,7 +7428,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/roles",
           "handler": "create",
-          "summary": "",
+          "summary": "A named set of permissions — what a job is allowed to do. The shop's own, because roles on a shop floor are not the same four everywhere: a supervisor who may move orders back but not touch money is a perfectly ordinary job and needs no code change to exist.",
           "permissions": [
             "ROLE_MANAGE"
           ],
@@ -7437,7 +7437,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What the role is called — \"Supervisor\", \"Accounts\", \"Floor\".",
               "constraints": [
                 "at least 2 characters",
                 "at most 60 characters"
@@ -7447,7 +7447,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "description",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What it is for, so whoever assigns it knows which one to pick.",
               "constraints": [
                 "at most 200 characters"
               ]
@@ -7467,7 +7467,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/roles/:id",
           "handler": "update",
-          "summary": "",
+          "summary": "A named set of permissions — what a job is allowed to do. The shop's own, because roles on a shop floor are not the same four everywhere: a supervisor who may move orders back but not touch money is a perfectly ordinary job and needs no code change to exist.",
           "permissions": [
             "ROLE_MANAGE"
           ],
@@ -7476,7 +7476,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What the role is called — \"Supervisor\", \"Accounts\", \"Floor\".",
               "constraints": [
                 "at least 2 characters",
                 "at most 60 characters"
@@ -7486,7 +7486,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "description",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What it is for, so whoever assigns it knows which one to pick.",
               "constraints": [
                 "at most 200 characters"
               ]
@@ -7554,7 +7554,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/users",
           "handler": "create",
-          "summary": "",
+          "summary": "Somebody who can sign in to this workspace. Not the same thing as an employee: most of the floor never has an account, and an office account may belong to somebody who is not on the payroll.",
           "permissions": [
             "USER_MANAGE"
           ],
@@ -7563,21 +7563,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The short code they sign in with — ADMIN, RK01. Unique within this workspace only: two shops may both have an ADMIN and they are different people, which is why the workspace is named before the code.",
               "constraints": []
             },
             {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Their name, as it appears against what they do.",
               "constraints": []
             },
             {
               "name": "email",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their email, where they have one.",
               "constraints": [
                 "a valid email address"
               ]
@@ -7586,14 +7586,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "phone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their number.",
               "constraints": []
             },
             {
               "name": "password",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The password they will sign in with. Stored hashed and never readable back.",
               "constraints": [
                 "at least 6 characters"
               ]
@@ -7602,7 +7602,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "role",
               "type": "UserRole",
               "required": true,
-              "definition": "",
+              "definition": "What they may do. A role is a set of permissions the shop defines, so a shop that splits or renames jobs is not fighting the software.",
               "constraints": [
                 "one of UserRole"
               ]
@@ -7622,14 +7622,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their name.",
               "constraints": []
             },
             {
               "name": "email",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their email.",
               "constraints": [
                 "a valid email address"
               ]
@@ -7638,14 +7638,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "phone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their number.",
               "constraints": []
             },
             {
               "name": "role",
               "type": "UserRole",
               "required": false,
-              "definition": "",
+              "definition": "What they may do.",
               "constraints": [
                 "one of UserRole"
               ]
@@ -7654,7 +7654,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether they can still sign in. Switching it off stops the account without removing anything they did — every order they punched and every payment they took stays attributed to them.",
               "constraints": []
             }
           ]
@@ -7672,7 +7672,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "password",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The new password. Replaces the old one; nothing can read the old one back.",
               "constraints": [
                 "at least 6 characters"
               ]
@@ -7733,7 +7733,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/workflows",
           "handler": "create",
-          "summary": "",
+          "summary": "A set of stages work moves through. Every shop's floor is different and the software follows the floor rather than the other way round. A shop can keep more than one — a flow for furniture and a flow for a glass job do not have the same steps.",
           "permissions": [
             "WORKFLOW_MANAGE"
           ],
@@ -7742,7 +7742,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "A short code for it. Fixed once created, because orders refer to it.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -7751,7 +7751,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What the shop calls this flow.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -7760,7 +7760,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "description",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What kind of work it is for, so whoever punches knows which to choose.",
               "constraints": []
             }
           ]
@@ -7778,7 +7778,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the shop calls this flow.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -7787,7 +7787,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "description",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What kind of work it is for.",
               "constraints": []
             },
             {
@@ -7830,7 +7830,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/workflows/:id/statuses",
           "handler": "addStatus",
-          "summary": "",
+          "summary": "One stage in a flow — a column on the board.",
           "permissions": [
             "WORKFLOW_MANAGE"
           ],
@@ -7839,7 +7839,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "A short code for the stage. Fixed once created; orders sit in it.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -7848,7 +7848,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What the stage is called on the board — \"Cutting\", \"Polish\", \"QC\".",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -7857,14 +7857,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "color",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Its colour on the board, which is how a floor reads it from a distance.",
               "constraints": []
             },
             {
               "name": "category",
               "type": "StatusCategory",
               "required": false,
-              "definition": "",
+              "definition": "What kind of stage it is — work in progress, waiting, done, lost. It is what lets the product tell \"finished\" from \"abandoned\" without knowing what this shop called either.",
               "constraints": [
                 "one of StatusCategory"
               ]
@@ -7880,35 +7880,35 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isInitial",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether new work starts here. A flow needs one, or a punched order has nowhere to land.",
               "constraints": []
             },
             {
               "name": "isTerminal",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether work stops here — the stage an order is finished in.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where the stage sits, left to right, on the board.",
               "constraints": []
             },
             {
               "name": "canvasX",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Where the stage sits on the flow diagram, across.",
               "constraints": []
             },
             {
               "name": "canvasY",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Where the stage sits on the flow diagram, down.",
               "constraints": []
             }
           ]
@@ -7926,28 +7926,28 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The stage's short code.",
               "constraints": []
             },
             {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the stage is called. Renaming it renames the column; every order sitting in it stays where it is.",
               "constraints": []
             },
             {
               "name": "color",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Its colour on the board.",
               "constraints": []
             },
             {
               "name": "category",
               "type": "StatusCategory",
               "required": false,
-              "definition": "",
+              "definition": "What kind of stage it is — in progress, waiting, done, lost.",
               "constraints": [
                 "one of StatusCategory"
               ]
@@ -7956,42 +7956,42 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "parentId",
               "type": "string | null",
               "required": false,
-              "definition": "",
+              "definition": "Parent status, for grouping. Null clears the parent.",
               "constraints": []
             },
             {
               "name": "isInitial",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether new work starts here.",
               "constraints": []
             },
             {
               "name": "isTerminal",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether work stops here.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where the stage sits, left to right, on the board.",
               "constraints": []
             },
             {
               "name": "canvasX",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Where the stage sits on the flow diagram, across.",
               "constraints": []
             },
             {
               "name": "canvasY",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Where the stage sits on the flow diagram, down.",
               "constraints": []
             }
           ]
@@ -8019,7 +8019,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "positions",
               "type": "NodePositionDto[]",
               "required": true,
-              "definition": "",
+              "definition": "Where every stage sits on the canvas.",
               "constraints": [
                 "a list"
               ]
@@ -8028,28 +8028,28 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "positions[].id",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Which stage.",
               "constraints": []
             },
             {
               "name": "positions[].canvasX",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Its position across the canvas.",
               "constraints": []
             },
             {
               "name": "positions[].canvasY",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Its position down the canvas.",
               "constraints": []
             },
             {
               "name": "transitions",
               "type": "TransitionDto[]",
               "required": true,
-              "definition": "",
+              "definition": "Every move the flow allows, as the diagram now draws them.",
               "constraints": [
                 "a list"
               ]
@@ -8058,35 +8058,35 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "transitions[].fromStatusId",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The stage being moved out of.",
               "constraints": []
             },
             {
               "name": "transitions[].toStatusId",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The stage being moved into.",
               "constraints": []
             },
             {
               "name": "transitions[].label",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the move is called on the button — \"Send to polish\", \"Reject\".",
               "constraints": []
             },
             {
               "name": "transitions[].requiresNote",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether a reason must be given. Worth setting on the moves that go backwards or sideways: those are the ones somebody asks about later.",
               "constraints": []
             },
             {
               "name": "transitions[].allowedRoles",
               "type": "UserRole[]",
               "required": false,
-              "definition": "",
+              "definition": "Who may make this move. Empty means anybody who can move orders at all — used to keep, say, sign-off to a supervisor.",
               "constraints": [
                 "a list",
                 "one of UserRole, { each: true }"
@@ -8107,7 +8107,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "statusIds",
               "type": "string[]",
               "required": true,
-              "definition": "",
+              "definition": "The stages to count, in the order they appear on the card.",
               "constraints": [
                 "a list"
               ]
