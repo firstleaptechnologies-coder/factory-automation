@@ -5216,7 +5216,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "date",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "Which day's register to open. Today, almost always.",
               "constraints": []
             }
           ]
@@ -5225,7 +5225,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "GET",
           "path": "/attendance",
           "handler": "register",
-          "summary": "",
+          "summary": "The register over a stretch of days — the view that settles arguments.",
           "permissions": [
             "ATTENDANCE_VIEW"
           ],
@@ -5234,21 +5234,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "from",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "From this day.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "Up to this day.",
               "constraints": []
             },
             {
               "name": "employeeId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one person's month.",
               "constraints": []
             }
           ]
@@ -5257,7 +5257,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "GET",
           "path": "/attendance/summary",
           "handler": "summary",
-          "summary": "",
+          "summary": "The register over a stretch of days — the view that settles arguments.",
           "permissions": [
             "ATTENDANCE_VIEW"
           ],
@@ -5266,21 +5266,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "from",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "From this day.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "Up to this day.",
               "constraints": []
             },
             {
               "name": "employeeId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one person's month.",
               "constraints": []
             }
           ]
@@ -5298,14 +5298,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "date",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "Which day is being marked.",
               "constraints": []
             },
             {
               "name": "marks",
               "type": "MarkDto[]",
               "required": false,
-              "definition": "",
+              "definition": "Everybody's mark for that day, in one go.",
               "constraints": [
                 "a list"
               ]
@@ -5314,14 +5314,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "marks[].employeeId",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Whose day this is.",
               "constraints": []
             },
             {
               "name": "marks[].mark",
               "type": "AttendanceMark",
               "required": true,
-              "definition": "",
+              "definition": "Present, half a day, absent, on leave, a holiday, or the weekly off. Leave is away with the shop's blessing — whether it is paid is the pay structure's business, not this row's.",
               "constraints": [
                 "one of AttendanceMark"
               ]
@@ -5337,7 +5337,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "marks[].outAt",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When they left, where the shop keeps times.",
               "constraints": []
             },
             {
@@ -5354,7 +5354,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "marks[].note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Why the day was what it was — late, sent home, called in on an off day.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -5374,7 +5374,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "status",
               "type": "EmploymentStatus",
               "required": false,
-              "definition": "",
+              "definition": "Working, away, or gone. Defaults to everybody currently employed.",
               "constraints": [
                 "one of EmploymentStatus"
               ]
@@ -5383,7 +5383,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "department",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one part of the shop.",
               "constraints": []
             },
             {
@@ -5419,7 +5419,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/employees",
           "handler": "create",
-          "summary": "",
+          "summary": "Somebody the shop employs. Deliberately not the same thing as a login. Most of the floor will never have an account, an account can be taken away without the person ceasing to work here, and an office account may belong to somebody who is not on the payroll at all.",
           "permissions": [
             "EMPLOYEE_MANAGE"
           ],
@@ -5428,7 +5428,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Their name, as it should appear on a payslip and a letter.",
               "constraints": [
                 "at least 2 characters",
                 "at most 120 characters"
@@ -5438,7 +5438,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "phone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The number they are reached on.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -5447,7 +5447,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "altPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A second number — a family member's, usually.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -5456,7 +5456,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "email",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where a payslip or a letter is sent, when they have one.",
               "constraints": [
                 "at most 200 characters"
               ]
@@ -5465,7 +5465,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "designation",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What they do — carpenter, polisher, supervisor. Printed on their letters.",
               "constraints": [
                 "at most 100 characters"
               ]
@@ -5474,7 +5474,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "department",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which part of the shop they work in. What attendance is grouped by.",
               "constraints": [
                 "at most 100 characters"
               ]
@@ -5483,14 +5483,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "joinedOn",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "The day they started. What length of service is counted from, which is what an experience letter states and what gratuity would turn on.",
               "constraints": []
             },
             {
               "name": "status",
               "type": "EmploymentStatus",
               "required": false,
-              "definition": "",
+              "definition": "Whether they are working, away, or have left. Somebody who leaves is marked as having left and never deleted: their attendance, their payslips and their letters are the shop's own records.",
               "constraints": [
                 "one of EmploymentStatus"
               ]
@@ -5513,14 +5513,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "pan",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their PAN, stored encrypted like the Aadhaar above. Needed wherever tax is deducted or reported against them, and wrong far more often than anybody expects — which is why it is checked against its shape as it is typed rather than on the day it is needed.",
               "constraints": []
             },
             {
               "name": "bankAccountName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The name on the bank account, which is not always the name the shop uses for them — a transfer to a name that does not match is a transfer that bounces.",
               "constraints": [
                 "at most 120 characters"
               ]
@@ -5529,7 +5529,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "bankAccountNumber",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their account number, for paying salary by transfer.",
               "constraints": [
                 "at most 30 characters"
               ]
@@ -5538,14 +5538,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "bankIfsc",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The branch code their account sits at. Checked against its shape because a transfer sent on a wrong IFSC either fails days later or reaches somebody else, and neither is discovered before payday.",
               "constraints": []
             },
             {
               "name": "address",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where they live. Printed on an appointment letter.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -5554,7 +5554,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "emergencyName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who to call if something happens to them at work.",
               "constraints": [
                 "at most 120 characters"
               ]
@@ -5563,7 +5563,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "emergencyPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The number to call. Worth keeping current for the whole floor: it is needed on exactly the day nobody has time to go looking for it.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -5581,7 +5581,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/employees/:id",
           "handler": "update",
-          "summary": "",
+          "summary": "Somebody the shop employs. Deliberately not the same thing as a login. Most of the floor will never have an account, an account can be taken away without the person ceasing to work here, and an office account may belong to somebody who is not on the payroll at all.",
           "permissions": [
             "EMPLOYEE_MANAGE"
           ],
@@ -5590,7 +5590,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Their name, as it should appear on a payslip and a letter.",
               "constraints": [
                 "at least 2 characters",
                 "at most 120 characters"
@@ -5600,7 +5600,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "phone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The number they are reached on.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -5609,7 +5609,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "altPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A second number — a family member's, usually.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -5618,7 +5618,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "email",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where a payslip or a letter is sent, when they have one.",
               "constraints": [
                 "at most 200 characters"
               ]
@@ -5627,7 +5627,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "designation",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What they do — carpenter, polisher, supervisor. Printed on their letters.",
               "constraints": [
                 "at most 100 characters"
               ]
@@ -5636,7 +5636,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "department",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which part of the shop they work in. What attendance is grouped by.",
               "constraints": [
                 "at most 100 characters"
               ]
@@ -5645,14 +5645,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "joinedOn",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "The day they started. What length of service is counted from, which is what an experience letter states and what gratuity would turn on.",
               "constraints": []
             },
             {
               "name": "status",
               "type": "EmploymentStatus",
               "required": false,
-              "definition": "",
+              "definition": "Whether they are working, away, or have left. Somebody who leaves is marked as having left and never deleted: their attendance, their payslips and their letters are the shop's own records.",
               "constraints": [
                 "one of EmploymentStatus"
               ]
@@ -5675,14 +5675,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "pan",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their PAN, stored encrypted like the Aadhaar above. Needed wherever tax is deducted or reported against them, and wrong far more often than anybody expects — which is why it is checked against its shape as it is typed rather than on the day it is needed.",
               "constraints": []
             },
             {
               "name": "bankAccountName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The name on the bank account, which is not always the name the shop uses for them — a transfer to a name that does not match is a transfer that bounces.",
               "constraints": [
                 "at most 120 characters"
               ]
@@ -5691,7 +5691,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "bankAccountNumber",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their account number, for paying salary by transfer.",
               "constraints": [
                 "at most 30 characters"
               ]
@@ -5700,14 +5700,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "bankIfsc",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The branch code their account sits at. Checked against its shape because a transfer sent on a wrong IFSC either fails days later or reaches somebody else, and neither is discovered before payday.",
               "constraints": []
             },
             {
               "name": "address",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where they live. Printed on an appointment letter.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -5716,7 +5716,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "emergencyName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who to call if something happens to them at work.",
               "constraints": [
                 "at most 120 characters"
               ]
@@ -5725,7 +5725,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "emergencyPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The number to call. Worth keeping current for the whole floor: it is needed on exactly the day nobody has time to go looking for it.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -5771,7 +5771,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/letters/templates",
           "handler": "createTemplate",
-          "summary": "",
+          "summary": "The wording a kind of letter starts from, before it is about anybody. Kept by the shop so its letters read the same whoever writes them, and so nobody is drafting an appointment letter from memory at five o'clock.",
           "permissions": [
             "EMPLOYEE_MANAGE"
           ],
@@ -5780,7 +5780,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "kind",
               "type": "LetterKind",
               "required": true,
-              "definition": "",
+              "definition": "What kind of letter it is — an offer, an appointment, an NDA, a statement of responsibilities, an experience or relieving letter, or a warning.",
               "constraints": [
                 "one of LetterKind"
               ]
@@ -5789,7 +5789,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What the shop calls this template when picking one.",
               "constraints": [
                 "at least 2 characters",
                 "at most 120 characters"
@@ -5799,7 +5799,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "body",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The wording, with placeholders for the person, their role and the dates. Filled in when a letter is actually issued.",
               "constraints": [
                 "at least 20 characters",
                 "at most 20000 characters"
@@ -5809,7 +5809,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether it is still offered. Switching it off leaves every letter already issued from it exactly as it was — those are in people's files.",
               "constraints": []
             }
           ]
@@ -5818,7 +5818,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/letters/templates/:id",
           "handler": "updateTemplate",
-          "summary": "",
+          "summary": "The wording a kind of letter starts from, before it is about anybody. Kept by the shop so its letters read the same whoever writes them, and so nobody is drafting an appointment letter from memory at five o'clock.",
           "permissions": [
             "EMPLOYEE_MANAGE"
           ],
@@ -5827,7 +5827,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "kind",
               "type": "LetterKind",
               "required": true,
-              "definition": "",
+              "definition": "What kind of letter it is — an offer, an appointment, an NDA, a statement of responsibilities, an experience or relieving letter, or a warning.",
               "constraints": [
                 "one of LetterKind"
               ]
@@ -5836,7 +5836,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What the shop calls this template when picking one.",
               "constraints": [
                 "at least 2 characters",
                 "at most 120 characters"
@@ -5846,7 +5846,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "body",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The wording, with placeholders for the person, their role and the dates. Filled in when a letter is actually issued.",
               "constraints": [
                 "at least 20 characters",
                 "at most 20000 characters"
@@ -5856,7 +5856,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether it is still offered. Switching it off leaves every letter already issued from it exactly as it was — those are in people's files.",
               "constraints": []
             }
           ]
@@ -5884,14 +5884,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "employeeId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one person's letters.",
               "constraints": []
             },
             {
               "name": "kind",
               "type": "LetterKind",
               "required": false,
-              "definition": "",
+              "definition": "Only one kind — every warning issued, say.",
               "constraints": [
                 "one of LetterKind"
               ]
@@ -5912,7 +5912,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/letters",
           "handler": "issue",
-          "summary": "",
+          "summary": "Issuing a letter to somebody.",
           "permissions": [
             "EMPLOYEE_MANAGE"
           ],
@@ -5921,14 +5921,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "employeeId",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Who it is about.",
               "constraints": []
             },
             {
               "name": "kind",
               "type": "LetterKind",
               "required": true,
-              "definition": "",
+              "definition": "What kind of letter it is.",
               "constraints": [
                 "one of LetterKind"
               ]
@@ -5937,7 +5937,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "title",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What it is called in their file — what somebody scans a list for.",
               "constraints": [
                 "at least 2 characters",
                 "at most 200 characters"
@@ -5957,7 +5957,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "issuedOn",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "The date on the letter. Today if nobody says otherwise.",
               "constraints": []
             }
           ]
@@ -5986,7 +5986,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/payroll/structures",
           "handler": "setStructure",
-          "summary": "",
+          "summary": "How somebody is paid, from a given date. A raise is a new structure, never an edit. Last month's payslip has to stay explicable after this month's rise, and a rate that changed underneath it would make the two disagree with nobody able to say why.",
           "permissions": [
             "SALARY_MANAGE"
           ],
@@ -5995,14 +5995,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "employeeId",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Whose pay this describes.",
               "constraints": []
             },
             {
               "name": "kind",
               "type": "PayKind",
               "required": true,
-              "definition": "",
+              "definition": "Monthly, daily, or by the piece. It decides what the rate means and how the month is worked out — a monthly salary is divided by the shop's working days, a daily rate is multiplied by days present.",
               "constraints": [
                 "one of PayKind"
               ]
@@ -6011,7 +6011,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "rate",
               "type": "number",
               "required": true,
-              "definition": "",
+              "definition": "The figure itself: a month's salary, a day's wage, or the price of one piece, depending on the kind above.",
               "constraints": [
                 "not below 0.01"
               ]
@@ -6029,7 +6029,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "overtimeHourlyRate",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "What an hour past the ordinary day is worth. Kept apart from the rate because overtime is usually agreed separately and not always at the same proportion.",
               "constraints": [
                 "not below 0"
               ]
@@ -6038,14 +6038,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "effectiveFrom",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "The date this starts applying from. Months before it are still worked out on whatever structure was in force then, which is what makes an old payslip re-explainable.",
               "constraints": []
             },
             {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Why it changed — a raise, a change of role, a correction.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -6066,7 +6066,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/payroll/advances",
           "handler": "giveAdvance",
-          "summary": "",
+          "summary": "Money handed over before payday, against the month's wages. Normal on a shop floor rather than exceptional. Recorded as it is given so it comes off the month it belongs to, instead of being remembered at the end of it.",
           "permissions": [
             "SALARY_MANAGE"
           ],
@@ -6075,14 +6075,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "employeeId",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Who took it.",
               "constraints": []
             },
             {
               "name": "amount",
               "type": "number",
               "required": true,
-              "definition": "",
+              "definition": "How much, in rupees.",
               "constraints": [
                 "not below 1"
               ]
@@ -6091,14 +6091,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "givenOn",
               "type": "date",
               "required": true,
-              "definition": "",
+              "definition": "The day it was handed over, which decides the month it comes off.",
               "constraints": []
             },
             {
               "name": "mode",
               "type": "PaymentMode",
               "required": true,
-              "definition": "",
+              "definition": "How it was given — cash out of the drawer, or a transfer.",
               "constraints": [
                 "one of PaymentMode"
               ]
@@ -6107,7 +6107,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What it was for, when that is worth keeping.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -6138,7 +6138,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/payroll/runs",
           "handler": "open",
-          "summary": "",
+          "summary": "Opening a month's salary run.",
           "permissions": [
             "SALARY_MANAGE"
           ],
@@ -6157,7 +6157,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about this month's run — a bonus paid, a shutdown.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -6168,7 +6168,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/payroll/runs/:id/payslips/:payslipId",
           "handler": "adjust",
-          "summary": "",
+          "summary": "Changing one person's payslip before the month is paid. Once a run is paid it is what the shop actually handed over, and a payslip that changed afterwards would stop matching the money that left.",
           "permissions": [
             "SALARY_MANAGE"
           ],
@@ -6186,7 +6186,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "otherDeductions",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Anything coming off beyond the advances already recorded — a fine, damage, money owed for something the shop bought for them.",
               "constraints": [
                 "not below 0"
               ]
@@ -6195,7 +6195,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "deductionNote",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Why it is being deducted. Printed on the payslip, because a deduction the person cannot account for is an argument on payday.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -6204,7 +6204,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything else about this person's month.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -6225,7 +6225,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/payroll/runs/:id/pay",
           "handler": "pay",
-          "summary": "",
+          "summary": "Paying a month's run, once every payslip is settled.",
           "permissions": [
             "SALARY_PAY"
           ],
@@ -6234,7 +6234,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "mode",
               "type": "PaymentMode",
               "required": true,
-              "definition": "",
+              "definition": "How the wages were paid — cash out of the drawer, or transfers from the bank. Required for the same reason it is on every other payment: the two come out of different pots.",
               "constraints": [
                 "one of PaymentMode"
               ]
