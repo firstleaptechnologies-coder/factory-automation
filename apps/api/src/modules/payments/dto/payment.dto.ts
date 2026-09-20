@@ -81,6 +81,12 @@ export class RecordDepositDto {
  * saying why is the same problem as deleting it, one step removed.
  */
 export class ReversePaymentDto {
+  /**
+   * Why the receipt is being taken back — a cheque that bounced, money
+   * recorded against the wrong order, an amount entered twice. Required and
+   * kept forever: the original row stays exactly as it was and this is the
+   * only record of why the figure moved.
+   */
   @IsString() @MinLength(3) reason!: string;
 }
 

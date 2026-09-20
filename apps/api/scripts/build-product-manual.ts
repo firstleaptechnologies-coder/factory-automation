@@ -36,7 +36,7 @@ import {
   undefinedFields,
 } from '@fas/shared';
 
-const API_SRC = join(__dirname, '..', 'src');
+export const API_SRC = join(__dirname, '..', 'src');
 
 /**
  * `MODULES.ORDERS` in a decorator, `'orders'` in the catalogue.
@@ -51,7 +51,7 @@ const MODULE_BY_CONSTANT: Record<string, string> = Object.fromEntries(
 const REPO = join(__dirname, '..', '..', '..');
 
 /** Every .ts under a directory, ignoring the tests. */
-function sources(dir: string, match: (f: string) => boolean): string[] {
+export function sources(dir: string, match: (f: string) => boolean): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
@@ -130,9 +130,17 @@ function fieldFrom(lines: string[], index: number): ManualField | null {
 
   // `name?: string;` and `page = 1;` are both fields; only the first carries a
   // type, so a defaulted one is described by what it defaults to.
+  /*
+   * `?` marks a field optional and `!` marks it definitely assigned — and a
+   * name followed by `!` is the shape TypeScript requires for a field that is
+   * always present. Reading only `?` therefore dropped every REQUIRED field in
+   * the product: 85 of them, including an expense's amount and a purchase
+   * line's material. The manual listed what was optional about a thing and
+   * silently omitted what it could not be created without.
+   */
   const property =
-    bare.match(/(?:^|\s)([a-zA-Z_][A-Za-z0-9_]*)(\??):\s*([^;=]+)/) ??
-    bare.match(/(?:^|\s)([a-zA-Z_][A-Za-z0-9_]*)(\??)\s*=\s*([^;]+);/);
+    bare.match(/(?:^|\s)([a-zA-Z_][A-Za-z0-9_]*)([?!]?):\s*([^;=]+)/) ??
+    bare.match(/(?:^|\s)([a-zA-Z_][A-Za-z0-9_]*)([?!]?)\s*=\s*([^;]+);/);
   if (!property) return null;
   const [, name, optional, rawType] = property;
 
@@ -170,7 +178,8 @@ function fieldFrom(lines: string[], index: number): ManualField | null {
   return {
     name,
     type,
-    required: !optional && !decorated.includes('@IsOptional') && !/=\s*[^;]+;/.test(line),
+    required:
+      optional !== '?' && !decorated.includes('@IsOptional') && !/=\s*[^;]+;/.test(line),
     // The comment above the field, or above the first of its decorators.
     definition: commentAbove(lines, top),
     constraints,
@@ -178,7 +187,7 @@ function fieldFrom(lines: string[], index: number): ManualField | null {
 }
 
 /** Every DTO class in the API, with its fields and their explanations. */
-function readDtos(): Map<string, { summary: string; fields: ManualField[] }> {
+export function readDtos(): Map<string, { summary: string; fields: ManualField[] }> {
   const dtos = new Map<string, { summary: string; fields: ManualField[] }>();
 
   for (const file of sources(API_SRC, (f) => f.endsWith('.dto.ts'))) {

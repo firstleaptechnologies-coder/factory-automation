@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { MODULE_CATALOGUE, PRODUCT_MANUAL, undefinedFields, type ProductManual } from '@fas/shared';
-import { GAPS_FILE, buildManual, gapList } from '../scripts/build-product-manual';
+import {
+  API_SRC,
+  GAPS_FILE,
+  buildManual,
+  gapList,
+  readDtos,
+  sources,
+} from '../scripts/build-product-manual';
 
 /**
  * The product manual cannot fall behind the product.
@@ -107,3 +114,56 @@ describe('what nobody has explained yet', () => {
  * it should never reach a vendor.
  */
 const UNDESCRIBED: string[] = [];
+
+/**
+ * The reader must not drop a field on the floor.
+ *
+ * It did, twice, and both times silently. Reading only `?` as the optional
+ * marker meant every field written `name!: string` — which is how TypeScript
+ * requires a field that is always present — was invisible: 85 of them,
+ * including an expense's amount and a purchase line's material. The manual
+ * listed what was optional about a thing and omitted what it could not be
+ * created without, and reported itself complete while doing it.
+ *
+ * A silent omission is the worst failure this file has, because the gap list
+ * cannot record what was never seen. So the parser is checked against a
+ * deliberately naive count of the same source: every line that carries a
+ * validation decorator and ends in a semicolon is a field, and the parser has
+ * to have found all of them.
+ */
+describe('reading the DTOs', () => {
+  const found = new Set<string>();
+  for (const [name, dto] of readDtos()) {
+    for (const field of dto.fields) found.add(`${name}.${field.name.split('.').pop()}`);
+  }
+
+  /** The same declarations, counted without understanding anything. */
+  const declared: string[] = [];
+  for (const file of sources(API_SRC, (f: string) => f.endsWith('.dto.ts'))) {
+    let current = '';
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      const declaration = line.match(/^export class (\w+)/);
+      if (declaration) {
+        current = declaration[1];
+        continue;
+      }
+      const text = line.trim();
+      if (!current || !text.endsWith(';')) continue;
+      if (!/@(Is[A-Za-z]+|Type|ValidateNested)\(/.test(text)) continue;
+      const bare = text.replace(/@[A-Za-z]+\((?:[^()]|\([^()]*\))*\)/g, ' ');
+      const name = bare.match(/(?:^|\s)([a-zA-Z_][A-Za-z0-9_]*)[?!]?\s*[:=]/)?.[1];
+      if (name) declared.push(`${current}.${name}`);
+    }
+  }
+
+  it('found some, so a pass means something', () => {
+    expect(declared.length).toBeGreaterThan(500);
+  });
+
+  it('missed none of them', () => {
+    const missed = declared.filter((field) => !found.has(field));
+    // If this fails, the manual is quietly describing less than the product
+    // accepts — and the gap list cannot warn about a field nobody saw.
+    expect(missed).toEqual([]);
+  });
+});

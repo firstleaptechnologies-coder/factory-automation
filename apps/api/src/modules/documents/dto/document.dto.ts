@@ -68,6 +68,12 @@ export class ChallanDto {
 export class CreditNoteDto {
   /** The taxable value being credited. The GST comes off in proportion. */
   @IsNumber() @Min(0.01) taxable!: number;
+  /**
+   * Why credit is being given — a return, a shortfall, a rate corrected, a
+   * cancellation. It is a fixed list rather than free text because the reason
+   * decides how the credit is treated for GST, and "as discussed" is not an
+   * answer an assessing officer accepts.
+   */
   @IsEnum(CreditReason) reason!: CreditReason;
   /** Required, and in the shop's own words. */
   @IsString() @MinLength(4) @MaxLength(500) note!: string;

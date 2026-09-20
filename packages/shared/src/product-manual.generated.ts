@@ -2964,7 +2964,18 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "INVOICE_CANCEL"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "reason",
+              "type": "string",
+              "required": true,
+              "definition": "Required. The number stays used whatever happens — a gap in an invoice series is the first thing an assessing officer asks about — so the only record of why it is void is this sentence.",
+              "constraints": [
+                "at least 4 characters",
+                "at most 300 characters"
+              ]
+            }
+          ]
         },
         {
           "method": "GET",
@@ -3087,7 +3098,18 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "INVOICE_CANCEL"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "reason",
+              "type": "string",
+              "required": true,
+              "definition": "Required. The number stays used whatever happens — a gap in an invoice series is the first thing an assessing officer asks about — so the only record of why it is void is this sentence.",
+              "constraints": [
+                "at least 4 characters",
+                "at most 300 characters"
+              ]
+            }
+          ]
         },
         {
           "method": "GET",
@@ -3158,6 +3180,34 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "taxable",
+              "type": "number",
+              "required": true,
+              "definition": "The taxable value being credited. The GST comes off in proportion.",
+              "constraints": [
+                "not below 0.01"
+              ]
+            },
+            {
+              "name": "reason",
+              "type": "CreditReason",
+              "required": true,
+              "definition": "Why credit is being given — a return, a shortfall, a rate corrected, a cancellation. It is a fixed list rather than free text because the reason decides how the credit is treated for GST, and \"as discussed\" is not an answer an assessing officer accepts.",
+              "constraints": [
+                "one of CreditReason"
+              ]
+            },
+            {
+              "name": "note",
+              "type": "string",
+              "required": true,
+              "definition": "Required, and in the shop's own words.",
+              "constraints": [
+                "at least 4 characters",
+                "at most 500 characters"
+              ]
+            },
+            {
               "name": "issuedOn",
               "type": "date",
               "required": false,
@@ -3174,7 +3224,18 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "INVOICE_CANCEL"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "reason",
+              "type": "string",
+              "required": true,
+              "definition": "Required. The number stays used whatever happens — a gap in an invoice series is the first thing an assessing officer asks about — so the only record of why it is void is this sentence.",
+              "constraints": [
+                "at least 4 characters",
+                "at most 300 characters"
+              ]
+            }
+          ]
         },
         {
           "method": "GET",
@@ -3280,7 +3341,17 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "PAYMENT_DELETE"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "reason",
+              "type": "string",
+              "required": true,
+              "definition": "Why the receipt is being taken back — a cheque that bounced, money recorded against the wrong order, an amount entered twice. Required and kept forever: the original row stays exactly as it was and this is the only record of why the figure moved.",
+              "constraints": [
+                "at least 3 characters"
+              ]
+            }
+          ]
         },
         {
           "method": "POST",
@@ -3497,11 +3568,29 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/expenses/options",
           "handler": "createOption",
-          "summary": "",
+          "summary": "One option on one of the expense dropdowns.",
           "permissions": [
             "EXPENSE_CONFIG"
           ],
           "fields": [
+            {
+              "name": "field",
+              "type": "ExpenseOptionField",
+              "required": true,
+              "definition": "Which dropdown it belongs to — how it was paid, who spent it, which supplier, what heading, or who was handed the money.",
+              "constraints": [
+                "one of ExpenseOptionField"
+              ]
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "required": true,
+              "definition": "What it says on the dropdown, in the shop's own words.",
+              "constraints": [
+                "at most 100 characters"
+              ]
+            },
             {
               "name": "account",
               "type": "LedgerAccount",
@@ -3517,11 +3606,28 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/expenses/options/order",
           "handler": "reorderOptions",
-          "summary": "",
+          "summary": "Dragging one dropdown's options into the order the shop wants them.",
           "permissions": [
             "EXPENSE_CONFIG"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "field",
+              "type": "ExpenseOptionField",
+              "required": true,
+              "definition": "Which dropdown is being reordered.",
+              "constraints": [
+                "one of ExpenseOptionField"
+              ]
+            },
+            {
+              "name": "orderedIds",
+              "type": "string[]",
+              "required": true,
+              "definition": "Every option on that dropdown, in the order they should appear.",
+              "constraints": []
+            }
+          ]
         },
         {
           "method": "PATCH",
@@ -3536,7 +3642,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "label",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What it says on the dropdown. Correcting it leaves past entries alone.",
               "constraints": [
                 "at most 100 characters"
               ]
@@ -3545,7 +3651,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "account",
               "type": "LedgerAccount",
               "required": false,
-              "definition": "",
+              "definition": "PAYMENT_TYPE only: which account this way of paying comes out of.",
               "constraints": [
                 "one of LedgerAccount"
               ]
@@ -3554,14 +3660,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether it is still offered. Switching it off takes it out of the dropdown and touches nothing already recorded under it — what was spent is a record of what happened and does not change because a heading fell out of use.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the dropdown. The ones used daily belong at the top, because this list is read while somebody is standing at a counter.",
               "constraints": []
             }
           ]
@@ -3580,7 +3686,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "GET",
           "path": "/expenses/analytics",
           "handler": "analytics",
-          "summary": "",
+          "summary": "Totals by heading and by month — \"where the money went\".",
           "permissions": [
             "EXPENSE_VIEW"
           ],
@@ -3589,14 +3695,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "from",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Counting from this date.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Counting up to this date.",
               "constraints": []
             }
           ]
@@ -3614,49 +3720,49 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "from",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Spent on or after this date.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Spent on or before this date.",
               "constraints": []
             },
             {
               "name": "spentType",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one heading — everything that went on transport, say.",
               "constraints": []
             },
             {
               "name": "doneBy",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only what one person spent.",
               "constraints": []
             },
             {
               "name": "paymentType",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only what was paid one way — everything that came out of the drawer.",
               "constraints": []
             },
             {
               "name": "vendor",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only what went to one supplier.",
               "constraints": []
             },
             {
               "name": "orderId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only what was spent against one order, for costing that job.",
               "constraints": []
             },
             {
@@ -3682,16 +3788,86 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/expenses",
           "handler": "create",
-          "summary": "",
+          "summary": "What the shop spends on itself, as opposed to what it spends on a job. Rent, electricity, tea, a replacement blade. The five dropdowns below are the shop's own lists rather than ours, because one shop's \"consumables\" is another's four separate headings — and a shop that cannot describe its spending in its own words stops recording it.",
           "permissions": [
             "EXPENSE_MANAGE"
           ],
           "fields": [
             {
+              "name": "date",
+              "type": "date",
+              "required": true,
+              "definition": "The day the money was spent, not the day it was typed in.",
+              "constraints": []
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": true,
+              "definition": "What it was, in a line. What somebody scanning a month of spending reads, so \"diesel for the generator\" rather than \"misc\".",
+              "constraints": [
+                "at most 500 characters"
+              ]
+            },
+            {
+              "name": "amount",
+              "type": "number",
+              "required": true,
+              "definition": "How much, in rupees. Must be more than zero, and is capped at ten crore — that ceiling is a guard against a typo, not a rule about what a shop may spend.",
+              "constraints": [
+                "not below 0.01"
+              ]
+            },
+            {
+              "name": "paymentType",
+              "type": "string",
+              "required": true,
+              "definition": "How it was paid, from the shop's own list. Each option is tied to an account, so recording the payment also says which pot it came out of — cash from the drawer and a transfer from the bank are not the same money.",
+              "constraints": [
+                "at most 100 characters"
+              ]
+            },
+            {
+              "name": "doneBy",
+              "type": "string",
+              "required": true,
+              "definition": "Who spent it. What \"who authorised this\" is answered from later.",
+              "constraints": [
+                "at most 100 characters"
+              ]
+            },
+            {
+              "name": "toName",
+              "type": "string",
+              "required": true,
+              "definition": "Who was actually handed the money, when that is a person rather than a firm.",
+              "constraints": [
+                "at most 200 characters"
+              ]
+            },
+            {
+              "name": "vendor",
+              "type": "string",
+              "required": true,
+              "definition": "Which supplier or shop it went to, from the list the shop keeps.",
+              "constraints": [
+                "at most 100 characters"
+              ]
+            },
+            {
+              "name": "spentType",
+              "type": "string",
+              "required": true,
+              "definition": "The heading it falls under — the shop's own categories. This is what \"where did the money go\" is grouped by, so it is worth keeping short and keeping few.",
+              "constraints": [
+                "at most 100 characters"
+              ]
+            },
+            {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about the spending itself that the description has no room for.",
               "constraints": [
                 "at most 1000 characters"
               ]
@@ -3709,7 +3885,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "taxableValue",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The amount before tax, off the bill. Only worth filling in when there is a proper GST bill behind the spending — most daily spending has none.",
               "constraints": [
                 "not below 0"
               ]
@@ -3718,7 +3894,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "taxAmount",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The GST on it, taken off the bill rather than worked out here. The vendor's arithmetic is what was paid.",
               "constraints": [
                 "not below 0"
               ]
@@ -3727,14 +3903,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "itcEligible",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether the shop can claim this tax back as input credit. Not every expense qualifies — staff welfare and a good many vehicle costs do not — and claiming one that does not is the kind of thing found a year later with interest attached. Recorded as a decision rather than assumed from the presence of a bill.",
               "constraints": []
             },
             {
               "name": "billFileId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The photographed bill or receipt. What makes the entry defensible: a figure with no paper behind it is somebody's memory of a figure.",
               "constraints": []
             },
             {
@@ -3759,16 +3935,86 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/expenses/:id",
           "handler": "update",
-          "summary": "",
+          "summary": "What the shop spends on itself, as opposed to what it spends on a job. Rent, electricity, tea, a replacement blade. The five dropdowns below are the shop's own lists rather than ours, because one shop's \"consumables\" is another's four separate headings — and a shop that cannot describe its spending in its own words stops recording it.",
           "permissions": [
             "EXPENSE_MANAGE"
           ],
           "fields": [
             {
+              "name": "date",
+              "type": "date",
+              "required": true,
+              "definition": "The day the money was spent, not the day it was typed in.",
+              "constraints": []
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": true,
+              "definition": "What it was, in a line. What somebody scanning a month of spending reads, so \"diesel for the generator\" rather than \"misc\".",
+              "constraints": [
+                "at most 500 characters"
+              ]
+            },
+            {
+              "name": "amount",
+              "type": "number",
+              "required": true,
+              "definition": "How much, in rupees. Must be more than zero, and is capped at ten crore — that ceiling is a guard against a typo, not a rule about what a shop may spend.",
+              "constraints": [
+                "not below 0.01"
+              ]
+            },
+            {
+              "name": "paymentType",
+              "type": "string",
+              "required": true,
+              "definition": "How it was paid, from the shop's own list. Each option is tied to an account, so recording the payment also says which pot it came out of — cash from the drawer and a transfer from the bank are not the same money.",
+              "constraints": [
+                "at most 100 characters"
+              ]
+            },
+            {
+              "name": "doneBy",
+              "type": "string",
+              "required": true,
+              "definition": "Who spent it. What \"who authorised this\" is answered from later.",
+              "constraints": [
+                "at most 100 characters"
+              ]
+            },
+            {
+              "name": "toName",
+              "type": "string",
+              "required": true,
+              "definition": "Who was actually handed the money, when that is a person rather than a firm.",
+              "constraints": [
+                "at most 200 characters"
+              ]
+            },
+            {
+              "name": "vendor",
+              "type": "string",
+              "required": true,
+              "definition": "Which supplier or shop it went to, from the list the shop keeps.",
+              "constraints": [
+                "at most 100 characters"
+              ]
+            },
+            {
+              "name": "spentType",
+              "type": "string",
+              "required": true,
+              "definition": "The heading it falls under — the shop's own categories. This is what \"where did the money go\" is grouped by, so it is worth keeping short and keeping few.",
+              "constraints": [
+                "at most 100 characters"
+              ]
+            },
+            {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about the spending itself that the description has no room for.",
               "constraints": [
                 "at most 1000 characters"
               ]
@@ -3786,7 +4032,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "taxableValue",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The amount before tax, off the bill. Only worth filling in when there is a proper GST bill behind the spending — most daily spending has none.",
               "constraints": [
                 "not below 0"
               ]
@@ -3795,7 +4041,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "taxAmount",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The GST on it, taken off the bill rather than worked out here. The vendor's arithmetic is what was paid.",
               "constraints": [
                 "not below 0"
               ]
@@ -3804,14 +4050,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "itcEligible",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether the shop can claim this tax back as input credit. Not every expense qualifies — staff welfare and a good many vehicle costs do not — and claiming one that does not is the kind of thing found a year later with interest attached. Recorded as a decision rather than assumed from the presence of a bill.",
               "constraints": []
             },
             {
               "name": "billFileId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The photographed bill or receipt. What makes the entry defensible: a figure with no paper behind it is somebody's memory of a figure.",
               "constraints": []
             },
             {
@@ -3840,7 +4086,18 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "EXPENSE_MANAGE"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "reason",
+              "type": "string",
+              "required": true,
+              "definition": "Required, and kept. A correction nobody explained is a figure that moved.",
+              "constraints": [
+                "at least 4 characters",
+                "at most 500 characters"
+              ]
+            }
+          ]
         },
         {
           "method": "GET",
@@ -4006,6 +4263,20 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "from",
+              "type": "date",
+              "required": true,
+              "definition": "Counting from this date.",
+              "constraints": []
+            },
+            {
+              "name": "to",
+              "type": "date",
+              "required": true,
+              "definition": "Counting up to this date.",
+              "constraints": []
+            },
+            {
               "name": "materialId",
               "type": "string",
               "required": false,
@@ -4034,11 +4305,36 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "materialId",
+              "type": "string",
+              "required": true,
+              "definition": "Which material moved.",
+              "constraints": []
+            },
+            {
               "name": "thicknessId",
               "type": "string",
               "required": false,
               "definition": "Which thickness of it.",
               "constraints": []
+            },
+            {
+              "name": "kind",
+              "type": "StockMoveKind",
+              "required": true,
+              "definition": "What kind of movement it was — issued to a job, returned as an offcut, wasted, or an adjustment after a count. The kind decides which way the quantity goes, which is why the quantity itself is always positive.",
+              "constraints": [
+                "one of StockMoveKind"
+              ]
+            },
+            {
+              "name": "quantity",
+              "type": "number",
+              "required": true,
+              "definition": "Always positive here; which way it goes is decided by the kind.",
+              "constraints": [
+                "not below 0.001"
+              ]
             },
             {
               "name": "unit",
@@ -4137,6 +4433,13 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "vendorId",
+              "type": "string",
+              "required": true,
+              "definition": "Who it is being bought from.",
+              "constraints": []
+            },
+            {
               "name": "expectedOn",
               "type": "date",
               "required": false,
@@ -4159,6 +4462,83 @@ export const PRODUCT_MANUAL: ProductManual = {
               "definition": "Anything about the order as a whole — where to deliver, who to ask for.",
               "constraints": [
                 "at most 500 characters"
+              ]
+            },
+            {
+              "name": "items",
+              "type": "PurchaseItemDto[]",
+              "required": true,
+              "definition": "What is being bought.",
+              "constraints": [
+                "a list"
+              ]
+            },
+            {
+              "name": "items[].materialId",
+              "type": "string",
+              "required": true,
+              "definition": "Which material, from the ones the shop has configured.",
+              "constraints": []
+            },
+            {
+              "name": "items[].thicknessId",
+              "type": "string",
+              "required": false,
+              "definition": "Which thickness of it. The same board in two thicknesses is two different things to buy, to stock and to cut from.",
+              "constraints": []
+            },
+            {
+              "name": "items[].unit",
+              "type": "string",
+              "required": false,
+              "definition": "A sheet, a kilo, a length — the shop's own word for one of them.",
+              "constraints": [
+                "at most 20 characters"
+              ]
+            },
+            {
+              "name": "items[].quantity",
+              "type": "number",
+              "required": true,
+              "definition": "How many, in that unit. Fractions allowed — half a kilo is a real order.",
+              "constraints": [
+                "not below 0.001"
+              ]
+            },
+            {
+              "name": "items[].rate",
+              "type": "number",
+              "required": true,
+              "definition": "The price per unit, before tax. What the shop agreed, not what it hoped for: this is the figure the job's material cost is worked out from.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].gstRatePct",
+              "type": "number",
+              "required": false,
+              "definition": "Taken off the bill rather than derived: a vendor's arithmetic is what is owed.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].taxAmount",
+              "type": "number",
+              "required": false,
+              "definition": "The tax on this line in rupees, taken off the vendor's bill rather than calculated here. Their arithmetic is what is owed, and a figure worked out differently would disagree with the paper by a rupee and cost an afternoon.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].note",
+              "type": "string",
+              "required": false,
+              "definition": "Anything about this line — a batch, a shade, a substitution agreed.",
+              "constraints": [
+                "at most 300 characters"
               ]
             }
           ]
@@ -4173,6 +4553,13 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "vendorId",
+              "type": "string",
+              "required": true,
+              "definition": "Who it is being bought from.",
+              "constraints": []
+            },
+            {
               "name": "expectedOn",
               "type": "date",
               "required": false,
@@ -4195,6 +4582,83 @@ export const PRODUCT_MANUAL: ProductManual = {
               "definition": "Anything about the order as a whole — where to deliver, who to ask for.",
               "constraints": [
                 "at most 500 characters"
+              ]
+            },
+            {
+              "name": "items",
+              "type": "PurchaseItemDto[]",
+              "required": true,
+              "definition": "What is being bought.",
+              "constraints": [
+                "a list"
+              ]
+            },
+            {
+              "name": "items[].materialId",
+              "type": "string",
+              "required": true,
+              "definition": "Which material, from the ones the shop has configured.",
+              "constraints": []
+            },
+            {
+              "name": "items[].thicknessId",
+              "type": "string",
+              "required": false,
+              "definition": "Which thickness of it. The same board in two thicknesses is two different things to buy, to stock and to cut from.",
+              "constraints": []
+            },
+            {
+              "name": "items[].unit",
+              "type": "string",
+              "required": false,
+              "definition": "A sheet, a kilo, a length — the shop's own word for one of them.",
+              "constraints": [
+                "at most 20 characters"
+              ]
+            },
+            {
+              "name": "items[].quantity",
+              "type": "number",
+              "required": true,
+              "definition": "How many, in that unit. Fractions allowed — half a kilo is a real order.",
+              "constraints": [
+                "not below 0.001"
+              ]
+            },
+            {
+              "name": "items[].rate",
+              "type": "number",
+              "required": true,
+              "definition": "The price per unit, before tax. What the shop agreed, not what it hoped for: this is the figure the job's material cost is worked out from.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].gstRatePct",
+              "type": "number",
+              "required": false,
+              "definition": "Taken off the bill rather than derived: a vendor's arithmetic is what is owed.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].taxAmount",
+              "type": "number",
+              "required": false,
+              "definition": "The tax on this line in rupees, taken off the vendor's bill rather than calculated here. Their arithmetic is what is owed, and a figure worked out differently would disagree with the paper by a rupee and cost an afternoon.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].note",
+              "type": "string",
+              "required": false,
+              "definition": "Anything about this line — a batch, a shade, a substitution agreed.",
+              "constraints": [
+                "at most 300 characters"
               ]
             }
           ]
@@ -4226,6 +4690,31 @@ export const PRODUCT_MANUAL: ProductManual = {
               "constraints": []
             },
             {
+              "name": "lines",
+              "type": "ReceiptLineDto[]",
+              "required": true,
+              "definition": "What turned up, line by line.",
+              "constraints": [
+                "a list"
+              ]
+            },
+            {
+              "name": "lines[].purchaseItemId",
+              "type": "string",
+              "required": true,
+              "definition": "Which line of the purchase order this is against.",
+              "constraints": []
+            },
+            {
+              "name": "lines[].quantity",
+              "type": "number",
+              "required": true,
+              "definition": "How many actually arrived, which is not always how many were ordered. A short delivery recorded as a full one is stock the shop thinks it has and a job that stops when somebody goes looking for it.",
+              "constraints": [
+                "not below 0.001"
+              ]
+            },
+            {
               "name": "note",
               "type": "string",
               "required": false,
@@ -4246,6 +4735,22 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "billNumber",
+              "type": "string",
+              "required": true,
+              "definition": "The number on their bill. What the shop's payment is matched against, and what its accountant looks for when claiming the input credit.",
+              "constraints": [
+                "at most 60 characters"
+              ]
+            },
+            {
+              "name": "billedOn",
+              "type": "date",
+              "required": true,
+              "definition": "The date on their bill, which decides the quarter the credit falls in — not the date it was entered here.",
+              "constraints": []
+            },
+            {
               "name": "otherCharges",
               "type": "number",
               "required": false,
@@ -4265,6 +4770,15 @@ export const PRODUCT_MANUAL: ProductManual = {
             "PURCHASE_PAY"
           ],
           "fields": [
+            {
+              "name": "mode",
+              "type": "PaymentMode",
+              "required": true,
+              "definition": "How it was paid — cash, UPI, transfer, cheque. Required for the same reason it is on a receipt: cash leaving the drawer and money leaving the bank are different events.",
+              "constraints": [
+                "one of PaymentMode"
+              ]
+            },
             {
               "name": "paidOn",
               "type": "date",
@@ -4328,6 +4842,16 @@ export const PRODUCT_MANUAL: ProductManual = {
             "VENDOR_MANAGE"
           ],
           "fields": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "What the shop calls them. A firm's name or a person's — whichever is said when somebody asks where a sheet came from.",
+              "constraints": [
+                "at least 2 characters",
+                "at most 160 characters"
+              ]
+            },
             {
               "name": "phone",
               "type": "string",
@@ -4444,6 +4968,16 @@ export const PRODUCT_MANUAL: ProductManual = {
             "VENDOR_MANAGE"
           ],
           "fields": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "What the shop calls them. A firm's name or a person's — whichever is said when somebody asks where a sheet came from.",
+              "constraints": [
+                "at least 2 characters",
+                "at most 160 characters"
+              ]
+            },
             {
               "name": "phone",
               "type": "string",
@@ -4677,7 +5211,15 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "ATTENDANCE_VIEW"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "date",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            }
+          ]
         },
         {
           "method": "GET",
@@ -4688,6 +5230,20 @@ export const PRODUCT_MANUAL: ProductManual = {
             "ATTENDANCE_VIEW"
           ],
           "fields": [
+            {
+              "name": "from",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "to",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
             {
               "name": "employeeId",
               "type": "string",
@@ -4707,6 +5263,20 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "from",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "to",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
               "name": "employeeId",
               "type": "string",
               "required": false,
@@ -4723,7 +5293,73 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "ATTENDANCE_MARK"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "date",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "marks",
+              "type": "MarkDto[]",
+              "required": false,
+              "definition": "",
+              "constraints": [
+                "a list"
+              ]
+            },
+            {
+              "name": "marks[].employeeId",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "marks[].mark",
+              "type": "AttendanceMark",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "one of AttendanceMark"
+              ]
+            },
+            {
+              "name": "marks[].inAt",
+              "type": "date",
+              "required": false,
+              "definition": "Times, where the shop keeps them.",
+              "constraints": []
+            },
+            {
+              "name": "marks[].outAt",
+              "type": "date",
+              "required": false,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "marks[].overtimeMinutes",
+              "type": "whole number",
+              "required": false,
+              "definition": "Minutes past the ordinary day. A whole shift is about as far as it goes.",
+              "constraints": [
+                "not below 0",
+                "not above 16 * 60"
+              ]
+            },
+            {
+              "name": "marks[].note",
+              "type": "string",
+              "required": false,
+              "definition": "",
+              "constraints": [
+                "at most 300 characters"
+              ]
+            }
+          ]
         },
         {
           "method": "GET",
@@ -4789,6 +5425,16 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 2 characters",
+                "at most 120 characters"
+              ]
+            },
+            {
               "name": "phone",
               "type": "string",
               "required": false,
@@ -4832,6 +5478,13 @@ export const PRODUCT_MANUAL: ProductManual = {
               "constraints": [
                 "at most 100 characters"
               ]
+            },
+            {
+              "name": "joinedOn",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
             },
             {
               "name": "status",
@@ -4934,6 +5587,16 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 2 characters",
+                "at most 120 characters"
+              ]
+            },
+            {
               "name": "phone",
               "type": "string",
               "required": false,
@@ -4977,6 +5640,13 @@ export const PRODUCT_MANUAL: ProductManual = {
               "constraints": [
                 "at most 100 characters"
               ]
+            },
+            {
+              "name": "joinedOn",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
             },
             {
               "name": "status",
@@ -5077,7 +5747,15 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "EMPLOYEE_MANAGE"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "leftOn",
+              "type": "date",
+              "required": true,
+              "definition": "The last day they worked.",
+              "constraints": []
+            }
+          ]
         },
         {
           "method": "GET",
@@ -5099,6 +5777,35 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "kind",
+              "type": "LetterKind",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "one of LetterKind"
+              ]
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 2 characters",
+                "at most 120 characters"
+              ]
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 20 characters",
+                "at most 20000 characters"
+              ]
+            },
+            {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
@@ -5116,6 +5823,35 @@ export const PRODUCT_MANUAL: ProductManual = {
             "EMPLOYEE_MANAGE"
           ],
           "fields": [
+            {
+              "name": "kind",
+              "type": "LetterKind",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "one of LetterKind"
+              ]
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 2 characters",
+                "at most 120 characters"
+              ]
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 20 characters",
+                "at most 20000 characters"
+              ]
+            },
             {
               "name": "isActive",
               "type": "yes or no",
@@ -5182,6 +5918,42 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "employeeId",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "kind",
+              "type": "LetterKind",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "one of LetterKind"
+              ]
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 2 characters",
+                "at most 200 characters"
+              ]
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "required": true,
+              "definition": "The body as it will be printed. Sent already filled in, because whoever issues it has read it and may have changed a line. Storing the template id and re-rendering later would make the letter in somebody's file a thing that could change afterwards.",
+              "constraints": [
+                "at least 20 characters",
+                "at most 20000 characters"
+              ]
+            },
+            {
               "name": "issuedOn",
               "type": "date",
               "required": false,
@@ -5220,6 +5992,31 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "employeeId",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "kind",
+              "type": "PayKind",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "one of PayKind"
+              ]
+            },
+            {
+              "name": "rate",
+              "type": "number",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "not below 0.01"
+              ]
+            },
+            {
               "name": "pieceLabel",
               "type": "string",
               "required": false,
@@ -5236,6 +6033,13 @@ export const PRODUCT_MANUAL: ProductManual = {
               "constraints": [
                 "not below 0"
               ]
+            },
+            {
+              "name": "effectiveFrom",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
             },
             {
               "name": "note",
@@ -5267,6 +6071,38 @@ export const PRODUCT_MANUAL: ProductManual = {
             "SALARY_MANAGE"
           ],
           "fields": [
+            {
+              "name": "employeeId",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "amount",
+              "type": "number",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "not below 1"
+              ]
+            },
+            {
+              "name": "givenOn",
+              "type": "date",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "mode",
+              "type": "PaymentMode",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "one of PaymentMode"
+              ]
+            },
             {
               "name": "note",
               "type": "string",
@@ -5307,6 +6143,16 @@ export const PRODUCT_MANUAL: ProductManual = {
             "SALARY_MANAGE"
           ],
           "fields": [
+            {
+              "name": "workingDays",
+              "type": "whole number",
+              "required": false,
+              "definition": "How many days this shop counts as a full month. Asked rather than counted: some shops pay for 26 days and some for 30, and a monthly salary is divided by whichever this one means.",
+              "constraints": [
+                "not below 1",
+                "not above 31"
+              ]
+            },
             {
               "name": "note",
               "type": "string",
@@ -5383,7 +6229,17 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "SALARY_PAY"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "mode",
+              "type": "PaymentMode",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "one of PaymentMode"
+              ]
+            }
+          ]
         },
         {
           "method": "DELETE",
@@ -5482,6 +6338,13 @@ export const PRODUCT_MANUAL: ProductManual = {
             "REPORT_VIEW"
           ],
           "fields": [
+            {
+              "name": "kind",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
             {
               "name": "format",
               "type": "ReportFormat",
@@ -6369,6 +7232,13 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [],
           "fields": [
             {
+              "name": "client",
+              "type": "'app' | 'web'",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
               "name": "platform",
               "type": "string",
               "required": false,
@@ -6385,6 +7255,45 @@ export const PRODUCT_MANUAL: ProductManual = {
               "constraints": [
                 "at most 40 characters"
               ]
+            },
+            {
+              "name": "entries",
+              "type": "ClientLogEntryDto[]",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "a list"
+              ]
+            },
+            {
+              "name": "entries[].level",
+              "type": "(typeof LOG_LEVELS)[number]",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "entries[].message",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at most 2000 characters"
+              ]
+            },
+            {
+              "name": "entries[].at",
+              "type": "date",
+              "required": true,
+              "definition": "When it happened on the device, which is not when it arrived.",
+              "constraints": []
+            },
+            {
+              "name": "entries[].context",
+              "type": "Record<string, unknown>",
+              "required": false,
+              "definition": "Whatever the client thought was worth sending. Never a token: the server cannot tell one string from another, so the clients are the ones that must not put one here.",
+              "constraints": []
             }
           ]
         },
@@ -6525,12 +7434,31 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 2 characters",
+                "at most 60 characters"
+              ]
+            },
+            {
               "name": "description",
               "type": "string",
               "required": false,
               "definition": "",
               "constraints": [
                 "at most 200 characters"
+              ]
+            },
+            {
+              "name": "permissions",
+              "type": "string[]",
+              "required": true,
+              "definition": "Checked against the registry rather than taken as given. A permission string nobody recognises would sit in the database looking like access somebody has, and grant nothing — which is worse than being refused, because it is invisible. Platform permissions are not on the list either: a shop cannot grant itself the run of the control plane.",
+              "constraints": [
+                "a list"
               ]
             }
           ]
@@ -6545,12 +7473,31 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 2 characters",
+                "at most 60 characters"
+              ]
+            },
+            {
               "name": "description",
               "type": "string",
               "required": false,
               "definition": "",
               "constraints": [
                 "at most 200 characters"
+              ]
+            },
+            {
+              "name": "permissions",
+              "type": "string[]",
+              "required": true,
+              "definition": "Checked against the registry rather than taken as given. A permission string nobody recognises would sit in the database looking like access somebody has, and grant nothing — which is worse than being refused, because it is invisible. Platform permissions are not on the list either: a shop cannot grant itself the run of the control plane.",
+              "constraints": [
+                "a list"
               ]
             }
           ]
@@ -7518,6 +8465,24 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "runtimeVersion",
+              "type": "string",
+              "required": true,
+              "definition": "Must match the native build's runtime version exactly.",
+              "constraints": [
+                "at most 40 characters"
+              ]
+            },
+            {
+              "name": "platform",
+              "type": "OtaPlatform",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "one of OtaPlatform"
+              ]
+            },
+            {
               "name": "kind",
               "type": "OtaReleaseKind",
               "required": false,
@@ -7638,6 +8603,24 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "platform",
+              "type": "OtaPlatform",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "one of OtaPlatform"
+              ]
+            },
+            {
+              "name": "latestBuild",
+              "type": "whole number",
+              "required": true,
+              "definition": "/ The newest native build that exists for this platform and channel.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
               "name": "latestVersionName",
               "type": "string",
               "required": false,
@@ -7660,6 +8643,15 @@ export const PRODUCT_MANUAL: ProductManual = {
               "definition": "/ Below this, the app stops. Raised by a person, never by a deploy.",
               "constraints": [
                 "not below 0"
+              ]
+            },
+            {
+              "name": "storeUrl",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at most 300 characters"
               ]
             },
             {
@@ -7719,7 +8711,15 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "PLATFORM_PRICING_MANAGE"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "reason",
+              "type": "string",
+              "required": true,
+              "definition": "Why it was withdrawn. Kept on the row — a bill sent and withdrawn happened.",
+              "constraints": []
+            }
+          ]
         },
         {
           "method": "POST",
@@ -7739,7 +8739,17 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "PLATFORM_IMPERSONATE"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "reason",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 8 characters"
+              ]
+            }
+          ]
         },
         {
           "method": "GET",
@@ -8046,6 +9056,20 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "key",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
               "name": "blurb",
               "type": "string",
               "required": false,
@@ -8126,7 +9150,17 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "PLATFORM_PRICING_MANAGE"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "includedModules",
+              "type": "string[]",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "a list"
+              ]
+            }
+          ]
         },
         {
           "method": "GET",
@@ -8146,7 +9180,17 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "PLATFORM_TENANT_VIEW"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "monthlyPrice",
+              "type": "number",
+              "required": true,
+              "definition": "Zero is allowed and means given away — which is not the same as unpriced.",
+              "constraints": [
+                "not below 0"
+              ]
+            }
+          ]
         },
         {
           "method": "GET",
@@ -8188,11 +9232,34 @@ export const PRODUCT_MANUAL: ProductManual = {
           ],
           "fields": [
             {
+              "name": "key",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
               "name": "blurb",
               "type": "string",
               "required": false,
               "definition": "",
               "constraints": []
+            },
+            {
+              "name": "permissions",
+              "type": "string[]",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "a list"
+              ]
             }
           ]
         },
@@ -8218,6 +9285,15 @@ export const PRODUCT_MANUAL: ProductManual = {
               "required": false,
               "definition": "",
               "constraints": []
+            },
+            {
+              "name": "permissions",
+              "type": "string[]",
+              "required": true,
+              "definition": "Replaces what the role holds. The service drops anything that is not a platform permission: a tenant permission here would grant nothing, because a platform user is not inside anybody's workspace, but it would read as if it did.",
+              "constraints": [
+                "a list"
+              ]
             }
           ]
         },
@@ -8249,7 +9325,40 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permissions": [
             "PLATFORM_STAFF_VIEW"
           ],
-          "fields": []
+          "fields": [
+            {
+              "name": "email",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "a valid email address"
+              ]
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "role",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": []
+            },
+            {
+              "name": "password",
+              "type": "string",
+              "required": true,
+              "definition": "",
+              "constraints": [
+                "at least 8 characters"
+              ]
+            }
+          ]
         },
         {
           "method": "PATCH",
