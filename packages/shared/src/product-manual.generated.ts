@@ -2516,7 +2516,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/disbursements/categories",
           "handler": "createCategory",
-          "summary": "",
+          "summary": "A heading payouts are filed under. The shop's own list, not ours.",
           "permissions": [
             "DISBURSEMENT_MANAGE"
           ],
@@ -2525,7 +2525,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "A short code the shop uses for it. Fixed once created, because every payout already filed under it refers to it — the name can be corrected, this cannot.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -2534,7 +2534,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What it is called on screen and on the ledger.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -2543,7 +2543,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "sortOrder",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list. The headings used most often belong at the top, because this list is read while somebody is standing waiting to be paid.",
               "constraints": []
             }
           ]
@@ -2561,7 +2561,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What it is called. Correcting this does not disturb what is filed under it.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -2570,14 +2570,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether it is still offered when recording a payout. Switching it off hides it from the list without touching a single payout already filed under it — the ledger is a record of what happened and does not change because a heading fell out of use.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list.",
               "constraints": []
             }
           ]
@@ -2595,7 +2595,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "status",
               "type": "DisbursementStatus",
               "required": false,
-              "definition": "",
+              "definition": "Owed, paid, or reversed. \"What do we still owe on jobs\" is the question this ledger is opened for most often.",
               "constraints": [
                 "one of DisbursementStatus"
               ]
@@ -2604,21 +2604,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "categoryId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one heading — everything spent on transport, say.",
               "constraints": []
             },
             {
               "name": "from",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Recorded on or after this date.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Recorded on or before this date.",
               "constraints": []
             }
           ]
@@ -2637,7 +2637,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/disbursements/order/:orderId",
           "handler": "create",
-          "summary": "",
+          "summary": "Money the shop pays out on somebody else's behalf, against one order. A fabricator, an installer, a transporter, a site charge. It is recorded against the order it belongs to and it stays beside that order — it is never taken off the order's total. A shop that quietly reduces what a job was worth by what it paid out cannot afterwards tell what it earned from what it spent, and the one number it most needs is the difference. What the shop calls these is its own — \"ISC\", \"site charges\", anything — which is what the label is for.",
           "permissions": [
             "DISBURSEMENT_MANAGE"
           ],
@@ -2646,7 +2646,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "payeeName",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Who is being paid. A person or a firm, as the shop would say it — this is what somebody searches the payout ledger for later.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -2655,7 +2655,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "amount",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "How much, in rupees. Must be more than zero: a payout of nothing is not a record of anything, and allowing it would let a row exist that changes no figure and explains no decision.",
               "constraints": [
                 "not below 0.01"
               ]
@@ -2664,21 +2664,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "categoryId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which heading it falls under — the shop's own list, so it can total what it spends on transport separately from what it spends on installation.",
               "constraints": []
             },
             {
               "name": "payeeContact",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A number for the payee, so whoever chases the payment can ring them.",
               "constraints": []
             },
             {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What it was for, in the shop's own words.",
               "constraints": []
             },
             {
@@ -2694,7 +2694,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "paidMode",
               "type": "PaymentMode",
               "required": false,
-              "definition": "",
+              "definition": "How it was paid — cash, UPI, transfer, cheque. Only meaningful when it is being recorded as already settled.",
               "constraints": [
                 "one of PaymentMode"
               ]
@@ -2703,14 +2703,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "paidAt",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it was actually paid, which is not always when it was entered.",
               "constraints": []
             },
             {
               "name": "reference",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The UTR, cheque number or transaction id. What the payment is found by if the payee ever says it never arrived.",
               "constraints": []
             }
           ]
@@ -2719,7 +2719,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/disbursements/:id/settle",
           "handler": "settle",
-          "summary": "",
+          "summary": "Paying a payout that was recorded as owed.",
           "permissions": [
             "DISBURSEMENT_MANAGE"
           ],
@@ -2728,7 +2728,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "paidMode",
               "type": "PaymentMode",
               "required": true,
-              "definition": "",
+              "definition": "How it was paid. Required, never assumed: cash leaving the drawer and a transfer leaving the bank are different events, and guessing which makes the cash position wrong.",
               "constraints": [
                 "one of PaymentMode"
               ]
@@ -2737,21 +2737,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "paidAt",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it was paid. Today if nobody says otherwise.",
               "constraints": []
             },
             {
               "name": "reference",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The UTR, cheque number or transaction id.",
               "constraints": []
             },
             {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything worth keeping about the settlement itself.",
               "constraints": []
             }
           ]
@@ -2781,7 +2781,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/disbursements/:id",
           "handler": "update",
-          "summary": "",
+          "summary": "Correcting a payout that has not been paid yet. Once it is settled it is money that left the shop, and money that has moved is corrected by its opposite rather than edited — the same rule the receipts follow.",
           "permissions": [
             "DISBURSEMENT_MANAGE"
           ],
@@ -2790,21 +2790,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "payeeName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who is being paid, if that was recorded wrongly.",
               "constraints": []
             },
             {
               "name": "payeeContact",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A number for the payee.",
               "constraints": []
             },
             {
               "name": "amount",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "How much, in rupees.",
               "constraints": [
                 "not below 0.01"
               ]
@@ -2813,21 +2813,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "categoryId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which heading it falls under.",
               "constraints": []
             },
             {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What it was for.",
               "constraints": []
             },
             {
               "name": "status",
               "type": "DisbursementStatus",
               "required": false,
-              "definition": "",
+              "definition": "Whether it is still owed or has been paid.",
               "constraints": [
                 "one of DisbursementStatus"
               ]
@@ -2857,21 +2857,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "orderId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only the documents raised against one order.",
               "constraints": []
             },
             {
               "name": "from",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Issued on or after this date.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Issued on or before this date.",
               "constraints": []
             },
             {
@@ -2917,7 +2917,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/orders/:orderId/invoice",
           "handler": "raise",
-          "summary": "",
+          "summary": "The tax invoice for an order. Numbered in an unbroken series, because a gap in an invoice series is the first thing an assessing officer asks about. What it shows — CGST and SGST against a single IGST line — follows from the client's state against the shop's.",
           "permissions": [
             "INVOICE_ISSUE"
           ],
@@ -2926,7 +2926,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "issuedOn",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "The date on the invoice. Today if nobody says otherwise.",
               "constraints": []
             },
             {
@@ -2940,7 +2940,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "terms",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The terms printed at the foot of it. Defaults to whatever the shop has set under Firm details, so the usual case needs nothing typed here.",
               "constraints": [
                 "at most 2000 characters"
               ]
@@ -2949,7 +2949,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything for this one invoice that the standing terms do not cover.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -2989,21 +2989,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "orderId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only the documents raised against one order.",
               "constraints": []
             },
             {
               "name": "from",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Issued on or after this date.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Issued on or before this date.",
               "constraints": []
             },
             {
@@ -3029,7 +3029,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/orders/:orderId/challan",
           "handler": "issueChallan",
-          "summary": "",
+          "summary": "The delivery challan — what physically went out, and with whom. Separate from the invoice because goods and the bill for them do not always travel together, and it is the challan that has to be in the vehicle.",
           "permissions": [
             "INVOICE_ISSUE"
           ],
@@ -3038,7 +3038,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "issuedOn",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "The date on the challan. Today if nobody says otherwise.",
               "constraints": []
             },
             {
@@ -3054,7 +3054,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "transport",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who carried it — the transporter's name, or the shop's own driver.",
               "constraints": [
                 "at most 160 characters"
               ]
@@ -3063,7 +3063,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "vehicle",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The vehicle number. What is asked for if a delivery is stopped or a consignment has to be traced.",
               "constraints": [
                 "at most 40 characters"
               ]
@@ -3072,7 +3072,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about the delivery itself — how many packages, what was damaged.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -3112,21 +3112,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "orderId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only the documents raised against one order.",
               "constraints": []
             },
             {
               "name": "from",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Issued on or after this date.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Issued on or before this date.",
               "constraints": []
             },
             {
@@ -3161,7 +3161,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "issuedOn",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "The date on the credit note. Today if nobody says otherwise.",
               "constraints": []
             }
           ]
@@ -3219,7 +3219,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "amount",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "How much came in, in rupees. What is still owed on the order is its total less everything received against it — so this figure is the one that decides whether a job is settled, and it is never rounded to make it look settled.",
               "constraints": [
                 "not below 0.01"
               ]
@@ -3228,7 +3228,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "mode",
               "type": "PaymentMode",
               "required": true,
-              "definition": "",
+              "definition": "Cash, UPI, transfer or cheque. Required and never defaulted: cash has to be walked to a bank afterwards and online money does not, so guessing which one it was makes the cash position meaningless.",
               "constraints": [
                 "one of PaymentMode"
               ]
@@ -3244,14 +3244,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything worth keeping about how it was paid — part payment, who handed it over.",
               "constraints": []
             },
             {
               "name": "receivedAt",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When the money actually arrived, which is often not when somebody got round to entering it. The date the books go by.",
               "constraints": []
             },
             {
@@ -3267,7 +3267,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "bankReference",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The bank's own reference for that deposit, when there is one.",
               "constraints": []
             }
           ]
@@ -3286,7 +3286,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/payments/deposits",
           "handler": "deposit",
-          "summary": "",
+          "summary": "Cash taken out of the shop and put into the bank. Recorded separately from the payment that brought the cash in, because they are two different events days apart. Until a deposit says otherwise the money is still in the drawer, and that difference is the whole point of the cash position.",
           "permissions": [
             "CASH_DEPOSIT"
           ],
@@ -3295,7 +3295,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "amount",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "How much was banked, in rupees.",
               "constraints": [
                 "not below 0.01"
               ]
@@ -3304,21 +3304,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "depositedAt",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it was banked. Today if nobody says otherwise.",
               "constraints": []
             },
             {
               "name": "bankReference",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The slip number or the bank's reference, for matching against a statement.",
               "constraints": []
             },
             {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything worth keeping — who took it, which branch.",
               "constraints": []
             },
             {
@@ -3350,14 +3350,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "from",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Movements on or after this date.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Movements on or before this date.",
               "constraints": []
             },
             {
@@ -3373,7 +3373,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "GET",
           "path": "/payments/cash-position",
           "handler": "cashPosition",
-          "summary": "",
+          "summary": "What came in as cash, what went to the bank, and what is therefore still in the drawer.",
           "permissions": [
             "CASH_POSITION_VIEW"
           ],
@@ -3382,14 +3382,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "from",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Counting from this date.",
               "constraints": []
             },
             {
               "name": "to",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "Counting up to this date.",
               "constraints": []
             }
           ]

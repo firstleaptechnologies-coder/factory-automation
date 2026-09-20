@@ -20,12 +20,28 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
  * makes the cash position meaningless.
  */
 export class RecordPaymentDto {
+  /**
+   * How much came in, in rupees. What is still owed on the order is its total
+   * less everything received against it — so this figure is the one that
+   * decides whether a job is settled, and it is never rounded to make it look
+   * settled.
+   */
   @Type(() => Number) @IsNumber() @Min(0.01) amount: number;
+  /**
+   * Cash, UPI, transfer or cheque. Required and never defaulted: cash has to
+   * be walked to a bank afterwards and online money does not, so guessing
+   * which one it was makes the cash position meaningless.
+   */
   @IsEnum(PaymentMode) mode: PaymentMode;
 
   /** UTR, cheque number or similar. */
   @IsOptional() @IsString() reference?: string;
+  /** Anything worth keeping about how it was paid — part payment, who handed it over. */
   @IsOptional() @IsString() note?: string;
+  /**
+   * When the money actually arrived, which is often not when somebody got
+   * round to entering it. The date the books go by.
+   */
   @IsOptional() @IsDateString() receivedAt?: string;
 
   /**
@@ -33,13 +49,26 @@ export class RecordPaymentDto {
    * Recorded as a deposit against this payment.
    */
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) depositedAmount?: number;
+  /** The bank's own reference for that deposit, when there is one. */
   @IsOptional() @IsString() bankReference?: string;
 }
 
+/**
+ * Cash taken out of the shop and put into the bank.
+ *
+ * Recorded separately from the payment that brought the cash in, because they
+ * are two different events days apart. Until a deposit says otherwise the
+ * money is still in the drawer, and that difference is the whole point of the
+ * cash position.
+ */
 export class RecordDepositDto {
+  /** How much was banked, in rupees. */
   @Type(() => Number) @IsNumber() @Min(0.01) amount: number;
+  /** When it was banked. Today if nobody says otherwise. */
   @IsOptional() @IsDateString() depositedAt?: string;
+  /** The slip number or the bank's reference, for matching against a statement. */
   @IsOptional() @IsString() bankReference?: string;
+  /** Anything worth keeping — who took it, which branch. */
   @IsOptional() @IsString() note?: string;
   /** Omit to record a deposit that is not tied to one order's cash. */
   @IsOptional() @IsString() paymentId?: string;
@@ -55,8 +84,14 @@ export class ReversePaymentDto {
   @IsString() @MinLength(3) reason!: string;
 }
 
+/**
+ * What came in as cash, what went to the bank, and what is therefore still in
+ * the drawer.
+ */
 export class CashPositionQueryDto {
+  /** Counting from this date. */
   @IsOptional() @IsDateString() from?: string;
+  /** Counting up to this date. */
   @IsOptional() @IsDateString() to?: string;
 }
 
@@ -85,7 +120,9 @@ export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
 export class TransactionQueryDto extends PaginationDto {
   /** One kind, or all of them when omitted. */
   @IsOptional() @IsIn(TRANSACTION_KINDS) kind?: TransactionKind;
+  /** Movements on or after this date. */
   @IsOptional() @IsDateString() from?: string;
+  /** Movements on or before this date. */
   @IsOptional() @IsDateString() to?: string;
   /** Order code, client name, or a bank/UTR reference. */
   @IsOptional() @IsString() declare search?: string;
