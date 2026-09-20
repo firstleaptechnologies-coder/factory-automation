@@ -1,18 +1,9 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import type { Release } from '@fas/shared';
+import { ROLLOUT_STEPS, type Release } from '@fas/shared';
 import { api } from '../../api/client';
 import { Text, haptic } from '../../ui';
 import { palette, radius, spacing } from '../../theme';
-
-/**
- * The rungs a rollout is walked up.
- *
- * Publishing is a staged decision — up a rung, watch, up again — not a number
- * somebody types. Zero is not a rung: that is Pause, a different intention,
- * and it sits with the other second-thoughts controls below.
- */
-export const STEPS = [20, 40, 60, 80, 100] as const;
 
 /**
  * Everything one release can have done to it, on a phone.
@@ -132,7 +123,7 @@ export function ReleaseLadder({
       </Text>
 
       <View style={styles.track} accessibilityRole="radiogroup">
-        {STEPS.map((step, index) => {
+        {ROLLOUT_STEPS.map((step, index) => {
           const here = live && release.rolloutPercent === step;
           // Rungs already climbed read as filled, so the track shows the
           // distance travelled without anybody reading a number.

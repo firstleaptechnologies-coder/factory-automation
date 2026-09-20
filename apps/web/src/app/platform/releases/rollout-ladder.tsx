@@ -1,19 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import type { Release } from '@fas/shared';
+import { ROLLOUT_STEPS, type Release } from '@fas/shared';
 import { api } from '@/lib/api';
 import { Icon } from '@/ui';
-
-/**
- * The rungs a rollout is walked up.
- *
- * Publishing is a staged decision, not a free-text number: you go up a rung,
- * watch, go up again. Nobody has ever wanted to type "37". Zero is not a rung —
- * it is Pause, which is a different intention and sits with the other
- * second-thoughts controls below.
- */
-const STEPS = [20, 40, 60, 80, 100] as const;
 
 /**
  * Everything one release can have done to it.
@@ -139,7 +129,7 @@ export function RolloutLadder({
         </span>
 
         <div className="ladder-track" role="group" aria-label="Rollout percentage">
-          {STEPS.map((step) => {
+          {ROLLOUT_STEPS.map((step) => {
             const current = live && release.rolloutPercent === step;
             // Rungs already passed read as filled, so the track shows how far
             // this release has travelled without anybody reading a number.

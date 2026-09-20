@@ -923,6 +923,20 @@ export const DEFAULT_OTA_CHANNEL: OtaChannel = 'production';
  * mapping is written down once, here, and checked against
  * `deploy/environments.json`.
  */
+/**
+ * The rungs a rollout is walked up.
+ *
+ * Publishing is a staged decision — up a rung, watch, up again — not a number
+ * somebody types; nobody has ever wanted to type "37". Zero is deliberately
+ * not a rung: that is Pause, which keeps a release live while serving nobody,
+ * and it is a different intention that belongs with the other second thoughts.
+ *
+ * Written once because it is drawn by both clients and described in the
+ * release-flow page, and three copies of a ladder is three chances for the
+ * page to describe rungs the screens do not have.
+ */
+export const ROLLOUT_STEPS = [20, 40, 60, 80, 100] as const;
+
 export const CHANNEL_BY_APP_ENV: Readonly<Record<string, OtaChannel>> = {
   development: 'development',
   staging: 'development',

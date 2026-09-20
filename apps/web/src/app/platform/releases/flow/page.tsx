@@ -122,7 +122,7 @@ const SECTIONS: Section[] = [
           },
           {
             title: 'Roll it out',
-            detail: 'Walk the percentage up from the Releases screen. It is sticky per install, so raising it only ever adds people.',
+            detail: 'Walk it up the ladder on the Releases screen — 20, 40, 60, 80, 100. The share is sticky per install, so raising it only ever adds people, and Pause holds a release live while serving nobody. A release older than the one that is live cannot be published: installs will not go backwards, so it would retire the live one on paper and change nothing on any phone. Use Roll back for that.',
             by: [{ kind: 'person', who: 'whoever is shipping' }],
           },
         ],
@@ -176,8 +176,8 @@ const SECTIONS: Section[] = [
             by: [{ kind: 'person', who: 'whoever is shipping' }],
           },
           {
-            title: 'Point the binary at staging',
-            detail: 'The manifest URL and the channel are written into the native files before the archive. They are baked in — an update can never change them.',
+            title: 'Point the binary at the staging API, on the development channel',
+            detail: 'The environment is staging; the channel it serves is development, and they are not the same word. Both the manifest URL and the channel are written into the native files before the archive, so they are baked in — an update can never change either.',
             by: [{ kind: 'robot', what: 'configure-ota-target.js' }],
           },
           {
@@ -209,7 +209,7 @@ const SECTIONS: Section[] = [
           },
           {
             title: 'Point the binary at production',
-            detail: 'Which is why a TestFlight binary cannot simply be promoted: it is pointed at staging, in the binary.',
+            detail: 'Which is why a TestFlight binary cannot simply be promoted: the staging URL and the development channel are inside it, in the native files.',
             by: [{ kind: 'robot', what: 'configure-ota-target.js' }],
           },
           {
