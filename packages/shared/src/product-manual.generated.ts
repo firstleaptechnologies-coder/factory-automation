@@ -8443,14 +8443,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "channel",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which channel's releases — `development` for TestFlight and Play internal, `production` for the stores. Each deployment only holds its own, so this is set from the API's own environment rather than picked.",
               "constraints": []
             },
             {
               "name": "platform",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "iOS or Android. They are separate queues with their own live release.",
               "constraints": []
             }
           ]
@@ -8477,7 +8477,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "platform",
               "type": "OtaPlatform",
               "required": true,
-              "definition": "",
+              "definition": "iOS or Android. A bundle built for one is never served to the other.",
               "constraints": [
                 "one of OtaPlatform"
               ]
@@ -8486,7 +8486,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "kind",
               "type": "OtaReleaseKind",
               "required": false,
-              "definition": "",
+              "definition": "An update, or a rollback. A rollback carries no bundle — it tells the app to drop back to the one inside the binary — which is why it is a kind rather than just another release.",
               "constraints": [
                 "one of OtaReleaseKind"
               ]
@@ -8495,21 +8495,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "metadata",
               "type": "Record<string, unknown>",
               "required": false,
-              "definition": "",
+              "definition": "What expo-updates is served alongside the bundle.",
               "constraints": []
             },
             {
               "name": "extra",
               "type": "Record<string, unknown>",
               "required": false,
-              "definition": "",
+              "definition": "Anything else worth carrying to the app — the OTA number it reads back on its own settings screen, so somebody on a shop floor can say which bundle they are on without reading a UUID down a phone.",
               "constraints": []
             },
             {
               "name": "changelog",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What changed. Written by the publish robot from the commit it built.",
               "constraints": [
                 "at most 2000 characters"
               ]
@@ -8547,7 +8547,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "status",
               "type": "OtaReleaseStatus",
               "required": false,
-              "definition": "",
+              "definition": "Draft, published, or archived. Publishing retires whatever was live in the same channel, platform and runtime — there is only ever one — and publishing something older than what is live is refused, because installs will not go backwards and it would change nothing on any phone.",
               "constraints": [
                 "one of OtaReleaseStatus"
               ]
@@ -8566,7 +8566,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "changelog",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What changed, if it is being corrected after the fact.",
               "constraints": [
                 "at most 2000 characters"
               ]
@@ -8597,7 +8597,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PUT",
           "path": "/platform/releases/gates",
           "handler": "setGate",
-          "summary": "",
+          "summary": "What the stores are serving, and what is still allowed to run. Drives the update prompt and the blocking update screen. Everything here is about the native binary, not about an OTA bundle — an update cannot change which build somebody has.",
           "permissions": [
             "PLATFORM_RELEASE_MANAGE"
           ],
@@ -8606,7 +8606,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "platform",
               "type": "OtaPlatform",
               "required": true,
-              "definition": "",
+              "definition": "iOS or Android. Each store moves at its own pace.",
               "constraints": [
                 "one of OtaPlatform"
               ]
@@ -8624,7 +8624,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "latestVersionName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What that build calls itself — \"1.0.1\". For people; the build number is what is actually compared, because \"1.10.0\" sorts below \"1.9.0\" as text and is newer as a version. A newer build carrying an older version name is refused outright: it would tell somebody on 1.0.1 to install 1.0.0.",
               "constraints": [
                 "at most 40 characters"
               ]
@@ -8649,7 +8649,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "storeUrl",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Where the update screen sends people — the App Store or Play listing.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -8658,7 +8658,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "message",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the update screen says, when the default wording is not enough — a reason somebody must update rather than merely being asked to.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -8744,7 +8744,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "reason",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Why we are going into their workspace. Written into that shop's own history, so acting inside somebody's business is never anonymous — it is the sentence they read months later when they ask who was in there.",
               "constraints": [
                 "at least 8 characters"
               ]
@@ -8784,7 +8784,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The shop's own name, as it appears to us and on their bill.",
               "constraints": [
                 "at least 2 characters"
               ]
@@ -8793,7 +8793,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isolation",
               "type": "TenantIsolation",
               "required": false,
-              "definition": "",
+              "definition": "Whether their data shares the platform database with other shops, kept apart by a tenant id, or lives in a database of its own. SHARED is the default and the normal case; DEDICATED is for a client who requires it, and it means every schema change has to reach them separately.",
               "constraints": [
                 "one of TenantIsolation"
               ]
@@ -8840,14 +8840,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "contactName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who we deal with at the shop.",
               "constraints": []
             },
             {
               "name": "contactEmail",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where their invoice and anything else from us is sent.",
               "constraints": [
                 "a valid email address"
               ]
@@ -8856,14 +8856,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "contactPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The number we ring them on.",
               "constraints": []
             },
             {
               "name": "notes",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about the account worth the next person knowing.",
               "constraints": []
             },
             {
@@ -8879,7 +8879,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "ownerCode",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The code they sign in with. Unique inside their workspace only, so every shop can have an ADMIN and they are different people.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -8888,7 +8888,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "ownerPassword",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Their first password. Given to them once and meant to be changed — it passes through whoever sets the shop up, which is exactly the reason not to leave it in place.",
               "constraints": [
                 "at least 6 characters"
               ]
@@ -8897,7 +8897,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "ownerEmail",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their email, where they have one.",
               "constraints": [
                 "a valid email address"
               ]
@@ -8917,14 +8917,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The shop's own name.",
               "constraints": []
             },
             {
               "name": "status",
               "type": "TenantStatus",
               "required": false,
-              "definition": "",
+              "definition": "Whether the workspace is live, suspended or closed. Suspending stops people signing in and keeps every row they have — a shop behind on payment has not stopped being a shop, and their records are theirs.",
               "constraints": [
                 "one of TenantStatus"
               ]
@@ -8973,14 +8973,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "contactName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who we deal with at the shop.",
               "constraints": []
             },
             {
               "name": "contactEmail",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where their invoice is sent.",
               "constraints": [
                 "a valid email address"
               ]
@@ -8989,14 +8989,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "contactPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The number we ring them on.",
               "constraints": []
             },
             {
               "name": "notes",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about the account worth the next person knowing.",
               "constraints": []
             }
           ]
@@ -9014,7 +9014,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isolation",
               "type": "TenantIsolation",
               "required": true,
-              "definition": "",
+              "definition": "Moving a shop between the shared database and one of their own. Not a setting so much as a migration: a dedicated tenant is one every schema change has to reach separately, and a deploy that misses them is a green deploy that left a client behind.",
               "constraints": [
                 "one of TenantIsolation"
               ]
@@ -9050,7 +9050,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/platform/tiers",
           "handler": "createTier",
-          "summary": "",
+          "summary": "A bundle we sell, rather than a checkbox per module.",
           "permissions": [
             "PLATFORM_TENANT_VIEW"
           ],
@@ -9059,28 +9059,28 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "key",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "A short key for it. Fixed once created, because every workspace on the tier refers to it.",
               "constraints": []
             },
             {
               "name": "label",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What it is called on the price list — \"Punch\", \"Shop\", \"Works\".",
               "constraints": []
             },
             {
               "name": "blurb",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "One line on what it is for, so whoever is selling knows which to offer.",
               "constraints": []
             },
             {
               "name": "monthlyPrice",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "What it costs a shop each month, in rupees.",
               "constraints": [
                 "not below 0"
               ]
@@ -9089,7 +9089,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "includedModules",
               "type": "string[]",
               "required": false,
-              "definition": "",
+              "definition": "Which modules come with it.",
               "constraints": [
                 "a list"
               ]
@@ -9109,7 +9109,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "monthlyPrice",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "What the tier costs a shop each month, in rupees.",
               "constraints": [
                 "not below 0"
               ]
@@ -9127,7 +9127,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether the tier can still be sold. Switching it off takes it off the price list and leaves every shop already on it exactly where they are — withdrawing a tier is not the same as moving its customers.",
               "constraints": []
             }
           ]
@@ -9155,7 +9155,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "includedModules",
               "type": "string[]",
               "required": true,
-              "definition": "",
+              "definition": "The set being considered, before it is saved. The answer says which shops would lose which modules — taking something out of a tier is a change to what existing customers already have, and it should not be discovered after the fact.",
               "constraints": [
                 "a list"
               ]
@@ -9235,28 +9235,28 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "key",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "A short key for it. Fixed once created, because staff refer to it.",
               "constraints": []
             },
             {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What the role is called.",
               "constraints": []
             },
             {
               "name": "blurb",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the role is for.",
               "constraints": []
             },
             {
               "name": "permissions",
               "type": "string[]",
               "required": true,
-              "definition": "",
+              "definition": "What it may do. Platform permissions only — somebody answering a support call has no business publishing a release, and a tenant permission here would grant nothing while reading as though it did.",
               "constraints": [
                 "a list"
               ]
@@ -9267,7 +9267,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/platform/roles/:key",
           "handler": "saveRole",
-          "summary": "",
+          "summary": "What one of our own jobs is allowed to do.",
           "permissions": [
             "PLATFORM_STAFF_MANAGE"
           ],
@@ -9276,14 +9276,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the role is called — \"Support\", \"Owner\".",
               "constraints": []
             },
             {
               "name": "blurb",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the role is for, so whoever assigns it knows which to pick.",
               "constraints": []
             },
             {
@@ -9321,7 +9321,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/platform/staff",
           "handler": "createStaff",
-          "summary": "",
+          "summary": "One of our own people, who works above every workspace.",
           "permissions": [
             "PLATFORM_STAFF_VIEW"
           ],
@@ -9330,7 +9330,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "email",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The email they sign in with. Not an employee code — that belongs to a shop.",
               "constraints": [
                 "a valid email address"
               ]
@@ -9339,21 +9339,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Their name, which is what a shop sees in their own history if we go in.",
               "constraints": []
             },
             {
               "name": "role",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Which of our roles they hold, and therefore what they may do.",
               "constraints": []
             },
             {
               "name": "password",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Their first password. Longer than a shop's, because this is every shop.",
               "constraints": [
                 "at least 8 characters"
               ]
@@ -9373,21 +9373,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their name.",
               "constraints": []
             },
             {
               "name": "role",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which of our roles they hold.",
               "constraints": []
             },
             {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether they can still sign in. Switching it off is what happens when somebody leaves: their account stops working and everything they did — every workspace opened, every release published — stays attributed to them.",
               "constraints": []
             }
           ]

@@ -85,6 +85,20 @@ describe('what nobody has explained yet', () => {
     expect(added).toEqual([]);
   });
 
+  /*
+   * The list is empty, and that is the standard now.
+   *
+   * It held 526 when this gate went in and was worked down module by module.
+   * With nothing on it, the two assertions above already refuse any
+   * undocumented field — but stating it outright is what makes the rule
+   * legible to whoever adds the next field, rather than something they infer
+   * from a test failing.
+   */
+  it('is empty — every field in the product is explained', () => {
+    expect(recorded).toEqual([]);
+    expect(undefinedFields(fresh)).toEqual([]);
+  });
+
   it('only ever shrinks', () => {
     /*
      * Fewer than recorded is the whole point and must never fail: writing a

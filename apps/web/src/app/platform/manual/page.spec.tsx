@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { PRODUCT_MANUAL, workspaceModules } from '@fas/shared';
+import { PRODUCT_MANUAL, undefinedFields, workspaceModules } from '@fas/shared';
 import ManualPage from './page';
 
 const push = jest.fn();
@@ -84,9 +84,17 @@ describe('what the owner reads', () => {
     expect(body.getAllByText('Not yet written up.').length).toBeGreaterThan(0);
   });
 
-  it('says how many fields are still unexplained, rather than hiding it', async () => {
+  /*
+   * Says where it stands either way. This asserted the count of unexplained
+   * fields and failed the day there were none — the page falling silent on
+   * being finished is itself a thing worth not doing, so it now says so.
+   */
+  it('says where it stands, whether or not anything is unexplained', async () => {
     await mount();
-    expect(screen.getByText(/fields/)).toBeInTheDocument();
+    const unexplained = undefinedFields(PRODUCT_MANUAL).length;
+    expect(
+      screen.getByText(unexplained ? /still have no explanation/ : /are explained/),
+    ).toBeInTheDocument();
   });
 
   it('can be switched to another module', async () => {

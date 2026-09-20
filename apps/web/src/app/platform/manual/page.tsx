@@ -48,6 +48,10 @@ export default function ManualPage() {
   const [reading, setReading] = useState<string>(forSale[0]?.key ?? '');
 
   const gaps = useMemo(() => undefinedFields(PRODUCT_MANUAL), []);
+  const explained = useMemo(
+    () => PRODUCT_MANUAL.modules.flatMap((m) => m.actions.flatMap((a) => a.fields)).length,
+    [],
+  );
   const shown = [...forSale, ...ours].find((m) => m.key === reading) ?? forSale[0];
 
   const toggle = (key: string) =>
@@ -98,7 +102,13 @@ export default function ManualPage() {
               written; they appear below marked as such rather than silently
               missing.
             </>
-          ) : null}
+          ) : (
+            <>
+              {' '}
+              All <strong>{explained} fields</strong> are explained — and a new
+              one cannot ship without its explanation.
+            </>
+          )}
         </p>
       </Card>
 
