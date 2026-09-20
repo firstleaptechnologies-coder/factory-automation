@@ -31,6 +31,7 @@
     "typecheck:mobile": "npm run typecheck --prefix apps/mobile",
     "test:mobile": "npm run test --prefix apps/mobile",
     "ota:publish": "ts-node --transpile-only scripts/publish-ota.ts",
-    "verify": "npm run build:shared && npm run db:generate && npm run typecheck --workspaces --if-present && npm test --workspaces --if-present && npm run lint:mobile && npm run typecheck:mobile && npm run test:mobile"
+    "verify": "npm run build:shared && npm run db:generate && npm run typecheck --workspaces --if-present && npm test --workspaces --if-present && npm run lint:mobile && npm run typecheck:mobile && npm run test:mobile",
+    "docs:manual": "npm run docs:manual -w @fas/api --"
   }
 }

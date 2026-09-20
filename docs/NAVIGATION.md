@@ -294,6 +294,7 @@ every screen needs a platform permission, which no tenant role can hold.*
 | Screen | Web | App route | Permission |
 | --- | --- | --- | --- |
 | Staff and roles | `/platform/staff` | `PlatformStaff` | `platform.staff.view` |
+| What it does | `/platform/manual` | — | `platform.release.view` |
 | Releases | `/platform/releases` | `PlatformReleases` | `platform.release.view` |
 |   ↳ How a release works | `/platform/releases/flow` | — | `platform.release.view` |
 

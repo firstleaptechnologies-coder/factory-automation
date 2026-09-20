@@ -22,6 +22,15 @@ export interface NavItem {
   label: string;
   /** A name from each client's own icon set. */
   icon: string;
+  /**
+   * One line saying what the screen is for.
+   *
+   * Lived in a map inside the mobile menu, which meant the web never showed
+   * it and the product manual could not either — the same knowledge, written
+   * once and reachable from one place. Here it is on the screen itself, so
+   * whoever adds a screen writes what it is for in the same edit.
+   */
+  blurb?: string;
   /** Everything under a group needs the same permission to be worth showing. */
   permission?: Permission;
   /**
@@ -82,6 +91,7 @@ export const NAV_GROUPS: NavGroup[] = [
         key: 'punch',
         module: MODULES.ORDERS,
         label: 'Punch order',
+        blurb: 'Take a new order, on the floor',
         icon: 'plus',
         permission: PERMISSIONS.ORDER_PUNCH,
         web: '/punch',
@@ -91,6 +101,7 @@ export const NAV_GROUPS: NavGroup[] = [
         key: 'orders',
         module: MODULES.ORDERS,
         label: 'Orders',
+        blurb: 'Everything punched, and where each one stands',
         icon: 'clipboard',
         permission: PERMISSIONS.ORDER_VIEW,
         web: '/orders',
@@ -134,6 +145,7 @@ export const NAV_GROUPS: NavGroup[] = [
         key: 'leads',
         module: MODULES.LEADS,
         label: 'Leads',
+        blurb: 'Enquiries that have not become work yet',
         icon: 'trend',
         permission: PERMISSIONS.LEAD_VIEW,
         web: '/leads',
@@ -175,6 +187,7 @@ export const NAV_GROUPS: NavGroup[] = [
         key: 'quotes',
         module: MODULES.QUOTES,
         label: 'Quotes',
+        blurb: 'Priced quotations, before there is an order',
         icon: 'tag',
         permission: PERMISSIONS.ESTIMATE_VIEW,
         web: '/quotes',
@@ -200,6 +213,7 @@ export const NAV_GROUPS: NavGroup[] = [
           {
             key: 'materials',
             label: 'Materials',
+            blurb: 'What can be picked while punching, and its thicknesses',
             icon: 'layers',
             permission: PERMISSIONS.CONFIG_VIEW,
             web: '/admin/materials',
@@ -208,6 +222,7 @@ export const NAV_GROUPS: NavGroup[] = [
           {
             key: 'sizes',
             label: 'Sizes',
+            blurb: 'Common presets, entered in any unit',
             icon: 'ruler',
             permission: PERMISSIONS.CONFIG_VIEW,
             web: '/admin/sizes',
@@ -216,6 +231,7 @@ export const NAV_GROUPS: NavGroup[] = [
           {
             key: 'flow',
             label: 'Status flow',
+            blurb: 'Stages and the moves allowed between them',
             icon: 'flow',
             permission: PERMISSIONS.CONFIG_VIEW,
             web: '/admin/flow',
@@ -248,6 +264,7 @@ export const NAV_GROUPS: NavGroup[] = [
           {
             key: 'lead-fields',
             label: 'Lead fields',
+            blurb: 'What you capture on an enquiry, and where it came from',
             icon: 'tune',
             permission: PERMISSIONS.CONFIG_VIEW,
             web: '/admin/lead-fields',
@@ -266,6 +283,7 @@ export const NAV_GROUPS: NavGroup[] = [
         key: 'transactions',
         module: MODULES.FINANCE,
         label: 'Transactions',
+        blurb: 'Every payment, deposit and what is still in hand',
         icon: 'card',
         permission: PERMISSIONS.CASH_POSITION_VIEW,
         web: '/transactions',
@@ -288,6 +306,7 @@ export const NAV_GROUPS: NavGroup[] = [
         key: 'payouts',
         module: MODULES.FINANCE,
         label: 'Payout ledger',
+        blurb: 'Money paid to others out of orders, once the client has paid',
         icon: 'arrowUpRight',
         permission: PERMISSIONS.DISBURSEMENT_VIEW,
         web: '/disbursements',
@@ -579,6 +598,7 @@ export const NAV_GROUPS: NavGroup[] = [
         key: 'clients',
         module: MODULES.CLIENTS,
         label: 'Clients',
+        blurb: 'Everyone the shop works for, and what each has ordered',
         icon: 'users',
         permission: PERMISSIONS.CLIENT_VIEW,
         web: '/clients',
@@ -620,6 +640,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         key: 'firm',
         label: 'Firm details',
+        blurb: 'GST number, bank details, terms and your letterhead',
         icon: 'clipboard',
         permission: PERMISSIONS.CONFIG_VIEW,
         web: '/admin/firm',
@@ -636,6 +657,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         key: 'settings',
         label: 'Settings',
+        blurb: 'Display unit, account, sign out',
         icon: 'settings',
         web: '/settings',
         app: 'Settings',
@@ -756,6 +778,18 @@ export const PLATFORM_NAV: NavGroup[] = [
          * to whoever owns the product — a shop's admin decides how their shop
          * works, not what code the phone in their hand is running.
          */
+        /*
+         * What the software does, module by module — and the copy a vendor is
+         * handed when they buy some of it.
+         */
+        key: 'platform-manual',
+        label: 'What it does',
+        blurb: 'Every module and field, and the manual a vendor is sent',
+        icon: 'clipboard',
+        permission: PERMISSIONS.PLATFORM_RELEASE_VIEW,
+        web: '/platform/manual',
+      },
+      {
         key: 'platform-releases',
         label: 'Releases',
         icon: 'box',

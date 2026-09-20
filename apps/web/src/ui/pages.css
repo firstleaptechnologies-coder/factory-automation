@@ -949,3 +949,69 @@ button.primary:disabled {
   .ladder-track { max-width: none; }
   .slot-row-meta { margin-left: 0; width: 100%; }
 }
+
+/* -- the product manual ------------------------------------------------------
+ *
+ * The owner's copy of what the software does. Read on screen far more often
+ * than it is exported, so it is laid out to be read rather than to be printed.
+ */
+.pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border: 1px solid var(--surface-lit);
+  border-radius: var(--r-pill);
+  background: var(--surface-shade);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pick input { accent-color: var(--accent); }
+
+.chip {
+  padding: 6px 12px;
+  border: 1px solid var(--surface-lit);
+  border-radius: var(--r-pill);
+  background: var(--surface-shade);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.chip-on { border-color: var(--accent); color: var(--accent); }
+
+.manual-flow { padding-left: 20px; margin: 0 0 var(--s-md); }
+.manual-flow li { margin-bottom: 8px; }
+
+.manual-screens { list-style: none; padding: 0; margin: 0 0 var(--s-md); }
+.manual-screens li { padding: 8px 0; border-bottom: 1px solid var(--surface-lit); }
+
+.manual-action {
+  padding: var(--s-md) 0 var(--s-md) var(--s-md);
+  border-left: 2px solid var(--surface-lit);
+  margin-bottom: var(--s-md);
+}
+
+.manual-fields { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.manual-fields th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--surface-lit);
+  padding: 6px 10px 6px 0;
+}
+.manual-fields td {
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid var(--surface-inset);
+  vertical-align: top;
+  font-size: 13px;
+}
+.manual-fields td:first-child { white-space: nowrap; }
+.req { font-size: 10px; text-transform: uppercase; color: var(--accent); }
+
+/* A long field table is the one thing here that may not fit a phone. */
+@media (max-width: 640px) {
+  .manual-action { overflow-x: auto; }
+}

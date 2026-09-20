@@ -51,22 +51,6 @@ export function AdminHomeScreen({ navigation }: { navigation: any }) {
   };
 
   /** What each screen is, in the shop's own words. */
-  const blurbs: Record<string, string> = {
-    punch: 'Take a new order, on the floor',
-    orders: 'Everything punched, and where each one stands',
-    leads: 'Enquiries that have not become work yet',
-    quotes: 'Priced quotations, before there is an order',
-    materials: 'What can be picked while punching, and its thicknesses',
-    sizes: 'Common presets, entered in any unit',
-    flow: 'Stages and the moves allowed between them',
-    'lead-fields': 'What you capture on an enquiry, and where it came from',
-    transactions: 'Every payment, deposit and what is still in hand',
-    payouts: 'Money paid to others out of orders, once the client has paid',
-    clients: 'Everyone the shop works for, and what each has ordered',
-    firm: 'GST number, bank details, terms and your letterhead',
-    settings: 'Display unit, account, sign out',
-  };
-
   /*
    * Two gates, and both have to pass: the plan decides what the business
    * bought, the role decides who inside it may touch it.
@@ -132,9 +116,9 @@ export function AdminHomeScreen({ navigation }: { navigation: any }) {
                       </View>
                       <View style={{ flex: 1, marginLeft: spacing.md }}>
                         <Text variant="body" bold>{item.label}</Text>
-                        {blurbs[item.key] ? (
+                        {item.blurb ? (
                           <Text variant="tiny" tone="muted" numberOfLines={2}>
-                            {blurbs[item.key]}
+                            {item.blurb}
                           </Text>
                         ) : null}
                       </View>
