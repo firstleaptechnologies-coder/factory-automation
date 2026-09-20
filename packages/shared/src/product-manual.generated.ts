@@ -3977,14 +3977,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "materialId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one material's level.",
               "constraints": []
             },
             {
               "name": "search",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Matches a material's name or code.",
               "constraints": []
             },
             {
@@ -4000,7 +4000,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "GET",
           "path": "/stock/waste",
           "handler": "waste",
-          "summary": "",
+          "summary": "What was thrown away, over a period. Asked for over a range rather than in total, because waste is only useful compared with itself: what this month cost against last month is the figure that changes how a shop cuts.",
           "permissions": [
             "STOCK_VIEW"
           ],
@@ -4009,7 +4009,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "materialId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one material's waste.",
               "constraints": []
             }
           ]
@@ -4037,14 +4037,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "thicknessId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which thickness of it.",
               "constraints": []
             },
             {
               "name": "unit",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A sheet, a kilo, a length — the shop's own word for one of them.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -4060,7 +4060,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "at",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it moved. Today if nobody says otherwise.",
               "constraints": []
             },
             {
@@ -4076,7 +4076,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything else worth keeping about the movement.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -4096,7 +4096,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "status",
               "type": "PurchaseStatus",
               "required": false,
-              "definition": "",
+              "definition": "Where it has got to — drafted, placed, received, billed, paid. \"What have we ordered that has not arrived\" is what this list is opened for.",
               "constraints": [
                 "one of PurchaseStatus"
               ]
@@ -4105,7 +4105,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "vendorId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only what was bought from one vendor.",
               "constraints": []
             },
             {
@@ -4131,7 +4131,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/purchases",
           "handler": "create",
-          "summary": "",
+          "summary": "An order placed on a vendor.",
           "permissions": [
             "PURCHASE_MANAGE"
           ],
@@ -4140,14 +4140,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "expectedOn",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it was promised. What a late delivery is measured against, and what the floor plans around when a job is waiting on the material.",
               "constraints": []
             },
             {
               "name": "otherCharges",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Freight, loading, and anything else on the bill that is not a line of material. Kept separate so the rate per sheet stays the rate per sheet — spreading delivery across the lines would quietly inflate what the shop thinks its material costs.",
               "constraints": [
                 "not below 0"
               ]
@@ -4156,7 +4156,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about the order as a whole — where to deliver, who to ask for.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -4167,7 +4167,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/purchases/:id",
           "handler": "update",
-          "summary": "",
+          "summary": "An order placed on a vendor.",
           "permissions": [
             "PURCHASE_MANAGE"
           ],
@@ -4176,14 +4176,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "expectedOn",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it was promised. What a late delivery is measured against, and what the floor plans around when a job is waiting on the material.",
               "constraints": []
             },
             {
               "name": "otherCharges",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Freight, loading, and anything else on the bill that is not a line of material. Kept separate so the rate per sheet stays the rate per sheet — spreading delivery across the lines would quietly inflate what the shop thinks its material costs.",
               "constraints": [
                 "not below 0"
               ]
@@ -4192,7 +4192,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about the order as a whole — where to deliver, who to ask for.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -4213,7 +4213,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/purchases/:id/receive",
           "handler": "receive",
-          "summary": "",
+          "summary": "Booking in a delivery. This is what puts stock on the rack — nothing else does, so every sheet in the building has a purchase, and a bill, behind it.",
           "permissions": [
             "PURCHASE_MANAGE"
           ],
@@ -4222,14 +4222,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "at",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it arrived. Today if nobody says otherwise.",
               "constraints": []
             },
             {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about the delivery — what was damaged, who signed for it.",
               "constraints": [
                 "at most 300 characters"
               ]
@@ -4249,7 +4249,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "otherCharges",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "Freight and loading as billed, if it differs from what was expected.",
               "constraints": [
                 "not below 0"
               ]
@@ -4260,7 +4260,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/purchases/:id/pay",
           "handler": "pay",
-          "summary": "",
+          "summary": "Paying a vendor's bill.",
           "permissions": [
             "PURCHASE_PAY"
           ],
@@ -4269,7 +4269,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "paidOn",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it was paid. Today if nobody says otherwise.",
               "constraints": []
             }
           ]
@@ -4297,7 +4297,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "includeInactive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Show vendors who have been switched off as well. Off by default, because the list is usually being read to decide who to buy from next.",
               "constraints": []
             },
             {
@@ -4323,7 +4323,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/vendors",
           "handler": "create",
-          "summary": "",
+          "summary": "Somebody the shop buys from. Material is most of a decor shop's cost, so who supplies it, on what terms and how reliably is worth keeping properly rather than in a phone's contacts.",
           "permissions": [
             "VENDOR_MANAGE"
           ],
@@ -4332,7 +4332,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "phone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The number that is rung to chase a delivery.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -4341,7 +4341,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "altPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A second number — the person who actually loads the vehicle, usually.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -4350,7 +4350,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "email",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where purchase orders are sent, when they are sent rather than telephoned.",
               "constraints": [
                 "at most 200 characters"
               ]
@@ -4366,7 +4366,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "company",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The trading name on their bills, which is rarely what they are called.",
               "constraints": [
                 "at most 160 characters"
               ]
@@ -4375,7 +4375,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "stateCode",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their GST state code, as two digits. Theirs against the shop's decides whether their bill carries CGST and SGST or a single IGST line — which is what the shop has to match when claiming the input credit back.",
               "constraints": [
                 "at most 4 characters"
               ]
@@ -4384,7 +4384,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "stateName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The state that code stands for, spelt out.",
               "constraints": [
                 "at most 60 characters"
               ]
@@ -4393,7 +4393,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "address",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where they are. Kept as one block, because it is usually pasted.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -4402,7 +4402,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "notes",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything worth remembering about dealing with them — who to ask for, how late they usually are, what they are good for and what they are not.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -4420,7 +4420,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "paymentTermDays",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "How many days after the bill they expect to be paid. Zero means on delivery. It is what \"what do we owe, and when\" is worked out from.",
               "constraints": [
                 "not below 0",
                 "not above 365"
@@ -4430,7 +4430,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether they are still bought from. Switching this off takes them out of the list offered when raising a purchase order and changes nothing about what was already bought from them — that history is the shop's record of what it paid and when.",
               "constraints": []
             }
           ]
@@ -4439,7 +4439,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/vendors/:id",
           "handler": "update",
-          "summary": "",
+          "summary": "Somebody the shop buys from. Material is most of a decor shop's cost, so who supplies it, on what terms and how reliably is worth keeping properly rather than in a phone's contacts.",
           "permissions": [
             "VENDOR_MANAGE"
           ],
@@ -4448,7 +4448,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "phone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The number that is rung to chase a delivery.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -4457,7 +4457,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "altPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A second number — the person who actually loads the vehicle, usually.",
               "constraints": [
                 "at most 20 characters"
               ]
@@ -4466,7 +4466,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "email",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where purchase orders are sent, when they are sent rather than telephoned.",
               "constraints": [
                 "at most 200 characters"
               ]
@@ -4482,7 +4482,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "company",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The trading name on their bills, which is rarely what they are called.",
               "constraints": [
                 "at most 160 characters"
               ]
@@ -4491,7 +4491,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "stateCode",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their GST state code, as two digits. Theirs against the shop's decides whether their bill carries CGST and SGST or a single IGST line — which is what the shop has to match when claiming the input credit back.",
               "constraints": [
                 "at most 4 characters"
               ]
@@ -4500,7 +4500,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "stateName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The state that code stands for, spelt out.",
               "constraints": [
                 "at most 60 characters"
               ]
@@ -4509,7 +4509,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "address",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where they are. Kept as one block, because it is usually pasted.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -4518,7 +4518,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "notes",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything worth remembering about dealing with them — who to ask for, how late they usually are, what they are good for and what they are not.",
               "constraints": [
                 "at most 500 characters"
               ]
@@ -4536,7 +4536,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "paymentTermDays",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "How many days after the bill they expect to be paid. Zero means on delivery. It is what \"what do we owe, and when\" is worked out from.",
               "constraints": [
                 "not below 0",
                 "not above 365"
@@ -4546,7 +4546,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether they are still bought from. Switching this off takes them out of the list offered when raising a purchase order and changes nothing about what was already bought from them — that history is the shop's record of what it paid and when.",
               "constraints": []
             }
           ]
