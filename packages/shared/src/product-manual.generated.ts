@@ -1105,35 +1105,35 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "statusId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only enquiries sitting at one stage.",
               "constraints": []
             },
             {
               "name": "ownerId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only what one person is chasing.",
               "constraints": []
             },
             {
               "name": "sourceId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only what came from one source — everything Instagram brought in.",
               "constraints": []
             },
             {
               "name": "search",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Matches the title, the contact's name, their number or the company.",
               "constraints": []
             },
             {
               "name": "converted",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Only the ones that became orders, or only the ones that did not. What a source is judged on: how many enquiries it brought against how many turned into work.",
               "constraints": []
             },
             {
@@ -1147,7 +1147,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "page",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Which page of the list. Counting starts at one.",
               "constraints": [
                 "not below 1"
               ]
@@ -1156,7 +1156,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "limit",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "How many enquiries on a page.",
               "constraints": [
                 "not below 1"
               ]
@@ -1207,7 +1207,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/leads",
           "handler": "create",
-          "summary": "",
+          "summary": "An enquiry, before there is any work. Somebody rings, walks in, or sends a photograph — nothing is agreed and it is still worth writing down. Deliberately cheap to record: a title is all that is required, because an enquiry that takes five minutes to log is an enquiry nobody logs.",
           "permissions": [
             "LEAD_CREATE"
           ],
@@ -1216,7 +1216,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "title",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What the enquiry is, in a line — \"wardrobe for Bandra flat\". What somebody reads off the board without opening it.",
               "constraints": [
                 "at least 2 characters"
               ]
@@ -1232,63 +1232,63 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "contactName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who rang, when they are not on file. Kept loose on purpose: an enquiry is not yet worth creating a client for, and most never become one.",
               "constraints": []
             },
             {
               "name": "contactPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their number — the one thing that makes an enquiry followable-up.",
               "constraints": []
             },
             {
               "name": "contactEmail",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their email, where the enquiry arrived by email.",
               "constraints": []
             },
             {
               "name": "company",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The firm they are from, when they mentioned one.",
               "constraints": []
             },
             {
               "name": "location",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where the work would be, if it happens.",
               "constraints": []
             },
             {
               "name": "sourceId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where the enquiry came from — a walk-in, a referral, Instagram. Worth telling apart when deciding where the next rupee of advertising goes, and the reason this is a list the shop keeps rather than free text.",
               "constraints": []
             },
             {
               "name": "workflowId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which pipeline it moves through, when the shop keeps more than one.",
               "constraints": []
             },
             {
               "name": "ownerId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who is chasing it. An enquiry nobody owns is an enquiry nobody rings back.",
               "constraints": []
             },
             {
               "name": "priority",
               "type": "Priority",
               "required": false,
-              "definition": "",
+              "definition": "How urgent it is, which orders the board.",
               "constraints": [
                 "one of Priority"
               ]
@@ -1297,7 +1297,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "estimatedValue",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "What it might be worth, as a guess. A guess is the point: it is what makes a pipeline addable-up, and nobody is held to it.",
               "constraints": [
                 "not below 0"
               ]
@@ -1306,14 +1306,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "expectedDate",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it might be decided — what a follow-up is planned around.",
               "constraints": []
             },
             {
               "name": "notes",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Whatever was said on the call that does not fit anywhere else.",
               "constraints": []
             },
             {
@@ -1329,7 +1329,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/leads/:id",
           "handler": "update",
-          "summary": "",
+          "summary": "Changing an enquiry. Every field means what it does on CreateLeadDto.",
           "permissions": [
             "LEAD_EDIT"
           ],
@@ -1338,7 +1338,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "title",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What the enquiry is, in a line.",
               "constraints": [
                 "at least 2 characters"
               ]
@@ -1347,63 +1347,63 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "clientId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Attaching it to a client, usually once they are on file.",
               "constraints": []
             },
             {
               "name": "contactName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who rang.",
               "constraints": []
             },
             {
               "name": "contactPhone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their number.",
               "constraints": []
             },
             {
               "name": "contactEmail",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Their email.",
               "constraints": []
             },
             {
               "name": "company",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The firm they are from.",
               "constraints": []
             },
             {
               "name": "location",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where the work would be.",
               "constraints": []
             },
             {
               "name": "sourceId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where the enquiry came from.",
               "constraints": []
             },
             {
               "name": "ownerId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who is chasing it.",
               "constraints": []
             },
             {
               "name": "priority",
               "type": "Priority",
               "required": false,
-              "definition": "",
+              "definition": "How urgent it is.",
               "constraints": [
                 "one of Priority"
               ]
@@ -1412,7 +1412,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "estimatedValue",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "What it might be worth.",
               "constraints": [
                 "not below 0"
               ]
@@ -1421,21 +1421,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "expectedDate",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it might be decided.",
               "constraints": []
             },
             {
               "name": "notes",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Whatever was said that does not fit anywhere else.",
               "constraints": []
             },
             {
               "name": "customFields",
               "type": "Record<string, unknown>",
               "required": false,
-              "definition": "",
+              "definition": "Values for the shop's own extra questions, keyed by their `key`.",
               "constraints": []
             }
           ]
@@ -1453,14 +1453,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "toStatusId",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The stage to move it to, from the shop's own pipeline.",
               "constraints": []
             },
             {
               "name": "note",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Why it moved — what they said, what is being waited on. A pipeline is only as useful as the reasons kept against it.",
               "constraints": []
             },
             {
@@ -1485,21 +1485,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "location",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Where the work is going — required on an order as it is on any other.",
               "constraints": []
             },
             {
               "name": "workflowId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which set of stages the new order moves through.",
               "constraints": []
             },
             {
               "name": "priority",
               "type": "Priority",
               "required": false,
-              "definition": "",
+              "definition": "How urgent the order is, which need not be how urgent the enquiry was.",
               "constraints": [
                 "one of Priority"
               ]
@@ -1508,21 +1508,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "dueDate",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "When it is promised.",
               "constraints": []
             },
             {
               "name": "notes",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything about the order that the enquiry's notes do not cover.",
               "constraints": []
             },
             {
               "name": "items",
               "type": "PunchItemDto[]",
               "required": true,
-              "definition": "",
+              "definition": "The pieces being made. Supplied here because an enquiry carries an interest and not measurements — the sizes are taken when the job is real.",
               "constraints": [
                 "a list"
               ]
@@ -1623,7 +1623,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/leads/sources",
           "handler": "createSource",
-          "summary": "",
+          "summary": "Where enquiries come from — the shop's own list.",
           "permissions": [
             "CONFIG_MANAGE"
           ],
@@ -1632,7 +1632,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "code",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "A short code for it, fixed once created because enquiries refer to it.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -1641,7 +1641,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What it is called on screen — \"Walk-in\", \"Instagram\", \"Referral\".",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -1650,14 +1650,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "color",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A colour, so the board can be read at a glance rather than word by word.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it sits in the list.",
               "constraints": []
             }
           ]
@@ -1666,7 +1666,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/leads/fields",
           "handler": "createField",
-          "summary": "",
+          "summary": "An extra question the shop wants asked, defined once and then present on every enquiry. What an architectural-decor shop needs to know is not what a joinery needs to know, so the questions are the shop's rather than ours.",
           "permissions": [
             "CONFIG_MANAGE"
           ],
@@ -1675,7 +1675,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "entity",
               "type": "CustomFieldEntity",
               "required": true,
-              "definition": "",
+              "definition": "What it is asked about. Enquiries today; the mechanism is not specific to them.",
               "constraints": [
                 "one of CustomFieldEntity"
               ]
@@ -1684,7 +1684,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "key",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The short name the answer is stored under. Fixed once created, because every enquiry already answered refers to it — the label can be corrected, this cannot.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -1693,7 +1693,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "label",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "The question as it is asked on screen.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -1702,7 +1702,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "type",
               "type": "CustomFieldType",
               "required": false,
-              "definition": "",
+              "definition": "What kind of answer it takes — text, a number, a date, a choice.",
               "constraints": [
                 "one of CustomFieldType"
               ]
@@ -1711,7 +1711,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "options",
               "type": "string[]",
               "required": false,
-              "definition": "",
+              "definition": "The choices, for a field that offers a list.",
               "constraints": [
                 "a list"
               ]
@@ -1720,21 +1720,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "helpText",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A line under the question, for when the question alone is not clear.",
               "constraints": []
             },
             {
               "name": "required",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether an enquiry can be saved without it. Worth using sparingly: a required field on an enquiry is a reason not to record the enquiry.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it appears on the form.",
               "constraints": []
             }
           ]
@@ -1752,14 +1752,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "label",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The question as it is asked. Correcting it leaves past answers alone.",
               "constraints": []
             },
             {
               "name": "type",
               "type": "CustomFieldType",
               "required": false,
-              "definition": "",
+              "definition": "What kind of answer it takes.",
               "constraints": [
                 "one of CustomFieldType"
               ]
@@ -1768,7 +1768,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "options",
               "type": "string[]",
               "required": false,
-              "definition": "",
+              "definition": "The choices, for a field that offers a list.",
               "constraints": [
                 "a list"
               ]
@@ -1777,28 +1777,28 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "helpText",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "A line under the question.",
               "constraints": []
             },
             {
               "name": "required",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether an enquiry can be saved without it.",
               "constraints": []
             },
             {
               "name": "sortOrder",
               "type": "whole number",
               "required": false,
-              "definition": "",
+              "definition": "Where it appears on the form.",
               "constraints": []
             },
             {
               "name": "isActive",
               "type": "yes or no",
               "required": false,
-              "definition": "",
+              "definition": "Whether it is still asked. Switching it off takes the question off the form and keeps every answer already given — those are part of the enquiries they were recorded against.",
               "constraints": []
             }
           ]
@@ -1878,7 +1878,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "PATCH",
           "path": "/firm",
           "handler": "saveFirm",
-          "summary": "",
+          "summary": "The shop's own details, as they print on its paperwork. Set once and used on every quote, invoice, challan and letter, so the shop's documents look like one firm's rather than like whoever made them that day.",
           "permissions": [
             "CONFIG_MANAGE"
           ],
@@ -1887,112 +1887,112 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "name",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The firm's name, as it should head its paperwork.",
               "constraints": []
             },
             {
               "name": "gstin",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The shop's own GST number, printed on every invoice it raises.",
               "constraints": []
             },
             {
               "name": "stateCode",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The shop's GST state code. Against the client's it decides whether a bill carries CGST and SGST or a single IGST line — this is one half of that.",
               "constraints": []
             },
             {
               "name": "stateName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The state that code stands for, spelt out.",
               "constraints": []
             },
             {
               "name": "phone",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The number printed on paperwork for clients to ring.",
               "constraints": []
             },
             {
               "name": "email",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The address printed for clients to write to.",
               "constraints": []
             },
             {
               "name": "address",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where the shop is, as it prints on a letterhead.",
               "constraints": []
             },
             {
               "name": "website",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The shop's website, if it has one.",
               "constraints": []
             },
             {
               "name": "bankName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The bank, for the payment details at the foot of an invoice.",
               "constraints": []
             },
             {
               "name": "bankAccountName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The name on the shop's account, which a client's transfer must match.",
               "constraints": []
             },
             {
               "name": "bankAccountNumber",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The account clients pay into.",
               "constraints": []
             },
             {
               "name": "bankIfsc",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The branch code for that account.",
               "constraints": []
             },
             {
               "name": "bankBranch",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The branch, where the shop prints it.",
               "constraints": []
             },
             {
               "name": "termsAndConditions",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The standing terms printed at the foot of quotes and invoices. Written once here rather than retyped, which is how two quotes end up promising different things.",
               "constraints": []
             },
             {
               "name": "signatoryName",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who signs the shop's paperwork.",
               "constraints": []
             },
             {
               "name": "accentColor",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The colour used on printed documents.",
               "constraints": []
             },
             {
@@ -2037,7 +2037,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "status",
               "type": "EstimateStatus",
               "required": false,
-              "definition": "",
+              "definition": "Only quotes at one stage — everything sent and not yet answered.",
               "constraints": [
                 "one of EstimateStatus"
               ]
@@ -2046,7 +2046,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "clientId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Only one client's quotes.",
               "constraints": []
             }
           ]
@@ -2075,7 +2075,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/estimates",
           "handler": "create",
-          "summary": "",
+          "summary": "A priced quotation, before there is an order. A shop loses work by quoting slowly, so this is built from the materials, sizes and rates the rest of the product already knows, and comes out on the shop's own letterhead. An accepted quote becomes an order without anybody retyping it.",
           "permissions": [
             "ESTIMATE_MANAGE"
           ],
@@ -2084,7 +2084,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "clientId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The client it is for, when they are on file.",
               "constraints": []
             },
             {
@@ -2198,42 +2198,42 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "billingAddress",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Who it is billed to. Defaults to the client's billing address.",
               "constraints": []
             },
             {
               "name": "shippingAddress",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Where it would be delivered, when that differs.",
               "constraints": []
             },
             {
               "name": "validTill",
               "type": "date",
               "required": false,
-              "definition": "",
+              "definition": "How long the price holds. Worth stating: material prices move, and a quote with no expiry is one a client produces six months later.",
               "constraints": []
             },
             {
               "name": "notes",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything for the client to read that is not a line of the quote.",
               "constraints": []
             },
             {
               "name": "termsOverride",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Terms for this one quote, replacing the shop's standing terms. Left empty the usual terms print, which is what almost every quote wants.",
               "constraints": []
             },
             {
               "name": "taxTreatment",
               "type": "TaxTreatment",
               "required": false,
-              "definition": "",
+              "definition": "Whether the tax goes on top of the prices quoted or comes out of them. It decides what the client is told the total is, so it belongs on the quote rather than being settled at invoice time.",
               "constraints": [
                 "one of TaxTreatment"
               ]
@@ -2242,7 +2242,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items",
               "type": "EstimateItemDto[]",
               "required": true,
-              "definition": "",
+              "definition": "What is being quoted for.",
               "constraints": [
                 "a list"
               ]
@@ -2251,7 +2251,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].name",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "What is being quoted for, as the client should read it.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -2260,21 +2260,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].description",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The detail under the name — finish, edge, hardware. What stops an argument later about what the price included.",
               "constraints": []
             },
             {
               "name": "items[].hsnSac",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The HSN or SAC code for this line. Required on a tax invoice, so it is worth putting on the quote it will be raised from.",
               "constraints": []
             },
             {
               "name": "items[].quantity",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "How many.",
               "constraints": [
                 "not below 0"
               ]
@@ -2283,14 +2283,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].unit",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "What one of them is — a piece, a square foot, a running foot.",
               "constraints": []
             },
             {
               "name": "items[].ratePerUnit",
               "type": "number",
               "required": false,
-              "definition": "",
+              "definition": "The price of one, before tax and before any discount on the line.",
               "constraints": [
                 "not below 0"
               ]
@@ -2308,7 +2308,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].gstSlabId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "The GST slab for this line. Falls back to the shop's default.",
               "constraints": []
             }
           ]
@@ -2326,7 +2326,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "status",
               "type": "EstimateStatus",
               "required": false,
-              "definition": "",
+              "definition": "Where the quote stands — drafted, sent, accepted, declined.",
               "constraints": [
                 "one of EstimateStatus"
               ]
@@ -2346,7 +2346,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "status",
               "type": "EstimateStatus",
               "required": true,
-              "definition": "",
+              "definition": "Where the quote stands. Recording a decline is as useful as recording an acceptance: what was quoted and lost is the only way to find out whether the shop is pricing itself out.",
               "constraints": [
                 "one of EstimateStatus"
               ]
@@ -2357,7 +2357,7 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "POST",
           "path": "/estimates/:id/convert",
           "handler": "convert",
-          "summary": "",
+          "summary": "Turning an accepted quote into work. The lines and their prices carry across, so the thing that was agreed is the thing that gets made and the thing that gets billed.",
           "permissions": [
             "ESTIMATE_MANAGE",
             "ORDER_PUNCH"
@@ -2367,7 +2367,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "location",
               "type": "string",
               "required": true,
-              "definition": "",
+              "definition": "Where the work is going.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -2376,21 +2376,21 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "workflowId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which set of stages the order moves through.",
               "constraints": []
             },
             {
               "name": "startStatusId",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Which stage to start at. Defaults to the flow's entry point.",
               "constraints": []
             },
             {
               "name": "notes",
               "type": "string",
               "required": false,
-              "definition": "",
+              "definition": "Anything for the floor that the quote's notes do not cover.",
               "constraints": []
             }
           ]
