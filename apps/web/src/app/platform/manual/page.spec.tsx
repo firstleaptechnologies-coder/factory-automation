@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { PRODUCT_MANUAL, workspaceModules } from '@fas/shared';
 import ManualPage from './page';
 
 const push = jest.fn();
@@ -56,9 +57,29 @@ describe('what the owner reads', () => {
     expect(body.getAllByText('What it is for').length).toBeGreaterThan(0);
   });
 
+  /*
+   * A blank cell reads as "nothing to say". It means "nobody has said it".
+   *
+   * Which module still has blanks changes as they get written — this was
+   * pinned to Orders and failed the day Orders was finished, which is a test
+   * failing because the work succeeded. So it asks the data which module is
+   * incomplete, and when none is, asserts the opposite.
+   */
   it('marks a field nobody has written up rather than leaving it blank', async () => {
-    // A blank cell reads as "nothing to say". It means "nobody has said it".
+    const incomplete = workspaceModules(PRODUCT_MANUAL).find((module) =>
+      module.actions.some((action) => action.fields.some((f) => !f.definition.trim())),
+    );
+
     await mount();
+
+    if (!incomplete) {
+      expect(screen.queryByText('Not yet written up.')).not.toBeInTheDocument();
+      return;
+    }
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: incomplete.label }));
+    });
     const body = within(screen.getByTestId('manual-body'));
     expect(body.getAllByText('Not yet written up.').length).toBeGreaterThan(0);
   });

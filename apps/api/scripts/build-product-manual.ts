@@ -108,7 +108,31 @@ function commentAbove(lines: string[], index: number): string {
 function fieldFrom(lines: string[], index: number): ManualField | null {
   const line = lines[index];
 
-  const property = line.match(/(?:^|\s)([a-zA-Z_][A-Za-z0-9_]*)(\??):\s*([^;=]+)/);
+  /*
+   * A declaration ends in a semicolon; a decorator does not.
+   *
+   * Without that, `@ValidateNested({ each: true })` read as a field called
+   * "each" — an option to a validator, presented to a vendor as something
+   * they fill in. Requiring the semicolon is what tells a property apart from
+   * the inside of a decorator's arguments.
+   */
+  if (!line.trim().endsWith(';')) return null;
+
+  /*
+   * The declaration with the decorators taken off it first.
+   *
+   * `@ValidateNested({ each: true }) @Type(() => X) items: X[];` is one field
+   * called `items`, but the first `name: value` on the line is `each: true`
+   * inside the decorator's own options — so a vendor's manual listed "each"
+   * as something to fill in. Strip what decorates the field, then read it.
+   */
+  const bare = line.replace(/@[A-Za-z]+\((?:[^()]|\([^()]*\))*\)/g, ' ');
+
+  // `name?: string;` and `page = 1;` are both fields; only the first carries a
+  // type, so a defaulted one is described by what it defaults to.
+  const property =
+    bare.match(/(?:^|\s)([a-zA-Z_][A-Za-z0-9_]*)(\??):\s*([^;=]+)/) ??
+    bare.match(/(?:^|\s)([a-zA-Z_][A-Za-z0-9_]*)(\??)\s*=\s*([^;]+);/);
   if (!property) return null;
   const [, name, optional, rawType] = property;
 
@@ -146,7 +170,7 @@ function fieldFrom(lines: string[], index: number): ManualField | null {
   return {
     name,
     type,
-    required: !optional && !decorated.includes('@IsOptional'),
+    required: !optional && !decorated.includes('@IsOptional') && !/=\s*[^;]+;/.test(line),
     // The comment above the field, or above the first of its decorators.
     definition: commentAbove(lines, top),
     constraints,
@@ -234,11 +258,35 @@ function readControllers(): RawRoute[] {
        * `@UseInterceptors(...)` as the name of the thing it decorates, and put
        * "UseInterceptors" in a vendor's manual as something the software does.
        */
-      const after = lines.slice(index + 1, index + 8);
+      const after = lines.slice(index + 1, index + 12);
       const start = after.findIndex((l) => l.trim() && !l.trim().startsWith('@'));
-      const signature = start === -1 ? '' : after.slice(start).join(' ');
+
+      /*
+       * Only this handler's own signature — up to the line that opens its
+       * body.
+       *
+       * Reading a fixed number of lines instead ran off the end of a short
+       * handler and into the next route's, so `GET /clients/:id`, which takes
+       * nothing at all, was documented as accepting the twelve fields of the
+       * POST below it. A manual that invents a request body is worse than one
+       * that omits it: somebody would have built against it.
+       */
+      const body = start === -1 ? -1 : after.slice(start).findIndex((l) => l.includes('{'));
+      const signature =
+        start === -1 || body === -1 ? '' : after.slice(start, start + body + 1).join(' ');
       const handler = signature.match(/^\s*(?:async\s+)?(\w+)\s*\(/)?.[1] ?? '';
-      const dto = signature.match(/@Body\(\)\s*\w+:\s*(\w+)/)?.[1] ?? null;
+      /*
+       * A body or a query — both are things somebody fills in.
+       *
+       * `search`, `page` and a date range arrive as query parameters and are
+       * typed into a box on a screen exactly like anything in a body. Reading
+       * only `@Body()` left every list and every report describing itself as
+       * taking nothing.
+       */
+      const dto =
+        signature.match(/@Body\(\)\s*\w+:\s*(\w+)/)?.[1] ??
+        signature.match(/@Query\(\)\s*\w+:\s*(\w+)/)?.[1] ??
+        null;
 
       routes.push({
         method: verb[1].toUpperCase(),
@@ -307,6 +355,33 @@ export function buildManual(): ProductManual {
   ];
   const platformScreens = screensIn(PLATFORM_NAV);
 
+  /*
+   * A field whose type is another DTO brings that DTO's fields with it.
+   *
+   * `items: PunchItemDto[]` is one line in the manual and the whole substance
+   * of an order — the material, the size, the quantity and the rate all live
+   * inside it. Listing the wrapper and stopping there documents the least
+   * interesting thing about punching an order.
+   *
+   * One level of nesting only. Two would mean a measurement's `value` and
+   * `unit` under every dimension of every line, which is more noise than
+   * anybody reading a manual wants; the parent field's own explanation covers
+   * what a measurement is.
+   */
+  const expand = (fields: ManualField[], depth = 0): ManualField[] =>
+    fields.flatMap((field) => {
+      const nested = dtos.get(field.type.replace(/\[\]$/, '').trim());
+      if (!nested || depth >= 1) return [field];
+      const many = field.type.trim().endsWith('[]');
+      return [
+        field,
+        ...nested.fields.map((inner) => ({
+          ...inner,
+          name: `${field.name}${many ? '[]' : ''}.${inner.name}`,
+        })),
+      ];
+    });
+
   const actionFor = (route: RawRoute): ManualAction => {
     const dto = route.dto ? dtos.get(route.dto) : undefined;
     return {
@@ -315,7 +390,7 @@ export function buildManual(): ProductManual {
       handler: route.handler,
       summary: route.summary || dto?.summary || '',
       permissions: route.permissions.map((p) => PERMISSION_LABELS[p] ?? p),
-      fields: dto?.fields ?? [],
+      fields: expand(dto?.fields ?? []),
     };
   };
 

@@ -78,9 +78,14 @@ describe('what nobody has explained yet', () => {
     expect(added).toEqual([]);
   });
 
-  it('is the only thing missing — everything else has a definition', () => {
-    const missing = undefinedFields(fresh).length;
-    expect(missing).toBe(recorded.length);
+  it('only ever shrinks', () => {
+    /*
+     * Fewer than recorded is the whole point and must never fail: writing a
+     * definition should not turn the build red until somebody re-runs a
+     * script. Only growth is a problem, and the test above catches that by
+     * name.
+     */
+    expect(undefinedFields(fresh).length).toBeLessThanOrEqual(recorded.length);
   });
 
   /*
