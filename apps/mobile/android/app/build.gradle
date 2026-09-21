@@ -96,8 +96,26 @@ android {
         applicationId "com.firstleap.factoryautomation"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        /*
+         * Given by whoever is building, not written down here.
+         *
+         * Fastlane passes them, from the same clock the iOS archive uses, so
+         * the two platforms never disagree about which build is newer. They
+         * were hardcoded to 1 and "1.0", and Gradle ignores a `-PversionCode`
+         * that nothing reads — so every Android build would have shipped as
+         * versionCode 1, and Play refuses a second upload at a code it has
+         * already seen. The first build would have worked and the second
+         * would have failed, which is the worst order to find this out in.
+         */
+        // Read into locals first. `versionCode (expr).toString()` parses as the
+        // call `versionCode(expr)` — which returns nothing — and then chains on
+        // that nothing, so the build fails with "Value is null" and a line
+        // number that looks like it is about the property rather than the
+        // parentheses.
+        def buildNumber = (project.findProperty("versionCode") ?: "1").toString().toInteger()
+        def marketing = (project.findProperty("versionName") ?: "1.0").toString()
+        versionCode buildNumber
+        versionName marketing
     }
     signingConfigs {
         debug {
@@ -106,18 +124,68 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+
+        /**
+         * The upload key, which is what Play recognises this app by.
+         *
+         * Supplied by the environment rather than committed: the keystore is
+         * the shop's app identity on Play, and a copy of it in the repository
+         * is a copy anybody with the repository has.
+         *
+         * Configured only when the file is actually there, so an ordinary
+         * `assembleDebug` on somebody's laptop does not have to have it. A
+         * release build without it fails loudly — see the check at the foot of
+         * this file.
+         */
+        release {
+            def keystore = file(System.getenv("ANDROID_KEYSTORE_PATH") ?: "upload-keystore.jks")
+            if (keystore.exists()) {
+                storeFile keystore
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+/*
+ * A release must never be signed with the debug key.
+ *
+ * The React Native template ships `release` pointing at `signingConfigs.debug`
+ * with a comment telling you to change it, and that is exactly the kind of
+ * instruction a project carries for a year. A debug-signed bundle is not a
+ * build that fails — it is a build that succeeds, uploads, and is refused by
+ * Play with a message about the certificate, days later and far from the
+ * cause. Worse, if one were ever accepted, the debug key becomes the app's
+ * identity and cannot be changed afterwards.
+ *
+ * So the absence of the upload keystore stops a release build here, where the
+ * reason is in front of whoever started it.
+ */
+gradle.taskGraph.whenReady { graph ->
+    def releasing = graph.allTasks.any { task ->
+        task.project == project &&
+            (task.name.startsWith("bundle") || task.name.startsWith("assemble")) &&
+            task.name.toLowerCase().contains("release")
+    }
+    if (releasing && android.signingConfigs.release.storeFile == null) {
+        throw new GradleException(
+            "No upload keystore, so this release would be signed with the debug key and " +
+            "refused by Play. Point ANDROID_KEYSTORE_PATH at the .jks, or put it at " +
+            "android/app/upload-keystore.jks, and set ANDROID_KEYSTORE_PASSWORD, " +
+            "ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD."
+        )
     }
 }
 

@@ -19,3 +19,29 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+/*
+ * One NDK for every module, not one per library's idea of a default.
+ *
+ * The app pins `ndkVersion` above, and the React Native and Expo modules that
+ * ask for it honour it — but a library that never sets it falls back to
+ * whatever NDK the Android Gradle Plugin defaults to, which is a different
+ * version. `expo-updates` is one of those, so a machine with the pinned NDK
+ * still failed to configure, asking for a second NDK nobody had chosen and
+ * nothing had installed.
+ *
+ * On a laptop that is a confusing 2.4 GB download. In CI it is worse: the
+ * build depends on which NDKs the runner image happens to ship that month,
+ * which is not a thing anybody would notice changing until a release stopped.
+ */
+subprojects { subproject ->
+    // `plugins.withId` rather than `afterEvaluate`: by the time this file is
+    // read the React Native root plugin has already evaluated the subprojects,
+    // and asking an evaluated project to call you afterwards is an error.
+    // This fires whenever the plugin is applied, before or after.
+    ["com.android.application", "com.android.library"].each { id ->
+        subproject.plugins.withId(id) {
+            subproject.android.ndkVersion = rootProject.ext.ndkVersion
+        }
+    }
+}

@@ -99,6 +99,29 @@ jobs:
       - name: Point the binary at its server
         run: node apps/mobile/scripts/configure-ota-target.js "${{ steps.bn.outputs.channel }}"
 
+      # The SDK pieces this project pins, installed rather than assumed.
+      #
+      # A runner image ships whatever platforms and NDKs it shipped that month,
+      # and `compileSdkVersion 37` is newer than most of them. Letting the
+      # Android plugin auto-install works until the day licences or the image
+      # change, and then a release stops for a reason that has nothing to do
+      # with the release. The versions are read out of android/build.gradle so
+      # there is one place they are written down — a second copy here would
+      # drift, and drift silently, since a stale version still installs.
+      - name: Install the Android SDK packages this project pins
+        run: |
+          cd apps/mobile/android
+          read_ext() { sed -n "s/.*$1 *= *\"\([^\"]*\)\".*/\1/p" build.gradle | head -1; }
+          COMPILE_SDK="$(sed -n 's/.*compileSdkVersion *= *\([0-9]*\).*/\1/p' build.gradle | head -1)"
+          BUILD_TOOLS="$(read_ext buildToolsVersion)"
+          NDK="$(read_ext ndkVersion)"
+          echo "platform android-$COMPILE_SDK, build-tools $BUILD_TOOLS, ndk $NDK"
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager --install \
+            "platforms;android-$COMPILE_SDK" \
+            "build-tools;$BUILD_TOOLS" \
+            "ndk;$NDK"
+
       - name: Set up Ruby for fastlane
         uses: ruby/setup-ruby@v1
         with:

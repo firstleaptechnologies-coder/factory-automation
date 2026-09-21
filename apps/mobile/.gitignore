@@ -33,6 +33,9 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+# The workflow writes the upload key here by this name; *.keystore does not
+# cover it, and a signing key in the repository is a signing key everybody has.
+*.jks
 .kotlin/
 
 # node.js
