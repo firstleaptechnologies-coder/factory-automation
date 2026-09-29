@@ -21,6 +21,7 @@ import { ArchivedLeadsScreen } from '../screens/ArchivedLeadsScreen';
 import { LeadDetailScreen } from '../screens/LeadDetailScreen';
 import { LeadCreateScreen } from '../screens/LeadCreateScreen';
 import { LeadConvertScreen } from '../screens/LeadConvertScreen';
+import { DocumentPreviewScreen } from '../screens/DocumentPreviewScreen';
 import { BoardScreen } from '../screens/BoardScreen';
 import { ClientsScreen } from '../screens/ClientsScreen';
 import { ClientDetailScreen } from '../screens/ClientDetailScreen';
@@ -169,6 +170,7 @@ export function RootNavigator() {
             <Stack.Screen name="LeadDetail" component={LeadDetailScreen} />
             <Stack.Screen name="LeadCreate" component={LeadCreateScreen} />
             <Stack.Screen name="LeadConvert" component={LeadConvertScreen} />
+            <Stack.Screen name="DocumentPreview" component={DocumentPreviewScreen} />
             <Stack.Screen name="Board" component={BoardScreen} />
             <Stack.Screen name="LeadBoard" component={LeadBoardScreen} />
             <Stack.Screen name="ArchivedLeads" component={ArchivedLeadsScreen} />

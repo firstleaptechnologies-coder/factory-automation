@@ -4,9 +4,10 @@ import { LeadsService } from './leads.service';
 import { CustomFieldsService } from './custom-fields.service';
 import { CodeGeneratorService } from '../../common/utils/code-generator.service';
 import { OrdersModule } from '../orders/orders.module';
+import { FilesModule } from '../files/files.module';
 
 @Module({
-  imports: [OrdersModule],
+  imports: [FilesModule, OrdersModule],
   controllers: [LeadsController],
   providers: [LeadsService, CustomFieldsService, CodeGeneratorService],
   exports: [LeadsService, CustomFieldsService],

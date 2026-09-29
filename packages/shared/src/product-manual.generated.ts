@@ -10,7 +10,7 @@
 import type { ProductManual } from './product-manual';
 
 export const PRODUCT_MANUAL: ProductManual = {
-  "generatedAt": "2026-09-20",
+  "generatedAt": "2026-09-29",
   "modules": [
     {
       "key": "orders",
@@ -1089,6 +1089,14 @@ export const PRODUCT_MANUAL: ProductManual = {
           "web": null,
           "app": "LeadConvert",
           "permission": null
+        },
+        {
+          "key": "lead-document",
+          "label": "Printed enquiry",
+          "blurb": "The priced enquiry as the client would receive it, read on the phone before it is sent",
+          "web": null,
+          "app": "DocumentPreview",
+          "permission": null
         }
       ],
       "actions": [
@@ -1197,6 +1205,16 @@ export const PRODUCT_MANUAL: ProductManual = {
           "method": "GET",
           "path": "/leads/:id",
           "handler": "findOne",
+          "summary": "",
+          "permissions": [
+            "LEAD_VIEW"
+          ],
+          "fields": []
+        },
+        {
+          "method": "GET",
+          "path": "/leads/:id/document",
+          "handler": "document",
           "summary": "",
           "permissions": [
             "LEAD_VIEW"
@@ -1317,6 +1335,88 @@ export const PRODUCT_MANUAL: ProductManual = {
               "constraints": []
             },
             {
+              "name": "items",
+              "type": "LeadItemDto[]",
+              "required": false,
+              "definition": "What the enquiry was priced at, line by line — the same lines a quotation carries. Optional, and usually absent: most enquiries are worth writing down before anybody has worked out a price, and demanding one would put a form in front of the thing that has to be quick.",
+              "constraints": [
+                "a list"
+              ]
+            },
+            {
+              "name": "items[].name",
+              "type": "string",
+              "required": true,
+              "definition": "What is being priced, as the client would read it.",
+              "constraints": [
+                "at least 1 characters"
+              ]
+            },
+            {
+              "name": "items[].description",
+              "type": "string",
+              "required": false,
+              "definition": "The detail under the name — finish, edge, hardware.",
+              "constraints": []
+            },
+            {
+              "name": "items[].hsnSac",
+              "type": "string",
+              "required": false,
+              "definition": "The HSN or SAC code, where it is already known.",
+              "constraints": []
+            },
+            {
+              "name": "items[].quantity",
+              "type": "number",
+              "required": false,
+              "definition": "How many.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].unit",
+              "type": "string",
+              "required": false,
+              "definition": "What one of them is — a square foot, a running foot, a piece.",
+              "constraints": []
+            },
+            {
+              "name": "items[].ratePerUnit",
+              "type": "number",
+              "required": false,
+              "definition": "The price of one, before tax and before any discount on the line.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].discountPct",
+              "type": "number",
+              "required": false,
+              "definition": "A percentage off this line. The money it comes to is computed, not sent.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].gstSlabId",
+              "type": "string",
+              "required": false,
+              "definition": "The GST slab for this line. Falls back to the shop's default.",
+              "constraints": []
+            },
+            {
+              "name": "taxTreatment",
+              "type": "TaxTreatment",
+              "required": false,
+              "definition": "Whether the rates on those lines are before GST, include it, or are figures the shop has agreed to absorb the tax out of. Means exactly what it means on a quotation, and defaults the same way.",
+              "constraints": [
+                "one of TaxTreatment"
+              ]
+            },
+            {
               "name": "customFields",
               "type": "Record<string, unknown>",
               "required": false,
@@ -1430,6 +1530,88 @@ export const PRODUCT_MANUAL: ProductManual = {
               "required": false,
               "definition": "Whatever was said that does not fit anywhere else.",
               "constraints": []
+            },
+            {
+              "name": "items",
+              "type": "LeadItemDto[]",
+              "required": false,
+              "definition": "The priced lines, replacing whatever is on the enquiry now. Left out entirely, the pricing is untouched — a screen showing the contact details and not the lines must not wipe the lines on save. An empty array is how they are cleared, because that is somebody saying \"no lines\" rather than a form staying quiet.",
+              "constraints": [
+                "a list"
+              ]
+            },
+            {
+              "name": "items[].name",
+              "type": "string",
+              "required": true,
+              "definition": "What is being priced, as the client would read it.",
+              "constraints": [
+                "at least 1 characters"
+              ]
+            },
+            {
+              "name": "items[].description",
+              "type": "string",
+              "required": false,
+              "definition": "The detail under the name — finish, edge, hardware.",
+              "constraints": []
+            },
+            {
+              "name": "items[].hsnSac",
+              "type": "string",
+              "required": false,
+              "definition": "The HSN or SAC code, where it is already known.",
+              "constraints": []
+            },
+            {
+              "name": "items[].quantity",
+              "type": "number",
+              "required": false,
+              "definition": "How many.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].unit",
+              "type": "string",
+              "required": false,
+              "definition": "What one of them is — a square foot, a running foot, a piece.",
+              "constraints": []
+            },
+            {
+              "name": "items[].ratePerUnit",
+              "type": "number",
+              "required": false,
+              "definition": "The price of one, before tax and before any discount on the line.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].discountPct",
+              "type": "number",
+              "required": false,
+              "definition": "A percentage off this line. The money it comes to is computed, not sent.",
+              "constraints": [
+                "not below 0"
+              ]
+            },
+            {
+              "name": "items[].gstSlabId",
+              "type": "string",
+              "required": false,
+              "definition": "The GST slab for this line. Falls back to the shop's default.",
+              "constraints": []
+            },
+            {
+              "name": "taxTreatment",
+              "type": "TaxTreatment",
+              "required": false,
+              "definition": "How GST relates to those rates. Changing it reprices the lines.",
+              "constraints": [
+                "one of TaxTreatment"
+              ]
             },
             {
               "name": "customFields",

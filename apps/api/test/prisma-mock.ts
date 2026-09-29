@@ -29,6 +29,7 @@ const MODELS = [
   'workflowTransition',
   'orderStatusHistory',
   'lead',
+  'leadItem',
   'leadStatusHistory',
   'leadSource',
   'customFieldDefinition',

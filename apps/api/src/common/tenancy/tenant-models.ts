@@ -10,7 +10,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'MaterialThickness', 'SizePreset', 'Workflow', 'WorkflowStatus',
   'WorkflowTransition', 'StoredFile', 'Order', 'OrderItem', 'OrderAttachment',
   'OrderStatusHistory', 'Payment', 'CashDeposit', 'LeadSource',
-  'CustomFieldDefinition', 'Lead', 'LeadStatusHistory', 'AppSetting',
+  'CustomFieldDefinition', 'Lead', 'LeadItem', 'LeadStatusHistory', 'AppSetting',
   'DocumentSequence', 'AuditLog', 'Disbursement', 'DisbursementCategory',
   'Estimate', 'EstimateItem', 'FirmProfile', 'Notification', 'LedgerEntry',
   'NotificationTemplate', 'Expense', 'ExpenseOption', 'ExpenseEditHistory',

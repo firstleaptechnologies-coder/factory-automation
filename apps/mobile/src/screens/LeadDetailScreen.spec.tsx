@@ -367,3 +367,83 @@ it('keeps the heading in view while the enquiry scrolls under it', async () => {
   expect(screen.getByTestId('sticky-bar')).toBeTruthy();
   expect(screen.getByTestId('screen-scroll').props.stickyHeaderIndices).toEqual([0]);
 });
+
+describe('an enquiry that was priced', () => {
+  const PRICED = {
+    ...LEAD,
+    taxTreatment: 'EXCLUSIVE',
+    total: '10000',
+    taxAmount: '1800',
+    grandTotal: '11800',
+    items: [
+      {
+        id: 'li1',
+        lineNo: 1,
+        name: 'Hdmr 22mm',
+        description: null,
+        hsnSac: '4411',
+        quantity: '10',
+        unit: 'Sqf',
+        ratePerUnit: '1000',
+        discountPct: '0',
+        discountAmount: '0',
+        gstSlabId: 'gst18',
+        gstRatePct: '18',
+        taxAmount: '1800',
+        netAmount: '10000',
+        amount: '11800',
+      },
+    ],
+  };
+
+  it('shows the working — the lines, not just a total', async () => {
+    await mount(PRICED);
+    expect(await screen.findByText('Hdmr 22mm')).toBeTruthy();
+    expect(screen.getByText('10 Sqf × ₹1,000')).toBeTruthy();
+  });
+
+  it('shows what it comes to, tax apart from taxable', async () => {
+    await mount(PRICED);
+    expect(await screen.findByText('Taxable ₹10,000 · GST ₹1,800')).toBeTruthy();
+    // Twice: once as the single line's own amount, once as the total.
+    expect(screen.getAllByText('₹11,800')).toHaveLength(2);
+  });
+
+  it('opens the printed enquiry, at the server’s own document', async () => {
+    await mount(PRICED);
+    await fireEvent.press(await screen.findByTestId('preview-button'));
+    expect(navigate).toHaveBeenCalledWith('DocumentPreview', {
+      path: '/leads/l1/document',
+      title: 'Enquiry',
+      subtitle: 'LEAD-1',
+      fileName: 'LEAD-1',
+      message: 'Enquiry LEAD-1 — ₹11,800',
+      phone: '9820012345',
+    });
+  });
+
+  it('offers no preview for an enquiry nobody priced — there is no page to show', async () => {
+    await mount();
+    expect(screen.queryByTestId('preview-button')).toBeNull();
+  });
+
+  it('hands the pricing to the quote rather than making somebody type it again', async () => {
+    mockPermissions = [PERMISSIONS.ESTIMATE_MANAGE];
+    await mount(PRICED);
+    await fireEvent.press(await screen.findByText('Quote this enquiry'));
+    const params = navigate.mock.calls.find((call) => call[0] === 'EstimateEdit')![1];
+    expect(params.lead.taxTreatment).toBe('EXCLUSIVE');
+    expect(params.lead.items).toEqual([
+      {
+        name: 'Hdmr 22mm',
+        description: undefined,
+        hsnSac: '4411',
+        quantity: 10,
+        unit: 'Sqf',
+        ratePerUnit: 1000,
+        discountPct: undefined,
+        gstSlabId: 'gst18',
+      },
+    ]);
+  });
+});

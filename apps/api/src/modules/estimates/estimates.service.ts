@@ -13,8 +13,9 @@ import { tenantId } from '../../common/tenancy/tenant-context';
 import { OrdersService } from '../orders/orders.service';
 import { ClientsService } from '../clients/clients.service';
 import { paginate } from '../../common/dto/pagination.dto';
-import { amountInWords, round2, splitTax } from '../../common/utils/pricing';
-import { estimateTotals } from './estimate-totals';
+import { amountInWords } from '../../common/utils/pricing';
+import { firmProfileOrCreate } from '../../common/documents/firm-profile';
+import { priceQuoteLine, quoteTotals } from '../../common/pricing/quote-lines';
 import { pricedFromQuote } from './estimate-pricing';
 import {
   CreateEstimateDto,
@@ -72,16 +73,9 @@ export class EstimatesService {
 
   // -- the firm's own letterhead details ------------------------------------
 
+  /** Shared with the priced enquiry, which prints on the same paper. */
   async firmProfile() {
-    const profile = await this.prisma.firmProfile.findFirst();
-    if (profile) return profile;
-
-    // A tenant that has never filled this in still has to be able to print, so
-    // the row is created on first read rather than being a missing-record error
-    // on the way to a PDF.
-    return this.prisma.firmProfile.create({
-      data: { tenantId: tenantId(), name: 'Your firm' },
-    });
+    return firmProfileOrCreate(this.prisma);
   }
 
   /** Just the colours, for every signed-in user regardless of role. */
@@ -168,7 +162,7 @@ export class EstimatesService {
         : null;
       const code = await this.codes.next('estimate', tx);
 
-      const totals = estimateTotals(priced, firm.stateCode, client?.stateCode);
+      const totals = quoteTotals(priced, firm.stateCode, client?.stateCode);
 
       return tx.estimate.create({
       data: {
@@ -227,7 +221,7 @@ export class EstimatesService {
           ? existing.client
           : await tx.client.findFirst({ where: { id: clientId ?? '' } });
 
-      const totals = estimateTotals(priced, firm.stateCode, client?.stateCode);
+      const totals = quoteTotals(priced, firm.stateCode, client?.stateCode);
 
       // Lines are replaced rather than reconciled: a revised quote is a new set
       // of numbers, and matching them up by position would silently mis-edit a
@@ -626,32 +620,14 @@ export class EstimatesService {
         const slab = item.gstSlabId
           ? await this.prisma.gstSlab.findFirst({ where: { id: item.gstSlabId } })
           : defaultSlab;
-        const gstRatePct = slab ? Number(slab.ratePct) : 0;
 
-        const gross = round2(item.quantity * item.ratePerUnit);
-        const discountPct = item.discountPct ?? 0;
-        const discountAmount = round2((gross * discountPct) / 100);
-        const afterDiscount = round2(gross - discountAmount);
-
-        // The line discount comes off before the tax split, so the client is
-        // taxed on what they are actually being charged.
-        const split = splitTax(afterDiscount, gstRatePct, treatment);
-
-        return {
-          name: item.name,
-          description: item.description,
-          hsnSac: item.hsnSac,
-          quantity: item.quantity,
-          unit: item.unit ?? 'Sqf',
-          ratePerUnit: item.ratePerUnit,
-          discountPct,
-          discountAmount,
-          gstSlabId: slab?.id ?? null,
-          gstRatePct,
-          taxAmount: split.tax,
-          netAmount: split.net,
-          amount: split.gross,
-        };
+        // The sum itself lives in common/pricing, because an enquiry is priced
+        // from the same lines and the two documents have to agree.
+        return priceQuoteLine(
+          item,
+          { id: slab?.id ?? null, ratePct: slab ? Number(slab.ratePct) : 0 },
+          treatment,
+        );
       }),
     );
   }

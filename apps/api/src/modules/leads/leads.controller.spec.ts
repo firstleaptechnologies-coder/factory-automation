@@ -10,6 +10,13 @@ const leads = {
   changeStatus: jest.fn(async (..._a: unknown[]) => 'moved'),
   convert: jest.fn(async (..._a: unknown[]) => 'converted'),
   createSource: jest.fn(async (..._a: unknown[]) => 'source'),
+  forPrinting: jest.fn(async (..._a: unknown[]) => ({
+    lead: { code: 'LEAD-1', createdAt: '2026-09-01T00:00:00Z', items: [], grandTotal: 0 },
+    firm: { name: 'Decor Bucket', letterheadFileId: null, logoFileId: null },
+    amountInWords: 'Zero Rupees Only',
+    terms: '',
+    interState: false,
+  })),
 };
 
 const customFields = {
@@ -19,7 +26,18 @@ const customFields = {
   deactivate: jest.fn(async (..._a: unknown[]) => 'gone'),
 };
 
-const controller = new LeadsController(leads as never, customFields as never);
+const files = {
+  read: jest.fn(async (..._a: unknown[]) => ({
+    file: { mimeType: 'image/png' },
+    data: Buffer.from('letterhead'),
+  })),
+};
+
+const controller = new LeadsController(
+  leads as never,
+  customFields as never,
+  files as never,
+);
 const USER = { id: 'u1', code: 'SALES01', role: 'SALES', permissions: [] } as never;
 
 beforeEach(() => jest.clearAllMocks());
@@ -88,4 +106,27 @@ it('reads and edits one lead', async () => {
   await controller.update('l1', { title: 'Kitchen jali' } as never);
   expect(leads.findOne).toHaveBeenCalledWith('l1');
   expect(leads.update).toHaveBeenCalledWith('l1', { title: 'Kitchen jali' });
+});
+
+describe('the printable enquiry', () => {
+  it('is HTML, and says Enquiry rather than Estimate', async () => {
+    const html = await controller.document('ld1');
+    expect(leads.forPrinting).toHaveBeenCalledWith('ld1');
+    expect(html).toContain('<!doctype html>');
+    expect(html).toContain('Enquiry For');
+    // It is not a quotation and must not read as one to whoever is handed it.
+    expect(html).not.toContain('Estimate For');
+  });
+
+  it('prints without a letterhead rather than not printing', async () => {
+    files.read.mockRejectedValueOnce(new Error('gone'));
+    leads.forPrinting.mockResolvedValueOnce({
+      lead: { code: 'LEAD-1', createdAt: '2026-09-01T00:00:00Z', items: [], grandTotal: 0 },
+      firm: { name: 'Decor Bucket', letterheadFileId: 'missing', logoFileId: null },
+      amountInWords: 'Zero Rupees Only',
+      terms: '',
+      interState: false,
+    } as never);
+    await expect(controller.document('ld1')).resolves.toContain('Decor Bucket');
+  });
 });

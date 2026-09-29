@@ -570,11 +570,53 @@ export interface CustomFieldDefinition {
   isActive: boolean;
 }
 
+/**
+ * One priced line on an enquiry.
+ *
+ * The same fields an EstimateItem carries, because the shop prices the job on
+ * the phone and quotes it afterwards from the same lines.
+ */
+export interface LeadItem {
+  id: string;
+  lineNo: number;
+  name: string;
+  description?: string | null;
+  /** HSN for goods, SAC for services. */
+  hsnSac?: string | null;
+  quantity: string;
+  unit: string;
+  ratePerUnit: string;
+  discountPct: string;
+  discountAmount: string;
+  gstSlabId?: string | null;
+  gstRatePct: string;
+  taxAmount: string;
+  /** Taxable value after the line discount. */
+  netAmount: string;
+  /** What the line comes to including its GST. */
+  amount: string;
+}
+
+/** A line as somebody types it. The money on it is worked out by the server. */
+export interface LeadItemInput {
+  name: string;
+  description?: string;
+  hsnSac?: string;
+  quantity: number;
+  unit?: string;
+  ratePerUnit: number;
+  /** A percentage off this line; the money is computed from it. */
+  discountPct?: number;
+  gstSlabId?: string;
+}
+
 export interface Lead {
   id: string;
   code: string;
   title: string;
-  client?: Pick<Client, 'id' | 'code' | 'name' | 'phone'> | null;
+  client?: (Pick<Client, 'id' | 'code' | 'name' | 'phone'> & {
+    stateCode?: string | null;
+  }) | null;
   contactName?: string | null;
   contactPhone?: string | null;
   contactEmail?: string | null;
@@ -605,6 +647,20 @@ export interface Lead {
   statusHistory?: OrderStatusHistoryEntry[];
   /** The quotes written for this enquiry, newest first. */
   estimates?: LeadEstimate[];
+
+  /** What it was priced at, line by line. Empty where nothing was priced. */
+  items?: LeadItem[];
+  /** How GST relates to the rates on those lines. */
+  taxTreatment: TaxTreatment;
+  /** What the lines come to. All zero where there are none. */
+  subtotal: string;
+  discount: string;
+  total: string;
+  cgst: string;
+  sgst: string;
+  igst: string;
+  taxAmount: string;
+  grandTotal: string;
 }
 
 export interface LeadBoard {
@@ -627,6 +683,14 @@ export interface CreateLeadInput {
   estimatedValue?: number;
   expectedDate?: string;
   notes?: string;
+  /**
+   * What it was priced at, line by line — the same lines a quote carries.
+   * Usually absent: most enquiries are written down before anybody has worked
+   * out a price.
+   */
+  items?: LeadItemInput[];
+  /** How GST relates to those rates. Defaults to being quoted before tax. */
+  taxTreatment?: TaxTreatment;
   customFields?: Record<string, unknown>;
 }
 

@@ -15,6 +15,7 @@ import {
   Avatar,
   Button,
   Card,
+  Chip,
   Field,
   Icon,
   Loader,
@@ -167,6 +168,52 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
         {data.owner ? <Row label="Owner" value={data.owner.name} /> : null}
       </Card>
 
+      {/*
+        What the enquiry was priced at, if it was. The same lines a quotation
+        carries, and the same figures — the shop prices the job on the phone
+        and quotes from it later, so this is the working, not a summary.
+      */}
+      {data.items?.length ? (
+        <Card tone="dark" style={styles.block}>
+          <View style={styles.pricedHead}>
+            <Text variant="label" tone="muted">Priced</Text>
+            <Chip
+              icon="receipt"
+              label="Preview"
+              testID="preview-button"
+              onPress={() =>
+                navigation.navigate('DocumentPreview', {
+                  path: `/leads/${leadId}/document`,
+                  title: 'Enquiry',
+                  subtitle: data.code,
+                  fileName: data.code,
+                  message: `Enquiry ${data.code} — ${formatInr(Number(data.grandTotal))}`,
+                  phone: data.contactPhone ?? data.client?.phone ?? undefined,
+                })
+              }
+            />
+          </View>
+          {data.items.map((item) => (
+            <View key={item.id} style={styles.lineRow}>
+              <View style={{ flex: 1 }}>
+                <Text variant="small" bold numberOfLines={2}>{item.name}</Text>
+                <Text variant="tiny" tone="faint">
+                  {Number(item.quantity)} {item.unit} × {formatInr(Number(item.ratePerUnit))}
+                  {Number(item.discountPct) > 0 ? ` less ${Number(item.discountPct)}%` : ''}
+                </Text>
+              </View>
+              <Text variant="small" bold>{formatInr(Number(item.amount))}</Text>
+            </View>
+          ))}
+          <View style={styles.lineTotal}>
+            <Text variant="small" tone="muted">
+              Taxable {formatInr(Number(data.total))} · GST {formatInr(Number(data.taxAmount))}
+            </Text>
+            <Text variant="h3" tone="accent" bold>{formatInr(Number(data.grandTotal))}</Text>
+          </View>
+        </Card>
+      ) : null}
+
       {fields.data?.length ? (
         <Card tone="dark" style={styles.block}>
           <Text variant="label" tone="muted" style={{ marginBottom: spacing.md }}>Details</Text>
@@ -230,6 +277,23 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
                 clientId: data.client?.id ?? null,
                 clientName: data.client?.name ?? data.contactName ?? null,
                 location: data.location ?? null,
+                /*
+                 * The pricing goes across rather than being typed again. This
+                 * is the whole reason an enquiry carries lines: a rate keyed
+                 * twice is a rate keyed differently, and the client agreed to
+                 * the first one.
+                 */
+                items: data.items?.map((item) => ({
+                  name: item.name,
+                  description: item.description ?? undefined,
+                  hsnSac: item.hsnSac ?? undefined,
+                  quantity: Number(item.quantity),
+                  unit: item.unit,
+                  ratePerUnit: Number(item.ratePerUnit),
+                  discountPct: Number(item.discountPct) || undefined,
+                  gstSlabId: item.gstSlabId ?? undefined,
+                })),
+                taxTreatment: data.taxTreatment,
               },
             })
           }
@@ -401,6 +465,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.lg,
     paddingVertical: spacing.sm,
+  },
+  pricedHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  lineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  lineTotal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: palette.surfaceLit,
   },
   blockLabel: { marginTop: spacing.xl, marginBottom: spacing.md },
   backHead: { marginTop: spacing.lg, marginBottom: spacing.sm },

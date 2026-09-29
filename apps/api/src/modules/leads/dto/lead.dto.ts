@@ -13,8 +13,37 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { CustomFieldEntity, CustomFieldType, Priority } from '@prisma/client';
+import { CustomFieldEntity, CustomFieldType, Priority, TaxTreatment } from '@prisma/client';
 import { PunchItemDto } from '../../orders/dto/order.dto';
+
+/**
+ * One priced line on an enquiry.
+ *
+ * Deliberately the same fields a quotation's line takes, in the same order,
+ * because the shop prices the job while the client is still on the phone and
+ * raises the quote from it afterwards. A line re-entered on the way is a line
+ * entered differently.
+ */
+export class LeadItemDto {
+  /** What is being priced, as the client would read it. */
+  @IsString() @MinLength(1) name: string;
+  /** The detail under the name — finish, edge, hardware. */
+  @IsOptional() @IsString() description?: string;
+  /** The HSN or SAC code, where it is already known. */
+  @IsOptional() @IsString() hsnSac?: string;
+
+  /** How many. */
+  @Type(() => Number) @IsNumber() @Min(0) quantity: number;
+  /** What one of them is — a square foot, a running foot, a piece. */
+  @IsOptional() @IsString() unit?: string;
+  /** The price of one, before tax and before any discount on the line. */
+  @Type(() => Number) @IsNumber() @Min(0) ratePerUnit: number;
+
+  /** A percentage off this line. The money it comes to is computed, not sent. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) discountPct?: number;
+  /** The GST slab for this line. Falls back to the shop's default. */
+  @IsOptional() @IsString() gstSlabId?: string;
+}
 
 /**
  * An enquiry, before there is any work.
@@ -69,6 +98,25 @@ export class CreateLeadDto {
   /** Whatever was said on the call that does not fit anywhere else. */
   @IsOptional() @IsString() notes?: string;
 
+  /**
+   * What the enquiry was priced at, line by line — the same lines a quotation
+   * carries. Optional, and usually absent: most enquiries are worth writing
+   * down before anybody has worked out a price, and demanding one would put a
+   * form in front of the thing that has to be quick.
+   */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LeadItemDto)
+  items?: LeadItemDto[];
+
+  /**
+   * Whether the rates on those lines are before GST, include it, or are
+   * figures the shop has agreed to absorb the tax out of. Means exactly what
+   * it means on a quotation, and defaults the same way.
+   */
+  @IsOptional() @IsEnum(TaxTreatment) taxTreatment?: TaxTreatment;
+
   /** Values for the admin-defined fields, keyed by their `key`. */
   @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 }
@@ -101,6 +149,21 @@ export class UpdateLeadDto {
   @IsOptional() @IsDateString() expectedDate?: string;
   /** Whatever was said that does not fit anywhere else. */
   @IsOptional() @IsString() notes?: string;
+  /**
+   * The priced lines, replacing whatever is on the enquiry now.
+   *
+   * Left out entirely, the pricing is untouched — a screen showing the
+   * contact details and not the lines must not wipe the lines on save. An
+   * empty array is how they are cleared, because that is somebody saying "no
+   * lines" rather than a form staying quiet.
+   */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LeadItemDto)
+  items?: LeadItemDto[];
+  /** How GST relates to those rates. Changing it reprices the lines. */
+  @IsOptional() @IsEnum(TaxTreatment) taxTreatment?: TaxTreatment;
   /** Values for the shop's own extra questions, keyed by their `key`. */
   @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 }

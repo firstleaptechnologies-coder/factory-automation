@@ -557,6 +557,7 @@ model GstSlab {
 
   orderItems    OrderItem[]
   estimateItems EstimateItem[]
+  leadItems     LeadItem[]
   orders        Order[]
 
   createdAt DateTime @default(now())
@@ -2612,6 +2613,24 @@ model Lead {
   ownerId String?
   owner   User?   @relation("LeadOwner", fields: [ownerId], references: [id])
 
+  /// How the GST on the enquiry's lines relates to the figures on them, as on
+  /// a quotation. An enquiry priced one way and quoted another is the same job
+  /// at two prices, which is how a shop loses the difference.
+  taxTreatment TaxTreatment @default(EXCLUSIVE)
+
+  /// What the enquiry's own lines come to, snapshotted the way a quotation's
+  /// are. Zero where the enquiry was taken without pricing anything, which is
+  /// still the common case — a price is not what makes an enquiry worth
+  /// writing down.
+  subtotal   Decimal @default(0) @db.Decimal(14, 2)
+  discount   Decimal @default(0) @db.Decimal(14, 2)
+  total      Decimal @default(0) @db.Decimal(14, 2)
+  cgst       Decimal @default(0) @db.Decimal(14, 2)
+  sgst       Decimal @default(0) @db.Decimal(14, 2)
+  igst       Decimal @default(0) @db.Decimal(14, 2)
+  taxAmount  Decimal @default(0) @db.Decimal(14, 2)
+  grandTotal Decimal @default(0) @db.Decimal(14, 2)
+
   estimatedValue Decimal?  @db.Decimal(14, 2)
   /// What was actually quoted, taken from the estimate that was sent.
   ///
@@ -2640,11 +2659,59 @@ model Lead {
 
   statusHistory LeadStatusHistory[]
   estimates     Estimate[]
+  items         LeadItem[]
 
   @@unique([tenantId, code])
   @@index([statusId])
   @@index([ownerId])
   @@index([createdAt])
+  @@index([tenantId])
+}
+
+/// One priced line on an enquiry.
+///
+/// The same shape as a line on a quotation, deliberately and to the column.
+/// The shop prices the enquiry on the phone and quotes from it later, and a
+/// line that had to be re-entered on the way is a line that gets re-entered
+/// wrongly — a rate typed twice is a rate typed differently. Carrying them
+/// across is a copy, not a re-keying.
+///
+/// Free-form rather than tied to a material and a size preset, for the reason
+/// EstimateItem is: an enquiry is priced before anything has been measured.
+model LeadItem {
+  /// Owning tenant. No FK: a dedicated database holds no Tenant row.
+  tenantId String
+  id       String @id @default(cuid())
+  leadId   String
+  lead     Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lineNo   Int
+
+  name        String
+  description String?
+  /// HSN for goods, SAC for services.
+  hsnSac      String?
+
+  quantity    Decimal @default(1) @db.Decimal(12, 3)
+  /// The unit as the shop says it — "Sqf", "Rft", "Nos".
+  unit        String  @default("Sqf")
+  ratePerUnit Decimal @default(0) @db.Decimal(14, 2)
+
+  /// Per-line discount, held as both so a printed enquiry can show the
+  /// percentage that was discussed beside the money it came to.
+  discountPct    Decimal @default(0) @db.Decimal(5, 2)
+  discountAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  gstSlabId  String?
+  gstSlab    GstSlab? @relation(fields: [gstSlabId], references: [id])
+  gstRatePct Decimal  @default(0) @db.Decimal(5, 2)
+  taxAmount  Decimal  @default(0) @db.Decimal(14, 2)
+
+  /// Taxable value after the line discount.
+  netAmount Decimal @default(0) @db.Decimal(14, 2)
+  /// What this line comes to including its GST.
+  amount    Decimal @default(0) @db.Decimal(14, 2)
+
+  @@unique([leadId, lineNo])
   @@index([tenantId])
 }
 

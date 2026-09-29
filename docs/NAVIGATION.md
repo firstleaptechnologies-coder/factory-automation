@@ -45,6 +45,8 @@ flowchart LR
     leads --> lead_detail
     lead_convert["Convert to an order"]
     lead_detail --> lead_convert
+    lead_document["Printed enquiry"]
+    lead_detail --> lead_document
     quotes["Quotes"]
     quote_new["New quote"]
     quotes --> quote_new
@@ -176,6 +178,7 @@ flowchart LR
 |   ↳ New lead | — | `LeadCreate` | — |
 |   ↳ One enquiry | `/leads/[id]` | `LeadDetail` | — |
 |     ↳ Convert to an order | — | `LeadConvert` | — |
+|     ↳ Printed enquiry | — | `DocumentPreview` | — |
 | Quotes | `/quotes` | `Estimates` | `estimate.view` |
 |   ↳ New quote | `/quotes/new` | `EstimateEdit` | — |
 |   ↳ One quote | `/quotes/[id]` | `EstimateDetail` | — |

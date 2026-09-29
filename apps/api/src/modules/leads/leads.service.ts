@@ -9,10 +9,13 @@ import {
   EstimateStatus,
   Prisma,
   StatusCategory,
+  TaxTreatment,
   UserRole,
   WorkflowKind,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { amountInWords } from '../../common/utils/pricing';
+import { firmProfileOrCreate } from '../../common/documents/firm-profile';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CodeGeneratorService } from '../../common/utils/code-generator.service';
 import { paginate } from '../../common/dto/pagination.dto';
@@ -20,9 +23,15 @@ import { OrdersService } from '../orders/orders.service';
 import { CustomFieldsService } from './custom-fields.service';
 import { pricedFromQuote } from '../estimates/estimate-pricing';
 import {
+  priceQuoteLine,
+  quoteTotals,
+  type PricedQuoteLine,
+} from '../../common/pricing/quote-lines';
+import {
   ChangeLeadStatusDto,
   ConvertLeadDto,
   CreateLeadDto,
+  LeadItemDto,
   LeadQueryDto,
   LeadSourceDto,
   UpdateLeadDto,
@@ -34,7 +43,19 @@ import { PERMISSIONS } from '@fas/shared';
 const BOARD_COLUMN_LIMIT = 20;
 
 const LEAD_INCLUDE = {
-  client: { select: { id: true, code: true, name: true, phone: true } },
+  /* In the order they were written, which is the order they were discussed. */
+  items: { orderBy: { lineNo: 'asc' as const } },
+  client: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      phone: true,
+      /* Which side of a state line the client is on, so a printed enquiry
+         shows CGST and SGST or a single IGST line rather than guessing. */
+      stateCode: true,
+    },
+  },
   source: { select: { id: true, code: true, name: true, color: true } },
   status: { select: { id: true, code: true, name: true, color: true, category: true } },
   owner: { select: { id: true, name: true } },
@@ -167,6 +188,10 @@ export class LeadsService {
     );
     const code = await this.codes.next('lead');
 
+    const treatment = dto.taxTreatment ?? TaxTreatment.EXCLUSIVE;
+    const priced = await this.priceItems(dto.items ?? [], treatment);
+    const totals = await this.itemTotals(priced, dto.clientId);
+
     return this.prisma.lead.create({
       data: {
         tenantId: tenantId(),
@@ -183,11 +208,28 @@ export class LeadsService {
         statusId: initial.id,
         ownerId: dto.ownerId ?? userId,
         priority: dto.priority,
-        estimatedValue: dto.estimatedValue,
+        /*
+         * The typed guess wins where there is one, and the priced lines stand
+         * in for it where there is not. The two are not the same thing — a
+         * guess is what somebody thought the job was worth with the phone
+         * still warm, and the lines are what it was actually priced at — but
+         * the pipeline has to add up to something, and an enquiry priced line
+         * by line that reports no value at all is worse than either.
+         */
+        estimatedValue: dto.estimatedValue ?? (priced.length ? totals.grandTotal : undefined),
         expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
         notes: dto.notes,
+        taxTreatment: treatment,
+        ...totals,
         customFields: customFields as Prisma.InputJsonValue,
         createdById: userId,
+        items: {
+          create: priced.map((line, index) => ({
+            tenantId: tenantId(),
+            lineNo: index + 1,
+            ...line,
+          })),
+        },
         statusHistory: {
           create: {
             tenantId: tenantId(),
@@ -214,26 +256,144 @@ export class LeadsService {
       partial: true,
     });
 
-    return this.prisma.lead.update({
-      where: { id },
-      data: {
-        title: dto.title,
-        clientId: dto.clientId,
-        contactName: dto.contactName,
-        contactPhone: dto.contactPhone,
-        contactEmail: dto.contactEmail,
-        company: dto.company,
-        location: dto.location,
-        sourceId: dto.sourceId,
-        ownerId: dto.ownerId,
-        priority: dto.priority,
-        estimatedValue: dto.estimatedValue,
-        expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
-        notes: dto.notes,
-        customFields: customFields as Prisma.InputJsonValue,
-      },
-      include: LEAD_INCLUDE,
+    /*
+     * Lines are only touched when the caller sent some. A screen that shows
+     * the contact details and not the pricing must not wipe the pricing on
+     * save — the same reason customFields are merged above rather than
+     * replaced. Sending an empty array is how lines are cleared, because that
+     * is somebody saying "no lines" rather than a form staying quiet.
+     */
+    const repricing = dto.items !== undefined || dto.taxTreatment !== undefined;
+    const treatment = dto.taxTreatment ?? lead.taxTreatment;
+    const priced = repricing
+      ? await this.priceItems(dto.items ?? asItemDtos(lead.items ?? []), treatment)
+      : [];
+    const totals = repricing
+      ? await this.itemTotals(priced, dto.clientId ?? lead.clientId ?? undefined)
+      : null;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (repricing) {
+        // Replaced rather than reconciled, as a quotation's are: matching a
+        // revised set up by position silently mis-edits the line somebody
+        // deleted from the middle.
+        await tx.leadItem.deleteMany({ where: { leadId: id } });
+      }
+
+      return tx.lead.update({
+        where: { id },
+        data: {
+          title: dto.title,
+          clientId: dto.clientId,
+          contactName: dto.contactName,
+          contactPhone: dto.contactPhone,
+          contactEmail: dto.contactEmail,
+          company: dto.company,
+          location: dto.location,
+          sourceId: dto.sourceId,
+          ownerId: dto.ownerId,
+          priority: dto.priority,
+          estimatedValue: dto.estimatedValue,
+          expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
+          notes: dto.notes,
+          customFields: customFields as Prisma.InputJsonValue,
+          ...(repricing && totals
+            ? {
+                taxTreatment: treatment,
+                ...totals,
+                items: {
+                  create: priced.map((line, index) => ({
+                    tenantId: tenantId(),
+                    lineNo: index + 1,
+                    ...line,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: LEAD_INCLUDE,
+      });
     });
+  }
+
+  /**
+   * Everything the printable enquiry needs, assembled in one place.
+   *
+   * Assembled here rather than in the renderer for the reason Quotes does it:
+   * the app and the paper must show the same figures, and a total that differs
+   * between the screen and the sheet is the one bug nobody forgives.
+   */
+  async forPrinting(id: string) {
+    const [lead, firm] = await Promise.all([
+      this.findOne(id),
+      firmProfileOrCreate(this.prisma),
+    ]);
+
+    return {
+      lead,
+      firm,
+      amountInWords: amountInWords(Number(lead.grandTotal)),
+      terms: firm.termsAndConditions ?? '',
+      interState: Number(lead.igst) > 0,
+    };
+  }
+
+  // -- pricing an enquiry ---------------------------------------------------
+
+  /**
+   * The enquiry's lines, priced.
+   *
+   * Exactly what Quotes does to its own, through the same function, because
+   * the shop prices the job on the phone and quotes it later and the two have
+   * to come to the same money. The slab is resolved here, per line, and the
+   * arithmetic is not ours.
+   */
+  private async priceItems(
+    items: LeadItemDto[],
+    treatment: TaxTreatment,
+  ): Promise<PricedQuoteLine[]> {
+    if (items.length === 0) return [];
+
+    const defaultSlab = await this.prisma.gstSlab.findFirst({
+      where: { isDefault: true, isActive: true },
+    });
+
+    return Promise.all(
+      items.map(async (item) => {
+        const slab = item.gstSlabId
+          ? await this.prisma.gstSlab.findFirst({ where: { id: item.gstSlabId } })
+          : defaultSlab;
+
+        return priceQuoteLine(
+          item,
+          { id: slab?.id ?? null, ratePct: slab ? Number(slab.ratePct) : 0 },
+          treatment,
+        );
+      }),
+    );
+  }
+
+  /**
+   * What the priced lines add up to, split the way the two states decide.
+   *
+   * The firm's own state code is read rather than required: a shop that has
+   * not filled in its profile yet is treated as selling locally, which is the
+   * documented fallback and the overwhelmingly common case.
+   */
+  private async itemTotals(priced: PricedQuoteLine[], clientId?: string) {
+    const [firm, client] = await Promise.all([
+      this.prisma.firmProfile.findFirst({ select: { stateCode: true } }),
+      clientId
+        ? this.prisma.client.findFirst({ where: { id: clientId }, select: { stateCode: true } })
+        : null,
+    ]);
+
+    const { savedAmount: _savedAmount, ...totals } = quoteTotals(
+      priced,
+      firm?.stateCode,
+      client?.stateCode,
+    );
+    return totals;
   }
 
   /** Same rule as orders: only moves drawn on the canvas are allowed. */
@@ -679,4 +839,33 @@ function stillLive(cutoff: Date): Prisma.LeadWhereInput {
       status: { isTerminal: false },
     },
   };
+}
+
+/**
+ * Stored lines, back in the shape the pricer takes.
+ *
+ * Needed when only the treatment changed: the lines themselves are what they
+ * were, but what each comes to is not, so they go through the same sum again
+ * rather than having their stored figures adjusted in place.
+ */
+function asItemDtos(items: {
+  name: string;
+  description: string | null;
+  hsnSac: string | null;
+  quantity: unknown;
+  unit: string;
+  ratePerUnit: unknown;
+  discountPct: unknown;
+  gstSlabId: string | null;
+}[]): LeadItemDto[] {
+  return items.map((item) => ({
+    name: item.name,
+    description: item.description ?? undefined,
+    hsnSac: item.hsnSac ?? undefined,
+    quantity: Number(item.quantity),
+    unit: item.unit,
+    ratePerUnit: Number(item.ratePerUnit),
+    discountPct: Number(item.discountPct),
+    gstSlabId: item.gstSlabId ?? undefined,
+  }));
 }

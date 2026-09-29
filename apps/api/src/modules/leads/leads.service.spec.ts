@@ -192,6 +192,224 @@ describe('create', () => {
   });
 });
 
+describe('pricing the enquiry', () => {
+  const LINE = { name: 'Hdmr 22mm', quantity: 10, ratePerUnit: 1000 };
+
+  function withSlab(db: Db, ratePct = 18) {
+    db.gstSlab.findFirst = jest.fn(async () => ({ id: 'gst18', ratePct }));
+  }
+
+  it('prices the lines through the same sum a quotation uses', async () => {
+    const { service, db } = build();
+    withSlab(db);
+    await inTenant(() =>
+      service.create({ title: 'X', contactName: 'A', items: [LINE] } as never),
+    );
+    const [line] = db.lead.create.mock.calls[0][0].data.items.create;
+    expect(line).toMatchObject({
+      lineNo: 1,
+      name: 'Hdmr 22mm',
+      netAmount: 10000,
+      taxAmount: 1800,
+      amount: 11800,
+      gstSlabId: 'gst18',
+      gstRatePct: 18,
+      tenantId: 'tenant-test',
+    });
+  });
+
+  it('takes the line discount off before the tax, not after', async () => {
+    const { service, db } = build();
+    withSlab(db);
+    await inTenant(() =>
+      service.create({
+        title: 'X',
+        contactName: 'A',
+        items: [{ ...LINE, discountPct: 10 }],
+      } as never),
+    );
+    const [line] = db.lead.create.mock.calls[0][0].data.items.create;
+    // 10,000 less 1,000 is 9,000 taxable — not 10,000 taxed and then reduced.
+    expect(line.discountAmount).toBe(1000);
+    expect(line.netAmount).toBe(9000);
+    expect(line.taxAmount).toBe(1620);
+  });
+
+  it('reads an inclusive rate as the figure the client pays', async () => {
+    const { service, db } = build();
+    withSlab(db);
+    await inTenant(() =>
+      service.create({
+        title: 'X',
+        contactName: 'A',
+        taxTreatment: 'INCLUSIVE',
+        items: [LINE],
+      } as never),
+    );
+    const data = db.lead.create.mock.calls[0][0].data;
+    // The tax comes out of the 10,000 rather than being added on top of it.
+    expect(data.grandTotal).toBe(10000);
+    expect(data.total).toBe(8474.58);
+  });
+
+  it('totals the enquiry the way it totals a quotation', async () => {
+    const { service, db } = build();
+    withSlab(db);
+    await inTenant(() =>
+      service.create({
+        title: 'X',
+        contactName: 'A',
+        items: [LINE, { name: 'Edge band', quantity: 40, ratePerUnit: 25 }],
+      } as never),
+    );
+    const data = db.lead.create.mock.calls[0][0].data;
+    expect(data.subtotal).toBe(11000);
+    expect(data.total).toBe(11000);
+    expect(data.taxAmount).toBe(1980);
+    expect(data.grandTotal).toBe(12980);
+  });
+
+  it('splits the GST across a state line as IGST, and within one as CGST and SGST', async () => {
+    const { service, db } = build();
+    withSlab(db);
+    db.firmProfile.findFirst = jest.fn(async () => ({ stateCode: '27' }));
+    db.client.findFirst = jest.fn(async () => ({ stateCode: '08' }));
+    await inTenant(() =>
+      service.create({ title: 'X', clientId: 'c1', items: [LINE] } as never),
+    );
+    const away = db.lead.create.mock.calls[0][0].data;
+    expect(away.igst).toBe(1800);
+    expect(away.cgst).toBe(0);
+
+    const local = build();
+    withSlab(local.db);
+    local.db.firmProfile.findFirst = jest.fn(async () => ({ stateCode: '27' }));
+    local.db.client.findFirst = jest.fn(async () => ({ stateCode: '27' }));
+    await inTenant(() =>
+      local.service.create({ title: 'X', clientId: 'c1', items: [LINE] } as never),
+    );
+    const home = local.db.lead.create.mock.calls[0][0].data;
+    expect(home.cgst).toBe(900);
+    expect(home.sgst).toBe(900);
+    expect(home.igst).toBe(0);
+  });
+
+  it('lets the priced lines stand in for the value when nobody typed a guess', async () => {
+    const { service, db } = build();
+    withSlab(db);
+    await inTenant(() =>
+      service.create({ title: 'X', contactName: 'A', items: [LINE] } as never),
+    );
+    expect(db.lead.create.mock.calls[0][0].data.estimatedValue).toBe(11800);
+  });
+
+  it('keeps the typed guess where there is one — it is not the same number', async () => {
+    const { service, db } = build();
+    withSlab(db);
+    await inTenant(() =>
+      service.create({
+        title: 'X',
+        contactName: 'A',
+        estimatedValue: 50000,
+        items: [LINE],
+      } as never),
+    );
+    expect(db.lead.create.mock.calls[0][0].data.estimatedValue).toBe(50000);
+  });
+
+  it('records an enquiry with no lines at all, which is still the common case', async () => {
+    const { service, db } = build();
+    await inTenant(() => service.create({ title: 'X', contactName: 'A' } as never));
+    const data = db.lead.create.mock.calls[0][0].data;
+    expect(data.items.create).toEqual([]);
+    expect(data.grandTotal).toBe(0);
+    expect(data.estimatedValue).toBeUndefined();
+  });
+
+  it('numbers the lines in the order they were written', async () => {
+    const { service, db } = build();
+    withSlab(db);
+    await inTenant(() =>
+      service.create({
+        title: 'X',
+        contactName: 'A',
+        items: [LINE, { name: 'Two', quantity: 1, ratePerUnit: 1 }],
+      } as never),
+    );
+    expect(
+      db.lead.create.mock.calls[0][0].data.items.create.map((l: { lineNo: number }) => l.lineNo),
+    ).toEqual([1, 2]);
+  });
+
+  describe('revising them', () => {
+    function withPriced(db: Db) {
+      db.lead.findUnique = jest.fn(async () => ({
+        id: 'ld1',
+        code: 'LEAD-1',
+        statusId: 'l1',
+        workflowId: 'w1',
+        clientId: null,
+        taxTreatment: 'EXCLUSIVE',
+        customFields: {},
+        items: [
+          {
+            name: 'Hdmr 22mm',
+            description: null,
+            hsnSac: null,
+            quantity: 10,
+            unit: 'Sqf',
+            ratePerUnit: 1000,
+            discountPct: 0,
+            gstSlabId: 'gst18',
+          },
+        ],
+      }));
+    }
+
+    it('replaces the set rather than reconciling it line by line', async () => {
+      const { service, db } = build();
+      withSlab(db);
+      withPriced(db);
+      await inTenant(() =>
+        service.update('ld1', {
+          items: [{ name: 'New', quantity: 1, ratePerUnit: 500 }],
+        } as never),
+      );
+      expect(db.leadItem.deleteMany).toHaveBeenCalledWith({ where: { leadId: 'ld1' } });
+      expect(db.lead.update.mock.calls[0][0].data.items.create).toHaveLength(1);
+    });
+
+    it('leaves the pricing alone when the caller did not mention it', async () => {
+      const { service, db } = build();
+      withPriced(db);
+      await service.update('ld1', { location: 'Andheri' } as never);
+      expect(db.leadItem.deleteMany).not.toHaveBeenCalled();
+      expect(db.lead.update.mock.calls[0][0].data).not.toHaveProperty('items');
+      expect(db.lead.update.mock.calls[0][0].data).not.toHaveProperty('grandTotal');
+    });
+
+    it('clears them when the caller sends an empty set, which is not the same as silence', async () => {
+      const { service, db } = build();
+      withPriced(db);
+      await service.update('ld1', { items: [] } as never);
+      expect(db.leadItem.deleteMany).toHaveBeenCalled();
+      expect(db.lead.update.mock.calls[0][0].data.grandTotal).toBe(0);
+    });
+
+    it('reprices what is already there when only the treatment changed', async () => {
+      const { service, db } = build();
+      withSlab(db);
+      withPriced(db);
+      await inTenant(() => service.update('ld1', { taxTreatment: 'INCLUSIVE' } as never));
+      const data = db.lead.update.mock.calls[0][0].data;
+      // The same line, read the other way round: 10,000 is now what they pay.
+      expect(data.items.create).toHaveLength(1);
+      expect(data.grandTotal).toBe(10000);
+      expect(data.total).toBe(8474.58);
+    });
+  });
+});
+
 describe('update', () => {
   function withLead(db: Db, over: Record<string, unknown> = {}) {
     db.lead.findUnique = jest.fn(async () => ({

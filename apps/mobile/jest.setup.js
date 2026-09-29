@@ -43,6 +43,10 @@ jest.mock('react-native-share', () => ({
   default: { open: jest.fn(async () => ({})), shareSingle: jest.fn(async () => ({})), Social: {} },
 }));
 
+jest.mock('react-native-webview', () => ({
+  WebView: 'WebView',
+}));
+
 jest.mock('react-native-image-picker', () => ({
   launchImageLibrary: jest.fn(async () => ({ assets: [] })),
   launchCamera: jest.fn(async () => ({ assets: [] })),

@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { CustomFieldEntity, UserRole } from '@prisma/client';
 import { LeadsService } from './leads.service';
 import { CustomFieldsService } from './custom-fields.service';
@@ -17,6 +27,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { RequireModule } from '../../common/decorators/module.decorator';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
+import { FilesService } from '../files/files.service';
+import { renderLeadHtml } from './lead-document';
 
 @RequireModule(MODULES.LEADS)
 @Controller('leads')
@@ -24,6 +36,7 @@ export class LeadsController {
   constructor(
     private readonly leads: LeadsService,
     private readonly customFields: CustomFieldsService,
+    private readonly files: FilesService,
   ) {}
 
   @RequirePermissions(PERMISSIONS.LEAD_VIEW)
@@ -55,6 +68,41 @@ export class LeadsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.leads.findOne(id);
+  }
+
+  /**
+   * The enquiry as a page somebody can read.
+   *
+   * HTML rather than a PDF, exactly as the quotation is: the app shows this
+   * markup directly and turns the same markup into a PDF when it is shared,
+   * so what was previewed is what gets sent. Rendering it twice — once for
+   * the screen and once for the file — is how the two end up different.
+   */
+  @RequirePermissions(PERMISSIONS.LEAD_VIEW)
+  @Get(':id/document')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  async document(@Param('id') id: string) {
+    const data = await this.leads.forPrinting(id);
+    return renderLeadHtml({
+      ...data,
+      // Inlined as a data URI rather than linked: the app renders this inside
+      // a PDF converter that will not fetch anything, and a letterhead that
+      // silently fails to load is a document nobody can send.
+      letterheadUrl: await this.dataUri(data.firm.letterheadFileId),
+      logoUrl: await this.dataUri(data.firm.logoFileId),
+    });
+  }
+
+  /** The firm's letterhead as bytes, or nothing if it has gone missing. */
+  private async dataUri(fileId?: string | null): Promise<string | null> {
+    if (!fileId) return null;
+    try {
+      const { file, data } = await this.files.read(fileId);
+      return `data:${file.mimeType};base64,${data.toString('base64')}`;
+    } catch {
+      // A missing letterhead must not stop the enquiry printing.
+      return null;
+    }
   }
 
   @RequirePermissions(PERMISSIONS.LEAD_CREATE)

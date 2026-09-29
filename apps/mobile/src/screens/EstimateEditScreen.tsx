@@ -82,6 +82,9 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
       clientId?: string | null;
       clientName?: string | null;
       location?: string | null;
+      /** What the enquiry was already priced at, where it was priced. */
+      items?: EstimateItemInput[];
+      taxTreatment?: TaxTreatment;
     };
   };
 
@@ -98,11 +101,19 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
   );
   const [billingAddress, setBillingAddress] = useState(lead?.location ?? '');
   const [shippingAddress, setShippingAddress] = useState('');
-  const [treatment, setTreatment] = useState<TaxTreatment>('EXCLUSIVE');
+  const [treatment, setTreatment] = useState<TaxTreatment>(lead?.taxTreatment ?? 'EXCLUSIVE');
   const [notes, setNotes] = useState(lead ? `For enquiry ${lead.code}` : '');
-  const [lines, setLines] = useState<Line[]>([
-    lead?.title ? { ...blankLine(), name: lead.title } : blankLine(),
-  ]);
+  /*
+   * An enquiry that was already priced hands its lines over whole, because
+   * re-keying a rate the client has already been told is how the quote ends
+   * up disagreeing with the conversation. Where it was not priced, its title
+   * seeds the first line, which is what the screen always did.
+   */
+  const [lines, setLines] = useState<Line[]>(() =>
+    lead?.items?.length
+      ? lead.items.map((item, index) => ({ ...item, key: `lead-${index}` }))
+      : [lead?.title ? { ...blankLine(), name: lead.title } : blankLine()],
+  );
 
   const [contactSheet, setContactSheet] = useState(false);
   const [slabFor, setSlabFor] = useState<string | null>(null);

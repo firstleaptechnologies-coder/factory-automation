@@ -57,6 +57,7 @@ export const BELONGS_TO: Record<string, { entity: string; field: string }> = {
   Payment: { entity: 'Order', field: 'orderId' },
   Disbursement: { entity: 'Order', field: 'orderId' },
   EstimateItem: { entity: 'Estimate', field: 'estimateId' },
+  LeadItem: { entity: 'Lead', field: 'leadId' },
   ClientLocation: { entity: 'Client', field: 'clientId' },
   MaterialThickness: { entity: 'Material', field: 'materialId' },
   WorkflowStatus: { entity: 'Workflow', field: 'workflowId' },

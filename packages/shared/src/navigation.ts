@@ -179,6 +179,15 @@ export const NAV_GROUPS: NavGroup[] = [
                 icon: 'arrowUpRight',
                 app: 'LeadConvert',
               },
+              {
+                key: 'lead-document',
+                label: 'Printed enquiry',
+                blurb:
+                  'The priced enquiry as the client would receive it, read on ' +
+                  'the phone before it is sent',
+                icon: 'receipt',
+                app: 'DocumentPreview',
+              },
             ],
           },
         ],
