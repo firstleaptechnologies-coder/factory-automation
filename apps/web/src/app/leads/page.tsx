@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Lead, LeadSource, Workflow } from '@fas/shared';
-import { PERMISSIONS } from '@fas/shared';
+import { PERMISSIONS, leadValue, leadValueSource } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { usePaginated } from '@/lib/usePaginated';
@@ -134,9 +134,9 @@ function Leads() {
                 <div className="row">
                   {lead.convertedOrder ? (
                     <span className="t-tiny success bold">→ {lead.convertedOrder.code}</span>
-                  ) : lead.estimatedValue ? (
+                  ) : leadValue(lead) !== null ? (
                     <span className="t-body bold accent">
-                      {formatInr(Number(lead.estimatedValue))}
+                      {formatInr(leadValue(lead)!)}
                     </span>
                   ) : null}
                   {lead.source ? (

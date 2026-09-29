@@ -209,14 +209,13 @@ export class LeadsService {
         ownerId: dto.ownerId ?? userId,
         priority: dto.priority,
         /*
-         * The typed guess wins where there is one, and the priced lines stand
-         * in for it where there is not. The two are not the same thing — a
-         * guess is what somebody thought the job was worth with the phone
-         * still warm, and the lines are what it was actually priced at — but
-         * the pipeline has to add up to something, and an enquiry priced line
-         * by line that reports no value at all is worse than either.
+         * The typed guess, and only that. What a priced enquiry is worth is
+         * its lines' grandTotal, and `leadValue` in @fas/shared says which of
+         * the three figures to believe. Writing the priced total in here too
+         * would be the same number in two columns, and the copy goes stale
+         * the first time the lines are repriced.
          */
-        estimatedValue: dto.estimatedValue ?? (priced.length ? totals.grandTotal : undefined),
+        estimatedValue: dto.estimatedValue,
         expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
         notes: dto.notes,
         taxTreatment: treatment,
@@ -702,12 +701,18 @@ export class LeadsService {
           ...(quiet ? stillLive(quiet) : {}),
         };
         /*
-         * What the column is worth: the quoted figure where a quote went out,
-         * the guess where none has. Two aggregates rather than one because
-         * that is a coalesce, and summing both columns outright would count
-         * the leads that have been quoted twice over.
+         * What the column is worth, in the order `leadValue` believes the
+         * figures: the quotation where one went out, the priced lines where
+         * they exist, the guess otherwise.
+         *
+         * Three aggregates rather than one because this is a coalesce, and
+         * summing the three columns outright would count a quoted enquiry
+         * two or three times over. Each arm excludes what the arm above it
+         * has already claimed, so every enquiry is counted exactly once —
+         * which is also why the counts add up to the column's total.
          */
-        const [leads, stats, quoted] = await Promise.all([
+        const unquoted = { ...where, quotedValue: null };
+        const [leads, quoted, priced, guessed] = await Promise.all([
           this.prisma.lead.findMany({
             where,
             orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
@@ -715,22 +720,30 @@ export class LeadsService {
             take: BOARD_COLUMN_LIMIT,
           }),
           this.prisma.lead.aggregate({
-            where: { ...where, quotedValue: null },
-            _count: { _all: true },
-            _sum: { estimatedValue: true },
-          }),
-          this.prisma.lead.aggregate({
             where: { ...where, quotedValue: { not: null } },
             _count: { _all: true },
             _sum: { quotedValue: true },
+          }),
+          this.prisma.lead.aggregate({
+            where: { ...unquoted, grandTotal: { gt: 0 } },
+            _count: { _all: true },
+            _sum: { grandTotal: true },
+          }),
+          this.prisma.lead.aggregate({
+            where: { ...unquoted, grandTotal: { lte: 0 } },
+            _count: { _all: true },
+            _sum: { estimatedValue: true },
           }),
         ]);
         return {
           status,
           leads,
-          total: stats._count._all + quoted._count._all,
+          total:
+            quoted._count._all + priced._count._all + guessed._count._all,
           value:
-            Number(stats._sum.estimatedValue ?? 0) + Number(quoted._sum.quotedValue ?? 0),
+            Number(quoted._sum.quotedValue ?? 0) +
+            Number(priced._sum.grandTotal ?? 0) +
+            Number(guessed._sum.estimatedValue ?? 0),
         };
       }),
     );

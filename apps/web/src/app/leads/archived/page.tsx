@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import type { Lead } from '@fas/shared';
+import { leadValue, leadValueSource } from '@fas/shared';
 import { api } from '@/lib/api';
 import { usePaginated } from '@/lib/usePaginated';
 import { Shell } from '@/components/Shell';
@@ -62,9 +63,9 @@ function Archived() {
                   </div>
                 </div>
                 <div className="row">
-                  {lead.estimatedValue ? (
+                  {leadValue(lead) !== null ? (
                     <span className="t-small muted">
-                      {formatInr(Number(lead.estimatedValue))}
+                      {formatInr(leadValue(lead)!)}
                     </span>
                   ) : null}
                   <Pill label={lead.status.name} color={lead.status.color} />

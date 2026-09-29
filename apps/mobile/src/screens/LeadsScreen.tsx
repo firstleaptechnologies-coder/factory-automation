@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import type { Lead, LeadSource, Workflow } from '@fas/shared';
-import { PERMISSIONS } from '@fas/shared';
+import { PERMISSIONS, leadValue } from '@fas/shared';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../hooks/useApi';
@@ -211,9 +211,9 @@ export function LeadsScreen({ route, navigation }: { route?: any; navigation: an
                   <Text variant="tiny" tone="success" bold>
                     → {lead.convertedOrder.code}
                   </Text>
-                ) : lead.estimatedValue ? (
+                ) : leadValue(lead) !== null ? (
                   <Text variant="small" tone="accent" bold>
-                    {formatInr(Number(lead.estimatedValue))}
+                    {formatInr(leadValue(lead)!)}
                   </Text>
                 ) : null}
               </View>

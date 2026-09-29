@@ -11,7 +11,7 @@ import type {
   WorkflowStatus,
   WorkflowTransition,
 } from '@fas/shared';
-import { PERMISSIONS } from '@fas/shared';
+import { PERMISSIONS, leadValue, leadValueSource } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { openDocument } from '@/lib/documents';
@@ -177,12 +177,12 @@ function LeadDetail({ leadId }: { leadId: string }) {
 
       <Card tone="accent" className="enter">
         <span className="t-label on-accent" style={{ opacity: 0.75 }}>
-          {data.quotedValue ? 'Quoted' : 'Estimated'}
+          {{ quoted: 'Quoted', priced: 'Priced', estimated: 'Estimated' }[
+            leadValueSource(data) ?? 'estimated'
+          ]}
         </span>
         <div className="t-display on-accent">
-          {data.quotedValue || data.estimatedValue
-            ? formatInr(Number(data.quotedValue ?? data.estimatedValue))
-            : '—'}
+          {leadValue(data) !== null ? formatInr(leadValue(data)!) : '—'}
         </div>
         <div className="row" style={{ marginTop: 6 }}>
           <Pill label={data.status.name} color={data.status.color} />

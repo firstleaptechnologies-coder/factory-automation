@@ -294,16 +294,21 @@ describe('pricing the enquiry', () => {
     expect(home.igst).toBe(0);
   });
 
-  it('lets the priced lines stand in for the value when nobody typed a guess', async () => {
+  it('does not write the priced total into the guess as well', async () => {
     const { service, db } = build();
     withSlab(db);
     await inTenant(() =>
       service.create({ title: 'X', contactName: 'A', items: [LINE] } as never),
     );
-    expect(db.lead.create.mock.calls[0][0].data.estimatedValue).toBe(11800);
+    const data = db.lead.create.mock.calls[0][0].data;
+    // Two columns holding the same number is one that goes stale: repricing
+    // moves grandTotal and leaves the copy behind. `leadValue` in @fas/shared
+    // decides which figure to show instead.
+    expect(data.estimatedValue).toBeUndefined();
+    expect(data.grandTotal).toBe(11800);
   });
 
-  it('keeps the typed guess where there is one — it is not the same number', async () => {
+  it('keeps the typed guess beside the priced lines, not instead of them', async () => {
     const { service, db } = build();
     withSlab(db);
     await inTenant(() =>
@@ -314,7 +319,9 @@ describe('pricing the enquiry', () => {
         items: [LINE],
       } as never),
     );
-    expect(db.lead.create.mock.calls[0][0].data.estimatedValue).toBe(50000);
+    const data = db.lead.create.mock.calls[0][0].data;
+    expect(data.estimatedValue).toBe(50000);
+    expect(data.grandTotal).toBe(11800);
   });
 
   it('records an enquiry with no lines at all, which is still the common case', async () => {
@@ -323,7 +330,6 @@ describe('pricing the enquiry', () => {
     const data = db.lead.create.mock.calls[0][0].data;
     expect(data.items.create).toEqual([]);
     expect(data.grandTotal).toBe(0);
-    expect(data.estimatedValue).toBeUndefined();
   });
 
   it('numbers the lines in the order they were written', async () => {
@@ -791,21 +797,29 @@ describe('board', () => {
   });
 
   /** The column is counted in two halves: quoted enquiries, and the rest. */
-  function halves(
+  /**
+   * The three arms the column total is made of, in the order `leadValue`
+   * believes them: what was quoted, what the lines come to, and the guess.
+   */
+  function arms(
     db: Db,
-    unquoted: { count: number; value: number },
     quoted: { count: number; value: number },
+    priced: { count: number; value: number } = { count: 0, value: 0 },
+    guessed: { count: number; value: number } = { count: 0, value: 0 },
   ) {
-    db.lead.aggregate = jest.fn(async (args: any) =>
-      args.where.quotedValue === null
-        ? { _count: { _all: unquoted.count }, _sum: { estimatedValue: unquoted.value } }
-        : { _count: { _all: quoted.count }, _sum: { quotedValue: quoted.value } },
-    );
+    db.lead.aggregate = jest.fn(async (args: any) => {
+      if (args.where.quotedValue !== null) {
+        return { _count: { _all: quoted.count }, _sum: { quotedValue: quoted.value } };
+      }
+      return args.where.grandTotal?.gt === 0
+        ? { _count: { _all: priced.count }, _sum: { grandTotal: priced.value } }
+        : { _count: { _all: guessed.count }, _sum: { estimatedValue: guessed.value } };
+    });
   }
 
   it('caps each column but reports the whole stage’s count and value', async () => {
     const { service, db } = build();
-    halves(db, { count: 137, value: 250000 }, { count: 0, value: 0 });
+    arms(db, { count: 0, value: 0 }, { count: 0, value: 0 }, { count: 137, value: 250000 });
     const board = await service.board();
     expect(db.lead.findMany.mock.calls[0][0].take).toBe(20);
     // A pipeline figure that moved with how many cards happened to load would
@@ -815,7 +829,7 @@ describe('board', () => {
 
   it('counts a quoted enquiry at what was quoted, not at the guess', async () => {
     const { service, db } = build();
-    halves(db, { count: 2, value: 100000 }, { count: 1, value: 450000 });
+    arms(db, { count: 1, value: 450000 }, { count: 0, value: 0 }, { count: 2, value: 100000 });
     const board = await service.board();
     // The guess is what somebody thought when the phone was put down; the
     // quote is a number that went to the client.
@@ -824,9 +838,45 @@ describe('board', () => {
 
   it('counts a quoted enquiry once, not in both halves', async () => {
     const { service, db } = build();
-    halves(db, { count: 0, value: 0 }, { count: 4, value: 900000 });
+    arms(db, { count: 4, value: 900000 });
     const board = await service.board();
     expect(board.columns[0]).toMatchObject({ total: 4, value: 900000 });
+  });
+
+  it('counts a priced enquiry at what its lines come to, not at the guess', async () => {
+    const { service, db } = build();
+    arms(
+      db,
+      { count: 0, value: 0 },
+      { count: 1, value: 60534 },
+      { count: 2, value: 100000 },
+    );
+    const board = await service.board();
+    // The lines are worked out from rates; the guess is what somebody thought
+    // with the phone still warm. Neither is counted twice.
+    expect(board.columns[0]).toMatchObject({ total: 3, value: 160534 });
+  });
+
+  it('counts an enquiry that is quoted and priced once, at the quotation', async () => {
+    const { service, db } = build();
+    // The priced arm excludes everything the quoted arm claimed, so a lead
+    // that is both appears only in the first.
+    arms(db, { count: 1, value: 450000 }, { count: 0, value: 0 });
+    const board = await service.board();
+    expect(board.columns[0]).toMatchObject({ total: 1, value: 450000 });
+  });
+
+  it('asks the three arms for disjoint sets, so nothing is summed twice', async () => {
+    const { service, db } = build();
+    arms(db, { count: 0, value: 0 });
+    await service.board();
+    // Three per column, and the pipeline here has two stages.
+    const wheres = db.lead.aggregate.mock.calls.map((call: any) => call[0].where);
+    expect(wheres).toHaveLength(6);
+    const [quotedArm, pricedArm, guessedArm] = wheres;
+    expect(quotedArm.quotedValue).toEqual({ not: null });
+    expect(pricedArm).toMatchObject({ quotedValue: null, grandTotal: { gt: 0 } });
+    expect(guessedArm).toMatchObject({ quotedValue: null, grandTotal: { lte: 0 } });
   });
 
   it('reports a stage with no leads as zero, not NaN', async () => {

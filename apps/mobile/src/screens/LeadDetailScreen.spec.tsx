@@ -405,8 +405,17 @@ describe('an enquiry that was priced', () => {
   it('shows what it comes to, tax apart from taxable', async () => {
     await mount(PRICED);
     expect(await screen.findByText('Taxable ₹10,000 · GST ₹1,800')).toBeTruthy();
-    // Twice: once as the single line's own amount, once as the total.
-    expect(screen.getAllByText('₹11,800')).toHaveLength(2);
+    // Three times: the hero, the single line's own amount, and the total.
+    expect(screen.getAllByText('₹11,800')).toHaveLength(3);
+  });
+
+  it('heads the enquiry with what its lines come to, not with the old guess', async () => {
+    // The fixture was guessed at ₹2.50 L and priced at ₹11,800. The guess is
+    // kept — the difference between the two is worth knowing — but the
+    // figure on the card is the one worked out from rates.
+    await mount(PRICED);
+    expect(await screen.findByText('Taxable ₹10,000 · GST ₹1,800')).toBeTruthy();
+    expect(screen.queryByText('₹2.50 L')).toBeNull();
   });
 
   it('opens the printed enquiry, at the server’s own document', async () => {

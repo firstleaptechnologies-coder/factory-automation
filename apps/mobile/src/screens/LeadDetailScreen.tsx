@@ -7,7 +7,7 @@ import type {
   WorkflowStatus,
   WorkflowTransition,
 } from '@fas/shared';
-import { PERMISSIONS } from '@fas/shared';
+import { PERMISSIONS, leadValue } from '@fas/shared';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../hooks/useApi';
@@ -134,9 +134,10 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
       <Animated.View entering={FadeInDown.duration(400).springify()}>
         <Card tone="accent">
           <Text variant="h1" tone="onAccent">{data.title}</Text>
-          {data.estimatedValue ? (
+          {/* Whichever of the three figures is the one to believe. */}
+          {leadValue(data) !== null ? (
             <Text variant="h2" tone="onAccent" style={{ opacity: 0.8, marginTop: spacing.xs }}>
-              {formatInr(Number(data.estimatedValue))}
+              {formatInr(leadValue(data)!)}
             </Text>
           ) : null}
           <View style={styles.heroFoot}>

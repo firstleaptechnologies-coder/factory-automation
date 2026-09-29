@@ -14,6 +14,7 @@ export * from './manual-html';
 export * from './image-policy';
 export * from './types';
 export * from './phone';
+export * from './lead-value';
 export * from './client';
 export * from './color';
 export * from './navigation';

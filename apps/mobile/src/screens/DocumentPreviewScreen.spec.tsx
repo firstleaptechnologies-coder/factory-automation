@@ -75,3 +75,32 @@ it('does not let the page reach out to the network for anything', async () => {
   // nothing to fetch — which is what makes this readable in a workshop.
   expect(web.props.source).not.toHaveProperty('uri');
 });
+
+describe('fitting an A4 sheet onto a phone', () => {
+  it('scales the page down rather than showing a third of it', async () => {
+    await mount();
+    const web = await screen.findByTestId('document-webview');
+    // 794 CSS pixels is 210mm — the width the document is laid out at.
+    expect(web.props.injectedJavaScript).toContain('794');
+    expect(web.props.injectedJavaScript).toContain('window.screen.width');
+  });
+
+  it('replaces the page’s own viewport rather than adding a second one', async () => {
+    await mount();
+    const web = await screen.findByTestId('document-webview');
+    // The document carries its own, because it is also served to a browser.
+    // A second meta loses to the one in the markup, which is the bug that
+    // put the Amount column off the right edge.
+    expect(web.props.injectedJavaScript).toContain(
+      'document.querySelector(\'meta[name="viewport"]\')',
+    );
+    expect(web.props.injectedJavaScriptBeforeContentLoaded).toBeUndefined();
+  });
+
+  it('still lets it be pinched larger, because an HSN code at 55% is not readable', async () => {
+    await mount();
+    const web = await screen.findByTestId('document-webview');
+    expect(web.props.injectedJavaScript).toContain('user-scalable=yes');
+    expect(web.props.injectedJavaScript).not.toContain('maximum-scale=1');
+  });
+});

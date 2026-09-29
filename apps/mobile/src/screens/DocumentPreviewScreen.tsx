@@ -91,9 +91,19 @@ export function DocumentPreviewScreen({ route, navigation }: { route: any; navig
           source={{ html: document.data }}
           style={styles.web}
           containerStyle={styles.webContainer}
-          scalesPageToFit
-          /* A4 at phone width is unreadable at 100%. */
-          injectedJavaScriptBeforeContentLoaded={VIEWPORT}
+          /*
+           * After the content loads, not before.
+           *
+           * The document carries its own `<meta viewport>` — it has to, it is
+           * also served to a browser — and a meta appended before the page
+           * parses is simply overridden by the one in the markup. Injected
+           * first, the sheet rendered at its true A4 width and the reader saw
+           * the left two-thirds of it: the Amount column and the totals block
+           * were off the right edge.
+           */
+          injectedJavaScript={FIT_TO_WIDTH}
+          /* Android will not run injected JS without a message handler. */
+          onMessage={ignoreMessages}
         />
       )}
 
@@ -104,15 +114,36 @@ export function DocumentPreviewScreen({ route, navigation }: { route: any; navig
   );
 }
 
+/** The page sends us nothing; the handler exists so Android runs the script. */
+const ignoreMessages = (): void => undefined;
+
 /**
- * The document is laid out in millimetres for A4. Without this it renders at
- * its true width and the reader sees the top-left corner of a page.
+ * Fit the sheet to the phone, and let it be pinched larger.
+ *
+ * The document is laid out in millimetres for A4 — 210mm is 794 CSS pixels —
+ * so at a phone's width it has to be scaled down or it is read one third at a
+ * time. The page's own viewport meta is replaced rather than a second one
+ * added: two of them and the one in the markup wins.
+ *
+ * `maximum-scale` is deliberately not 1. This is a document somebody checks
+ * before sending it to a client, and an HSN code at 55% is not checkable.
  */
-const VIEWPORT = `
-  var meta = document.createElement('meta');
-  meta.name = 'viewport';
-  meta.content = 'width=794, initial-scale=' + (window.screen.width / 794);
-  document.head.appendChild(meta);
+const FIT_TO_WIDTH = `
+  (function () {
+    var A4 = 794;
+    var meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'viewport');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute(
+      'content',
+      'width=' + A4 + ', initial-scale=' + (window.screen.width / A4) +
+        ', minimum-scale=' + (window.screen.width / A4) +
+        ', maximum-scale=3, user-scalable=yes',
+    );
+  })();
   true;
 `;
 

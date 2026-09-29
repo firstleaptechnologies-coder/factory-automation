@@ -11,7 +11,7 @@ import type {
   Material,
   TaxTreatment,
 } from '@fas/shared';
-import { PERMISSIONS } from '@fas/shared';
+import { PERMISSIONS, leadValue, leadValueSource } from '@fas/shared';
 import { formatCurrencyInr } from '@/lib/format';
 import { Shell } from '@/components/Shell';
 import { KanbanBoard } from '@/components/KanbanBoard';
@@ -322,14 +322,14 @@ export default function LeadBoardPage() {
               {lead.location ? <div className="sub">{lead.location}</div> : null}
               {/* The quoted figure where a quote went out, the guess where none
                   has — the same rule the column total follows. */}
-              {lead.quotedValue ? (
+              {/* The quotation, the priced lines, or the guess — in that
+                  order, and labelled so the reader knows which. */}
+              {leadValue(lead) !== null ? (
                 <div style={{ fontSize: 12, marginTop: 4 }}>
-                  {formatCurrencyInr(Number(lead.quotedValue))}
-                  <span className="muted"> quoted</span>
-                </div>
-              ) : lead.estimatedValue ? (
-                <div style={{ fontSize: 12, marginTop: 4 }}>
-                  {formatCurrencyInr(Number(lead.estimatedValue))}
+                  {formatCurrencyInr(leadValue(lead)!)}
+                  {leadValueSource(lead) === 'quoted' ? (
+                    <span className="muted"> quoted</span>
+                  ) : null}
                 </div>
               ) : null}
               {lead.source ? (
