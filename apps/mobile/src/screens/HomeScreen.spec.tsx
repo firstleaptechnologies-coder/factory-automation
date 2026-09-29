@@ -91,6 +91,7 @@ beforeEach(() => {
     PERMISSIONS.CLIENT_VIEW,
     PERMISSIONS.CASH_POSITION_VIEW,
     PERMISSIONS.DISBURSEMENT_VIEW,
+    PERMISSIONS.LEAD_VIEW,
     PERMISSIONS.ORDER_PUNCH,
     PERMISSIONS.WORKFLOW_MANAGE,
   ];
@@ -188,7 +189,7 @@ describe('where the work is', () => {
   it('draws every tile label at one size too', async () => {
     await mount();
     await measure();
-    const sizes = ['Quotes', 'Clients', 'Transactions', 'Payout', 'Punch'].map(sizeOf);
+    const sizes = ['Quotes', 'Clients', 'Transactions', 'Leads', 'Punch'].map(sizeOf);
     expect(new Set(sizes).size).toBe(1);
   });
 
@@ -272,11 +273,22 @@ it.each([
   ['Quotes', 'Estimates'],
   ['Clients', 'Clients'],
   ['Transactions', 'Transactions'],
-  ['Payout', 'DisbursementLedger'],
 ])('the %s tile opens %s', async (label, route) => {
   await mount();
   await fireEvent.press(screen.getByText(label));
   expect(navigate).toHaveBeenCalledWith(route);
+});
+
+/*
+ * Leads is a tab, not a stack screen, so it is reached through the tab
+ * navigator rather than pushed on top of Home. Its own test because the shape
+ * of the call differs — asserting the flat name would pass on a screen that
+ * opened the wrong thing.
+ */
+it('the Leads tile opens the Leads tab', async () => {
+  await mount();
+  await fireEvent.press(screen.getByText('Leads'));
+  expect(navigate).toHaveBeenCalledWith('Main', { screen: 'Leads' });
 });
 
 /*
@@ -325,15 +337,26 @@ it('offers only the actions this person is allowed to take', async () => {
   mockGranted = [PERMISSIONS.CLIENT_VIEW];
   await mount();
   expect(screen.getByText('Clients')).toBeTruthy();
-  for (const hidden of ['Quote', 'Cash', 'Payout', 'Punch']) {
+  for (const hidden of ['Quote', 'Cash', 'Leads', 'Punch']) {
     expect(screen.queryByText(hidden)).toBeNull();
   }
 });
 
 it('puts punching last, where a thumb lands', async () => {
   await mount();
-  const labels = ['Quotes', 'Clients', 'Transactions', 'Payout', 'Punch'];
+  const labels = ['Quotes', 'Clients', 'Transactions', 'Leads', 'Punch'];
   for (const label of labels) expect(screen.getByText(label)).toBeTruthy();
+});
+
+/*
+ * Five, not six. The row is sized for five and the labels shrink to fit, so a
+ * sixth makes every one of them smaller — which is why Leads replaced Payout
+ * rather than joining it. Payout is read weekly; an enquiry nobody opens today
+ * is work that goes somewhere else.
+ */
+it('keeps the shortcut row at five, and Payout off it', async () => {
+  await mount();
+  expect(screen.queryByText('Payout')).toBeNull();
 });
 
 it('offers no board of its own — each list is the way to its board', async () => {

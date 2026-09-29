@@ -82,7 +82,16 @@ export function HomeScreen({ navigation }: { navigation: any }) {
     can(PERMISSIONS.ESTIMATE_VIEW) && { icon: 'clipboard' as const, label: 'Quotes', to: 'Estimates' },
     can(PERMISSIONS.CLIENT_VIEW) && { icon: 'users' as const, label: 'Clients', to: 'Clients' },
     can(PERMISSIONS.CASH_POSITION_VIEW) && { icon: 'card' as const, label: 'Transactions', to: 'Transactions' },
-    can(PERMISSIONS.DISBURSEMENT_VIEW) && { icon: 'arrowUpRight' as const, label: 'Payout', to: 'DisbursementLedger' },
+    /*
+     * Leads sits where Payout did.
+     *
+     * The row is sized for five and a sixth makes every label smaller, so
+     * this was a swap rather than an addition. Payout is the one of the five
+     * that is read weekly rather than daily, and it is still one tap away
+     * from the menu; an enquiry that nobody opens today is work that goes
+     * somewhere else.
+     */
+    can(PERMISSIONS.LEAD_VIEW) && { icon: 'trend' as const, label: 'Leads', to: 'Leads' },
     can(PERMISSIONS.ORDER_PUNCH) && { icon: 'plus' as const, label: 'Punch', to: 'PunchTab' },
   ].filter(Boolean) as { icon: IconName; label: string; to: string }[];
   const tileSize = fitLabels(

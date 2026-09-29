@@ -120,37 +120,15 @@ it('shows the admin’s own custom fields, by their labels', async () => {
   expect(screen.getByText('Rao')).toBeTruthy();
 });
 
-it('shows the history of how it got here, and what was edited on the way', async () => {
-  mockHistory.mockResolvedValue([
-    {
-      id: 'h1',
-      at: '2026-09-01T10:00:00Z',
-      kind: 'moved',
-      action: 'lead.moved',
-      entity: 'Lead',
-      entityId: 'l1',
-      from: null,
-      to: 'New enquiry',
-      reason: 'Lead created',
-      by: 'Ravi',
-    },
-    {
-      id: 'h2',
-      at: '2026-09-02T10:00:00Z',
-      kind: 'changed',
-      action: 'lead.updated',
-      entity: 'Lead',
-      entityId: 'l1',
-      by: 'Ravi',
-      changes: [{ field: 'estimatedValue', from: 50000, to: 65000 }],
-    },
-  ]);
+it('does not read the history back on the enquiry, and never asks for it', async () => {
+  // The server still writes it — every move and every edit — and the API's
+  // own specs hold that. What the owner asked for is that it is not read
+  // back here: an audit trail under a live enquiry invites arguing about the
+  // last move rather than making the next one. So the screen does not show
+  // it, and the app does not spend a request fetching what it will not show.
   await mount();
-
-  expect(await screen.findByText('Punched at New enquiry')).toBeTruthy();
-  expect(screen.getByText(/Lead created/)).toBeTruthy();
-  // A status list could never have shown this.
-  expect(screen.getByText('Estimated value changed')).toBeTruthy();
+  expect(screen.queryByText('History')).toBeNull();
+  expect(mockHistory).not.toHaveBeenCalled();
 });
 
 describe('converting', () => {
@@ -372,25 +350,13 @@ describe('sending the enquiry back', () => {
     );
   });
 
-  it('marks a reversal in the history', async () => {
+  it('does not show the reversal back on the enquiry either', async () => {
+    // It is recorded — leads.service.spec.ts holds that the row is written
+    // with reversed: true. The app simply does not display history at all,
+    // and a reversal is not the exception that earns it one.
     allowed();
-    mockHistory.mockResolvedValue([
-      {
-        id: 'h9',
-        at: '2026-09-02T10:00:00Z',
-        kind: 'moved',
-        action: 'lead.moved_back',
-        entity: 'Lead',
-        entityId: 'l1',
-        from: 'Quoted',
-        to: 'Contacted',
-        reversed: true,
-        reason: 'Talking again',
-        by: 'Nakul',
-      },
-    ]);
     await mount();
-    expect(await screen.findByText(/went back/)).toBeTruthy();
+    expect(screen.queryByText(/went back/)).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import type { Lead, LeadSource, Workflow } from '@fas/shared';
 import { PERMISSIONS } from '@fas/shared';
@@ -7,7 +7,6 @@ import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { usePaginated } from '../hooks/usePaginated';
-import { FilterSheet } from '../components/FilterSheet';
 import {
   Card,
   Chip,
@@ -20,6 +19,8 @@ import {
   RoundButton,
   Screen,
   ScreenHeader,
+  Sheet,
+  SheetOption,
   Text,
 } from '../ui';
 import { palette, spacing } from '../theme';
@@ -30,8 +31,14 @@ import { formatInr, relativeTime } from '../lib/format';
  *
  * The bar opens this rather than the board for the same reason its Orders tab
  * does: looking one up — by name, by phone, by where it came from — is the
- * common errand, and pushing the pipeline along is the occasional one. The
- * board is a tap away on the home card.
+ * common errand, and pushing the pipeline along is the occasional one.
+ *
+ * The header carries the two things done from here often enough to deserve a
+ * thumb: taking a new enquiry, and everything else. The filters are not in a
+ * sheet, because a sheet hides what is currently on — somebody scrolls a list
+ * that is quietly filtered and concludes the enquiry is missing. As chips they
+ * are always readable, and clearing one is a tap rather than a sheet, an
+ * unpick and an Apply.
  */
 export function LeadsScreen({ route, navigation }: { route?: any; navigation: any }) {
   const { can } = useAuth();
@@ -40,7 +47,7 @@ export function LeadsScreen({ route, navigation }: { route?: any; navigation: an
     (route?.params as { statusId?: string } | undefined)?.statusId ?? null,
   );
   const [sourceId, setSourceId] = useState<string | null>(null);
-  const [filterSheet, setFilterSheet] = useState(false);
+  const [menu, setMenu] = useState(false);
 
   const workflow = useApi<Workflow>(() => api.defaultWorkflow('LEAD'), []);
   const sources = useApi<LeadSource[]>(() => api.leadSources(), []);
@@ -57,40 +64,6 @@ export function LeadsScreen({ route, navigation }: { route?: any; navigation: an
     [search, statusId, sourceId],
   );
 
-  const activeFilters = [statusId, sourceId].filter(Boolean).length;
-
-  // Built once per data change: a wheel handed a fresh option list on every
-  // render loses track of what was chosen.
-  const filterDimensions = useMemo(
-    () => [
-      {
-        key: 'statusId',
-        label: 'Stage',
-        options: [
-          { id: null, label: 'Any stage' },
-          ...(workflow.data?.statuses ?? []).map((status) => ({
-            id: status.id,
-            label: status.name,
-            color: status.color,
-          })),
-        ],
-      },
-      {
-        key: 'sourceId',
-        label: 'Source',
-        options: [
-          { id: null, label: 'Any source' },
-          ...(sources.data ?? []).map((source) => ({
-            id: source.id,
-            label: source.name,
-            color: source.color,
-          })),
-        ],
-      },
-    ],
-    [workflow.data, sources.data],
-  );
-
   return (
     <Screen
       refreshing={leads.refreshing}
@@ -102,7 +75,26 @@ export function LeadsScreen({ route, navigation }: { route?: any; navigation: an
           <ScreenHeader
             title="Leads"
             subtitle={`${leads.total} enquir${leads.total === 1 ? 'y' : 'ies'}`}
-            right={<RoundButton icon="filter" testID="filter-button" onPress={() => setFilterSheet(true)} />}
+            right={
+              <View style={styles.headerActions}>
+                {can(PERMISSIONS.LEAD_CREATE) ? (
+                  <RoundButton
+                    icon="plus"
+                    size={42}
+                    testID="new-lead-button"
+                    accessibilityLabel="New lead"
+                    onPress={() => navigation.navigate('LeadCreate')}
+                  />
+                ) : null}
+                <RoundButton
+                  icon="more"
+                  size={42}
+                  testID="leads-menu-button"
+                  accessibilityLabel="More"
+                  onPress={() => setMenu(true)}
+                />
+              </View>
+            }
           />
 
           <Field
@@ -112,26 +104,57 @@ export function LeadsScreen({ route, navigation }: { route?: any; navigation: an
             icon="search"
           />
 
-          {/* The same three the orders list offers, in the same place: the
-              board is a way of looking at this list, and a new enquiry starts
-              from it. */}
-          <View style={styles.actions}>
-            <Chip icon="layers" label="Board" onPress={() => navigation.navigate('LeadBoard')} />
-            <Chip icon="history" label="Archived" onPress={() => navigation.navigate('ArchivedLeads')} />
-            {can(PERMISSIONS.LEAD_CREATE) ? (
-              <Chip icon="plus" label="New lead" onPress={() => navigation.navigate('LeadCreate')} />
-            ) : null}
-            {activeFilters > 0 ? (
+          {/*
+            Two rails, one per thing a list is narrowed by. Each scrolls
+            sideways because a shop with fourteen stages should not lose the
+            list to a wall of chips, and the leading chip names the rail — so
+            "All stages" says what the row is as well as clearing it.
+          */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            testID="stage-filters"
+            contentContainerStyle={styles.filterRow}>
+            <Chip
+              label="All stages"
+              selected={!statusId}
+              onPress={() => setStatusId(null)}
+            />
+            {(workflow.data?.statuses ?? []).map((status) => (
               <Chip
-                label={`${activeFilters} filter${activeFilters > 1 ? 's' : ''} ×`}
-                selected
-                onPress={() => {
-                  setStatusId(null);
-                  setSourceId(null);
-                }}
+                key={status.id}
+                label={status.name}
+                accent={status.color}
+                selected={statusId === status.id}
+                testID={`stage-${status.id}`}
+                onPress={() => setStatusId(statusId === status.id ? null : status.id)}
               />
-            ) : null}
-          </View>
+            ))}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            testID="source-filters"
+            contentContainerStyle={[styles.filterRow, styles.lastFilterRow]}>
+            <Chip
+              label="All sources"
+              selected={!sourceId}
+              onPress={() => setSourceId(null)}
+            />
+            {(sources.data ?? []).map((source) => (
+              <Chip
+                key={source.id}
+                label={source.name}
+                accent={source.color}
+                selected={sourceId === source.id}
+                testID={`source-${source.id}`}
+                onPress={() => setSourceId(sourceId === source.id ? null : source.id)}
+              />
+            ))}
+          </ScrollView>
         </>
       }>
       {leads.loading ? (
@@ -207,23 +230,34 @@ export function LeadsScreen({ route, navigation }: { route?: any; navigation: an
         noun="enquiries"
       />
 
-      <FilterSheet
-        visible={filterSheet}
-        onClose={() => setFilterSheet(false)}
-        title="Filter leads"
-        dimensions={filterDimensions}
-        value={{ statusId, sourceId }}
-        onApply={(next) => {
-          setStatusId(next.statusId ?? null);
-          setSourceId(next.sourceId ?? null);
-        }}
-      />
+      {/* The other two ways of looking at the same pipeline. Neither is a
+          daily errand, so neither earns a button of its own. */}
+      <Sheet visible={menu} onClose={() => setMenu(false)} title="Leads">
+        <SheetOption
+          label="Board view"
+          description="The same enquiries arranged by stage"
+          onPress={() => {
+            setMenu(false);
+            navigation.navigate('LeadBoard');
+          }}
+        />
+        <SheetOption
+          label="Archived"
+          description="Enquiries that went quiet"
+          onPress={() => {
+            setMenu(false);
+            navigation.navigate('ArchivedLeads');
+          }}
+        />
+      </Sheet>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  filterRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
+  lastFilterRow: { marginBottom: spacing.sm },
   card: { marginBottom: spacing.md },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },

@@ -3,7 +3,6 @@ import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import type {
   CustomFieldDefinition,
-  HistoryEntry,
   Lead,
   WorkflowStatus,
   WorkflowTransition,
@@ -27,7 +26,6 @@ import {
   Text,
   haptic,
 } from '../ui';
-import { HistoryTimeline } from '../components/HistoryTimeline';
 import { palette, spacing } from '../theme';
 import { formatDateTime, formatInr, relativeTime } from '../lib/format';
 
@@ -58,14 +56,14 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
 
   const fields = useApi<CustomFieldDefinition[]>(() => api.leadFields(), []);
   /*
-   * The history is its own request: it is no longer only the stages this
-   * enquiry passed through, but what was edited on it and by whom.
+   * There is no history request here, and that is deliberate rather than
+   * unbuilt. The server still writes every stage change and every edit — the
+   * shop's own record of who did what is not something the app gets to opt
+   * out of — but the owner does not want it read back on the enquiry. It is
+   * an audit trail, not a conversation, and a timeline under a live lead
+   * invites re-litigating a move rather than making the next one. Removing
+   * the screen removes the reading, never the writing.
    */
-  const history = useApi<HistoryEntry[]>(
-    useCallback(() => api.history('leads', leadId), [leadId]),
-    [leadId],
-  );
-
   const lead = useApi<Lead>(
     useCallback(async () => {
       const fresh = await api.lead(leadId);
@@ -90,7 +88,6 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
       setPendingBack(null);
       setNote('');
       lead.reload();
-      history.reload();
     } catch (e) {
       haptic('notificationError');
       Alert.alert('Could not move it back', e instanceof Error ? e.message : 'Unknown error');
@@ -108,7 +105,6 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
       setPendingMove(null);
       setNote('');
       lead.reload();
-      history.reload();
     } catch (e) {
       haptic('notificationError');
       Alert.alert('Could not move', e instanceof Error ? e.message : 'Unknown error');
@@ -125,8 +121,8 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
       refreshing={lead.refreshing}
       onRefresh={lead.refresh}
       /* The heading stays put, as it does on the lists: an enquiry with its
-         quotes and its history under it is long enough that the way back was
-         a scroll away. */
+         custom fields and its quotes under it is long enough that the way
+         back was a scroll away. */
       sticky={
         <ScreenHeader
           title={data.code}
@@ -285,9 +281,6 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
         </>
       ) : null}
 
-      <Text variant="label" tone="muted" style={styles.blockLabel}>History</Text>
-      <HistoryTimeline entries={history.data ?? []} />
-
       <Sheet
         visible={moveSheet}
         title="Move this lead"
@@ -411,6 +404,4 @@ const styles = StyleSheet.create({
   },
   blockLabel: { marginTop: spacing.xl, marginBottom: spacing.md },
   backHead: { marginTop: spacing.lg, marginBottom: spacing.sm },
-  historyRow: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.sm },
-  historyDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
 });

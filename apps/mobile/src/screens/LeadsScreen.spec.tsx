@@ -77,7 +77,9 @@ it('shows each enquiry with who it is from and where it stands', async () => {
   expect(screen.getByText('Kitchen jali')).toBeTruthy();
   expect(screen.getByText('Verma · 9820012345')).toBeTruthy();
   expect(screen.getByText('Andheri')).toBeTruthy();
-  expect(screen.getByText('New enquiry')).toBeTruthy();
+  // Twice now: once as the stage chip on the rail, once as the enquiry's own
+  // pill. Both are the stage — one narrows the list, the other reports it.
+  expect(screen.getAllByText('New enquiry')).toHaveLength(2);
 });
 
 it('falls back to the client’s name when no contact was taken', async () => {
@@ -108,31 +110,39 @@ it('says so when nothing matches', async () => {
 });
 
 describe('the ways out of the list', () => {
-  it('opens the board, which is the same pipeline arranged differently', async () => {
+  it('takes a new enquiry from the plus, without a menu in between', async () => {
     await mount();
-    await fireEvent.press(screen.getByText('Board'));
-    expect(navigate).toHaveBeenCalledWith('LeadBoard');
-  });
-
-  it('opens the archive of enquiries that went quiet', async () => {
-    await mount();
-    await fireEvent.press(screen.getByText('Archived'));
-    expect(navigate).toHaveBeenCalledWith('ArchivedLeads');
-  });
-
-  it('takes a new enquiry', async () => {
-    await mount();
-    await fireEvent.press(screen.getByText('New lead'));
+    await fireEvent.press(screen.getByTestId('new-lead-button'));
     expect(navigate).toHaveBeenCalledWith('LeadCreate');
   });
 
   it('offers that only to somebody who may take one', async () => {
     mockGranted = [];
     await mount();
+    expect(screen.queryByTestId('new-lead-button')).toBeNull();
+    // Looking is not taking: the menu, and what is in it, stays.
+    expect(screen.getByTestId('leads-menu-button')).toBeTruthy();
+  });
+
+  it('keeps the board behind the menu, not on the header', async () => {
+    await mount();
+    expect(screen.queryByText('Board view')).toBeNull();
+    await fireEvent.press(screen.getByTestId('leads-menu-button'));
+    await fireEvent.press(screen.getByText('Board view'));
+    expect(navigate).toHaveBeenCalledWith('LeadBoard');
+  });
+
+  it('opens the archive of enquiries that went quiet, from the same menu', async () => {
+    await mount();
+    await fireEvent.press(screen.getByTestId('leads-menu-button'));
+    await fireEvent.press(screen.getByText('Archived'));
+    expect(navigate).toHaveBeenCalledWith('ArchivedLeads');
+  });
+
+  it('holds nothing else in the menu — the two ways of looking, and no more', async () => {
+    await mount();
+    await fireEvent.press(screen.getByTestId('leads-menu-button'));
     expect(screen.queryByText('New lead')).toBeNull();
-    // The board and the archive stay — looking is not taking.
-    expect(screen.getByText('Board')).toBeTruthy();
-    expect(screen.getByText('Archived')).toBeTruthy();
   });
 });
 
@@ -151,26 +161,43 @@ describe('searching and filtering', () => {
     expect(lastQuery().statusId).toBe('st1');
   });
 
-  it('filters by stage and source together', async () => {
+  // The whole point of chips over a sheet: what is on is on screen, so a
+  // quietly filtered list cannot read as a missing enquiry.
+  it('shows every stage and every source as a chip, on the list itself', async () => {
     await mount();
-    await fireEvent.press(screen.getByTestId('filter-button'));
-    // The stage is on the card behind the sheet too; take the wheel's row.
-    await fireEvent((await screen.findAllByText('New enquiry')).at(-1)!, 'touchEnd');
-    await fireEvent(screen.getAllByText('Instagram').at(-1)!, 'touchEnd');
-    await fireEvent.press(screen.getByText('Apply 2 filters'));
-    await waitFor(() => expect(lastQuery().statusId).toBe('st1'));
-    expect(lastQuery().sourceId).toBe('src1');
+    expect(screen.getByText('All stages')).toBeTruthy();
+    expect(screen.getByText('All sources')).toBeTruthy();
+    expect(screen.getByTestId('stage-st1')).toBeTruthy();
+    expect(screen.getByTestId('source-src1')).toBeTruthy();
   });
 
-  it('clears them again', async () => {
-    await mount([LEAD], 1, { statusId: 'st1' });
+  it('scrolls those rails sideways rather than wrapping them down the screen', async () => {
+    await mount();
+    expect(screen.getByTestId('stage-filters').props.horizontal).toBe(true);
+    expect(screen.getByTestId('source-filters').props.horizontal).toBe(true);
+  });
+
+  it('filters by stage and source together, a tap each', async () => {
+    await mount();
+    await fireEvent.press(screen.getByTestId('stage-st1'));
     await waitFor(() => expect(lastQuery().statusId).toBe('st1'));
-    await fireEvent.press(screen.getByText('1 filter ×'));
+    await fireEvent.press(screen.getByTestId('source-src1'));
+    await waitFor(() => expect(lastQuery().sourceId).toBe('src1'));
+    expect(lastQuery().statusId).toBe('st1');
+  });
+
+  it('clears a chip by tapping it again', async () => {
+    await mount();
+    await fireEvent.press(screen.getByTestId('stage-st1'));
+    await waitFor(() => expect(lastQuery().statusId).toBe('st1'));
+    await fireEvent.press(screen.getByTestId('stage-st1'));
     await waitFor(() => expect(lastQuery().statusId).toBeUndefined());
   });
 
-  it('says how many filters are on, and clears them', async () => {
+  it('clears one from its "all" chip, which is the rail’s own name', async () => {
     await mount([LEAD], 1, { statusId: 'st1' });
-    expect(screen.getByText('1 filter ×')).toBeTruthy();
+    await waitFor(() => expect(lastQuery().statusId).toBe('st1'));
+    await fireEvent.press(screen.getByText('All stages'));
+    await waitFor(() => expect(lastQuery().statusId).toBeUndefined());
   });
 });
