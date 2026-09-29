@@ -4,12 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
   CustomFieldDefinition,
-  GstSlab,
   Lead,
   LeadBoard,
   LeadSource,
   Material,
-  TaxTreatment,
 } from '@fas/shared';
 import { PERMISSIONS, leadValue, leadValueSource } from '@fas/shared';
 import { formatCurrencyInr } from '@/lib/format';
@@ -20,7 +18,6 @@ import { ConvertLeadDialog } from '@/components/ConvertLeadDialog';
 import {
   PricedLines,
   PricePreview,
-  TreatmentChips,
   blankLine,
   usableLines,
   type PricedLine,
@@ -52,13 +49,11 @@ export default function LeadBoardPage() {
     location: '',
     sourceId: '',
     estimatedValue: '',
+    billingAddress: '',
+    shippingAddress: '',
   });
   const [customValues, setCustomValues] = useState<Record<string, unknown>>({});
-  const [slabs, setSlabs] = useState<GstSlab[]>([]);
-  const [treatment, setTreatment] = useState<TaxTreatment>('EXCLUSIVE');
   const [lines, setLines] = useState<PricedLine[]>([]);
-
-  const defaultSlab = slabs.find((slab) => slab.isDefault) ?? slabs[0];
 
   const load = useCallback(async () => {
     const [b, s, f] = await Promise.all([api.leadBoard(), api.leadSources(), api.leadFields()]);
@@ -72,7 +67,6 @@ export default function LeadBoardPage() {
       setMessage({ text: e instanceof Error ? e.message : 'Could not load', tone: 'danger' }),
     );
     api.materials().then(setMaterials).catch(() => undefined);
-    api.gstSlabs().then(setSlabs).catch(() => undefined);
   }, [load]);
 
   const create = async () => {
@@ -80,21 +74,25 @@ export default function LeadBoardPage() {
     try {
       await api.createLead({
         title: form.title,
-        contactName: form.contactName || undefined,
-        contactPhone: form.contactPhone || undefined,
+        contactName: form.contactName.trim(),
+        contactPhone: form.contactPhone.trim(),
         company: form.company || undefined,
         location: form.location || undefined,
+        billingAddress: form.billingAddress || undefined,
+        shippingAddress: form.shippingAddress || undefined,
         sourceId: form.sourceId || undefined,
         estimatedValue: form.estimatedValue ? Number(form.estimatedValue) : undefined,
         // Left out entirely when nothing was priced, rather than sent empty:
         // an enquiry with no lines is the ordinary case, not a cleared one.
         ...(usableLines(lines).length
           ? {
-              taxTreatment: treatment,
               items: usableLines(lines).map(({ key: _key, ...line }) => ({
-                ...line,
                 name: line.name.trim(),
-                gstSlabId: line.gstSlabId ?? defaultSlab?.id,
+                description: line.description?.trim() || undefined,
+                unit: line.unit,
+                quantity: line.quantity || undefined,
+                ratePerUnit: line.ratePerUnit || undefined,
+                discountPct: line.discountPct || undefined,
               })),
             }
           : {}),
@@ -103,10 +101,10 @@ export default function LeadBoardPage() {
       setForm({
         title: '', contactName: '', contactPhone: '', company: '',
         location: '', sourceId: '', estimatedValue: '',
+        billingAddress: '', shippingAddress: '',
       });
       setCustomValues({});
       setLines([]);
-      setTreatment('EXCLUSIVE');
       setShowForm(false);
       await load();
       setMessage({ text: 'Lead created.', tone: 'success' });
@@ -209,12 +207,28 @@ export default function LeadBoardPage() {
               />
             </div>
             <div className="field">
-              <label>Contact name</label>
-              <input value={form.contactName} onChange={(e) => setForm((current) => ({ ...current, contactName: e.target.value }))} />
+              <label>Client name</label>
+              <input
+                value={form.contactName}
+                placeholder="Who rang?"
+                onChange={(e) => setForm((current) => ({ ...current, contactName: e.target.value }))}
+              />
             </div>
             <div className="field">
               <label>Phone</label>
-              <input value={form.contactPhone} onChange={(e) => setForm((current) => ({ ...current, contactPhone: e.target.value }))} />
+              <input
+                value={form.contactPhone}
+                placeholder="The number to ring back on"
+                onChange={(e) => setForm((current) => ({ ...current, contactPhone: e.target.value }))}
+              />
+            </div>
+            <div className="field">
+              <label>Billing address</label>
+              <input value={form.billingAddress} onChange={(e) => setForm((current) => ({ ...current, billingAddress: e.target.value }))} />
+            </div>
+            <div className="field">
+              <label>Shipping address</label>
+              <input value={form.shippingAddress} onChange={(e) => setForm((current) => ({ ...current, shippingAddress: e.target.value }))} />
             </div>
             <div className="field">
               <label>Company</label>
@@ -255,31 +269,27 @@ export default function LeadBoardPage() {
             Where it is priced, the lines are the ones a quotation takes, and
             the quote raised from this enquiry copies them.
           */}
-          <h3 style={{ marginTop: 12 }}>Pricing</h3>
+          <h3 style={{ marginTop: 12 }}>Items</h3>
           {lines.length === 0 ? (
             <>
               <p className="muted" style={{ marginTop: -6 }}>
-                Optional. Priced here, it carries straight into the quote.
+                What they asked for. A rate is optional — put one in if you
+                know it, and it carries into the quote.
               </p>
               <button className="ghost" onClick={() => setLines([blankLine()])}>
-                Price this enquiry
+                Add items
               </button>
             </>
           ) : (
             <>
-              <TreatmentChips treatment={treatment} onChange={setTreatment} />
               <PricedLines
                 lines={lines}
                 onChange={setLines}
-                slabs={slabs ?? undefined}
+                slabs={undefined}
+                tax={false}
                 allowEmpty
               />
-              <PricePreview
-                lines={lines}
-                slabs={slabs ?? undefined}
-                defaultSlabId={defaultSlab?.id}
-                treatment={treatment}
-              />
+              <PricePreview lines={lines} treatment="EXCLUSIVE" tax={false} />
             </>
           )}
 
@@ -294,7 +304,14 @@ export default function LeadBoardPage() {
             </>
           ) : null}
 
-          <button className="primary" disabled={!form.title.trim()} onClick={create}>
+          {/* A name and a number, or there is nobody to ring back — which is
+              what the API refuses too, so the button says so first. */}
+          <button
+            className="primary"
+            disabled={
+              !form.title.trim() || !form.contactName.trim() || !form.contactPhone.trim()
+            }
+            onClick={create}>
             Create lead
           </button>
         </div>

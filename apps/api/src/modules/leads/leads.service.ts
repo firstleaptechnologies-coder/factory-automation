@@ -9,7 +9,6 @@ import {
   EstimateStatus,
   Prisma,
   StatusCategory,
-  TaxTreatment,
   UserRole,
   WorkflowKind,
 } from '@prisma/client';
@@ -22,11 +21,19 @@ import { paginate } from '../../common/dto/pagination.dto';
 import { OrdersService } from '../orders/orders.service';
 import { CustomFieldsService } from './custom-fields.service';
 import { pricedFromQuote } from '../estimates/estimate-pricing';
-import {
-  priceQuoteLine,
-  quoteTotals,
-  type PricedQuoteLine,
-} from '../../common/pricing/quote-lines';
+import { round2 } from '../../common/utils/pricing';
+
+/** One line of an enquiry, worked out. No tax: see `priceItems`. */
+interface PricedLeadLine {
+  name: string;
+  description?: string;
+  quantity: number;
+  unit: string;
+  ratePerUnit: number;
+  discountPct: number;
+  discountAmount: number;
+  amount: number;
+}
 import {
   ChangeLeadStatusDto,
   ConvertLeadDto,
@@ -176,9 +183,15 @@ export class LeadsService {
       );
     }
 
-    if (!dto.clientId && !dto.contactName && !dto.contactPhone) {
+    /*
+     * The DTO already requires both, so reaching here without them means a
+     * caller that bypassed validation. Left in as a second gate because the
+     * cost of an enquiry with nobody to ring back is that it is never chased,
+     * and nothing downstream notices.
+     */
+    if (!dto.contactName?.trim() || !dto.contactPhone?.trim()) {
       throw new BadRequestException(
-        'A lead needs either an existing client or a contact name or phone',
+        'A lead needs a contact name and a phone number — an enquiry nobody can ring back is a note, not a lead',
       );
     }
 
@@ -188,9 +201,8 @@ export class LeadsService {
     );
     const code = await this.codes.next('lead');
 
-    const treatment = dto.taxTreatment ?? TaxTreatment.EXCLUSIVE;
-    const priced = await this.priceItems(dto.items ?? [], treatment);
-    const totals = await this.itemTotals(priced, dto.clientId);
+    const priced = this.priceItems(dto.items ?? []);
+    const totals = this.itemTotals(priced);
 
     return this.prisma.lead.create({
       data: {
@@ -218,7 +230,8 @@ export class LeadsService {
         estimatedValue: dto.estimatedValue,
         expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
         notes: dto.notes,
-        taxTreatment: treatment,
+        billingAddress: dto.billingAddress,
+        shippingAddress: dto.shippingAddress,
         ...totals,
         customFields: customFields as Prisma.InputJsonValue,
         createdById: userId,
@@ -262,14 +275,9 @@ export class LeadsService {
      * replaced. Sending an empty array is how lines are cleared, because that
      * is somebody saying "no lines" rather than a form staying quiet.
      */
-    const repricing = dto.items !== undefined || dto.taxTreatment !== undefined;
-    const treatment = dto.taxTreatment ?? lead.taxTreatment;
-    const priced = repricing
-      ? await this.priceItems(dto.items ?? asItemDtos(lead.items ?? []), treatment)
-      : [];
-    const totals = repricing
-      ? await this.itemTotals(priced, dto.clientId ?? lead.clientId ?? undefined)
-      : null;
+    const repricing = dto.items !== undefined;
+    const priced = repricing ? this.priceItems(dto.items ?? []) : [];
+    const totals = repricing ? this.itemTotals(priced) : null;
 
     return this.prisma.$transaction(async (tx) => {
       if (repricing) {
@@ -295,10 +303,11 @@ export class LeadsService {
           estimatedValue: dto.estimatedValue,
           expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
           notes: dto.notes,
+          billingAddress: dto.billingAddress,
+          shippingAddress: dto.shippingAddress,
           customFields: customFields as Prisma.InputJsonValue,
           ...(repricing && totals
             ? {
-                taxTreatment: treatment,
                 ...totals,
                 items: {
                   create: priced.map((line, index) => ({
@@ -331,68 +340,51 @@ export class LeadsService {
     return {
       lead,
       firm,
-      amountInWords: amountInWords(Number(lead.grandTotal)),
+      amountInWords: amountInWords(Number(lead.total)),
       terms: firm.termsAndConditions ?? '',
-      interState: Number(lead.igst) > 0,
     };
   }
 
   // -- pricing an enquiry ---------------------------------------------------
 
   /**
-   * The enquiry's lines, priced.
+   * The enquiry's lines, worked out.
    *
-   * Exactly what Quotes does to its own, through the same function, because
-   * the shop prices the job on the phone and quotes it later and the two have
-   * to come to the same money. The slab is resolved here, per line, and the
-   * arithmetic is not ours.
+   * Quantity × rate, less the line's discount. No tax, no slab lookup, no
+   * treatment — an enquiry is not a tax document. The GST is worked out on
+   * the quotation raised from it, where somebody is actually being asked to
+   * pay, and `common/pricing/quote-lines.ts` is where that lives.
+   *
+   * Every figure defaults to nothing, because a line on an enquiry is
+   * frequently just a name: "MDF jali, laser cut", rate to follow.
    */
-  private async priceItems(
-    items: LeadItemDto[],
-    treatment: TaxTreatment,
-  ): Promise<PricedQuoteLine[]> {
-    if (items.length === 0) return [];
+  private priceItems(items: LeadItemDto[]): PricedLeadLine[] {
+    return items.map((item) => {
+      const quantity = item.quantity ?? 0;
+      const ratePerUnit = item.ratePerUnit ?? 0;
+      const discountPct = item.discountPct ?? 0;
 
-    const defaultSlab = await this.prisma.gstSlab.findFirst({
-      where: { isDefault: true, isActive: true },
+      const gross = round2(quantity * ratePerUnit);
+      const discountAmount = round2((gross * discountPct) / 100);
+
+      return {
+        name: item.name,
+        description: item.description,
+        quantity,
+        unit: item.unit ?? 'Sqf',
+        ratePerUnit,
+        discountPct,
+        discountAmount,
+        amount: round2(gross - discountAmount),
+      };
     });
-
-    return Promise.all(
-      items.map(async (item) => {
-        const slab = item.gstSlabId
-          ? await this.prisma.gstSlab.findFirst({ where: { id: item.gstSlabId } })
-          : defaultSlab;
-
-        return priceQuoteLine(
-          item,
-          { id: slab?.id ?? null, ratePct: slab ? Number(slab.ratePct) : 0 },
-          treatment,
-        );
-      }),
-    );
   }
 
-  /**
-   * What the priced lines add up to, split the way the two states decide.
-   *
-   * The firm's own state code is read rather than required: a shop that has
-   * not filled in its profile yet is treated as selling locally, which is the
-   * documented fallback and the overwhelmingly common case.
-   */
-  private async itemTotals(priced: PricedQuoteLine[], clientId?: string) {
-    const [firm, client] = await Promise.all([
-      this.prisma.firmProfile.findFirst({ select: { stateCode: true } }),
-      clientId
-        ? this.prisma.client.findFirst({ where: { id: clientId }, select: { stateCode: true } })
-        : null,
-    ]);
-
-    const { savedAmount: _savedAmount, ...totals } = quoteTotals(
-      priced,
-      firm?.stateCode,
-      client?.stateCode,
-    );
-    return totals;
+  /** What the lines add up to. Three figures, and none of them is a tax. */
+  private itemTotals(priced: PricedLeadLine[]) {
+    const discount = round2(sum(priced.map((line) => line.discountAmount)));
+    const total = round2(sum(priced.map((line) => line.amount)));
+    return { subtotal: round2(total + discount), discount, total };
   }
 
   /** Same rule as orders: only moves drawn on the canvas are allowed. */
@@ -725,12 +717,12 @@ export class LeadsService {
             _sum: { quotedValue: true },
           }),
           this.prisma.lead.aggregate({
-            where: { ...unquoted, grandTotal: { gt: 0 } },
+            where: { ...unquoted, total: { gt: 0 } },
             _count: { _all: true },
-            _sum: { grandTotal: true },
+            _sum: { total: true },
           }),
           this.prisma.lead.aggregate({
-            where: { ...unquoted, grandTotal: { lte: 0 } },
+            where: { ...unquoted, total: { lte: 0 } },
             _count: { _all: true },
             _sum: { estimatedValue: true },
           }),
@@ -742,7 +734,7 @@ export class LeadsService {
             quoted._count._all + priced._count._all + guessed._count._all,
           value:
             Number(quoted._sum.quotedValue ?? 0) +
-            Number(priced._sum.grandTotal ?? 0) +
+            Number(priced._sum.total ?? 0) +
             Number(guessed._sum.estimatedValue ?? 0),
         };
       }),
@@ -854,31 +846,6 @@ function stillLive(cutoff: Date): Prisma.LeadWhereInput {
   };
 }
 
-/**
- * Stored lines, back in the shape the pricer takes.
- *
- * Needed when only the treatment changed: the lines themselves are what they
- * were, but what each comes to is not, so they go through the same sum again
- * rather than having their stored figures adjusted in place.
- */
-function asItemDtos(items: {
-  name: string;
-  description: string | null;
-  hsnSac: string | null;
-  quantity: unknown;
-  unit: string;
-  ratePerUnit: unknown;
-  discountPct: unknown;
-  gstSlabId: string | null;
-}[]): LeadItemDto[] {
-  return items.map((item) => ({
-    name: item.name,
-    description: item.description ?? undefined,
-    hsnSac: item.hsnSac ?? undefined,
-    quantity: Number(item.quantity),
-    unit: item.unit,
-    ratePerUnit: Number(item.ratePerUnit),
-    discountPct: Number(item.discountPct),
-    gstSlabId: item.gstSlabId ?? undefined,
-  }));
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
 }

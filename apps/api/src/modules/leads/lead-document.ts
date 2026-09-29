@@ -21,7 +21,6 @@ export interface LeadDocumentInput {
   firm: Record<string, any>;
   amountInWords: string;
   terms: string;
-  interState: boolean;
   letterheadUrl?: string | null;
   logoUrl?: string | null;
 }
@@ -41,16 +40,27 @@ export function renderLeadHtml(input: LeadDocumentInput): string {
     ...rest,
     /*
      * The shared page reads `clientName` and `billingAddress`, which an
-     * enquiry does not have columns for — it has whoever rang and where the
-     * work would be. Mapped here rather than adding empty columns to Lead:
-     * an enquiry has no billing address because nothing is being billed.
+     * enquiry names differently — it has whoever rang, and it may have only
+     * the site rather than a billing address. Mapped here rather than bent
+     * into the Lead model.
      */
     document: {
       ...lead,
       clientName: lead.client?.name ?? lead.contactName ?? lead.company,
-      billingAddress: lead.location,
+      // The enquiry's own billing address where one was taken, and where the
+      // work would be otherwise — an enquiry often has the site before it has
+      // anywhere to send a bill.
+      billingAddress: lead.billingAddress ?? lead.location,
+      shippingAddress: lead.shippingAddress,
     },
     docType: 'Enquiry',
+    /*
+     * No HSN column, no GST column, no tax rows. An enquiry is not a tax
+     * document, and a priced sheet carrying a GST column reads as a bill to
+     * whoever is holding it — which is the same reason the corner says
+     * Enquiry rather than Estimate.
+     */
+    showTax: false,
     facts,
   });
 }

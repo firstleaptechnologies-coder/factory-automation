@@ -22,7 +22,7 @@ import { LeadDetailScreen } from '../screens/LeadDetailScreen';
 import { LeadCreateScreen } from '../screens/LeadCreateScreen';
 import { LeadConvertScreen } from '../screens/LeadConvertScreen';
 import { DocumentPreviewScreen } from '../screens/DocumentPreviewScreen';
-import { LeadPriceScreen } from '../screens/LeadPriceScreen';
+import { LeadItemsScreen } from '../screens/LeadItemsScreen';
 import { BoardScreen } from '../screens/BoardScreen';
 import { ClientsScreen } from '../screens/ClientsScreen';
 import { ClientDetailScreen } from '../screens/ClientDetailScreen';
@@ -171,7 +171,7 @@ export function RootNavigator() {
             <Stack.Screen name="LeadDetail" component={LeadDetailScreen} />
             <Stack.Screen name="LeadCreate" component={LeadCreateScreen} />
             <Stack.Screen name="LeadConvert" component={LeadConvertScreen} />
-            <Stack.Screen name="LeadPrice" component={LeadPriceScreen} />
+            <Stack.Screen name="LeadItems" component={LeadItemsScreen} />
             <Stack.Screen name="DocumentPreview" component={DocumentPreviewScreen} />
             <Stack.Screen name="Board" component={BoardScreen} />
             <Stack.Screen name="LeadBoard" component={LeadBoardScreen} />

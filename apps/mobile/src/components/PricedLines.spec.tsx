@@ -19,8 +19,14 @@ describe('which lines count', () => {
     expect(usableLines([line({ name: '  ' })])).toEqual([]);
   });
 
-  it('drops the ones for no quantity, which is what a fresh row is', () => {
-    expect(usableLines([line({ quantity: 0 })])).toEqual([]);
+  it('keeps a named line with no quantity, because an enquiry is full of them', () => {
+    // "MDF jali, laser cut", rate to follow. Dropping it would lose what the
+    // client actually said.
+    expect(usableLines([line({ quantity: 0 })])).toHaveLength(1);
+  });
+
+  it('drops it for a quotation, which is a figure somebody must pay', () => {
+    expect(usableLines([line({ quantity: 0 })], { needsQuantity: true })).toEqual([]);
   });
 });
 

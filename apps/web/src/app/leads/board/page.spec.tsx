@@ -7,7 +7,6 @@ const apiMock = {
   leadSources: jest.fn(),
   leadFields: jest.fn(),
   materials: jest.fn(),
-  gstSlabs: jest.fn(),
   createLead: jest.fn(),
   allowedNext: jest.fn(),
   allowedBack: jest.fn(),
@@ -128,9 +127,6 @@ beforeEach(() => {
   apiMock.leadSources.mockResolvedValue([{ id: 's1', name: 'Instagram', color: '#E1306C' }]);
   apiMock.leadFields.mockResolvedValue([]);
   apiMock.materials.mockResolvedValue([]);
-  apiMock.gstSlabs.mockResolvedValue([
-    { id: 'gst18', name: 'GST 18%', ratePct: '18', isDefault: true, isActive: true },
-  ]);
   apiMock.createLead.mockResolvedValue({});
   apiMock.allowedNext.mockResolvedValue([
     { id: 't1', toStatusId: 'st2', requiresNote: false, toStatus: { id: 'st2', name: 'Quoted' } },
@@ -226,94 +222,148 @@ describe('taking a new enquiry', () => {
     await screen.findByText('Close');
   };
 
+  /** The three the dialog will not save without: what, who, and a number. */
+  const fill = (title = 'Kitchen jali') => {
+    fireEvent.change(byLabel('Title'), { target: { value: title } });
+    fireEvent.change(byLabel('Client name'), { target: { value: 'Verma' } });
+    fireEvent.change(byLabel('Phone'), { target: { value: '9820012345' } });
+  };
+
   it('will not create one with no title, since that is the enquiry', async () => {
     await openForm();
+    fireEvent.change(byLabel('Client name'), { target: { value: 'Verma' } });
+    fireEvent.change(byLabel('Phone'), { target: { value: '9820012345' } });
     expect(screen.getByText('Create lead')).toBeDisabled();
+  });
+
+  it('will not create one with nobody to ring back', async () => {
+    await openForm();
+    fireEvent.change(byLabel('Title'), { target: { value: 'Kitchen jali' } });
+    expect(screen.getByText('Create lead')).toBeDisabled();
+
+    fireEvent.change(byLabel('Client name'), { target: { value: 'Verma' } });
+    // A name on its own is still nobody you can ring back.
+    expect(screen.getByText('Create lead')).toBeDisabled();
+
+    fireEvent.change(byLabel('Phone'), { target: { value: '9820012345' } });
+    expect(screen.getByText('Create lead')).not.toBeDisabled();
   });
 
   it('sends only what was filled in', async () => {
     await openForm();
-    fireEvent.change(byLabel('Title'), { target: { value: 'Kitchen jali' } });
-    fireEvent.change(byLabel('Contact name'), { target: { value: 'Verma' } });
+    fill();
     fireEvent.click(screen.getByText('Create lead'));
     await waitFor(() => expect(apiMock.createLead).toHaveBeenCalled());
     const body = apiMock.createLead.mock.calls[0][0];
-    expect(body).toMatchObject({ title: 'Kitchen jali', contactName: 'Verma' });
+    expect(body).toMatchObject({
+      title: 'Kitchen jali',
+      contactName: 'Verma',
+      contactPhone: '9820012345',
+    });
     expect(body.company).toBeUndefined();
-    expect(body.estimatedValue).toBeUndefined();
+    expect(body.billingAddress).toBeUndefined();
+  });
+
+  it('takes the addresses where the call produced them', async () => {
+    await openForm();
+    fill();
+    fireEvent.change(byLabel('Billing address'), { target: { value: 'Unit 4, Andheri' } });
+    fireEvent.click(screen.getByText('Create lead'));
+    await waitFor(() => expect(apiMock.createLead).toHaveBeenCalled());
+    const body = apiMock.createLead.mock.calls[0][0];
+    expect(body.billingAddress).toBe('Unit 4, Andheri');
+    // Empty means the same as billing, so nothing is sent for it.
+    expect(body.shippingAddress).toBeUndefined();
   });
 
   it('sends the estimated value as a number', async () => {
     await openForm();
-    fireEvent.change(byLabel('Title'), { target: { value: 'Kitchen jali' } });
+    fill();
     fireEvent.change(byLabel('Estimated value (₹)'), { target: { value: '250000' } });
     fireEvent.click(screen.getByText('Create lead'));
     await waitFor(() => expect(apiMock.createLead).toHaveBeenCalled());
     expect(apiMock.createLead.mock.calls[0][0].estimatedValue).toBe(250000);
   });
 
-  describe('pricing it while taking it', () => {
-    /** Opens the dialog's line editor and fills the first line. */
-    const startPricing = async () => {
-      fireEvent.click(screen.getByText('Price this enquiry'));
+  describe('the items on it', () => {
+    /** Opens the dialog's item editor and names the first line. */
+    const addItem = async (name = 'MDF jali 18mm') => {
+      fireEvent.click(screen.getByText('Add items'));
       await screen.findByPlaceholderText('Hdmr cutting 22mm');
       fireEvent.change(screen.getByPlaceholderText('Hdmr cutting 22mm'), {
-        target: { value: 'Hdmr 22mm' },
+        target: { value: name },
       });
-      fireEvent.change(byLabel('Qty'), { target: { value: '10' } });
-      fireEvent.change(byLabel('Rate'), { target: { value: '1000' } });
     };
 
-    it('stays closed until asked for — most enquiries arrive without a price', async () => {
+    it('stays closed until asked for — plenty of enquiries are one line', async () => {
       await openForm();
-      expect(screen.getByText('Price this enquiry')).toBeInTheDocument();
+      expect(screen.getByText('Add items')).toBeInTheDocument();
       expect(screen.queryByPlaceholderText('Hdmr cutting 22mm')).not.toBeInTheDocument();
     });
 
-    it('takes a line in the shape a quotation takes one', async () => {
+    it('asks nothing about GST — an enquiry is not a tax document', async () => {
       await openForm();
-      await startPricing();
-      expect(byLabel('HSN/SAC')).toBeInTheDocument();
-      expect(byLabel('Disc %')).toBeInTheDocument();
-      expect(screen.getByText('Sqf')).toBeInTheDocument();
-      expect(screen.getAllByText('GST 18%').length).toBeGreaterThan(0);
+      await addItem();
+      expect(screen.queryByText('GST on top')).not.toBeInTheDocument();
+      expect(screen.queryByText('GST 18%')).not.toBeInTheDocument();
+      expect(document.querySelector('.field-label')).toBeTruthy();
+      const labels = Array.from(document.querySelectorAll('.field-label')).map(
+        (node) => node.textContent,
+      );
+      expect(labels).not.toContain('HSN/SAC');
+      expect(labels).toContain('Description');
     });
 
-    it('sends the lines and says how GST was quoted', async () => {
+    it('sends an item that is only a name, because most of them are', async () => {
       await openForm();
-      fireEvent.change(byLabel('Title'), { target: { value: 'Kitchen jali' } });
-      await startPricing();
+      fill();
+      await addItem();
       fireEvent.click(screen.getByText('Create lead'));
 
       await waitFor(() => expect(apiMock.createLead).toHaveBeenCalled());
       const body = apiMock.createLead.mock.calls[0][0];
-      expect(body.taxTreatment).toBe('EXCLUSIVE');
-      expect(body.items).toEqual([
+      expect(body.items).toEqual([{ name: 'MDF jali 18mm', unit: 'Sqf' }]);
+      expect(body).not.toHaveProperty('taxTreatment');
+    });
+
+    it('sends the rate where somebody knew one', async () => {
+      await openForm();
+      fill();
+      await addItem();
+      fireEvent.change(byLabel('Description'), { target: { value: 'Natural finish' } });
+      fireEvent.change(byLabel('Qty'), { target: { value: '120' } });
+      fireEvent.change(byLabel('Rate'), { target: { value: '450' } });
+      fireEvent.click(screen.getByText('Create lead'));
+
+      await waitFor(() => expect(apiMock.createLead).toHaveBeenCalled());
+      expect(apiMock.createLead.mock.calls[0][0].items).toEqual([
         {
-          name: 'Hdmr 22mm',
-          quantity: 10,
+          name: 'MDF jali 18mm',
+          description: 'Natural finish',
           unit: 'Sqf',
-          ratePerUnit: 1000,
-          gstSlabId: 'gst18',
+          quantity: 120,
+          ratePerUnit: 450,
         },
       ]);
     });
 
-    it('sends no items when nothing was priced, which is not a cleared set', async () => {
+    it('sends no items when nothing was listed, which is not a cleared set', async () => {
       await openForm();
-      fireEvent.change(byLabel('Title'), { target: { value: 'Kitchen jali' } });
+      fill();
       fireEvent.click(screen.getByText('Create lead'));
       await waitFor(() => expect(apiMock.createLead).toHaveBeenCalled());
-      const body = apiMock.createLead.mock.calls[0][0];
-      expect(body).not.toHaveProperty('items');
-      expect(body).not.toHaveProperty('taxTreatment');
+      expect(apiMock.createLead.mock.calls[0][0]).not.toHaveProperty('items');
     });
 
-    it('previews what it comes to, and says the server has the last word', async () => {
+    it('totals what was priced, without a tax line', async () => {
       await openForm();
-      await startPricing();
+      await addItem();
+      fireEvent.change(byLabel('Qty'), { target: { value: '120' } });
+      fireEvent.change(byLabel('Rate'), { target: { value: '450' } });
       expect(screen.getByText('The server prices it for real when you save.')).toBeInTheDocument();
-      expect(screen.getByText('₹11,800')).toBeInTheDocument();
+      expect(screen.getByText('Subtotal')).toBeInTheDocument();
+      expect(screen.queryByText('GST')).not.toBeInTheDocument();
+      expect(screen.queryByText('Taxable')).not.toBeInTheDocument();
     });
   });
 
@@ -332,7 +382,7 @@ describe('taking a new enquiry', () => {
 
   it('closes the form, empties it and reloads the board', async () => {
     await openForm();
-    fireEvent.change(byLabel('Title'), { target: { value: 'Kitchen jali' } });
+    fill('Kitchen jali');
     fireEvent.click(screen.getByText('Create lead'));
     expect(await screen.findByText('Lead created.')).toBeInTheDocument();
     expect(screen.getByText('+ New lead')).toBeInTheDocument();
@@ -342,7 +392,7 @@ describe('taking a new enquiry', () => {
   it('says why one was refused, and keeps the form open', async () => {
     apiMock.createLead.mockRejectedValue(new Error('Source is not active'));
     await openForm();
-    fireEvent.change(byLabel('Title'), { target: { value: 'Kitchen jali' } });
+    fill('Kitchen jali');
     fireEvent.click(screen.getByText('Create lead'));
     expect(await screen.findByText('Source is not active')).toBeInTheDocument();
     expect(byLabel('Title')).toHaveValue('Kitchen jali');

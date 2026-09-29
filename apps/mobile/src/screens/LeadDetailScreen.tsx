@@ -177,13 +177,13 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
       {data.items?.length ? (
         <Card tone="dark" style={styles.block}>
           <View style={styles.pricedHead}>
-            <Text variant="label" tone="muted">Priced</Text>
+            <Text variant="label" tone="muted">Items</Text>
             <View style={styles.pricedActions}>
               <Chip
                 icon="edit"
                 label="Edit"
                 testID="edit-pricing-button"
-                onPress={() => navigation.navigate('LeadPrice', { leadId })}
+                onPress={() => navigation.navigate('LeadItems', { leadId })}
               />
             <Chip
               icon="receipt"
@@ -195,7 +195,7 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
                   title: 'Enquiry',
                   subtitle: data.code,
                   fileName: data.code,
-                  message: `Enquiry ${data.code} — ${formatInr(Number(data.grandTotal))}`,
+                  message: `Enquiry ${data.code} — ${formatInr(Number(data.total))}`,
                   phone: data.contactPhone ?? data.client?.phone ?? undefined,
                 })
               }
@@ -206,20 +206,39 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
             <View key={item.id} style={styles.lineRow}>
               <View style={{ flex: 1 }}>
                 <Text variant="small" bold numberOfLines={2}>{item.name}</Text>
-                <Text variant="tiny" tone="faint">
-                  {Number(item.quantity)} {item.unit} × {formatInr(Number(item.ratePerUnit))}
-                  {Number(item.discountPct) > 0 ? ` less ${Number(item.discountPct)}%` : ''}
-                </Text>
+                {item.description ? (
+                  <Text variant="tiny" tone="muted" numberOfLines={3}>
+                    {item.description}
+                  </Text>
+                ) : null}
+                {/* Only where somebody worked one out. Plenty of enquiry
+                    lines are a name and nothing else. */}
+                {Number(item.ratePerUnit) > 0 ? (
+                  <Text variant="tiny" tone="faint">
+                    {Number(item.quantity)} {item.unit} × {formatInr(Number(item.ratePerUnit))}
+                    {Number(item.discountPct) > 0 ? ` less ${Number(item.discountPct)}%` : ''}
+                  </Text>
+                ) : Number(item.quantity) > 0 ? (
+                  <Text variant="tiny" tone="faint">
+                    {Number(item.quantity)} {item.unit}
+                  </Text>
+                ) : null}
               </View>
-              <Text variant="small" bold>{formatInr(Number(item.amount))}</Text>
+              {Number(item.amount) > 0 ? (
+                <Text variant="small" bold>{formatInr(Number(item.amount))}</Text>
+              ) : null}
             </View>
           ))}
-          <View style={styles.lineTotal}>
-            <Text variant="small" tone="muted">
-              Taxable {formatInr(Number(data.total))} · GST {formatInr(Number(data.taxAmount))}
-            </Text>
-            <Text variant="h3" tone="accent" bold>{formatInr(Number(data.grandTotal))}</Text>
-          </View>
+          {Number(data.total) > 0 ? (
+            <View style={styles.lineTotal}>
+              <Text variant="small" tone="muted">
+                {Number(data.discount) > 0
+                  ? `Less ${formatInr(Number(data.discount))} discount`
+                  : 'Before tax — GST is worked out on the quote'}
+              </Text>
+              <Text variant="h3" tone="accent" bold>{formatInr(Number(data.total))}</Text>
+            </View>
+          ) : null}
         </Card>
       ) : null}
 
@@ -230,11 +249,11 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
       */}
       {!data.items?.length && !data.convertedOrder ? (
         <Button
-          title="Price this enquiry"
+          title="Add items"
           variant="dark"
-          testID="price-button"
+          testID="add-items-button"
           icon={<Icon name="tag" size={17} color={palette.text} />}
-          onPress={() => navigation.navigate('LeadPrice', { leadId })}
+          onPress={() => navigation.navigate('LeadItems', { leadId })}
           style={{ marginTop: spacing.md }}
         />
       ) : null}
@@ -311,14 +330,13 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
                 items: data.items?.map((item) => ({
                   name: item.name,
                   description: item.description ?? undefined,
-                  hsnSac: item.hsnSac ?? undefined,
                   quantity: Number(item.quantity),
                   unit: item.unit,
                   ratePerUnit: Number(item.ratePerUnit),
                   discountPct: Number(item.discountPct) || undefined,
-                  gstSlabId: item.gstSlabId ?? undefined,
                 })),
-                taxTreatment: data.taxTreatment,
+                billingAddress: data.billingAddress ?? null,
+                shippingAddress: data.shippingAddress ?? null,
               },
             })
           }

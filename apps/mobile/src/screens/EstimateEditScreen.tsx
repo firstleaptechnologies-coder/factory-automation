@@ -133,13 +133,18 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
         shippingAddress: shippingAddress.trim() || undefined,
         notes: notes.trim() || undefined,
         taxTreatment: treatment,
-        items: lines
-          .filter((line) => line.name.trim() && line.quantity > 0)
-          .map(({ key: _key, ...line }) => ({
+        items: usableLines(lines, { needsQuantity: true }).map(
+          ({ key: _key, ...line }) => ({
             ...line,
             name: line.name.trim(),
+            /* `needsQuantity` has already refused a line without one; this
+               only narrows the shared editor's optional fields, which an
+               enquiry is allowed to leave empty and a quote is not. */
+            quantity: line.quantity ?? 0,
+            ratePerUnit: line.ratePerUnit ?? 0,
             gstSlabId: line.gstSlabId ?? defaultSlab?.id,
-          })),
+          }),
+        ),
       };
 
       const saved = estimateId
@@ -158,7 +163,7 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
 
   if (estimateId && !existing.data) return <Loader label="Loading" />;
 
-  const usable = usableLines(lines).length > 0;
+  const usable = usableLines(lines, { needsQuantity: true }).length > 0;
 
   return (
     <Screen>

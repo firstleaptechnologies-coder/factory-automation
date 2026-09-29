@@ -314,43 +314,44 @@ it('keeps the heading and its actions in view while the enquiry scrolls', () => 
   });
 });
 
-describe('an enquiry that was priced', () => {
+describe('an enquiry with items on it', () => {
   const PRICED = {
-    taxTreatment: 'EXCLUSIVE',
+    subtotal: '10000',
+    discount: '0',
     total: '10000',
-    taxAmount: '1800',
-    grandTotal: '11800',
     items: [
       {
         id: 'li1',
         lineNo: 1,
         name: 'Hdmr 22mm',
-        description: null,
-        hsnSac: '4411',
+        description: 'Laser cut, natural finish',
         quantity: '10',
         unit: 'Sqf',
         ratePerUnit: '1000',
         discountPct: '0',
         discountAmount: '0',
-        gstSlabId: 'gst18',
-        gstRatePct: '18',
-        taxAmount: '1800',
-        netAmount: '10000',
-        amount: '11800',
+        amount: '10000',
       },
     ],
   };
 
-  it('shows the working — the lines, not just a figure', async () => {
+  it('shows the working — the items, with their detail under the name', async () => {
     await mount(PRICED);
     expect(screen.getByText('Hdmr 22mm')).toBeInTheDocument();
-    expect(screen.getByText('HSN 4411')).toBeInTheDocument();
+    expect(screen.getByText('Laser cut, natural finish')).toBeInTheDocument();
     expect(screen.getByText('10 Sqf')).toBeInTheDocument();
   });
 
-  it('shows the tax apart from the taxable value', async () => {
+  it('says the tax is the quote’s job, and shows no GST column', async () => {
     await mount(PRICED);
-    expect(screen.getByText('Taxable ₹10,000 · GST ₹1,800')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Before tax — GST is worked out on the quote/),
+    ).toBeInTheDocument();
+    const headings = Array.from(document.querySelectorAll('.table th')).map(
+      (node) => node.textContent,
+    );
+    expect(headings).not.toContain('GST');
+    expect(headings).toEqual(['Item', 'Qty', 'Rate', 'Discount', 'Amount']);
   });
 
   it('offers the printed enquiry, which is the server’s own page', async () => {
@@ -358,7 +359,7 @@ describe('an enquiry that was priced', () => {
     expect(screen.getByText('Open the printed enquiry')).toBeInTheDocument();
   });
 
-  it('offers nothing to print for an enquiry nobody priced', async () => {
+  it('offers nothing to print for an enquiry with no items', async () => {
     await mount();
     expect(screen.queryByText('Open the printed enquiry')).not.toBeInTheDocument();
   });

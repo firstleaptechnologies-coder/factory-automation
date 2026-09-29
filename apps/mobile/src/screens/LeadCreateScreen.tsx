@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import type {
-  CustomFieldDefinition,
-  GstSlab,
-  LeadSource,
-  TaxTreatment,
-} from '@fas/shared';
+import type { CustomFieldDefinition, LeadSource } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { CustomFieldInputs } from '../components/CustomFieldInputs';
+import { ContactPickerSheet } from '../components/ContactPickerSheet';
+import { looksLikeAddress } from '../hooks/useClipboardSuggestion';
 import {
   PricedLines,
   blankLine,
@@ -32,61 +29,70 @@ import { palette, spacing } from '../theme';
 /**
  * New enquiry.
  *
- * Two halves, and the split is deliberate. The top is what an enquiry has
- * always needed — who rang, what about, where — and it stays as cheap as it
- * was: a title and a way to reach somebody is enough, because an enquiry that
- * takes five minutes to log is an enquiry nobody logs.
+ * Shaped like the quote form, because the shop asks the same questions on the
+ * same call — who it is for, where a bill would go, and what they want — and
+ * everything typed here carries into the quotation rather than being asked
+ * for twice.
  *
- * Under it is the pricing, in exactly the shape a quotation takes it, because
- * it is the same editor. Not the punch form's materials and sizes: an enquiry
- * is priced before anything has been measured, which is the same reason
- * Quotes does not use it either. It is closed until asked for, so the common
- * case is untouched, and what is typed here carries straight into the quote
- * rather than being keyed a second time.
+ * Three differences from the quote, and each is deliberate:
  *
- * The lower half is whatever the admin defined.
+ *   **A name and a number are required.** Everything else on an enquiry can
+ *   wait, but an enquiry nobody can ring back is a note, not a lead — it is
+ *   the one field that decides whether the shop ever hears from them again.
+ *
+ *   **No GST.** An enquiry is not a tax document and must not look like one:
+ *   a priced sheet carrying a GST column reads as a bill to whoever is handed
+ *   it. The tax is worked out on the quotation, where somebody is actually
+ *   being asked to pay.
+ *
+ *   **No estimated total.** Estimating is what the quote is for. This is the
+ *   enquiry and what was asked for, and the lines carry a rate only if
+ *   somebody happens to know one.
  */
 export function LeadCreateScreen({ navigation }: { navigation: any }) {
   const sources = useApi<LeadSource[]>(() => api.leadSources(), []);
   const fields = useApi<CustomFieldDefinition[]>(() => api.leadFields(), []);
-  const slabs = useApi<GstSlab[]>(() => api.gstSlabs(), []);
 
   const [title, setTitle] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [company, setCompany] = useState('');
   const [location, setLocation] = useState('');
+  const [billingAddress, setBillingAddress] = useState('');
+  const [shippingAddress, setShippingAddress] = useState('');
   const [sourceId, setSourceId] = useState<string | null>(null);
-  const [estimatedValue, setEstimatedValue] = useState('');
   const [custom, setCustom] = useState<Record<string, unknown>>({});
+  const [contactSheet, setContactSheet] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const [treatment, setTreatment] = useState<TaxTreatment>('EXCLUSIVE');
   const [lines, setLines] = useState<PricedLine[]>([]);
 
-  const defaultSlab = slabs.data?.find((slab) => slab.isDefault) ?? slabs.data?.[0];
-  const usable = usableLines(lines);
+  const named = usableLines(lines);
+  const reachable = Boolean(contactName.trim() && contactPhone.trim());
 
   const submit = async () => {
     setBusy(true);
     try {
       const lead = await api.createLead({
         title: title.trim(),
-        contactName: contactName.trim() || undefined,
-        contactPhone: contactPhone.trim() || undefined,
+        contactName: contactName.trim(),
+        contactPhone: contactPhone.trim(),
         company: company.trim() || undefined,
         location: location.trim() || undefined,
+        billingAddress: billingAddress.trim() || undefined,
+        shippingAddress: shippingAddress.trim() || undefined,
         sourceId: sourceId ?? undefined,
-        estimatedValue: estimatedValue ? Number(estimatedValue) : undefined,
-        // Left out entirely when nothing was priced, rather than sent empty:
-        // an enquiry with no lines is the ordinary case, not a cleared one.
-        ...(usable.length
+        // Left out entirely when nothing was listed, rather than sent empty:
+        // an enquiry with no lines is ordinary, not a cleared one.
+        ...(named.length
           ? {
-              taxTreatment: treatment,
-              items: usable.map(({ key: _key, ...line }) => ({
-                ...line,
+              items: named.map(({ key: _key, ...line }) => ({
                 name: line.name.trim(),
-                gstSlabId: line.gstSlabId ?? defaultSlab?.id,
+                description: line.description?.trim() || undefined,
+                unit: line.unit,
+                quantity: line.quantity || undefined,
+                ratePerUnit: line.ratePerUnit || undefined,
+                discountPct: line.discountPct || undefined,
               })),
             }
           : {}),
@@ -109,35 +115,58 @@ export function LeadCreateScreen({ navigation }: { navigation: any }) {
       <ScreenHeader title="New lead" onBack={() => navigation.goBack()} />
 
       <Animated.View entering={FadeInDown.duration(320)}>
+        <Text variant="label" tone="muted" style={styles.label}>Who is it for?</Text>
         <Field
-          label="What is the enquiry for?"
-          placeholder="e.g. Marble kitchen counters"
-          value={title}
-          onChangeText={setTitle}
-          icon="tag"
-        />
-        <Field
-          label="Contact name"
+          label="Client name"
+          placeholder="Who rang?"
           value={contactName}
           onChangeText={setContactName}
           icon="user"
         />
         <Field
           label="Phone"
+          placeholder="The number to ring back on"
           value={contactPhone}
           onChangeText={setContactPhone}
           keyboardType="phone-pad"
           icon="phone"
         />
+        <View style={styles.chipWrap}>
+          <Chip
+            label="From contacts"
+            testID="from-contacts"
+            onPress={() => setContactSheet(true)}
+          />
+        </View>
+
         <Field label="Company" value={company} onChangeText={setCompany} />
-        <Field label="Location" value={location} onChangeText={setLocation} icon="pin" />
+
         <Field
-          label="Estimated value (₹)"
-          hint="A guess. Price it line by line below if you have the numbers."
-          value={estimatedValue}
-          onChangeText={setEstimatedValue}
-          keyboardType="numeric"
+          label="Billing address"
+          hint="Optional — asked again on the quote if it is not known yet"
+          value={billingAddress}
+          onChangeText={setBillingAddress}
+          multiline
+          pasteAccepts={looksLikeAddress}
         />
+        <Field
+          label="Shipping address"
+          hint="Leave empty if it is the same"
+          value={shippingAddress}
+          onChangeText={setShippingAddress}
+          multiline
+          pasteAccepts={looksLikeAddress}
+        />
+
+        <Text variant="label" tone="muted" style={styles.label}>What is it for?</Text>
+        <Field
+          label="Enquiry"
+          placeholder="e.g. Marble kitchen counters"
+          value={title}
+          onChangeText={setTitle}
+          icon="tag"
+        />
+        <Field label="Site location" value={location} onChangeText={setLocation} icon="pin" />
 
         <Text variant="label" tone="muted" style={styles.label}>Source</Text>
         <View style={styles.chipWrap}>
@@ -153,20 +182,21 @@ export function LeadCreateScreen({ navigation }: { navigation: any }) {
         </View>
 
         {/*
-          Closed until asked for. Most enquiries are taken before anybody has
-          worked out a price, and a form that opens with an empty line table
-          reads as a form demanding one.
+          Closed until asked for. Plenty of enquiries are one line said on the
+          phone, and a form that opens with an empty item table reads as one
+          demanding a specification.
         */}
-        <Text variant="h3" style={styles.section}>Pricing</Text>
+        <Text variant="h3" style={styles.section}>Items</Text>
         {lines.length === 0 ? (
           <>
             <Text variant="tiny" tone="faint" style={styles.blurb}>
-              Optional. Priced here, it carries straight into the quote.
+              What they asked for. A rate is optional — put one in if you know
+              it, and it carries into the quote.
             </Text>
             <Button
-              title="Price this enquiry"
+              title="Add items"
               variant="dark"
-              testID="start-pricing"
+              testID="start-items"
               icon={<Icon name="plus" size={16} color={palette.text} />}
               onPress={() => setLines([blankLine()])}
             />
@@ -175,11 +205,12 @@ export function LeadCreateScreen({ navigation }: { navigation: any }) {
           <PricedLines
             lines={lines}
             onChange={setLines}
-            treatment={treatment}
-            onTreatmentChange={setTreatment}
-            slabs={slabs.data ?? undefined}
-            /* An enquiry can go back to having no price at all. */
+            /* Unused without tax, but the editor is shared with the quote. */
+            treatment="EXCLUSIVE"
+            onTreatmentChange={() => undefined}
+            tax={false}
             allowEmpty
+            placeholder="MDF jali, laser cut"
           />
         )}
 
@@ -201,17 +232,27 @@ export function LeadCreateScreen({ navigation }: { navigation: any }) {
           title="Create lead"
           size="lg"
           loading={busy}
-          disabled={!title.trim()}
+          /* A name and a number, or there is nobody to ring back. */
+          disabled={!reachable || !title.trim()}
           onPress={submit}
           style={{ marginTop: spacing.lg }}
         />
       </Animated.View>
+
+      <ContactPickerSheet
+        visible={contactSheet}
+        onClose={() => setContactSheet(false)}
+        onPick={(contact) => {
+          setContactName(contact.name);
+          if (contact.phone) setContactPhone(contact.phone);
+        }}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  label: { marginBottom: spacing.sm },
+  label: { marginTop: spacing.lg, marginBottom: spacing.sm },
   blurb: { marginBottom: spacing.md, lineHeight: 16 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   section: { marginTop: spacing.xl, marginBottom: spacing.sm },

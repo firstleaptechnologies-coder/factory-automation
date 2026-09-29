@@ -24,9 +24,10 @@ export type PricedLine = {
   name: string;
   description?: string;
   hsnSac?: string;
-  quantity: number;
+  /** Absent on an enquiry line nobody has counted yet. */
+  quantity?: number;
   unit?: string;
-  ratePerUnit: number;
+  ratePerUnit?: number;
   discountPct?: number;
   gstSlabId?: string;
 };
@@ -63,8 +64,22 @@ export function blankLine(): PricedLine {
 }
 
 /** The lines worth sending: named, and for more than nothing. */
-export const usableLines = (lines: PricedLine[]): PricedLine[] =>
-  lines.filter((line) => line.name.trim() && line.quantity > 0);
+/**
+ * The lines worth sending.
+ *
+ * The two documents disagree about what counts, so the caller says which. A
+ * quotation needs a quantity — it is a figure somebody is being asked to pay.
+ * An enquiry does not: it is frequently a list of what was asked for before
+ * anybody has counted anything, and dropping those on save would lose what
+ * the client actually said.
+ */
+export const usableLines = (
+  lines: PricedLine[],
+  { needsQuantity = false }: { needsQuantity?: boolean } = {},
+): PricedLine[] =>
+  lines.filter(
+    (line) => line.name.trim() && (!needsQuantity || (line.quantity ?? 0) > 0),
+  );
 
 /**
  * What the lines come to, as the server will work it out.
@@ -138,11 +153,14 @@ export function PricePreview({
   slabs,
   defaultSlabId,
   treatment,
+  /** False on an enquiry, which charges no tax. */
+  tax = true,
 }: {
   lines: PricedLine[];
   slabs?: GstSlab[];
   defaultSlabId?: string;
   treatment: TaxTreatment;
+  tax?: boolean;
 }) {
   const preview = useMemo(
     () => previewTotals(lines, slabs, defaultSlabId, treatment),
@@ -155,13 +173,17 @@ export function PricePreview({
       <p className="t-tiny faint" style={{ marginTop: -8 }}>
         The server prices it for real when you save.
       </p>
-      <SumRow label="Taxable" value={formatInr(preview.net)} />
+      <SumRow label={tax ? 'Taxable' : 'Subtotal'} value={formatInr(preview.net)} />
       {preview.discount > 0 ? (
         <SumRow label="Discount" value={formatInr(preview.discount)} />
       ) : null}
-      <SumRow label="GST" value={formatInr(preview.tax)} />
+      {tax ? <SumRow label="GST" value={formatInr(preview.tax)} /> : null}
       <div className="divider" />
-      <SumRow label="Client pays" value={formatInr(preview.gross)} accent />
+      <SumRow
+        label={tax ? 'Client pays' : 'Total'}
+        value={formatInr(preview.gross)}
+        accent
+      />
     </>
   );
 }
@@ -172,11 +194,18 @@ export function PricedLines({
   slabs,
   /** Whether the last line can be removed. A quote needs one; an enquiry does not. */
   allowEmpty = false,
+  /**
+   * Whether this document charges tax. A quotation does, and offers a slab
+   * and an HSN code per line; an enquiry does not, because a priced sheet
+   * with GST on it reads as a bill to whoever is handed it.
+   */
+  tax = true,
 }: {
   lines: PricedLine[];
   onChange: (next: PricedLine[]) => void;
   slabs?: GstSlab[];
   allowEmpty?: boolean;
+  tax?: boolean;
 }) {
   const defaultSlab = slabs?.find((slab) => slab.isDefault) ?? slabs?.[0];
 
@@ -227,12 +256,22 @@ export function PricedLines({
                   onChange={(value) => setLine(line.key, { name: value })}
                   style={{ flex: '3 1 220px' }}
                 />
+                {/* Under the name, because it describes the name. */}
                 <Field
-                  label="HSN/SAC"
-                  value={line.hsnSac ?? ''}
-                  onChange={(value) => setLine(line.key, { hsnSac: value })}
-                  style={{ flex: '1 1 110px' }}
+                  label="Description"
+                  placeholder="Finish, edge, size"
+                  value={line.description ?? ''}
+                  onChange={(value) => setLine(line.key, { description: value })}
+                  style={{ flex: '2 1 200px' }}
                 />
+                {tax ? (
+                  <Field
+                    label="HSN/SAC"
+                    value={line.hsnSac ?? ''}
+                    onChange={(value) => setLine(line.key, { hsnSac: value })}
+                    style={{ flex: '1 1 110px' }}
+                  />
+                ) : null}
                 <Field
                   label="Qty"
                   value={line.quantity ? String(line.quantity) : ''}
@@ -265,22 +304,26 @@ export function PricedLines({
                     onClick={() => setLine(line.key, { unit })}
                   />
                 ))}
-                <span style={{ width: 'var(--s-lg)' }} />
-                {(slabs ?? []).map((option) => (
-                  <Chip
-                    key={option.id}
-                    label={`GST ${Number(option.ratePct)}%`}
-                    selected={(line.gstSlabId ?? defaultSlab?.id) === option.id}
-                    onClick={() => setLine(line.key, { gstSlabId: option.id })}
-                  />
-                ))}
+                {tax ? (
+                  <>
+                    <span style={{ width: 'var(--s-lg)' }} />
+                    {(slabs ?? []).map((option) => (
+                      <Chip
+                        key={option.id}
+                        label={`GST ${Number(option.ratePct)}%`}
+                        selected={(line.gstSlabId ?? defaultSlab?.id) === option.id}
+                        onClick={() => setLine(line.key, { gstSlabId: option.id })}
+                      />
+                    ))}
+                  </>
+                ) : null}
               </div>
 
               {gross > 0 ? (
                 <p className="t-tiny faint" style={{ marginTop: 'var(--s-sm)' }}>
                   {formatInr(gross)}
                   {off > 0 ? ` less ${formatInr(off)} discount` : ''}
-                  {slab ? ` · GST ${Number(slab.ratePct)}%` : ''}
+                  {tax && slab ? ` · GST ${Number(slab.ratePct)}%` : ''}
                 </p>
               ) : null}
             </Card>

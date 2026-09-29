@@ -13,36 +13,37 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { CustomFieldEntity, CustomFieldType, Priority, TaxTreatment } from '@prisma/client';
+import { CustomFieldEntity, CustomFieldType, Priority } from '@prisma/client';
 import { PunchItemDto } from '../../orders/dto/order.dto';
 
 /**
- * One priced line on an enquiry.
+ * One line on an enquiry: what the client asked for.
  *
- * Deliberately the same fields a quotation's line takes, in the same order,
- * because the shop prices the job while the client is still on the phone and
- * raises the quote from it afterwards. A line re-entered on the way is a line
- * entered differently.
+ * The name is all that is required. An enquiry is frequently a list of what
+ * somebody wants before anybody has worked out what it costs, and a line that
+ * cannot be written down without a rate is a line written on paper instead.
+ *
+ * No GST and no HSN. An enquiry is not a tax document and is not presented as
+ * one; the tax is worked out on the quotation raised from it, where somebody
+ * is actually being asked to pay.
  */
 export class LeadItemDto {
-  /** What is being priced, as the client would read it. */
+  /** What is being asked for, as the client would read it. */
   @IsString() @MinLength(1) name: string;
-  /** The detail under the name — finish, edge, hardware. */
+  /**
+   * The detail under the name — finish, edge, hardware, the size agreed on
+   * the call. What stops an argument later about what the price covered.
+   */
   @IsOptional() @IsString() description?: string;
-  /** The HSN or SAC code, where it is already known. */
-  @IsOptional() @IsString() hsnSac?: string;
 
-  /** How many. */
-  @Type(() => Number) @IsNumber() @Min(0) quantity: number;
+  /** How many. Left out where nobody has counted yet. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) quantity?: number;
   /** What one of them is — a square foot, a running foot, a piece. */
   @IsOptional() @IsString() unit?: string;
-  /** The price of one, before tax and before any discount on the line. */
-  @Type(() => Number) @IsNumber() @Min(0) ratePerUnit: number;
-
+  /** The price of one, before any discount on the line. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) ratePerUnit?: number;
   /** A percentage off this line. The money it comes to is computed, not sent. */
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) discountPct?: number;
-  /** The GST slab for this line. Falls back to the shop's default. */
-  @IsOptional() @IsString() gstSlabId?: string;
 }
 
 /**
@@ -60,21 +61,33 @@ export class CreateLeadDto {
    */
   @IsString() @MinLength(2) title: string;
 
-  /** Either an existing client, or loose contact details for someone who rang. */
+  /** An existing client, where the enquiry came from somebody already on file. */
   @IsOptional() @IsString() clientId?: string;
   /**
-   * Who rang, when they are not on file. Kept loose on purpose: an enquiry is
-   * not yet worth creating a client for, and most never become one.
+   * Who rang. Required, even when a client is attached, because an enquiry
+   * with no name against it is an enquiry nobody can follow up — and "the
+   * client record has a name" is not the same as knowing who called.
    */
-  @IsOptional() @IsString() contactName?: string;
-  /** Their number — the one thing that makes an enquiry followable-up. */
-  @IsOptional() @IsString() contactPhone?: string;
+  @IsString() @MinLength(1) contactName: string;
+  /**
+   * Their number. Required for the same reason: an enquiry nobody can ring
+   * back is a note, not a lead. This is the one field that decides whether
+   * the shop ever hears from them again.
+   */
+  @IsString() @MinLength(1) contactPhone: string;
   /** Their email, where the enquiry arrived by email. */
   @IsOptional() @IsString() contactEmail?: string;
   /** The firm they are from, when they mentioned one. */
   @IsOptional() @IsString() company?: string;
   /** Where the work would be, if it happens. */
   @IsOptional() @IsString() location?: string;
+  /**
+   * Where a bill would go. Optional: an enquiry is worth recording before
+   * anybody has asked for an address, and it is asked for again on the quote.
+   */
+  @IsOptional() @IsString() billingAddress?: string;
+  /** Where the work would be delivered. Empty means the same as billing. */
+  @IsOptional() @IsString() shippingAddress?: string;
 
   /**
    * Where the enquiry came from — a walk-in, a referral, Instagram. Worth
@@ -99,23 +112,16 @@ export class CreateLeadDto {
   @IsOptional() @IsString() notes?: string;
 
   /**
-   * What the enquiry was priced at, line by line — the same lines a quotation
-   * carries. Optional, and usually absent: most enquiries are worth writing
-   * down before anybody has worked out a price, and demanding one would put a
-   * form in front of the thing that has to be quick.
+   * What was asked for, line by line. Optional, and often just names: an
+   * enquiry is worth writing down before anybody has worked out a price, and
+   * demanding one would put a form in front of the thing that has to be
+   * quick.
    */
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => LeadItemDto)
   items?: LeadItemDto[];
-
-  /**
-   * Whether the rates on those lines are before GST, include it, or are
-   * figures the shop has agreed to absorb the tax out of. Means exactly what
-   * it means on a quotation, and defaults the same way.
-   */
-  @IsOptional() @IsEnum(TaxTreatment) taxTreatment?: TaxTreatment;
 
   /** Values for the admin-defined fields, keyed by their `key`. */
   @IsOptional() @IsObject() customFields?: Record<string, unknown>;
@@ -137,6 +143,10 @@ export class UpdateLeadDto {
   @IsOptional() @IsString() company?: string;
   /** Where the work would be. */
   @IsOptional() @IsString() location?: string;
+  /** Where a bill would go. */
+  @IsOptional() @IsString() billingAddress?: string;
+  /** Where it would be delivered. Empty means the same as billing. */
+  @IsOptional() @IsString() shippingAddress?: string;
   /** Where the enquiry came from. */
   @IsOptional() @IsString() sourceId?: string;
   /** Who is chasing it. */
@@ -150,20 +160,18 @@ export class UpdateLeadDto {
   /** Whatever was said that does not fit anywhere else. */
   @IsOptional() @IsString() notes?: string;
   /**
-   * The priced lines, replacing whatever is on the enquiry now.
+   * The lines, replacing whatever is on the enquiry now.
    *
-   * Left out entirely, the pricing is untouched — a screen showing the
-   * contact details and not the lines must not wipe the lines on save. An
-   * empty array is how they are cleared, because that is somebody saying "no
-   * lines" rather than a form staying quiet.
+   * Left out entirely, they are untouched — a screen showing the contact
+   * details and not the lines must not wipe the lines on save. An empty array
+   * is how they are cleared, because that is somebody saying "no lines"
+   * rather than a form staying quiet.
    */
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => LeadItemDto)
   items?: LeadItemDto[];
-  /** How GST relates to those rates. Changing it reprices the lines. */
-  @IsOptional() @IsEnum(TaxTreatment) taxTreatment?: TaxTreatment;
   /** Values for the shop's own extra questions, keyed by their `key`. */
   @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 }

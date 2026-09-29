@@ -30,9 +30,10 @@ export type PricedLine = {
   name: string;
   description?: string;
   hsnSac?: string;
-  quantity: number;
+  /** Absent on an enquiry line nobody has counted yet. */
+  quantity?: number;
   unit?: string;
-  ratePerUnit: number;
+  ratePerUnit?: number;
   discountPct?: number;
   gstSlabId?: string;
 };
@@ -69,8 +70,24 @@ export function blankLine(): PricedLine {
 }
 
 /** The lines worth sending: named, and for more than nothing. */
-export const usableLines = (lines: PricedLine[]): PricedLine[] =>
-  lines.filter((line) => line.name.trim() && line.quantity > 0);
+/**
+ * The lines worth sending.
+ *
+ * The two documents disagree about what counts, so the caller says which.
+ *
+ * A quotation needs a quantity: it is a figure somebody is being asked to
+ * pay, and a line priced at nothing on one is a mistake. An enquiry does
+ * not — it is frequently a list of what was asked for before anybody has
+ * counted anything, "MDF jali, laser cut", rate to follow. Dropping those on
+ * save would silently lose what the client actually said.
+ */
+export const usableLines = (
+  lines: PricedLine[],
+  { needsQuantity = false }: { needsQuantity?: boolean } = {},
+): PricedLine[] =>
+  lines.filter(
+    (line) => line.name.trim() && (!needsQuantity || (line.quantity ?? 0) > 0),
+  );
 
 /**
  * What the lines come to, as the server will work it out.
@@ -120,6 +137,15 @@ export function PricedLines({
   /** Whether the last line can be removed. A quote needs one; an enquiry does not. */
   allowEmpty = false,
   placeholder = 'Hdmr cutting 22mm',
+  /**
+   * Whether this document charges tax.
+   *
+   * A quotation does, so it asks how GST is quoted and offers a slab and an
+   * HSN code per line. An enquiry does not: it is not a tax document and must
+   * not look like one, because a priced sheet with GST on it reads as a bill
+   * to whoever is handed it.
+   */
+  tax = true,
 }: {
   lines: PricedLine[];
   onChange: (next: PricedLine[]) => void;
@@ -128,6 +154,7 @@ export function PricedLines({
   slabs?: GstSlab[];
   allowEmpty?: boolean;
   placeholder?: string;
+  tax?: boolean;
 }) {
   const [slabFor, setSlabFor] = React.useState<string | null>(null);
   const [unitFor, setUnitFor] = React.useState<string | null>(null);
@@ -138,26 +165,30 @@ export function PricedLines({
     onChange(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
 
   const preview = useMemo(
-    () => previewTotals(lines, slabs, defaultSlab?.id, treatment),
-    [lines, slabs, defaultSlab, treatment],
+    () => previewTotals(lines, tax ? slabs : undefined, defaultSlab?.id, treatment),
+    [lines, slabs, defaultSlab, treatment, tax],
   );
 
   return (
     <>
-      <Text variant="label" tone="muted" style={styles.label}>How is GST quoted?</Text>
-      <View style={styles.chipWrap}>
-        {TREATMENTS.map((option) => (
-          <Chip
-            key={option.value}
-            label={option.label}
-            selected={treatment === option.value}
-            onPress={() => onTreatmentChange(option.value)}
-          />
-        ))}
-      </View>
-      <Text variant="tiny" tone="faint" style={styles.blurb}>
-        {TREATMENTS.find((option) => option.value === treatment)?.blurb}
-      </Text>
+      {tax ? (
+        <>
+          <Text variant="label" tone="muted" style={styles.label}>How is GST quoted?</Text>
+          <View style={styles.chipWrap}>
+            {TREATMENTS.map((option) => (
+              <Chip
+                key={option.value}
+                label={option.label}
+                selected={treatment === option.value}
+                onPress={() => onTreatmentChange(option.value)}
+              />
+            ))}
+          </View>
+          <Text variant="tiny" tone="faint" style={styles.blurb}>
+            {TREATMENTS.find((option) => option.value === treatment)?.blurb}
+          </Text>
+        </>
+      ) : null}
 
       {lines.map((line, index) => {
         const slab = slabs?.find((s) => s.id === (line.gstSlabId ?? defaultSlab?.id));
@@ -182,6 +213,16 @@ export function PricedLines({
                 placeholder={placeholder}
                 value={line.name}
                 onChangeText={(value) => setLine(line.key, { name: value })}
+              />
+
+              {/* Under the name, because it describes the name: the finish,
+                  the edge, the size agreed on the call. What stops an
+                  argument later about what the price covered. */}
+              <Field
+                placeholder="Detail — finish, edge, size"
+                value={line.description ?? ''}
+                onChangeText={(value) => setLine(line.key, { description: value })}
+                multiline
               />
 
               <View style={styles.row}>
@@ -217,20 +258,24 @@ export function PricedLines({
                   testID={`unit-${index}`}
                   onPress={() => setUnitFor(line.key)}
                 />
-                <Chip
-                  label={slab ? `GST ${Number(slab.ratePct)}%` : 'GST'}
-                  testID={`slab-${index}`}
-                  onPress={() => setSlabFor(line.key)}
-                />
-                <Chip
-                  label={line.hsnSac ? `HSN ${line.hsnSac}` : '+ HSN/SAC'}
-                  testID={`hsn-${index}`}
-                  onPress={() =>
-                    Alert.prompt?.('HSN / SAC', 'Optional code for this line', (value) =>
-                      setLine(line.key, { hsnSac: value }),
-                    )
-                  }
-                />
+                {tax ? (
+                  <>
+                    <Chip
+                      label={slab ? `GST ${Number(slab.ratePct)}%` : 'GST'}
+                      testID={`slab-${index}`}
+                      onPress={() => setSlabFor(line.key)}
+                    />
+                    <Chip
+                      label={line.hsnSac ? `HSN ${line.hsnSac}` : '+ HSN/SAC'}
+                      testID={`hsn-${index}`}
+                      onPress={() =>
+                        Alert.prompt?.('HSN / SAC', 'Optional code for this line', (value) =>
+                          setLine(line.key, { hsnSac: value }),
+                        )
+                      }
+                    />
+                  </>
+                ) : null}
               </View>
 
               {gross > 0 ? (
@@ -263,12 +308,16 @@ export function PricedLines({
         <Text variant="tiny" tone="faint" style={{ marginBottom: spacing.sm }}>
           The server prices it for real when you save.
         </Text>
-        <SumRow label="Taxable" value={formatInr(preview.net)} />
+        <SumRow label={tax ? 'Taxable' : 'Subtotal'} value={formatInr(preview.net)} />
         {preview.discount > 0 ? (
           <SumRow label="Discount" value={formatInr(preview.discount)} />
         ) : null}
-        <SumRow label="GST" value={formatInr(preview.tax)} />
-        <SumRow label="Client pays" value={formatInr(preview.gross)} accent />
+        {tax ? <SumRow label="GST" value={formatInr(preview.tax)} /> : null}
+        <SumRow
+          label={tax ? 'Client pays' : 'Total'}
+          value={formatInr(preview.gross)}
+          accent
+        />
       </Card>
 
       <Sheet visible={Boolean(unitFor)} title="Unit" onClose={() => setUnitFor(null)}>
@@ -284,7 +333,7 @@ export function PricedLines({
         ))}
       </Sheet>
 
-      <Sheet visible={Boolean(slabFor)} title="GST slab" onClose={() => setSlabFor(null)}>
+      <Sheet visible={Boolean(tax && slabFor)} title="GST slab" onClose={() => setSlabFor(null)}>
         {(slabs ?? []).map((slab) => (
           <SheetOption
             key={slab.id}

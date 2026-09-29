@@ -24,7 +24,7 @@
  */
 export interface LeadValueFigures {
   quotedValue?: string | number | null;
-  grandTotal?: string | number | null;
+  total?: string | number | null;
   estimatedValue?: string | number | null;
 }
 
@@ -34,7 +34,7 @@ export function leadValue(lead: LeadValueFigures): number | null {
   if (quoted !== null) return quoted;
 
   // Zero is what an unpriced enquiry's total is, not a price of nothing.
-  const priced = num(lead.grandTotal);
+  const priced = num(lead.total);
   if (priced !== null && priced > 0) return priced;
 
   return num(lead.estimatedValue);
@@ -45,7 +45,7 @@ export function leadValueSource(
   lead: LeadValueFigures,
 ): 'quoted' | 'priced' | 'estimated' | null {
   if (num(lead.quotedValue) !== null) return 'quoted';
-  const priced = num(lead.grandTotal);
+  const priced = num(lead.total);
   if (priced !== null && priced > 0) return 'priced';
   return num(lead.estimatedValue) !== null ? 'estimated' : null;
 }

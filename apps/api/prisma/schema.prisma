@@ -557,7 +557,6 @@ model GstSlab {
 
   orderItems    OrderItem[]
   estimateItems EstimateItem[]
-  leadItems     LeadItem[]
   orders        Order[]
 
   createdAt DateTime @default(now())
@@ -2613,23 +2612,28 @@ model Lead {
   ownerId String?
   owner   User?   @relation("LeadOwner", fields: [ownerId], references: [id])
 
-  /// How the GST on the enquiry's lines relates to the figures on them, as on
-  /// a quotation. An enquiry priced one way and quoted another is the same job
-  /// at two prices, which is how a shop loses the difference.
-  taxTreatment TaxTreatment @default(EXCLUSIVE)
+  /// Where a bill would go, and where the work would be delivered.
+  ///
+  /// Taken on the enquiry because they are asked for on the call that creates
+  /// it, and because the quotation raised from it needs them — a quote that
+  /// has to stop and ask for an address the shop already wrote down once is a
+  /// quote that goes out slower.
+  ///
+  /// Optional, both. An enquiry is worth recording before anybody knows where
+  /// the job is, and shipping empty means the same as billing.
+  billingAddress  String?
+  shippingAddress String?
 
-  /// What the enquiry's own lines come to, snapshotted the way a quotation's
-  /// are. Zero where the enquiry was taken without pricing anything, which is
+  /// What the enquiry's own lines come to. No tax: an enquiry is not a tax
+  /// document and is not presented as one. GST is worked out on the quotation
+  /// raised from it, where somebody is actually being asked to pay.
+  ///
+  /// Zero where the enquiry was taken without pricing anything, which is
   /// still the common case — a price is not what makes an enquiry worth
   /// writing down.
-  subtotal   Decimal @default(0) @db.Decimal(14, 2)
-  discount   Decimal @default(0) @db.Decimal(14, 2)
-  total      Decimal @default(0) @db.Decimal(14, 2)
-  cgst       Decimal @default(0) @db.Decimal(14, 2)
-  sgst       Decimal @default(0) @db.Decimal(14, 2)
-  igst       Decimal @default(0) @db.Decimal(14, 2)
-  taxAmount  Decimal @default(0) @db.Decimal(14, 2)
-  grandTotal Decimal @default(0) @db.Decimal(14, 2)
+  subtotal Decimal @default(0) @db.Decimal(14, 2)
+  discount Decimal @default(0) @db.Decimal(14, 2)
+  total    Decimal @default(0) @db.Decimal(14, 2)
 
   estimatedValue Decimal?  @db.Decimal(14, 2)
   /// What was actually quoted, taken from the estimate that was sent.
@@ -2687,12 +2691,16 @@ model LeadItem {
   lineNo   Int
 
   name        String
+  /// The detail under the name — finish, edge, hardware, the size agreed on
+  /// the call. What stops an argument later about what the price covered.
   description String?
-  /// HSN for goods, SAC for services.
-  hsnSac      String?
 
-  quantity    Decimal @default(1) @db.Decimal(12, 3)
-  /// The unit as the shop says it — "Sqf", "Rft", "Nos".
+  /// All three optional in practice: an enquiry is often a list of what the
+  /// client asked for before anybody has worked out what it costs. They
+  /// default to nothing rather than being required.
+  quantity    Decimal @default(0) @db.Decimal(12, 3)
+  /// The unit as the shop says it — "Sqf", "Rft", "Nos". 120 of something is
+  /// meaningless on a decor floor; 120 Sqf is not 120 pieces.
   unit        String  @default("Sqf")
   ratePerUnit Decimal @default(0) @db.Decimal(14, 2)
 
@@ -2701,15 +2709,9 @@ model LeadItem {
   discountPct    Decimal @default(0) @db.Decimal(5, 2)
   discountAmount Decimal @default(0) @db.Decimal(14, 2)
 
-  gstSlabId  String?
-  gstSlab    GstSlab? @relation(fields: [gstSlabId], references: [id])
-  gstRatePct Decimal  @default(0) @db.Decimal(5, 2)
-  taxAmount  Decimal  @default(0) @db.Decimal(14, 2)
-
-  /// Taxable value after the line discount.
-  netAmount Decimal @default(0) @db.Decimal(14, 2)
-  /// What this line comes to including its GST.
-  amount    Decimal @default(0) @db.Decimal(14, 2)
+  /// What the line comes to: quantity × rate, less its discount. No tax —
+  /// see the note on Lead's totals.
+  amount Decimal @default(0) @db.Decimal(14, 2)
 
   @@unique([leadId, lineNo])
   @@index([tenantId])

@@ -28,9 +28,20 @@ export interface PricedDocumentInput {
   firm: Record<string, any>;
   amountInWords: string;
   terms: string;
-  interState: boolean;
+  /** Whether the supply crossed a state line. Only read when `showTax`. */
+  interState?: boolean;
   /** The word printed in the corner, and on the "… For" heading. */
   docType: string;
+  /**
+   * Whether this document charges tax.
+   *
+   * A quotation does: it has HSN and GST columns and the split an Indian
+   * invoice must show. An enquiry does not — it is not a tax document and
+   * must not look like one, because a priced sheet with a GST column on it
+   * reads as a bill to whoever is handed it. Defaults to true, so the
+   * quotation keeps the page it has always had.
+   */
+  showTax?: boolean;
   /** The facts block on the right of the parties row, in order. */
   facts: { label: string; value: string }[];
   /** Absolute URL of the uploaded letterhead, when the firm has one. */
@@ -40,6 +51,7 @@ export interface PricedDocumentInput {
 
 export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
   const { document: estimate, firm, terms } = input;
+  const showTax = input.showTax ?? true;
   const accent = safeColor(firm.accentColor) ?? '#E4232F';
   const ink = '#1F2430';
 
@@ -54,7 +66,7 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
         <td><strong>${esc(item.name)}</strong>${
           item.description ? `<div class="sub">${esc(item.description)}</div>` : ''
         }</td>
-        <td>${esc(item.hsnSac ?? '')}</td>
+        ${showTax ? `<td>${esc(item.hsnSac ?? '')}</td>` : ''}
         <td class="r">${num(item.quantity, 0)}</td>
         <td class="c">${esc(item.unit ?? '')}</td>
         <td class="r">${money(item.ratePerUnit)}</td>
@@ -62,10 +74,14 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
           item.discountPct,
           1,
         )}%)</span></td>
-        <td class="r">${money(item.taxAmount)} <span class="pct">(${num(
-          item.gstRatePct,
-          1,
-        )}%)</span></td>
+        ${
+          showTax
+            ? `<td class="r">${money(item.taxAmount)} <span class="pct">(${num(
+                item.gstRatePct,
+                1,
+              )}%)</span></td>`
+            : ''
+        }
         <td class="r"><strong>${money(item.amount)}</strong></td>
       </tr>`,
     )
@@ -79,10 +95,12 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
   // Intra-state shows CGST and SGST as separate lines at half the rate each;
   // inter-state shows one IGST line. Printing the wrong pair invalidates the
   // document, so it follows the numbers rather than a setting.
-  const taxRows = input.interState
-    ? `<tr><td>IGST</td><td class="r">${money(estimate.igst)}</td></tr>`
-    : `<tr><td>SGST</td><td class="r">${money(estimate.sgst)}</td></tr>
-       <tr><td>CGST</td><td class="r">${money(estimate.cgst)}</td></tr>`;
+  const taxRows = !showTax
+    ? ''
+    : input.interState
+      ? `<tr><td>IGST</td><td class="r">${money(estimate.igst)}</td></tr>`
+      : `<tr><td>SGST</td><td class="r">${money(estimate.sgst)}</td></tr>
+         <tr><td>CGST</td><td class="r">${money(estimate.cgst)}</td></tr>`;
 
   const termLines = terms
     .split('\n')
@@ -258,24 +276,24 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
     <table class="lines">
       <thead><tr>
         <th style="width:5%">#</th>
-        <th style="width:24%">Item Name</th>
-        <th style="width:10%">HSN/ SAC</th>
+        <th style="width:${showTax ? 24 : 38}%">Item Name</th>
+        ${showTax ? '<th style="width:10%">HSN/ SAC</th>' : ''}
         <th style="width:9%">Quantity</th>
         <th style="width:7%">Unit</th>
         <th style="width:11%">Price/ Unit</th>
         <th style="width:12%">Discount</th>
-        <th style="width:12%">GST</th>
-        <th style="width:15%">Amount</th>
+        ${showTax ? '<th style="width:12%">GST</th>' : ''}
+        <th style="width:${showTax ? 15 : 18}%">Amount</th>
       </tr></thead>
       <tbody>
         ${rows}
         <tr class="total">
-          <td></td><td>Total</td><td></td>
+          <td></td><td>Total</td>${showTax ? '<td></td>' : ''}
           <td class="r">${num(totalQty, 0)}</td>
           <td></td><td></td>
           <td class="r">${money(estimate.discount)}</td>
-          <td class="r">${money(estimate.taxAmount)}</td>
-          <td class="r">${money(estimate.grandTotal)}</td>
+          ${showTax ? `<td class="r">${money(estimate.taxAmount)}</td>` : ''}
+          <td class="r">${money(showTax ? estimate.grandTotal : estimate.total)}</td>
         </tr>
       </tbody>
     </table>
@@ -300,9 +318,11 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
               : ''
           }
           ${taxRows}
-          <tr class="grand"><td>Total</td><td class="r">${money(estimate.grandTotal)}</td></tr>
+          <tr class="grand"><td>Total</td><td class="r">${money(
+            showTax ? estimate.grandTotal : estimate.total,
+          )}</td></tr>
           ${
-            Number(estimate.savedAmount) > 0
+            showTax && Number(estimate.savedAmount) > 0
               ? `<tr><td>You Saved</td><td class="r">${money(estimate.savedAmount)}</td></tr>`
               : ''
           }

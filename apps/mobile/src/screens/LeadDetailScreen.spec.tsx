@@ -200,6 +200,9 @@ describe('quoting the enquiry', () => {
         clientId: null,
         clientName: 'Verma',
         location: 'Andheri',
+        billingAddress: null,
+        shippingAddress: null,
+        items: undefined,
       },
     });
   });
@@ -368,54 +371,77 @@ it('keeps the heading in view while the enquiry scrolls under it', async () => {
   expect(screen.getByTestId('screen-scroll').props.stickyHeaderIndices).toEqual([0]);
 });
 
-describe('an enquiry that was priced', () => {
+describe('an enquiry with items on it', () => {
   const PRICED = {
     ...LEAD,
-    taxTreatment: 'EXCLUSIVE',
+    subtotal: '10000',
+    discount: '0',
     total: '10000',
-    taxAmount: '1800',
-    grandTotal: '11800',
     items: [
       {
         id: 'li1',
         lineNo: 1,
         name: 'Hdmr 22mm',
-        description: null,
-        hsnSac: '4411',
+        description: 'Laser cut, natural finish',
         quantity: '10',
         unit: 'Sqf',
         ratePerUnit: '1000',
         discountPct: '0',
         discountAmount: '0',
-        gstSlabId: 'gst18',
-        gstRatePct: '18',
-        taxAmount: '1800',
-        netAmount: '10000',
-        amount: '11800',
+        amount: '10000',
       },
     ],
   };
 
-  it('shows the working — the lines, not just a total', async () => {
+  it('shows the working — the items, with their detail under the name', async () => {
     await mount(PRICED);
     expect(await screen.findByText('Hdmr 22mm')).toBeTruthy();
+    expect(screen.getByText('Laser cut, natural finish')).toBeTruthy();
     expect(screen.getByText('10 Sqf × ₹1,000')).toBeTruthy();
   });
 
-  it('shows what it comes to, tax apart from taxable', async () => {
+  it('says the tax is the quote’s job, and shows no tax line', async () => {
     await mount(PRICED);
-    expect(await screen.findByText('Taxable ₹10,000 · GST ₹1,800')).toBeTruthy();
-    // Three times: the hero, the single line's own amount, and the total.
-    expect(screen.getAllByText('₹11,800')).toHaveLength(3);
+    expect(
+      await screen.findByText('Before tax — GST is worked out on the quote'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/GST ₹/)).toBeNull();
+    expect(screen.queryByText('Taxable')).toBeNull();
   });
 
-  it('heads the enquiry with what its lines come to, not with the old guess', async () => {
-    // The fixture was guessed at ₹2.50 L and priced at ₹11,800. The guess is
-    // kept — the difference between the two is worth knowing — but the
-    // figure on the card is the one worked out from rates.
+  it('heads the enquiry with what its items come to, not with the old guess', async () => {
+    // The fixture was guessed at ₹2.50 L and its items come to ₹10,000. The
+    // guess is kept — the difference is worth knowing — but the figure on
+    // the card is the one worked out from rates.
     await mount(PRICED);
-    expect(await screen.findByText('Taxable ₹10,000 · GST ₹1,800')).toBeTruthy();
+    expect(await screen.findByText('Hdmr 22mm')).toBeTruthy();
     expect(screen.queryByText('₹2.50 L')).toBeNull();
+    expect(screen.getAllByText('₹10,000').length).toBeGreaterThan(0);
+  });
+
+  it('shows an item that is only a name, without inventing a figure for it', async () => {
+    await mount({
+      ...LEAD,
+      subtotal: '0',
+      discount: '0',
+      total: '0',
+      items: [
+        {
+          id: 'li2',
+          lineNo: 1,
+          name: 'MDF jali, laser cut',
+          description: null,
+          quantity: '0',
+          unit: 'Sqf',
+          ratePerUnit: '0',
+          discountPct: '0',
+          discountAmount: '0',
+          amount: '0',
+        },
+      ],
+    });
+    expect(await screen.findByText('MDF jali, laser cut')).toBeTruthy();
+    expect(screen.queryByText('₹0')).toBeNull();
   });
 
   it('opens the printed enquiry, at the server’s own document', async () => {
@@ -426,46 +452,45 @@ describe('an enquiry that was priced', () => {
       title: 'Enquiry',
       subtitle: 'LEAD-1',
       fileName: 'LEAD-1',
-      message: 'Enquiry LEAD-1 — ₹11,800',
+      message: 'Enquiry LEAD-1 — ₹10,000',
       phone: '9820012345',
     });
   });
 
-  it('offers no preview for an enquiry nobody priced — there is no page to show', async () => {
+  it('offers no preview for an enquiry with no items — there is no page to show', async () => {
     await mount();
     expect(screen.queryByTestId('preview-button')).toBeNull();
   });
 
-  it('offers to price an enquiry that has no price, because that is the common one', async () => {
+  it('offers to add items to an enquiry that has none, which is the common one', async () => {
     await mount();
-    await fireEvent.press(await screen.findByTestId('price-button'));
-    expect(navigate).toHaveBeenCalledWith('LeadPrice', { leadId: 'l1' });
+    await fireEvent.press(await screen.findByTestId('add-items-button'));
+    expect(navigate).toHaveBeenCalledWith('LeadItems', { leadId: 'l1' });
   });
 
   it('lets a price be corrected, rather than making it a one-shot entry', async () => {
     await mount(PRICED);
     await fireEvent.press(await screen.findByTestId('edit-pricing-button'));
-    expect(navigate).toHaveBeenCalledWith('LeadPrice', { leadId: 'l1' });
+    expect(navigate).toHaveBeenCalledWith('LeadItems', { leadId: 'l1' });
     // And does not offer to price it a second time from scratch.
     expect(screen.queryByTestId('price-button')).toBeNull();
   });
 
-  it('hands the pricing to the quote rather than making somebody type it again', async () => {
+  it('hands the items to the quote rather than making somebody type them again', async () => {
     mockPermissions = [PERMISSIONS.ESTIMATE_MANAGE];
     await mount(PRICED);
     await fireEvent.press(await screen.findByText('Quote this enquiry'));
     const params = navigate.mock.calls.find((call) => call[0] === 'EstimateEdit')![1];
-    expect(params.lead.taxTreatment).toBe('EXCLUSIVE');
+    // The lines go across; no tax does, because an enquiry carries none.
+    expect(params.lead).not.toHaveProperty('taxTreatment');
     expect(params.lead.items).toEqual([
       {
         name: 'Hdmr 22mm',
-        description: undefined,
-        hsnSac: '4411',
+        description: 'Laser cut, natural finish',
         quantity: 10,
         unit: 'Sqf',
         ratePerUnit: 1000,
         discountPct: undefined,
-        gstSlabId: 'gst18',
       },
     ]);
   });

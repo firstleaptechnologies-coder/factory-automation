@@ -110,19 +110,49 @@ describe('list', () => {
 });
 
 describe('create', () => {
-  it('refuses a lead with no client and no way to reach anyone', async () => {
+  it('refuses an enquiry with nobody to ring back', async () => {
     const { service } = build();
     await expect(inTenant(() => service.create({ title: 'Kitchen' } as never))).rejects.toThrow(
-      /existing client or a contact name or phone/,
+      /contact name and a phone number/,
     );
   });
 
-  it('accepts a lead identified only by a phone number', async () => {
+  it('refuses one with a name but no number', async () => {
+    const { service } = build();
+    await expect(
+      inTenant(() => service.create({ title: 'Kitchen', contactName: 'Verma' } as never)),
+    ).rejects.toThrow(/contact name and a phone number/);
+  });
+
+  it('refuses one with a number but no name', async () => {
+    const { service } = build();
+    await expect(
+      inTenant(() => service.create({ title: 'Kitchen', contactPhone: '9820012345' } as never)),
+    ).rejects.toThrow(/contact name and a phone number/);
+  });
+
+  it('still wants both even when the enquiry is attached to a client on file', async () => {
+    // "The client record has a name" is not the same as knowing who rang.
+    const { service } = build();
+    await expect(
+      inTenant(() => service.create({ title: 'Kitchen', clientId: 'c1' } as never)),
+    ).rejects.toThrow(/contact name and a phone number/);
+  });
+
+  it('takes the addresses where the call produced them', async () => {
     const { service, db } = build();
     await inTenant(() =>
-      service.create({ title: 'Kitchen', contactPhone: '9820012345' } as never),
+      service.create({
+        title: 'Kitchen',
+        contactName: 'Verma',
+        contactPhone: '9820012345',
+        billingAddress: 'Unit 4, Andheri West',
+        shippingAddress: 'Site, Powai',
+      } as never),
     );
-    expect(db.lead.create).toHaveBeenCalled();
+    const data = db.lead.create.mock.calls[0][0].data;
+    expect(data.billingAddress).toBe('Unit 4, Andheri West');
+    expect(data.shippingAddress).toBe('Site, Powai');
   });
 
   it('refuses a pipeline with no starting stage', async () => {
@@ -133,7 +163,7 @@ describe('create', () => {
       statuses: [{ id: 'l2', isInitial: false }],
     }));
     await expect(
-      inTenant(() => service.create({ title: 'X', contactName: 'A' } as never)),
+      inTenant(() => service.create({ title: 'X', contactName: 'A', contactPhone: '98200' } as never)),
     ).rejects.toThrow(/no starting status/);
   });
 
@@ -141,13 +171,13 @@ describe('create', () => {
     const { service, db } = build();
     db.workflow.findFirst = jest.fn(async () => null);
     await expect(
-      inTenant(() => service.create({ title: 'X', contactName: 'A' } as never)),
+      inTenant(() => service.create({ title: 'X', contactName: 'A', contactPhone: '98200' } as never)),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('resolves the default LEAD pipeline, not the order one', async () => {
     const { service, db } = build();
-    await inTenant(() => service.create({ title: 'X', contactName: 'A' } as never));
+    await inTenant(() => service.create({ title: 'X', contactName: 'A', contactPhone: '98200' } as never));
     expect(db.workflow.findFirst.mock.calls[0][0].where).toMatchObject({
       kind: WorkflowKind.LEAD,
       isDefault: true,
@@ -157,7 +187,7 @@ describe('create', () => {
 
   it('starts on the initial stage and writes the opening history row', async () => {
     const { service, db } = build();
-    await inTenant(() => service.create({ title: 'X', contactName: 'A' } as never));
+    await inTenant(() => service.create({ title: 'X', contactName: 'A', contactPhone: '98200' } as never));
     const data = db.lead.create.mock.calls[0][0].data;
     expect(data.statusId).toBe('l1');
     expect(data.statusHistory.create).toMatchObject({
@@ -169,14 +199,14 @@ describe('create', () => {
 
   it('makes the creator the owner when none is named', async () => {
     const { service, db } = build();
-    await inTenant(() => service.create({ title: 'X', contactName: 'A' } as never, 'u1'));
+    await inTenant(() => service.create({ title: 'X', contactName: 'A', contactPhone: '98200' } as never, 'u1'));
     expect(db.lead.create.mock.calls[0][0].data.ownerId).toBe('u1');
   });
 
   it('keeps an explicit owner', async () => {
     const { service, db } = build();
     await inTenant(() =>
-      service.create({ title: 'X', contactName: 'A', ownerId: 'u2' } as never, 'u1'),
+      service.create({ title: 'X', contactName: 'A', contactPhone: '98200', ownerId: 'u2' } as never, 'u1'),
     );
     expect(db.lead.create.mock.calls[0][0].data.ownerId).toBe('u2');
   });
@@ -187,160 +217,126 @@ describe('create', () => {
       { key: 'budget', label: 'Budget', type: 'NUMBER', options: [], required: true },
     ]);
     await expect(
-      inTenant(() => service.create({ title: 'X', contactName: 'A' } as never)),
+      inTenant(() => service.create({ title: 'X', contactName: 'A', contactPhone: '98200' } as never)),
     ).rejects.toThrow(/Budget is required/);
   });
 });
 
-describe('pricing the enquiry', () => {
+describe('the lines on an enquiry', () => {
   const LINE = { name: 'Hdmr 22mm', quantity: 10, ratePerUnit: 1000 };
+  const who = { contactName: 'A', contactPhone: '98200' };
 
-  function withSlab(db: Db, ratePct = 18) {
-    db.gstSlab.findFirst = jest.fn(async () => ({ id: 'gst18', ratePct }));
-  }
-
-  it('prices the lines through the same sum a quotation uses', async () => {
+  it('works a line out as quantity by rate, and charges no tax on it', async () => {
     const { service, db } = build();
-    withSlab(db);
-    await inTenant(() =>
-      service.create({ title: 'X', contactName: 'A', items: [LINE] } as never),
-    );
+    await inTenant(() => service.create({ title: 'X', ...who, items: [LINE] } as never));
     const [line] = db.lead.create.mock.calls[0][0].data.items.create;
     expect(line).toMatchObject({
       lineNo: 1,
       name: 'Hdmr 22mm',
-      netAmount: 10000,
-      taxAmount: 1800,
-      amount: 11800,
-      gstSlabId: 'gst18',
-      gstRatePct: 18,
+      quantity: 10,
+      unit: 'Sqf',
+      ratePerUnit: 1000,
+      amount: 10000,
       tenantId: 'tenant-test',
     });
+    // An enquiry is not a tax document. Nothing here should carry one.
+    expect(line).not.toHaveProperty('gstSlabId');
+    expect(line).not.toHaveProperty('gstRatePct');
+    expect(line).not.toHaveProperty('taxAmount');
+    expect(line).not.toHaveProperty('hsnSac');
   });
 
-  it('takes the line discount off before the tax, not after', async () => {
+  it('never asks the database for a GST slab', async () => {
     const { service, db } = build();
-    withSlab(db);
+    await inTenant(() => service.create({ title: 'X', ...who, items: [LINE] } as never));
+    expect(db.gstSlab.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('takes the line discount off the line', async () => {
+    const { service, db } = build();
+    await inTenant(() =>
+      service.create({ title: 'X', ...who, items: [{ ...LINE, discountPct: 10 }] } as never),
+    );
+    const [line] = db.lead.create.mock.calls[0][0].data.items.create;
+    expect(line.discountAmount).toBe(1000);
+    expect(line.amount).toBe(9000);
+  });
+
+  it('carries the description under the name', async () => {
+    const { service, db } = build();
     await inTenant(() =>
       service.create({
         title: 'X',
-        contactName: 'A',
-        items: [{ ...LINE, discountPct: 10 }],
+        ...who,
+        items: [{ ...LINE, description: 'Laser cut, 18mm, natural finish' }],
       } as never),
     );
     const [line] = db.lead.create.mock.calls[0][0].data.items.create;
-    // 10,000 less 1,000 is 9,000 taxable — not 10,000 taxed and then reduced.
-    expect(line.discountAmount).toBe(1000);
-    expect(line.netAmount).toBe(9000);
-    expect(line.taxAmount).toBe(1620);
+    expect(line.description).toBe('Laser cut, 18mm, natural finish');
   });
 
-  it('reads an inclusive rate as the figure the client pays', async () => {
+  it('takes a line that is only a name, because most of them are', async () => {
     const { service, db } = build();
-    withSlab(db);
     await inTenant(() =>
-      service.create({
-        title: 'X',
-        contactName: 'A',
-        taxTreatment: 'INCLUSIVE',
-        items: [LINE],
-      } as never),
+      service.create({ title: 'X', ...who, items: [{ name: 'MDF jali, laser cut' }] } as never),
     );
-    const data = db.lead.create.mock.calls[0][0].data;
-    // The tax comes out of the 10,000 rather than being added on top of it.
-    expect(data.grandTotal).toBe(10000);
-    expect(data.total).toBe(8474.58);
+    const [line] = db.lead.create.mock.calls[0][0].data.items.create;
+    expect(line).toMatchObject({ name: 'MDF jali, laser cut', quantity: 0, ratePerUnit: 0 });
+    expect(line.amount).toBe(0);
   });
 
-  it('totals the enquiry the way it totals a quotation', async () => {
+  it('totals the lines into three figures, and none of them is a tax', async () => {
     const { service, db } = build();
-    withSlab(db);
     await inTenant(() =>
       service.create({
         title: 'X',
-        contactName: 'A',
-        items: [LINE, { name: 'Edge band', quantity: 40, ratePerUnit: 25 }],
+        ...who,
+        items: [
+          { ...LINE, discountPct: 10 },
+          { name: 'Edge band', quantity: 40, ratePerUnit: 25 },
+        ],
       } as never),
     );
     const data = db.lead.create.mock.calls[0][0].data;
     expect(data.subtotal).toBe(11000);
-    expect(data.total).toBe(11000);
-    expect(data.taxAmount).toBe(1980);
-    expect(data.grandTotal).toBe(12980);
+    expect(data.discount).toBe(1000);
+    expect(data.total).toBe(10000);
+    expect(data).not.toHaveProperty('taxAmount');
+    expect(data).not.toHaveProperty('grandTotal');
+    expect(data).not.toHaveProperty('cgst');
+    expect(data).not.toHaveProperty('taxTreatment');
   });
 
-  it('splits the GST across a state line as IGST, and within one as CGST and SGST', async () => {
+  it('leaves the typed guess alone — it is a different number', async () => {
     const { service, db } = build();
-    withSlab(db);
-    db.firmProfile.findFirst = jest.fn(async () => ({ stateCode: '27' }));
-    db.client.findFirst = jest.fn(async () => ({ stateCode: '08' }));
     await inTenant(() =>
-      service.create({ title: 'X', clientId: 'c1', items: [LINE] } as never),
-    );
-    const away = db.lead.create.mock.calls[0][0].data;
-    expect(away.igst).toBe(1800);
-    expect(away.cgst).toBe(0);
-
-    const local = build();
-    withSlab(local.db);
-    local.db.firmProfile.findFirst = jest.fn(async () => ({ stateCode: '27' }));
-    local.db.client.findFirst = jest.fn(async () => ({ stateCode: '27' }));
-    await inTenant(() =>
-      local.service.create({ title: 'X', clientId: 'c1', items: [LINE] } as never),
-    );
-    const home = local.db.lead.create.mock.calls[0][0].data;
-    expect(home.cgst).toBe(900);
-    expect(home.sgst).toBe(900);
-    expect(home.igst).toBe(0);
-  });
-
-  it('does not write the priced total into the guess as well', async () => {
-    const { service, db } = build();
-    withSlab(db);
-    await inTenant(() =>
-      service.create({ title: 'X', contactName: 'A', items: [LINE] } as never),
-    );
-    const data = db.lead.create.mock.calls[0][0].data;
-    // Two columns holding the same number is one that goes stale: repricing
-    // moves grandTotal and leaves the copy behind. `leadValue` in @fas/shared
-    // decides which figure to show instead.
-    expect(data.estimatedValue).toBeUndefined();
-    expect(data.grandTotal).toBe(11800);
-  });
-
-  it('keeps the typed guess beside the priced lines, not instead of them', async () => {
-    const { service, db } = build();
-    withSlab(db);
-    await inTenant(() =>
-      service.create({
-        title: 'X',
-        contactName: 'A',
-        estimatedValue: 50000,
-        items: [LINE],
-      } as never),
+      service.create({ title: 'X', ...who, estimatedValue: 50000, items: [LINE] } as never),
     );
     const data = db.lead.create.mock.calls[0][0].data;
     expect(data.estimatedValue).toBe(50000);
-    expect(data.grandTotal).toBe(11800);
+    expect(data.total).toBe(10000);
+  });
+
+  it('does not write the lines’ total into the guess as well', async () => {
+    const { service, db } = build();
+    await inTenant(() => service.create({ title: 'X', ...who, items: [LINE] } as never));
+    // Two columns holding one number is one that goes stale. `leadValue` in
+    // @fas/shared decides which figure to show.
+    expect(db.lead.create.mock.calls[0][0].data.estimatedValue).toBeUndefined();
   });
 
   it('records an enquiry with no lines at all, which is still the common case', async () => {
     const { service, db } = build();
-    await inTenant(() => service.create({ title: 'X', contactName: 'A' } as never));
+    await inTenant(() => service.create({ title: 'X', ...who } as never));
     const data = db.lead.create.mock.calls[0][0].data;
     expect(data.items.create).toEqual([]);
-    expect(data.grandTotal).toBe(0);
+    expect(data.total).toBe(0);
   });
 
   it('numbers the lines in the order they were written', async () => {
     const { service, db } = build();
-    withSlab(db);
     await inTenant(() =>
-      service.create({
-        title: 'X',
-        contactName: 'A',
-        items: [LINE, { name: 'Two', quantity: 1, ratePerUnit: 1 }],
-      } as never),
+      service.create({ title: 'X', ...who, items: [LINE, { name: 'Two' }] } as never),
     );
     expect(
       db.lead.create.mock.calls[0][0].data.items.create.map((l: { lineNo: number }) => l.lineNo),
@@ -348,25 +344,22 @@ describe('pricing the enquiry', () => {
   });
 
   describe('revising them', () => {
-    function withPriced(db: Db) {
+    function withLines(db: Db) {
       db.lead.findUnique = jest.fn(async () => ({
         id: 'ld1',
         code: 'LEAD-1',
         statusId: 'l1',
         workflowId: 'w1',
         clientId: null,
-        taxTreatment: 'EXCLUSIVE',
         customFields: {},
         items: [
           {
             name: 'Hdmr 22mm',
             description: null,
-            hsnSac: null,
             quantity: 10,
             unit: 'Sqf',
             ratePerUnit: 1000,
             discountPct: 0,
-            gstSlabId: 'gst18',
           },
         ],
       }));
@@ -374,44 +367,38 @@ describe('pricing the enquiry', () => {
 
     it('replaces the set rather than reconciling it line by line', async () => {
       const { service, db } = build();
-      withSlab(db);
-      withPriced(db);
+      withLines(db);
       await inTenant(() =>
-        service.update('ld1', {
-          items: [{ name: 'New', quantity: 1, ratePerUnit: 500 }],
-        } as never),
+        service.update('ld1', { items: [{ name: 'New', quantity: 1, ratePerUnit: 500 }] } as never),
       );
       expect(db.leadItem.deleteMany).toHaveBeenCalledWith({ where: { leadId: 'ld1' } });
-      expect(db.lead.update.mock.calls[0][0].data.items.create).toHaveLength(1);
+      const data = db.lead.update.mock.calls[0][0].data;
+      expect(data.items.create).toHaveLength(1);
+      expect(data.total).toBe(500);
     });
 
-    it('leaves the pricing alone when the caller did not mention it', async () => {
+    it('leaves them alone when the caller did not mention them', async () => {
       const { service, db } = build();
-      withPriced(db);
+      withLines(db);
       await service.update('ld1', { location: 'Andheri' } as never);
       expect(db.leadItem.deleteMany).not.toHaveBeenCalled();
       expect(db.lead.update.mock.calls[0][0].data).not.toHaveProperty('items');
-      expect(db.lead.update.mock.calls[0][0].data).not.toHaveProperty('grandTotal');
+      expect(db.lead.update.mock.calls[0][0].data).not.toHaveProperty('total');
     });
 
-    it('clears them when the caller sends an empty set, which is not the same as silence', async () => {
+    it('clears them when the caller sends an empty set, which is not silence', async () => {
       const { service, db } = build();
-      withPriced(db);
-      await service.update('ld1', { items: [] } as never);
+      withLines(db);
+      await inTenant(() => service.update('ld1', { items: [] } as never));
       expect(db.leadItem.deleteMany).toHaveBeenCalled();
-      expect(db.lead.update.mock.calls[0][0].data.grandTotal).toBe(0);
+      expect(db.lead.update.mock.calls[0][0].data.total).toBe(0);
     });
 
-    it('reprices what is already there when only the treatment changed', async () => {
+    it('takes the addresses on an edit too', async () => {
       const { service, db } = build();
-      withSlab(db);
-      withPriced(db);
-      await inTenant(() => service.update('ld1', { taxTreatment: 'INCLUSIVE' } as never));
-      const data = db.lead.update.mock.calls[0][0].data;
-      // The same line, read the other way round: 10,000 is now what they pay.
-      expect(data.items.create).toHaveLength(1);
-      expect(data.grandTotal).toBe(10000);
-      expect(data.total).toBe(8474.58);
+      withLines(db);
+      await service.update('ld1', { billingAddress: 'Unit 4' } as never);
+      expect(db.lead.update.mock.calls[0][0].data.billingAddress).toBe('Unit 4');
     });
   });
 });
@@ -811,8 +798,8 @@ describe('board', () => {
       if (args.where.quotedValue !== null) {
         return { _count: { _all: quoted.count }, _sum: { quotedValue: quoted.value } };
       }
-      return args.where.grandTotal?.gt === 0
-        ? { _count: { _all: priced.count }, _sum: { grandTotal: priced.value } }
+      return args.where.total?.gt === 0
+        ? { _count: { _all: priced.count }, _sum: { total: priced.value } }
         : { _count: { _all: guessed.count }, _sum: { estimatedValue: guessed.value } };
     });
   }
@@ -875,8 +862,8 @@ describe('board', () => {
     expect(wheres).toHaveLength(6);
     const [quotedArm, pricedArm, guessedArm] = wheres;
     expect(quotedArm.quotedValue).toEqual({ not: null });
-    expect(pricedArm).toMatchObject({ quotedValue: null, grandTotal: { gt: 0 } });
-    expect(guessedArm).toMatchObject({ quotedValue: null, grandTotal: { lte: 0 } });
+    expect(pricedArm).toMatchObject({ quotedValue: null, total: { gt: 0 } });
+    expect(guessedArm).toMatchObject({ quotedValue: null, total: { lte: 0 } });
   });
 
   it('reports a stage with no leads as zero, not NaN', async () => {

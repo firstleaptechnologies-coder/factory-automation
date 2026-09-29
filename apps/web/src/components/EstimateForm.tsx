@@ -108,20 +108,24 @@ export function EstimateForm({
   useEffect(() => {
     const enquiry = quotingFor.data;
     if (!enquiry?.items?.length) return;
-    setTreatment(enquiry.taxTreatment);
+    /*
+     * The lines come across; the tax does not, because an enquiry does not
+     * carry any. The quote's own treatment stays at whatever it defaults to
+     * and the shop chooses it here, which is the one place it belongs.
+     */
     setLines(
       enquiry.items.map((item) => ({
         key: `lead-${item.id}`,
         name: item.name,
         description: item.description ?? undefined,
-        hsnSac: item.hsnSac ?? undefined,
         quantity: Number(item.quantity),
         unit: item.unit,
         ratePerUnit: Number(item.ratePerUnit),
         discountPct: Number(item.discountPct) || undefined,
-        gstSlabId: item.gstSlabId ?? undefined,
       })),
     );
+    if (enquiry.billingAddress) setBillingAddress(enquiry.billingAddress);
+    if (enquiry.shippingAddress) setShippingAddress(enquiry.shippingAddress);
   }, [quotingFor.data]);
 
   useEffect(() => {
@@ -159,13 +163,18 @@ export function EstimateForm({
         shippingAddress: shippingAddress.trim() || undefined,
         notes: notes.trim() || undefined,
         taxTreatment: treatment,
-        items: lines
-          .filter((line) => line.name.trim() && line.quantity > 0)
-          .map(({ key, ...line }) => ({
+        items: usableLines(lines, { needsQuantity: true }).map(
+          ({ key: _key, ...line }) => ({
             ...line,
             name: line.name.trim(),
+            /* `needsQuantity` has already refused a line without one; this
+               only narrows the shared editor's optional fields, which an
+               enquiry may leave empty and a quote may not. */
+            quantity: line.quantity ?? 0,
+            ratePerUnit: line.ratePerUnit ?? 0,
             gstSlabId: line.gstSlabId ?? defaultSlab?.id,
-          })),
+          }),
+        ),
       };
 
       const saved = estimateId
@@ -180,7 +189,7 @@ export function EstimateForm({
   };
 
   if (estimateId && existing.loading) return <Loader label="Loading" />;
-  const usable = usableLines(lines).length > 0;
+  const usable = usableLines(lines, { needsQuantity: true }).length > 0;
 
   return (
     <>

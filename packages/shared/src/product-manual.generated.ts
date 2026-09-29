@@ -1091,17 +1091,17 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permission": null
         },
         {
-          "key": "lead-price",
-          "label": "Price this enquiry",
-          "blurb": "The lines the job was quoted at, in the shape a quotation takes them — so the quote copies them rather than asking for them again",
+          "key": "lead-items",
+          "label": "Items on an enquiry",
+          "blurb": "What the client asked for, line by line, with a rate where somebody knows one — so the quote copies them rather than asking for them again",
           "web": null,
-          "app": "LeadPrice",
+          "app": "LeadItems",
           "permission": null
         },
         {
           "key": "lead-document",
           "label": "Printed enquiry",
-          "blurb": "The priced enquiry as the client would receive it, read on the phone before it is sent",
+          "blurb": "The enquiry as the client would receive it, read on the phone before it is sent",
           "web": null,
           "app": "DocumentPreview",
           "permission": null
@@ -1251,22 +1251,26 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "clientId",
               "type": "string",
               "required": false,
-              "definition": "Either an existing client, or loose contact details for someone who rang.",
+              "definition": "An existing client, where the enquiry came from somebody already on file.",
               "constraints": []
             },
             {
               "name": "contactName",
               "type": "string",
-              "required": false,
-              "definition": "Who rang, when they are not on file. Kept loose on purpose: an enquiry is not yet worth creating a client for, and most never become one.",
-              "constraints": []
+              "required": true,
+              "definition": "Who rang. Required, even when a client is attached, because an enquiry with no name against it is an enquiry nobody can follow up — and \"the client record has a name\" is not the same as knowing who called.",
+              "constraints": [
+                "at least 1 characters"
+              ]
             },
             {
               "name": "contactPhone",
               "type": "string",
-              "required": false,
-              "definition": "Their number — the one thing that makes an enquiry followable-up.",
-              "constraints": []
+              "required": true,
+              "definition": "Their number. Required for the same reason: an enquiry nobody can ring back is a note, not a lead. This is the one field that decides whether the shop ever hears from them again.",
+              "constraints": [
+                "at least 1 characters"
+              ]
             },
             {
               "name": "contactEmail",
@@ -1287,6 +1291,20 @@ export const PRODUCT_MANUAL: ProductManual = {
               "type": "string",
               "required": false,
               "definition": "Where the work would be, if it happens.",
+              "constraints": []
+            },
+            {
+              "name": "billingAddress",
+              "type": "string",
+              "required": false,
+              "definition": "Where a bill would go. Optional: an enquiry is worth recording before anybody has asked for an address, and it is asked for again on the quote.",
+              "constraints": []
+            },
+            {
+              "name": "shippingAddress",
+              "type": "string",
+              "required": false,
+              "definition": "Where the work would be delivered. Empty means the same as billing.",
               "constraints": []
             },
             {
@@ -1346,7 +1364,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items",
               "type": "LeadItemDto[]",
               "required": false,
-              "definition": "What the enquiry was priced at, line by line — the same lines a quotation carries. Optional, and usually absent: most enquiries are worth writing down before anybody has worked out a price, and demanding one would put a form in front of the thing that has to be quick.",
+              "definition": "What was asked for, line by line. Optional, and often just names: an enquiry is worth writing down before anybody has worked out a price, and demanding one would put a form in front of the thing that has to be quick.",
               "constraints": [
                 "a list"
               ]
@@ -1355,7 +1373,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].name",
               "type": "string",
               "required": true,
-              "definition": "What is being priced, as the client would read it.",
+              "definition": "What is being asked for, as the client would read it.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -1364,21 +1382,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].description",
               "type": "string",
               "required": false,
-              "definition": "The detail under the name — finish, edge, hardware.",
-              "constraints": []
-            },
-            {
-              "name": "items[].hsnSac",
-              "type": "string",
-              "required": false,
-              "definition": "The HSN or SAC code, where it is already known.",
+              "definition": "The detail under the name — finish, edge, hardware, the size agreed on the call. What stops an argument later about what the price covered.",
               "constraints": []
             },
             {
               "name": "items[].quantity",
               "type": "number",
               "required": false,
-              "definition": "How many.",
+              "definition": "How many. Left out where nobody has counted yet.",
               "constraints": [
                 "not below 0"
               ]
@@ -1394,7 +1405,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].ratePerUnit",
               "type": "number",
               "required": false,
-              "definition": "The price of one, before tax and before any discount on the line.",
+              "definition": "The price of one, before any discount on the line.",
               "constraints": [
                 "not below 0"
               ]
@@ -1406,22 +1417,6 @@ export const PRODUCT_MANUAL: ProductManual = {
               "definition": "A percentage off this line. The money it comes to is computed, not sent.",
               "constraints": [
                 "not below 0"
-              ]
-            },
-            {
-              "name": "items[].gstSlabId",
-              "type": "string",
-              "required": false,
-              "definition": "The GST slab for this line. Falls back to the shop's default.",
-              "constraints": []
-            },
-            {
-              "name": "taxTreatment",
-              "type": "TaxTreatment",
-              "required": false,
-              "definition": "Whether the rates on those lines are before GST, include it, or are figures the shop has agreed to absorb the tax out of. Means exactly what it means on a quotation, and defaults the same way.",
-              "constraints": [
-                "one of TaxTreatment"
               ]
             },
             {
@@ -1494,6 +1489,20 @@ export const PRODUCT_MANUAL: ProductManual = {
               "constraints": []
             },
             {
+              "name": "billingAddress",
+              "type": "string",
+              "required": false,
+              "definition": "Where a bill would go.",
+              "constraints": []
+            },
+            {
+              "name": "shippingAddress",
+              "type": "string",
+              "required": false,
+              "definition": "Where it would be delivered. Empty means the same as billing.",
+              "constraints": []
+            },
+            {
               "name": "sourceId",
               "type": "string",
               "required": false,
@@ -1543,7 +1552,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items",
               "type": "LeadItemDto[]",
               "required": false,
-              "definition": "The priced lines, replacing whatever is on the enquiry now. Left out entirely, the pricing is untouched — a screen showing the contact details and not the lines must not wipe the lines on save. An empty array is how they are cleared, because that is somebody saying \"no lines\" rather than a form staying quiet.",
+              "definition": "The lines, replacing whatever is on the enquiry now. Left out entirely, they are untouched — a screen showing the contact details and not the lines must not wipe the lines on save. An empty array is how they are cleared, because that is somebody saying \"no lines\" rather than a form staying quiet.",
               "constraints": [
                 "a list"
               ]
@@ -1552,7 +1561,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].name",
               "type": "string",
               "required": true,
-              "definition": "What is being priced, as the client would read it.",
+              "definition": "What is being asked for, as the client would read it.",
               "constraints": [
                 "at least 1 characters"
               ]
@@ -1561,21 +1570,14 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].description",
               "type": "string",
               "required": false,
-              "definition": "The detail under the name — finish, edge, hardware.",
-              "constraints": []
-            },
-            {
-              "name": "items[].hsnSac",
-              "type": "string",
-              "required": false,
-              "definition": "The HSN or SAC code, where it is already known.",
+              "definition": "The detail under the name — finish, edge, hardware, the size agreed on the call. What stops an argument later about what the price covered.",
               "constraints": []
             },
             {
               "name": "items[].quantity",
               "type": "number",
               "required": false,
-              "definition": "How many.",
+              "definition": "How many. Left out where nobody has counted yet.",
               "constraints": [
                 "not below 0"
               ]
@@ -1591,7 +1593,7 @@ export const PRODUCT_MANUAL: ProductManual = {
               "name": "items[].ratePerUnit",
               "type": "number",
               "required": false,
-              "definition": "The price of one, before tax and before any discount on the line.",
+              "definition": "The price of one, before any discount on the line.",
               "constraints": [
                 "not below 0"
               ]
@@ -1603,22 +1605,6 @@ export const PRODUCT_MANUAL: ProductManual = {
               "definition": "A percentage off this line. The money it comes to is computed, not sent.",
               "constraints": [
                 "not below 0"
-              ]
-            },
-            {
-              "name": "items[].gstSlabId",
-              "type": "string",
-              "required": false,
-              "definition": "The GST slab for this line. Falls back to the shop's default.",
-              "constraints": []
-            },
-            {
-              "name": "taxTreatment",
-              "type": "TaxTreatment",
-              "required": false,
-              "definition": "How GST relates to those rates. Changing it reprices the lines.",
-              "constraints": [
-                "one of TaxTreatment"
               ]
             },
             {

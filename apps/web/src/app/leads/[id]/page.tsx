@@ -279,7 +279,7 @@ function LeadDetail({ leadId }: { leadId: string }) {
       {data.items?.length ? (
         <>
           <SectionHead
-            title="Priced"
+            title="Items"
             action={
               <Button
                 title="Open the printed enquiry"
@@ -297,7 +297,6 @@ function LeadDetail({ leadId }: { leadId: string }) {
                   <th className="num">Qty</th>
                   <th className="num">Rate</th>
                   <th className="num">Discount</th>
-                  <th className="num">GST</th>
                   <th className="num">Amount</th>
                 </tr>
               </thead>
@@ -306,8 +305,8 @@ function LeadDetail({ leadId }: { leadId: string }) {
                   <tr key={item.id}>
                     <td className="bold">
                       {item.name}
-                      {item.hsnSac ? (
-                        <div className="t-tiny faint">HSN {item.hsnSac}</div>
+                      {item.description ? (
+                        <div className="t-tiny muted">{item.description}</div>
                       ) : null}
                     </td>
                     <td className="num muted">
@@ -318,10 +317,6 @@ function LeadDetail({ leadId }: { leadId: string }) {
                       {formatInr(item.discountAmount)}
                       <div className="t-tiny faint">{Number(item.discountPct)}%</div>
                     </td>
-                    <td className="num muted">
-                      {formatInr(item.taxAmount)}
-                      <div className="t-tiny faint">{Number(item.gstRatePct)}%</div>
-                    </td>
                     <td className="num bold">{formatInr(item.amount)}</td>
                   </tr>
                 ))}
@@ -329,9 +324,12 @@ function LeadDetail({ leadId }: { leadId: string }) {
             </table>
             <div className="row-between" style={{ marginTop: 'var(--s-md)' }}>
               <span className="t-small muted">
-                Taxable {formatInr(Number(data.total))} · GST {formatInr(Number(data.taxAmount))}
+                {Number(data.discount) > 0
+                  ? `Less ${formatInr(Number(data.discount))} discount · `
+                  : ''}
+                Before tax — GST is worked out on the quote
               </span>
-              <span className="t-h2">{formatInr(Number(data.grandTotal))}</span>
+              <span className="t-h2">{formatInr(Number(data.total))}</span>
             </div>
           </Card>
         </>

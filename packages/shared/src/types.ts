@@ -571,43 +571,39 @@ export interface CustomFieldDefinition {
 }
 
 /**
- * One priced line on an enquiry.
+ * One line on an enquiry: what the client asked for.
  *
- * The same fields an EstimateItem carries, because the shop prices the job on
- * the phone and quotes it afterwards from the same lines.
+ * No GST and no HSN. An enquiry is not a tax document and is not presented as
+ * one — the tax is worked out on the quotation raised from it, where somebody
+ * is actually being asked to pay.
  */
 export interface LeadItem {
   id: string;
   lineNo: number;
   name: string;
+  /** The detail under the name — finish, edge, hardware, the size agreed. */
   description?: string | null;
-  /** HSN for goods, SAC for services. */
-  hsnSac?: string | null;
   quantity: string;
   unit: string;
   ratePerUnit: string;
   discountPct: string;
   discountAmount: string;
-  gstSlabId?: string | null;
-  gstRatePct: string;
-  taxAmount: string;
-  /** Taxable value after the line discount. */
-  netAmount: string;
-  /** What the line comes to including its GST. */
+  /** Quantity × rate, less the line's discount. */
   amount: string;
 }
 
-/** A line as somebody types it. The money on it is worked out by the server. */
+/**
+ * A line as somebody types it. Only the name is required: an enquiry is
+ * frequently a list of what was asked for before anybody has a rate.
+ */
 export interface LeadItemInput {
   name: string;
   description?: string;
-  hsnSac?: string;
-  quantity: number;
+  quantity?: number;
   unit?: string;
-  ratePerUnit: number;
+  ratePerUnit?: number;
   /** A percentage off this line; the money is computed from it. */
   discountPct?: number;
-  gstSlabId?: string;
 }
 
 export interface Lead {
@@ -617,11 +613,16 @@ export interface Lead {
   client?: (Pick<Client, 'id' | 'code' | 'name' | 'phone'> & {
     stateCode?: string | null;
   }) | null;
-  contactName?: string | null;
-  contactPhone?: string | null;
+  /** Who rang. Required on an enquiry: one nobody can name is never chased. */
+  contactName: string;
+  /** Their number. Required: one nobody can ring back is a note, not a lead. */
+  contactPhone: string;
   contactEmail?: string | null;
   company?: string | null;
   location?: string | null;
+  /** Where a bill would go, and where it would be delivered. Both optional. */
+  billingAddress?: string | null;
+  shippingAddress?: string | null;
   source?: LeadSource | null;
   status: {
     id: string;
@@ -648,19 +649,12 @@ export interface Lead {
   /** The quotes written for this enquiry, newest first. */
   estimates?: LeadEstimate[];
 
-  /** What it was priced at, line by line. Empty where nothing was priced. */
+  /** What was asked for, line by line. Empty where nothing was listed. */
   items?: LeadItem[];
-  /** How GST relates to the rates on those lines. */
-  taxTreatment: TaxTreatment;
-  /** What the lines come to. All zero where there are none. */
+  /** What the lines come to. All zero where there are none, and no tax. */
   subtotal: string;
   discount: string;
   total: string;
-  cgst: string;
-  sgst: string;
-  igst: string;
-  taxAmount: string;
-  grandTotal: string;
 }
 
 export interface LeadBoard {
@@ -672,11 +666,14 @@ export interface LeadBoard {
 export interface CreateLeadInput {
   title: string;
   clientId?: string;
-  contactName?: string;
-  contactPhone?: string;
+  /** Required, both: an enquiry nobody can ring back is a note, not a lead. */
+  contactName: string;
+  contactPhone: string;
   contactEmail?: string;
   company?: string;
   location?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
   sourceId?: string;
   ownerId?: string;
   priority?: Priority;
@@ -684,13 +681,10 @@ export interface CreateLeadInput {
   expectedDate?: string;
   notes?: string;
   /**
-   * What it was priced at, line by line — the same lines a quote carries.
-   * Usually absent: most enquiries are written down before anybody has worked
-   * out a price.
+   * What was asked for, line by line. Usually just names: most enquiries are
+   * written down before anybody has worked out a price.
    */
   items?: LeadItemInput[];
-  /** How GST relates to those rates. Defaults to being quoted before tax. */
-  taxTreatment?: TaxTreatment;
   customFields?: Record<string, unknown>;
 }
 

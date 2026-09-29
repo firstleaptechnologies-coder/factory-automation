@@ -1,14 +1,12 @@
 import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { LeadPriceScreen } from './LeadPriceScreen';
+import { LeadItemsScreen } from './LeadItemsScreen';
 
 const mockLead = jest.fn();
-const mockGstSlabs = jest.fn();
 const mockUpdateLead = jest.fn();
 jest.mock('../api/client', () => ({
   api: {
     lead: (...a: unknown[]) => mockLead(...a),
-    gstSlabs: () => mockGstSlabs(),
     updateLead: (...a: unknown[]) => mockUpdateLead(...a),
   },
 }));
@@ -17,46 +15,32 @@ const ITEM = {
   id: 'li1',
   lineNo: 1,
   name: 'Hdmr 22mm',
-  description: null,
-  hsnSac: '4411',
+  description: 'Laser cut',
   quantity: '10',
   unit: 'Sqf',
   ratePerUnit: '1000',
   discountPct: '0',
   discountAmount: '0',
-  gstSlabId: 'gst18',
-  gstRatePct: '18',
-  taxAmount: '1800',
-  netAmount: '10000',
-  amount: '11800',
+  amount: '10000',
 };
 
 const goBack = jest.fn();
 
 async function mount(over: Record<string, unknown> = {}) {
-  mockLead.mockResolvedValue({
-    id: 'l1',
-    code: 'LEAD-1',
-    taxTreatment: 'EXCLUSIVE',
-    items: [],
-    ...over,
-  });
+  mockLead.mockResolvedValue({ id: 'l1', code: 'LEAD-1', items: [], ...over });
   await render(
-    <LeadPriceScreen route={{ params: { leadId: 'l1' } }} navigation={{ goBack }} />,
+    <LeadItemsScreen route={{ params: { leadId: 'l1' } }} navigation={{ goBack }} />,
   );
-  await screen.findByText('Price this enquiry');
+  await screen.findByText('Items');
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGstSlabs.mockResolvedValue([
-    { id: 'gst18', name: 'GST 18%', ratePct: '18', isDefault: true, isActive: true },
-  ]);
   mockUpdateLead.mockResolvedValue({});
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
-it('opens on what the enquiry is already priced at', async () => {
+it('opens on what the enquiry already lists', async () => {
   await mount({ items: [ITEM] });
   await waitFor(() =>
     expect(screen.getByDisplayValue('Hdmr 22mm')).toBeTruthy(),
@@ -65,42 +49,41 @@ it('opens on what the enquiry is already priced at', async () => {
   expect(screen.getByDisplayValue('1000')).toBeTruthy();
 });
 
-it('opens on one blank line for an enquiry nobody has priced', async () => {
+it('opens on one blank line for an enquiry with nothing listed yet', async () => {
   await mount();
   await waitFor(() =>
-    expect(screen.getByPlaceholderText('Hdmr cutting 22mm')).toBeTruthy(),
+    expect(screen.getByPlaceholderText('MDF jali, laser cut')).toBeTruthy(),
   );
 });
 
-it('saves the revised set, and how GST was quoted', async () => {
+it('saves the revised set, and says nothing about GST', async () => {
   await mount({ items: [ITEM] });
   await waitFor(() => expect(screen.getByDisplayValue('1000')).toBeTruthy());
   await fireEvent.changeText(screen.getByLabelText('Rate'), '1200');
-  await fireEvent.press(screen.getByText('Save pricing'));
+  await fireEvent.press(screen.getByText('Save items'));
 
   await waitFor(() => expect(mockUpdateLead).toHaveBeenCalled());
   const [id, body] = mockUpdateLead.mock.calls[0];
   expect(id).toBe('l1');
-  expect(body.taxTreatment).toBe('EXCLUSIVE');
+  // An enquiry is not a tax document; nothing about tax goes with it.
+  expect(body).not.toHaveProperty('taxTreatment');
   expect(body.items).toEqual([
     {
       name: 'Hdmr 22mm',
-      description: undefined,
-      hsnSac: '4411',
-      quantity: 10,
+      description: 'Laser cut',
       unit: 'Sqf',
+      quantity: 10,
       ratePerUnit: 1200,
       discountPct: undefined,
-      gstSlabId: 'gst18',
     },
   ]);
 });
 
-it('sends an empty set when the lines are all taken away — that is clearing it', async () => {
+it('sends an empty set when the items are all taken away — that is clearing it', async () => {
   await mount({ items: [ITEM] });
   await waitFor(() => expect(screen.getByDisplayValue('Hdmr 22mm')).toBeTruthy());
   await fireEvent.press(screen.getByTestId('remove-line-0'));
-  await fireEvent.press(screen.getByText('Save pricing'));
+  await fireEvent.press(screen.getByText('Save items'));
 
   await waitFor(() => expect(mockUpdateLead).toHaveBeenCalled());
   // Deliberately [], not absent: the API reads silence as "leave it alone".
@@ -110,15 +93,23 @@ it('sends an empty set when the lines are all taken away — that is clearing it
 it('goes back to the enquiry once it is saved', async () => {
   await mount({ items: [ITEM] });
   await waitFor(() => expect(screen.getByDisplayValue('Hdmr 22mm')).toBeTruthy());
-  await fireEvent.press(screen.getByText('Save pricing'));
+  await fireEvent.press(screen.getByText('Save items'));
   await waitFor(() => expect(goBack).toHaveBeenCalled());
+});
+
+it('offers no GST anywhere on the screen', async () => {
+  await mount({ items: [ITEM] });
+  await waitFor(() => expect(screen.getByDisplayValue('Hdmr 22mm')).toBeTruthy());
+  expect(screen.queryByText('GST on top')).toBeNull();
+  expect(screen.queryByTestId('slab-0')).toBeNull();
+  expect(screen.queryByText('+ HSN/SAC')).toBeNull();
 });
 
 it('shows the server’s refusal and stays put', async () => {
   mockUpdateLead.mockRejectedValue(new Error('Lead has been converted'));
   await mount({ items: [ITEM] });
   await waitFor(() => expect(screen.getByDisplayValue('Hdmr 22mm')).toBeTruthy());
-  await fireEvent.press(screen.getByText('Save pricing'));
+  await fireEvent.press(screen.getByText('Save items'));
   await waitFor(() =>
     expect(Alert.alert).toHaveBeenCalledWith('Could not save', 'Lead has been converted'),
   );

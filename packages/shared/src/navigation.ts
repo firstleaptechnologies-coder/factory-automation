@@ -180,21 +180,21 @@ export const NAV_GROUPS: NavGroup[] = [
                 app: 'LeadConvert',
               },
               {
-                key: 'lead-price',
-                label: 'Price this enquiry',
+                key: 'lead-items',
+                label: 'Items on an enquiry',
                 blurb:
-                  'The lines the job was quoted at, in the shape a quotation ' +
-                  'takes them — so the quote copies them rather than asking ' +
-                  'for them again',
+                  'What the client asked for, line by line, with a rate ' +
+                  'where somebody knows one — so the quote copies them ' +
+                  'rather than asking for them again',
                 icon: 'tag',
-                app: 'LeadPrice',
+                app: 'LeadItems',
               },
               {
                 key: 'lead-document',
                 label: 'Printed enquiry',
                 blurb:
-                  'The priced enquiry as the client would receive it, read on ' +
-                  'the phone before it is sent',
+                  'The enquiry as the client would receive it, read on the ' +
+                  'phone before it is sent',
                 icon: 'receipt',
                 app: 'DocumentPreview',
               },

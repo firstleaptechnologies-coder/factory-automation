@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
-import type { GstSlab, Lead, TaxTreatment } from '@fas/shared';
+import type { Lead } from '@fas/shared';
 import { api } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import {
@@ -13,64 +13,60 @@ import { Button, Loader, Screen, ScreenHeader, Text, haptic } from '../ui';
 import { spacing } from '../theme';
 
 /**
- * Pricing an enquiry that is already on the board.
+ * The items on an enquiry that is already on the board.
  *
- * The lines can be typed when the enquiry is taken, but a rate agreed on a
- * second call, or one typed wrongly the first time, has to be fixable — a
- * price that can only ever be entered once is a price the shop works around
- * by raising a second enquiry, which is how a pipeline stops counting.
+ * They can be typed when the enquiry is taken, but a client who rings back
+ * with two more things, or a rate agreed on a second call, has to be
+ * recordable — a list that can only ever be entered once is one the shop
+ * works around by raising a second enquiry, which is how a pipeline stops
+ * counting.
  *
- * The same editor the enquiry was created with, and the same one Quotes uses.
- * Saving replaces the set: a revised price is a new set of numbers, not an
- * amendment to the old ones.
+ * The same editor the enquiry was created with, and the one Quotes uses, with
+ * the tax turned off. Saving replaces the set: a revised list is a new list,
+ * not an amendment to the old one.
  */
-export function LeadPriceScreen({ route, navigation }: { route: any; navigation: any }) {
+export function LeadItemsScreen({ route, navigation }: { route: any; navigation: any }) {
   const { leadId } = route.params as { leadId: string };
 
   const lead = useApi<Lead>(() => api.lead(leadId), [leadId]);
-  const slabs = useApi<GstSlab[]>(() => api.gstSlabs(), []);
 
-  const [treatment, setTreatment] = useState<TaxTreatment>('EXCLUSIVE');
   const [lines, setLines] = useState<PricedLine[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const data = lead.data;
     if (!data) return;
-    setTreatment(data.taxTreatment ?? 'EXCLUSIVE');
     setLines(
       data.items?.length
         ? data.items.map((item) => ({
             key: item.id,
             name: item.name,
             description: item.description ?? undefined,
-            hsnSac: item.hsnSac ?? undefined,
-            quantity: Number(item.quantity),
+            quantity: Number(item.quantity) || undefined,
             unit: item.unit,
-            ratePerUnit: Number(item.ratePerUnit),
+            ratePerUnit: Number(item.ratePerUnit) || undefined,
             discountPct: Number(item.discountPct) || undefined,
-            gstSlabId: item.gstSlabId ?? undefined,
           }))
         : [blankLine()],
     );
   }, [lead.data]);
 
-  const defaultSlab = slabs.data?.find((slab) => slab.isDefault) ?? slabs.data?.[0];
-
   const save = async () => {
     setBusy(true);
     try {
       await api.updateLead(leadId, {
-        taxTreatment: treatment,
         /*
          * Always sent, empty included. On this screen an empty set is
          * somebody deliberately clearing the pricing, which is exactly the
          * case the API distinguishes from a form that stayed quiet.
          */
         items: usableLines(lines).map(({ key: _key, ...line }) => ({
-          ...line,
           name: line.name.trim(),
-          gstSlabId: line.gstSlabId ?? defaultSlab?.id,
+          description: line.description?.trim() || undefined,
+          unit: line.unit,
+          quantity: line.quantity || undefined,
+          ratePerUnit: line.ratePerUnit || undefined,
+          discountPct: line.discountPct || undefined,
         })),
       });
       haptic('notificationSuccess');
@@ -88,27 +84,30 @@ export function LeadPriceScreen({ route, navigation }: { route: any; navigation:
   return (
     <Screen>
       <ScreenHeader
-        title="Price this enquiry"
+        title="Items"
         subtitle={lead.data.code}
         onBack={() => navigation.goBack()}
       />
 
       <Text variant="tiny" tone="faint" style={{ marginBottom: spacing.lg }}>
-        The same lines a quote takes. Priced here, they carry into the quote
-        rather than being typed again.
+        What the client asked for. A rate is optional — put one in if you know
+        it, and it carries into the quote rather than being typed again. GST
+        is worked out on the quote, not here.
       </Text>
 
       <PricedLines
         lines={lines}
         onChange={setLines}
-        treatment={treatment}
-        onTreatmentChange={setTreatment}
-        slabs={slabs.data ?? undefined}
+        /* Unused without tax, but the editor is shared with the quote. */
+        treatment="EXCLUSIVE"
+        onTreatmentChange={() => undefined}
+        tax={false}
         allowEmpty
+        placeholder="MDF jali, laser cut"
       />
 
       <Button
-        title="Save pricing"
+        title="Save items"
         size="lg"
         loading={busy}
         onPress={save}
