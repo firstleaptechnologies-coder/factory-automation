@@ -4,10 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
   CustomFieldDefinition,
+  GstSlab,
   Lead,
   LeadBoard,
   LeadSource,
   Material,
+  TaxTreatment,
 } from '@fas/shared';
 import { PERMISSIONS } from '@fas/shared';
 import { formatCurrencyInr } from '@/lib/format';
@@ -15,6 +17,14 @@ import { Shell } from '@/components/Shell';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { CustomFields } from '@/components/CustomFields';
 import { ConvertLeadDialog } from '@/components/ConvertLeadDialog';
+import {
+  PricedLines,
+  PricePreview,
+  TreatmentChips,
+  blankLine,
+  usableLines,
+  type PricedLine,
+} from '@/components/PricedLines';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Select } from '@/ui';
@@ -44,6 +54,11 @@ export default function LeadBoardPage() {
     estimatedValue: '',
   });
   const [customValues, setCustomValues] = useState<Record<string, unknown>>({});
+  const [slabs, setSlabs] = useState<GstSlab[]>([]);
+  const [treatment, setTreatment] = useState<TaxTreatment>('EXCLUSIVE');
+  const [lines, setLines] = useState<PricedLine[]>([]);
+
+  const defaultSlab = slabs.find((slab) => slab.isDefault) ?? slabs[0];
 
   const load = useCallback(async () => {
     const [b, s, f] = await Promise.all([api.leadBoard(), api.leadSources(), api.leadFields()]);
@@ -57,6 +72,7 @@ export default function LeadBoardPage() {
       setMessage({ text: e instanceof Error ? e.message : 'Could not load', tone: 'danger' }),
     );
     api.materials().then(setMaterials).catch(() => undefined);
+    api.gstSlabs().then(setSlabs).catch(() => undefined);
   }, [load]);
 
   const create = async () => {
@@ -70,6 +86,18 @@ export default function LeadBoardPage() {
         location: form.location || undefined,
         sourceId: form.sourceId || undefined,
         estimatedValue: form.estimatedValue ? Number(form.estimatedValue) : undefined,
+        // Left out entirely when nothing was priced, rather than sent empty:
+        // an enquiry with no lines is the ordinary case, not a cleared one.
+        ...(usableLines(lines).length
+          ? {
+              taxTreatment: treatment,
+              items: usableLines(lines).map(({ key: _key, ...line }) => ({
+                ...line,
+                name: line.name.trim(),
+                gstSlabId: line.gstSlabId ?? defaultSlab?.id,
+              })),
+            }
+          : {}),
         customFields: customValues,
       });
       setForm({
@@ -77,6 +105,8 @@ export default function LeadBoardPage() {
         location: '', sourceId: '', estimatedValue: '',
       });
       setCustomValues({});
+      setLines([]);
+      setTreatment('EXCLUSIVE');
       setShowForm(false);
       await load();
       setMessage({ text: 'Lead created.', tone: 'success' });
@@ -217,6 +247,41 @@ export default function LeadBoardPage() {
               />
             </div>
           </div>
+
+          {/*
+            Optional, and closed until asked for. Most enquiries are written
+            down before anybody has worked out a price, and a dialog that
+            opens with an empty line table reads as one demanding a price.
+            Where it is priced, the lines are the ones a quotation takes, and
+            the quote raised from this enquiry copies them.
+          */}
+          <h3 style={{ marginTop: 12 }}>Pricing</h3>
+          {lines.length === 0 ? (
+            <>
+              <p className="muted" style={{ marginTop: -6 }}>
+                Optional. Priced here, it carries straight into the quote.
+              </p>
+              <button className="ghost" onClick={() => setLines([blankLine()])}>
+                Price this enquiry
+              </button>
+            </>
+          ) : (
+            <>
+              <TreatmentChips treatment={treatment} onChange={setTreatment} />
+              <PricedLines
+                lines={lines}
+                onChange={setLines}
+                slabs={slabs ?? undefined}
+                allowEmpty
+              />
+              <PricePreview
+                lines={lines}
+                slabs={slabs ?? undefined}
+                defaultSlabId={defaultSlab?.id}
+                treatment={treatment}
+              />
+            </>
+          )}
 
           {fields.length ? (
             <>

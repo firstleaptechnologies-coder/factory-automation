@@ -7,6 +7,7 @@ const apiMock = {
   leadSources: jest.fn(),
   leadFields: jest.fn(),
   materials: jest.fn(),
+  gstSlabs: jest.fn(),
   createLead: jest.fn(),
   allowedNext: jest.fn(),
   allowedBack: jest.fn(),
@@ -103,9 +104,19 @@ async function mount(board: unknown = BOARD) {
   await screen.findByTestId('board');
 }
 
+/*
+ * The dialog's own fields are `<div class="field"><label>…`, and the shared
+ * line editor's are the kit's `<label class="field"><span class="field-label">…`.
+ * One helper reads both, so a test does not have to know which kind of field
+ * it is typing into.
+ */
 const byLabel = (label: string) =>
   Array.from(document.querySelectorAll('.field, .col'))
-    .find((node) => node.querySelector('label')?.textContent === label)!
+    .find(
+      (node) =>
+        node.querySelector('label')?.textContent === label ||
+        node.querySelector('.field-label')?.textContent === label,
+    )!
     .querySelector('input') as HTMLInputElement;
 
 beforeEach(() => {
@@ -117,6 +128,9 @@ beforeEach(() => {
   apiMock.leadSources.mockResolvedValue([{ id: 's1', name: 'Instagram', color: '#E1306C' }]);
   apiMock.leadFields.mockResolvedValue([]);
   apiMock.materials.mockResolvedValue([]);
+  apiMock.gstSlabs.mockResolvedValue([
+    { id: 'gst18', name: 'GST 18%', ratePct: '18', isDefault: true, isActive: true },
+  ]);
   apiMock.createLead.mockResolvedValue({});
   apiMock.allowedNext.mockResolvedValue([
     { id: 't1', toStatusId: 'st2', requiresNote: false, toStatus: { id: 'st2', name: 'Quoted' } },
@@ -236,6 +250,71 @@ describe('taking a new enquiry', () => {
     fireEvent.click(screen.getByText('Create lead'));
     await waitFor(() => expect(apiMock.createLead).toHaveBeenCalled());
     expect(apiMock.createLead.mock.calls[0][0].estimatedValue).toBe(250000);
+  });
+
+  describe('pricing it while taking it', () => {
+    /** Opens the dialog's line editor and fills the first line. */
+    const startPricing = async () => {
+      fireEvent.click(screen.getByText('Price this enquiry'));
+      await screen.findByPlaceholderText('Hdmr cutting 22mm');
+      fireEvent.change(screen.getByPlaceholderText('Hdmr cutting 22mm'), {
+        target: { value: 'Hdmr 22mm' },
+      });
+      fireEvent.change(byLabel('Qty'), { target: { value: '10' } });
+      fireEvent.change(byLabel('Rate'), { target: { value: '1000' } });
+    };
+
+    it('stays closed until asked for — most enquiries arrive without a price', async () => {
+      await openForm();
+      expect(screen.getByText('Price this enquiry')).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Hdmr cutting 22mm')).not.toBeInTheDocument();
+    });
+
+    it('takes a line in the shape a quotation takes one', async () => {
+      await openForm();
+      await startPricing();
+      expect(byLabel('HSN/SAC')).toBeInTheDocument();
+      expect(byLabel('Disc %')).toBeInTheDocument();
+      expect(screen.getByText('Sqf')).toBeInTheDocument();
+      expect(screen.getAllByText('GST 18%').length).toBeGreaterThan(0);
+    });
+
+    it('sends the lines and says how GST was quoted', async () => {
+      await openForm();
+      fireEvent.change(byLabel('Title'), { target: { value: 'Kitchen jali' } });
+      await startPricing();
+      fireEvent.click(screen.getByText('Create lead'));
+
+      await waitFor(() => expect(apiMock.createLead).toHaveBeenCalled());
+      const body = apiMock.createLead.mock.calls[0][0];
+      expect(body.taxTreatment).toBe('EXCLUSIVE');
+      expect(body.items).toEqual([
+        {
+          name: 'Hdmr 22mm',
+          quantity: 10,
+          unit: 'Sqf',
+          ratePerUnit: 1000,
+          gstSlabId: 'gst18',
+        },
+      ]);
+    });
+
+    it('sends no items when nothing was priced, which is not a cleared set', async () => {
+      await openForm();
+      fireEvent.change(byLabel('Title'), { target: { value: 'Kitchen jali' } });
+      fireEvent.click(screen.getByText('Create lead'));
+      await waitFor(() => expect(apiMock.createLead).toHaveBeenCalled());
+      const body = apiMock.createLead.mock.calls[0][0];
+      expect(body).not.toHaveProperty('items');
+      expect(body).not.toHaveProperty('taxTreatment');
+    });
+
+    it('previews what it comes to, and says the server has the last word', async () => {
+      await openForm();
+      await startPricing();
+      expect(screen.getByText('The server prices it for real when you save.')).toBeInTheDocument();
+      expect(screen.getByText('₹11,800')).toBeInTheDocument();
+    });
   });
 
   it('carries whatever this shop chose to capture', async () => {
