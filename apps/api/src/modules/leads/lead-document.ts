@@ -61,6 +61,13 @@ export function renderLeadHtml(input: LeadDocumentInput): string {
      * Enquiry rather than Estimate.
      */
     showTax: false,
+    /*
+     * Only where somebody worked a price out. An enquiry taken as a list of
+     * what the client asked for prints as that list; printed with the money
+     * columns it reads "Total ₹0.00 — Zero Rupees only", which is not "not
+     * priced yet" to whoever receives it.
+     */
+    showMoney: Number(lead.total ?? 0) > 0,
     facts,
   });
 }

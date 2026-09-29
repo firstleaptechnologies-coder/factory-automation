@@ -393,6 +393,15 @@ describe('an enquiry with items on it', () => {
     ],
   };
 
+  it('reads the addresses back, so nobody types one twice', async () => {
+    await mount({
+      billingAddress: 'Flat 902, Hiranandani Estate, Thane West',
+      shippingAddress: 'Site office, Powai',
+    });
+    expect(await screen.findByText('Flat 902, Hiranandani Estate, Thane West')).toBeTruthy();
+    expect(screen.getByText('Site office, Powai')).toBeTruthy();
+  });
+
   it('shows the working — the items, with their detail under the name', async () => {
     await mount(PRICED);
     expect(await screen.findByText('Hdmr 22mm')).toBeTruthy();

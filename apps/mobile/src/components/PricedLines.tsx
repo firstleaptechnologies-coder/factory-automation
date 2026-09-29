@@ -298,11 +298,17 @@ export function PricedLines({
       />
 
       {/*
-        Shown from the first line onwards, even at zero. A total that appears
-        only once a line is "good enough" reads as the form having decided
-        something; at zero it is simply what has been typed so far, and it is
-        where the tax treatment's effect becomes visible.
+        On a quotation, shown from the first line onwards even at zero: a
+        total that appears only once a line is "good enough" reads as the form
+        having decided something, and this is where the tax treatment's effect
+        becomes visible.
+
+        On an enquiry there is no treatment to demonstrate and plenty of lines
+        are a name with no rate, so a summary reading "Total ₹0" says the job
+        is worth nothing rather than that nothing has been priced. It waits
+        until there is a figure to show.
       */}
+      {tax || preview.gross > 0 ? (
       <Card tone="dark" style={{ marginTop: spacing.lg }}>
         <Text variant="label" tone="muted">Preview</Text>
         <Text variant="tiny" tone="faint" style={{ marginBottom: spacing.sm }}>
@@ -319,6 +325,7 @@ export function PricedLines({
           accent
         />
       </Card>
+      ) : null}
 
       <Sheet visible={Boolean(unitFor)} title="Unit" onClose={() => setUnitFor(null)}>
         {UNITS.map((unit) => (

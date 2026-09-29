@@ -11,11 +11,10 @@ const leads = {
   convert: jest.fn(async (..._a: unknown[]) => 'converted'),
   createSource: jest.fn(async (..._a: unknown[]) => 'source'),
   forPrinting: jest.fn(async (..._a: unknown[]) => ({
-    lead: { code: 'LEAD-1', createdAt: '2026-09-01T00:00:00Z', items: [], grandTotal: 0 },
+    lead: { code: 'LEAD-1', createdAt: '2026-09-01T00:00:00Z', items: [], total: 0 },
     firm: { name: 'Decor Bucket', letterheadFileId: null, logoFileId: null },
     amountInWords: 'Zero Rupees Only',
     terms: '',
-    interState: false,
   })),
 };
 
@@ -121,12 +120,89 @@ describe('the printable enquiry', () => {
   it('prints without a letterhead rather than not printing', async () => {
     files.read.mockRejectedValueOnce(new Error('gone'));
     leads.forPrinting.mockResolvedValueOnce({
-      lead: { code: 'LEAD-1', createdAt: '2026-09-01T00:00:00Z', items: [], grandTotal: 0 },
+      lead: { code: 'LEAD-1', createdAt: '2026-09-01T00:00:00Z', items: [], total: 0 },
       firm: { name: 'Decor Bucket', letterheadFileId: 'missing', logoFileId: null },
       amountInWords: 'Zero Rupees Only',
       terms: '',
-      interState: false,
     } as never);
     await expect(controller.document('ld1')).resolves.toContain('Decor Bucket');
+  });
+});
+
+describe('an enquiry nobody has priced', () => {
+  const unpriced = {
+    lead: {
+      code: 'LEAD-1',
+      createdAt: '2026-09-01T00:00:00Z',
+      contactName: 'Deshpande',
+      total: 0,
+      discount: 0,
+      items: [
+        { name: 'Louvered shutters, 8 nos', description: 'Teak veneer', quantity: 0, unit: 'Sqf' },
+      ],
+    },
+    firm: { name: 'Decor Bucket', letterheadFileId: null, logoFileId: null },
+    amountInWords: 'Zero Rupees Only',
+    terms: '',
+  };
+
+  it('prints as the list it is, not as a quotation for nothing', async () => {
+    leads.forPrinting.mockResolvedValueOnce(unpriced as never);
+    const html = await controller.document('ld1');
+    // What a client would read off a sheet of ₹0.00 is not "not priced yet".
+    expect(html).not.toContain('₹ 0.00');
+    expect(html).not.toContain('Zero Rupees Only');
+    expect(html).not.toContain('Sub Total');
+    // The list itself is still there, with its detail.
+    expect(html).toContain('Louvered shutters, 8 nos');
+    expect(html).toContain('Teak veneer');
+  });
+
+  it('drops the money columns rather than printing them empty', async () => {
+    leads.forPrinting.mockResolvedValueOnce(unpriced as never);
+    const html = await controller.document('ld1');
+    expect(html).not.toContain('Price/ Unit');
+    expect(html).not.toContain('Discount');
+    expect(html).not.toContain('Amount');
+    // Quantity and unit stay: they are what was asked for, not a price.
+    expect(html).toContain('Quantity');
+    expect(html).toContain('Unit');
+  });
+
+  it('leaves the quantity blank rather than printing a nought', async () => {
+    leads.forPrinting.mockResolvedValueOnce(unpriced as never);
+    const html = await controller.document('ld1');
+    // A column of noughts reads as "none of these", which is the opposite of
+    // "nobody has counted them yet".
+    expect(html).not.toMatch(/<td class="r">0<\/td>/);
+  });
+
+  it('prints the figures once somebody has worked one out', async () => {
+    leads.forPrinting.mockResolvedValueOnce({
+      ...unpriced,
+      lead: {
+        ...unpriced.lead,
+        total: 10000,
+        subtotal: 10000,
+        items: [
+          {
+            name: 'Louvered shutters',
+            quantity: 10,
+            unit: 'Sqf',
+            ratePerUnit: 1000,
+            discountAmount: 0,
+            discountPct: 0,
+            amount: 10000,
+          },
+        ],
+      },
+      amountInWords: 'Ten Thousand Rupees only',
+    } as never);
+    const html = await controller.document('ld1');
+    expect(html).toContain('Price/ Unit');
+    expect(html).toContain('Ten Thousand Rupees only');
+    // And still no tax, because an enquiry carries none.
+    expect(html).not.toContain('SGST');
+    expect(html).not.toContain('HSN');
   });
 });

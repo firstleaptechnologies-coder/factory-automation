@@ -208,6 +208,15 @@ describe('the items on it', () => {
     expect(mockCreateLead.mock.calls[0][0]).not.toHaveProperty('items');
   });
 
+  it('shows no total at all until something has a rate', async () => {
+    await mount();
+    await addItem();
+    // "Total ₹0" on a name-only line says the job is worth nothing, rather
+    // than that nobody has priced it.
+    expect(screen.queryByText('Subtotal')).toBeNull();
+    expect(screen.queryByText('₹0')).toBeNull();
+  });
+
   it('totals what was priced, without a tax line', async () => {
     await mount();
     await addItem();

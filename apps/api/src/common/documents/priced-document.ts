@@ -42,6 +42,17 @@ export interface PricedDocumentInput {
    * quotation keeps the page it has always had.
    */
   showTax?: boolean;
+  /**
+   * Whether this document carries figures at all.
+   *
+   * An enquiry frequently does not: it is a list of what the client asked
+   * for, written before anybody worked out a price. Printed with the money
+   * columns anyway it comes out as ₹0.00 down every line and "Zero Rupees
+   * only" at the bottom, which to whoever receives it is not "not priced
+   * yet" — it is a quotation for nothing. So the columns come off and it
+   * prints as what it is: a list.
+   */
+  showMoney?: boolean;
   /** The facts block on the right of the parties row, in order. */
   facts: { label: string; value: string }[];
   /** Absolute URL of the uploaded letterhead, when the firm has one. */
@@ -52,6 +63,7 @@ export interface PricedDocumentInput {
 export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
   const { document: estimate, firm, terms } = input;
   const showTax = input.showTax ?? true;
+  const showMoney = input.showMoney ?? true;
   const accent = safeColor(firm.accentColor) ?? '#E4232F';
   const ink = '#1F2430';
 
@@ -67,13 +79,17 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
           item.description ? `<div class="sub">${esc(item.description)}</div>` : ''
         }</td>
         ${showTax ? `<td>${esc(item.hsnSac ?? '')}</td>` : ''}
-        <td class="r">${num(item.quantity, 0)}</td>
+        <td class="r">${qty(item.quantity)}</td>
         <td class="c">${esc(item.unit ?? '')}</td>
-        <td class="r">${money(item.ratePerUnit)}</td>
-        <td class="r">${money(item.discountAmount)} <span class="pct">(${num(
-          item.discountPct,
-          1,
-        )}%)</span></td>
+        ${showMoney ? `<td class="r">${money(item.ratePerUnit)}</td>` : ''}
+        ${
+          showMoney
+            ? `<td class="r">${money(item.discountAmount)} <span class="pct">(${num(
+                item.discountPct,
+                1,
+              )}%)</span></td>`
+            : ''
+        }
         ${
           showTax
             ? `<td class="r">${money(item.taxAmount)} <span class="pct">(${num(
@@ -82,7 +98,7 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
               )}%)</span></td>`
             : ''
         }
-        <td class="r"><strong>${money(item.amount)}</strong></td>
+        ${showMoney ? `<td class="r"><strong>${money(item.amount)}</strong></td>` : ''}
       </tr>`,
     )
     .join('');
@@ -280,28 +296,36 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
         ${showTax ? '<th style="width:10%">HSN/ SAC</th>' : ''}
         <th style="width:9%">Quantity</th>
         <th style="width:7%">Unit</th>
-        <th style="width:11%">Price/ Unit</th>
-        <th style="width:12%">Discount</th>
+        ${showMoney ? '<th style="width:11%">Price/ Unit</th>' : ''}
+        ${showMoney ? '<th style="width:12%">Discount</th>' : ''}
         ${showTax ? '<th style="width:12%">GST</th>' : ''}
-        <th style="width:${showTax ? 15 : 18}%">Amount</th>
+        ${showMoney ? `<th style="width:${showTax ? 15 : 18}%">Amount</th>` : ''}
       </tr></thead>
       <tbody>
         ${rows}
-        <tr class="total">
-          <td></td><td>Total</td>${showTax ? '<td></td>' : ''}
-          <td class="r">${num(totalQty, 0)}</td>
-          <td></td><td></td>
-          <td class="r">${money(estimate.discount)}</td>
-          ${showTax ? `<td class="r">${money(estimate.taxAmount)}</td>` : ''}
-          <td class="r">${money(showTax ? estimate.grandTotal : estimate.total)}</td>
-        </tr>
+        ${
+          showMoney
+            ? `<tr class="total">
+                 <td></td><td>Total</td>${showTax ? '<td></td>' : ''}
+                 <td class="r">${qty(totalQty)}</td>
+                 <td></td><td></td>
+                 <td class="r">${money(estimate.discount)}</td>
+                 ${showTax ? `<td class="r">${money(estimate.taxAmount)}</td>` : ''}
+                 <td class="r">${money(showTax ? estimate.grandTotal : estimate.total)}</td>
+               </tr>`
+            : ''
+        }
       </tbody>
     </table>
 
     <div class="lower">
       <div class="left">
-        <h3>${esc(input.docType)} Amount In Words</h3>
-        <div class="words">${esc(input.amountInWords)}</div>
+        ${
+          showMoney
+            ? `<h3>${esc(input.docType)} Amount In Words</h3>
+               <div class="words">${esc(input.amountInWords)}</div>`
+            : ''
+        }
         ${termLines ? `<h3>Terms And Conditions</h3><div class="terms">${termLines}</div>` : ''}
         ${bank ? `<div class="bank"><strong>Bank Details:</strong>${bank}</div>` : ''}
         <div class="sign">
@@ -310,7 +334,7 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
         </div>
       </div>
       <div class="right">
-        <table class="sums">
+        ${showMoney ? `<table class="sums">
           <tr><td>Sub Total</td><td class="r">${money(estimate.subtotal)}</td></tr>
           ${
             Number(estimate.discount) > 0
@@ -326,7 +350,7 @@ export function renderPricedDocumentHtml(input: PricedDocumentInput): string {
               ? `<tr><td>You Saved</td><td class="r">${money(estimate.savedAmount)}</td></tr>`
               : ''
           }
-        </table>
+        </table>` : ''}
       </div>
     </div>
   </div>
@@ -355,6 +379,18 @@ function money(value: unknown): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+/**
+ * A quantity, or nothing where nobody counted.
+ *
+ * Zero prints blank rather than "0": on an enquiry written as a list of what
+ * the client asked for, a column of noughts reads as "none of these", which
+ * is the opposite of what it means.
+ */
+function qty(value: unknown): string {
+  const amount = Number(value ?? 0);
+  return amount > 0 ? amount.toFixed(0) : '';
 }
 
 function num(value: unknown, decimals: number): string {

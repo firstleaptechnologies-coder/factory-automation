@@ -165,7 +165,11 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
         </View>
         {data.contactPhone ? <Row label="Phone" value={data.contactPhone} /> : null}
         {data.company ? <Row label="Company" value={data.company} /> : null}
-        {data.location ? <Row label="Location" value={data.location} /> : null}
+        {data.location ? <Row label="Site" value={data.location} /> : null}
+        {/* Shown because it was asked for on the call: an address somebody
+            typed and can never read back is an address they type again. */}
+        {data.billingAddress ? <Row label="Billing" value={data.billingAddress} /> : null}
+        {data.shippingAddress ? <Row label="Shipping" value={data.shippingAddress} /> : null}
         {data.owner ? <Row label="Owner" value={data.owner.name} /> : null}
       </Card>
 

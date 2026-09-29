@@ -201,6 +201,12 @@ function LeadDetail({ leadId }: { leadId: string }) {
           {data.contactPhone ? <Row label="Phone" value={data.contactPhone} /> : null}
           {data.company ? <Row label="Company" value={data.company} /> : null}
           {data.location ? <Row label="Site" value={data.location} /> : null}
+          {/* Asked for on the call, so it is readable back — an address
+              somebody types and never sees again is one they type twice. */}
+          {data.billingAddress ? <Row label="Billing" value={data.billingAddress} /> : null}
+          {data.shippingAddress ? (
+            <Row label="Shipping" value={data.shippingAddress} />
+          ) : null}
           {data.owner ? <Row label="Owner" value={data.owner.name} /> : null}
           {data.client ? (
             <Button

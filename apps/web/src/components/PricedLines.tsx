@@ -167,6 +167,11 @@ export function PricePreview({
     [lines, slabs, defaultSlabId, treatment],
   );
 
+  // On an enquiry, plenty of lines are a name with no rate, and a summary
+  // reading "Total ₹0" says the job is worth nothing rather than that nothing
+  // has been priced. It waits until there is a figure to show.
+  if (!tax && preview.gross <= 0) return null;
+
   return (
     <>
       <SectionHead title="Preview" />
