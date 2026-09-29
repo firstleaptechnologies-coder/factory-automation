@@ -427,6 +427,20 @@ describe('an enquiry that was priced', () => {
     expect(screen.queryByTestId('preview-button')).toBeNull();
   });
 
+  it('offers to price an enquiry that has no price, because that is the common one', async () => {
+    await mount();
+    await fireEvent.press(await screen.findByTestId('price-button'));
+    expect(navigate).toHaveBeenCalledWith('LeadPrice', { leadId: 'l1' });
+  });
+
+  it('lets a price be corrected, rather than making it a one-shot entry', async () => {
+    await mount(PRICED);
+    await fireEvent.press(await screen.findByTestId('edit-pricing-button'));
+    expect(navigate).toHaveBeenCalledWith('LeadPrice', { leadId: 'l1' });
+    // And does not offer to price it a second time from scratch.
+    expect(screen.queryByTestId('price-button')).toBeNull();
+  });
+
   it('hands the pricing to the quote rather than making somebody type it again', async () => {
     mockPermissions = [PERMISSIONS.ESTIMATE_MANAGE];
     await mount(PRICED);

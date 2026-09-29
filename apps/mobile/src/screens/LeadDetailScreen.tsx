@@ -177,6 +177,13 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
         <Card tone="dark" style={styles.block}>
           <View style={styles.pricedHead}>
             <Text variant="label" tone="muted">Priced</Text>
+            <View style={styles.pricedActions}>
+              <Chip
+                icon="edit"
+                label="Edit"
+                testID="edit-pricing-button"
+                onPress={() => navigation.navigate('LeadPrice', { leadId })}
+              />
             <Chip
               icon="receipt"
               label="Preview"
@@ -192,6 +199,7 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
                 })
               }
             />
+            </View>
           </View>
           {data.items.map((item) => (
             <View key={item.id} style={styles.lineRow}>
@@ -212,6 +220,22 @@ export function LeadDetailScreen({ route, navigation }: { route: any; navigation
             <Text variant="h3" tone="accent" bold>{formatInr(Number(data.grandTotal))}</Text>
           </View>
         </Card>
+      ) : null}
+
+      {/*
+        An enquiry taken without a price — the common case — still needs a way
+        to acquire one, because the price is usually agreed on the second call
+        rather than the first.
+      */}
+      {!data.items?.length && !data.convertedOrder ? (
+        <Button
+          title="Price this enquiry"
+          variant="dark"
+          testID="price-button"
+          icon={<Icon name="tag" size={17} color={palette.text} />}
+          onPress={() => navigation.navigate('LeadPrice', { leadId })}
+          style={{ marginTop: spacing.md }}
+        />
       ) : null}
 
       {fields.data?.length ? (
@@ -466,6 +490,7 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     paddingVertical: spacing.sm,
   },
+  pricedActions: { flexDirection: 'row', gap: spacing.sm },
   pricedHead: {
     flexDirection: 'row',
     alignItems: 'center',

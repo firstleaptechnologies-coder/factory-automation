@@ -14,6 +14,7 @@ import type {
 import { PERMISSIONS } from '@fas/shared';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { openDocument } from '@/lib/documents';
 import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { useAuth } from '@/lib/auth';
 import { Shell } from '@/components/Shell';
@@ -267,6 +268,73 @@ function LeadDetail({ leadId }: { leadId: string }) {
             />
           ))}
         </Card>
+      ) : null}
+
+      {/*
+        What the enquiry was priced at, if it was — the same lines a quotation
+        carries, because the shop prices the job on the phone and quotes from
+        it afterwards. The printed page is the server's own, the same markup
+        the app previews and turns into a PDF.
+      */}
+      {data.items?.length ? (
+        <>
+          <SectionHead
+            title="Priced"
+            action={
+              <Button
+                title="Open the printed enquiry"
+                icon="clipboard"
+                variant="dark"
+                onClick={() => void openDocument(`/leads/${leadId}/document`)}
+              />
+            }
+          />
+          <Card size="sm" className="scroll-x">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th className="num">Qty</th>
+                  <th className="num">Rate</th>
+                  <th className="num">Discount</th>
+                  <th className="num">GST</th>
+                  <th className="num">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td className="bold">
+                      {item.name}
+                      {item.hsnSac ? (
+                        <div className="t-tiny faint">HSN {item.hsnSac}</div>
+                      ) : null}
+                    </td>
+                    <td className="num muted">
+                      {Number(item.quantity)} {item.unit}
+                    </td>
+                    <td className="num muted">{formatInr(item.ratePerUnit)}</td>
+                    <td className="num muted">
+                      {formatInr(item.discountAmount)}
+                      <div className="t-tiny faint">{Number(item.discountPct)}%</div>
+                    </td>
+                    <td className="num muted">
+                      {formatInr(item.taxAmount)}
+                      <div className="t-tiny faint">{Number(item.gstRatePct)}%</div>
+                    </td>
+                    <td className="num bold">{formatInr(item.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="row-between" style={{ marginTop: 'var(--s-md)' }}>
+              <span className="t-small muted">
+                Taxable {formatInr(Number(data.total))} · GST {formatInr(Number(data.taxAmount))}
+              </span>
+              <span className="t-h2">{formatInr(Number(data.grandTotal))}</span>
+            </div>
+          </Card>
+        </>
       ) : null}
 
       {/* What has been quoted for this enquiry. The pipeline's figure for it

@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import type {
   Estimate,
   EstimateItemInput,
@@ -20,44 +19,22 @@ import {
 } from '../components/ClientPicker';
 import { looksLikeAddress } from '../hooks/useClipboardSuggestion';
 import {
+  PricedLines,
+  blankLine,
+  usableLines,
+  type PricedLine as Line,
+} from '../components/PricedLines';
+import {
   Button,
-  Card,
   Chip,
   Field,
-  Icon,
   Loader,
   Screen,
   ScreenHeader,
-  Sheet,
-  SheetOption,
   Text,
   haptic,
 } from '../ui';
-import { palette, spacing } from '../theme';
-import { formatInr } from '../lib/format';
-
-const UNITS = ['Sqf', 'Sqm', 'Rft', 'Nos', 'Lot'];
-
-const TREATMENTS: { value: TaxTreatment; label: string; blurb: string }[] = [
-  {
-    value: 'EXCLUSIVE',
-    label: 'GST on top',
-    blurb: 'You quote before tax. The client pays your figure plus GST.',
-  },
-  {
-    value: 'INCLUSIVE',
-    label: 'GST included',
-    blurb: 'Your figure is what they pay. The GST is already inside it.',
-  },
-  {
-    value: 'ABSORBED',
-    label: 'GST absorbed',
-    blurb:
-      'For a client who cannot take a GST bill: they pay the figure you quoted and you carry the tax out of it.',
-  },
-];
-
-type Line = EstimateItemInput & { key: string };
+import { spacing } from '../theme';
 
 /**
  * Writing a quotation.
@@ -116,8 +93,6 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
   );
 
   const [contactSheet, setContactSheet] = useState(false);
-  const [slabFor, setSlabFor] = useState<string | null>(null);
-  const [unitFor, setUnitFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   React.useEffect(() => {
@@ -147,41 +122,6 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
   }, [existing.data]);
 
   const defaultSlab = slabs.data?.find((slab) => slab.isDefault) ?? slabs.data?.[0];
-
-  const setLine = (key: string, patch: Partial<Line>) =>
-    setLines((current) =>
-      current.map((line) => (line.key === key ? { ...line, ...patch } : line)),
-    );
-
-  /**
-   * A preview only. The server prices the estimate for real — showing a figure
-   * here that the server then disagrees with would be worse than showing none.
-   */
-  const preview = useMemo(() => {
-    let net = 0;
-    let tax = 0;
-    let discount = 0;
-
-    for (const line of lines) {
-      const slab = slabs.data?.find((s) => s.id === (line.gstSlabId ?? defaultSlab?.id));
-      const rate = slab ? Number(slab.ratePct) : 0;
-      const gross = (line.quantity || 0) * (line.ratePerUnit || 0);
-      const off = (gross * (line.discountPct || 0)) / 100;
-      const afterDiscount = gross - off;
-
-      discount += off;
-      if (treatment === 'EXCLUSIVE') {
-        net += afterDiscount;
-        tax += (afterDiscount * rate) / 100;
-      } else {
-        const lineNet = afterDiscount / (1 + rate / 100);
-        net += lineNet;
-        tax += afterDiscount - lineNet;
-      }
-    }
-
-    return { net, tax, discount, gross: net + tax };
-  }, [lines, slabs.data, defaultSlab, treatment]);
 
   const save = async () => {
     setBusy(true);
@@ -218,7 +158,7 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
 
   if (estimateId && !existing.data) return <Loader label="Loading" />;
 
-  const usable = lines.some((line) => line.name.trim() && line.quantity > 0);
+  const usable = usableLines(lines).length > 0;
 
   return (
     <Screen>
@@ -260,127 +200,14 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
         pasteAccepts={looksLikeAddress}
       />
 
-      <Text variant="label" tone="muted" style={styles.block}>How is GST quoted?</Text>
-      <View style={styles.chipWrap}>
-        {TREATMENTS.map((option) => (
-          <Chip
-            key={option.value}
-            label={option.label}
-            selected={treatment === option.value}
-            onPress={() => setTreatment(option.value)}
-          />
-        ))}
-      </View>
-      <Text variant="tiny" tone="faint" style={styles.blurb}>
-        {TREATMENTS.find((option) => option.value === treatment)?.blurb}
-      </Text>
-
       <Text variant="label" tone="muted" style={styles.block}>Lines</Text>
-      {lines.map((line, index) => {
-        const slab = slabs.data?.find((s) => s.id === (line.gstSlabId ?? defaultSlab?.id));
-        const gross = (line.quantity || 0) * (line.ratePerUnit || 0);
-        const off = (gross * (line.discountPct || 0)) / 100;
-
-        return (
-          <Animated.View key={line.key} entering={FadeIn.duration(200)} layout={Layout}>
-            <Card tone="dark" style={styles.line}>
-              <View style={styles.lineHead}>
-                <Text variant="tiny" tone="faint">LINE {index + 1}</Text>
-                {lines.length > 1 ? (
-                  <Chip
-                    label="Remove"
-                    onPress={() =>
-                      setLines((current) => current.filter((l) => l.key !== line.key))
-                    }
-                  />
-                ) : null}
-              </View>
-
-              <Field
-                placeholder="Hdmr cutting 22mm"
-                value={line.name}
-                onChangeText={(value) => setLine(line.key, { name: value })}
-              />
-
-              <View style={styles.row}>
-                <Field
-                  label="Qty"
-                  value={line.quantity ? String(line.quantity) : ''}
-                  onChangeText={(value) =>
-                    setLine(line.key, { quantity: Number(value) || 0 })
-                  }
-                  keyboardType="decimal-pad"
-                  containerStyle={{ flex: 1 }}
-                  pasteable={false}
-                />
-                <Field
-                  label="Rate"
-                  value={line.ratePerUnit ? String(line.ratePerUnit) : ''}
-                  onChangeText={(value) =>
-                    setLine(line.key, { ratePerUnit: Number(value) || 0 })
-                  }
-                  keyboardType="decimal-pad"
-                  containerStyle={{ flex: 1 }}
-                  pasteable={false}
-                />
-                <Field
-                  label="Disc %"
-                  value={line.discountPct ? String(line.discountPct) : ''}
-                  onChangeText={(value) =>
-                    setLine(line.key, { discountPct: Number(value) || 0 })
-                  }
-                  keyboardType="decimal-pad"
-                  containerStyle={{ flex: 1 }}
-                  pasteable={false}
-                />
-              </View>
-
-              <View style={styles.chipWrap}>
-                <Chip label={line.unit ?? 'Sqf'} onPress={() => setUnitFor(line.key)} />
-                <Chip
-                  label={slab ? `GST ${Number(slab.ratePct)}%` : 'GST'}
-                  onPress={() => setSlabFor(line.key)}
-                />
-                <Chip
-                  label={line.hsnSac ? `HSN ${line.hsnSac}` : '+ HSN/SAC'}
-                  onPress={() =>
-                    Alert.prompt?.('HSN / SAC', 'Optional code for this line', (value) =>
-                      setLine(line.key, { hsnSac: value }),
-                    )
-                  }
-                />
-              </View>
-
-              {gross > 0 ? (
-                <Text variant="tiny" tone="faint" style={{ marginTop: spacing.sm }}>
-                  {formatInr(gross)}
-                  {off > 0 ? ` less ${formatInr(off)} discount` : ''}
-                </Text>
-              ) : null}
-            </Card>
-          </Animated.View>
-        );
-      })}
-
-      <Button
-        title="Add a line"
-        variant="dark"
-        icon={<Icon name="plus" size={16} color={palette.text} />}
-        onPress={() => setLines((current) => [...current, blankLine()])}
+      <PricedLines
+        lines={lines}
+        onChange={setLines}
+        treatment={treatment}
+        onTreatmentChange={setTreatment}
+        slabs={slabs.data ?? undefined}
       />
-
-      <Card tone="dark" style={{ marginTop: spacing.lg }}>
-        <Text variant="label" tone="muted">Preview</Text>
-        <Text variant="tiny" tone="faint" style={{ marginBottom: spacing.sm }}>
-          The server prices it for real when you save.
-        </Text>
-        <Row label="Taxable" value={formatInr(preview.net)} />
-        {preview.discount > 0 ? (
-          <Row label="Discount" value={formatInr(preview.discount)} />
-        ) : null}
-        <Row label="GST" value={formatInr(preview.tax)} />
-        <Row label="Client pays" value={formatInr(preview.gross)} accent />
-      </Card>
 
       <Field
         label="Notes"
@@ -409,73 +236,11 @@ export function EstimateEditScreen({ route, navigation }: { route: any; navigati
         }}
       />
 
-      <Sheet visible={Boolean(unitFor)} title="Unit" onClose={() => setUnitFor(null)}>
-        {UNITS.map((unit) => (
-          <SheetOption
-            key={unit}
-            label={unit}
-            onPress={() => {
-              if (unitFor) setLine(unitFor, { unit });
-              setUnitFor(null);
-            }}
-          />
-        ))}
-      </Sheet>
-
-      <Sheet visible={Boolean(slabFor)} title="GST slab" onClose={() => setSlabFor(null)}>
-        {(slabs.data ?? []).map((slab) => (
-          <SheetOption
-            key={slab.id}
-            label={slab.name}
-            description={`${Number(slab.ratePct)}%`}
-            onPress={() => {
-              if (slabFor) setLine(slabFor, { gstSlabId: slab.id });
-              setSlabFor(null);
-            }}
-          />
-        ))}
-      </Sheet>
     </Screen>
   );
 }
 
-function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <View style={styles.sumRow}>
-      <Text variant="small" tone="muted">{label}</Text>
-      <Text variant={accent ? 'h3' : 'body'} tone={accent ? 'accent' : 'default'} bold>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function blankLine(): Line {
-  return {
-    key: `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    name: '',
-    quantity: 0,
-    unit: 'Sqf',
-    ratePerUnit: 0,
-  };
-}
-
 const styles = StyleSheet.create({
   block: { marginTop: spacing.lg, marginBottom: spacing.sm },
-  blurb: { marginBottom: spacing.md, lineHeight: 16 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-  line: { marginBottom: spacing.md },
-  lineHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  row: { flexDirection: 'row', gap: spacing.sm },
-  sumRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 3,
-  },
 });

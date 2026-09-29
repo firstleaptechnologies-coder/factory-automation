@@ -6,6 +6,7 @@ import type {
   Estimate,
   EstimateItemInput,
   GstSlab,
+  Lead,
   TaxTreatment,
 } from '@fas/shared';
 import { api } from '@/lib/api';
@@ -93,6 +94,19 @@ export function EstimateForm({
   );
   const slabs = useApi<GstSlab[]>(() => api.gstSlabs(), []);
 
+  /*
+   * An enquiry that was already priced hands its lines over whole.
+   *
+   * Fetched rather than carried in the query string: the lines are not
+   * something to pack into a URL, and the point of the enquiry carrying them
+   * is that nobody re-keys a rate the client has already been told. Only for
+   * a new quote — revising an existing one reads its own lines below.
+   */
+  const quotingFor = useApi<Lead | null>(
+    async () => (lead?.id && !estimateId ? api.lead(lead.id) : null),
+    [lead?.id, estimateId],
+  );
+
   const [client, setClient] = useState<ClientChoice>(
     lead?.clientId
       ? pickedClient({ id: lead.clientId, name: lead.clientName ?? '' })
@@ -108,6 +122,25 @@ export function EstimateForm({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const enquiry = quotingFor.data;
+    if (!enquiry?.items?.length) return;
+    setTreatment(enquiry.taxTreatment);
+    setLines(
+      enquiry.items.map((item) => ({
+        key: `lead-${item.id}`,
+        name: item.name,
+        description: item.description ?? undefined,
+        hsnSac: item.hsnSac ?? undefined,
+        quantity: Number(item.quantity),
+        unit: item.unit,
+        ratePerUnit: Number(item.ratePerUnit),
+        discountPct: Number(item.discountPct) || undefined,
+        gstSlabId: item.gstSlabId ?? undefined,
+      })),
+    );
+  }, [quotingFor.data]);
 
   useEffect(() => {
     const data = existing.data;

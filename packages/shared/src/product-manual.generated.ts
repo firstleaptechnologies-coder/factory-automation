@@ -1091,6 +1091,14 @@ export const PRODUCT_MANUAL: ProductManual = {
           "permission": null
         },
         {
+          "key": "lead-price",
+          "label": "Price this enquiry",
+          "blurb": "The lines the job was quoted at, in the shape a quotation takes them — so the quote copies them rather than asking for them again",
+          "web": null,
+          "app": "LeadPrice",
+          "permission": null
+        },
+        {
           "key": "lead-document",
           "label": "Printed enquiry",
           "blurb": "The priced enquiry as the client would receive it, read on the phone before it is sent",
